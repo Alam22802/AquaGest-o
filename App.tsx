@@ -82,7 +82,7 @@ const App: React.FC = () => {
   }, [state, isLoading]);
 
   useEffect(() => {
-    const interval = setInterval(backgroundSync, 60000); 
+    const interval = setInterval(backgroundSync, 30000); 
     return () => clearInterval(interval);
   }, [backgroundSync]);
 
