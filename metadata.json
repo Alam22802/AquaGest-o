@@ -1,0 +1,7 @@
+{
+  "name": "AquaGestão - Piscicultura Inteligente",
+  "description": "Sistema completo para gestão de fazendas de piscicultura, permitindo controle de gaiolas, linhas de produção, alimentação diária e monitoramento de mortalidade com insights inteligentes.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
