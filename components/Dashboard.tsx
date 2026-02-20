@@ -277,7 +277,7 @@ const Dashboard: React.FC<Props> = ({ state }) => {
       "Data": s.date,
       "Lote Abate": s.slaughterBatch,
       "Produtor": s.producer,
-      "GTA (kg)": s.gtaWeight,
+      "Peso Filé Congelado (kg)": s.gtaWeight,
       "Recepção (kg)": s.receptionWeight,
       "Embalado (kg)": s.packedQuantity,
       "Rendimento (%)": s.receptionWeight > 0 ? ((s.packedQuantity / s.receptionWeight) * 100).toFixed(1) : 0,

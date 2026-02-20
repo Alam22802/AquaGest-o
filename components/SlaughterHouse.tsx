@@ -283,7 +283,7 @@ const SlaughterHouse: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                   </div>
                </div>
                <div className="space-y-2 border-l-2 border-white/10 pl-6">
-                  <div className="text-[9px] font-black opacity-40 uppercase tracking-widest">Total GTA</div>
+                  <div className="text-[9px] font-black opacity-40 uppercase tracking-widest">Total Filé Congelado</div>
                   <div className="text-2xl font-black flex items-baseline gap-1">
                      {slaughterStats.totalGta.toLocaleString('pt-BR', { minimumFractionDigits: 0 })}
                      <span className="text-[10px] opacity-40">kg</span>
@@ -418,7 +418,7 @@ const SlaughterHouse: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
           </div>
 
           <div className="space-y-1">
-            <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-widest">Peso GTA (kg)</label>
+            <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-widest">Peso Filé Congelado (kg)</label>
             <div className="relative">
               <Scale className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-300" />
               <input type="number" step="0.01" placeholder="0.00" className="w-full pl-12 pr-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none" value={formData.gtaWeight} onChange={e => setFormData({...formData, gtaWeight: e.target.value})} />
@@ -495,7 +495,7 @@ const SlaughterHouse: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
             <thead className="bg-slate-50 text-[10px] font-black text-slate-400 uppercase tracking-widest">
               <tr>
                 <th className="px-8 py-5">Lote / Produtor</th>
-                <th className="px-8 py-5">Pesos (GTA/Recep)</th>
+                <th className="px-8 py-5">Pesos (Filé/Recep)</th>
                 <th className="px-8 py-5">Horário Abate</th>
                 <th className="px-8 py-5">Embalado (kg)</th>
                 <th className="px-8 py-5">Registrado por</th>
@@ -517,7 +517,7 @@ const SlaughterHouse: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                     <td className="px-8 py-6">
                       <div className="flex flex-col gap-1">
                         <div className="flex items-center gap-2">
-                           <span className="text-[9px] font-black text-slate-400 uppercase w-10">GTA:</span>
+                           <span className="text-[9px] font-black text-slate-400 uppercase w-10">FILÉ:</span>
                            <span className="text-xs font-black text-slate-800">{(log.gtaWeight || 0).toFixed(2)}kg</span>
                         </div>
                         <div className="flex items-center gap-2">
