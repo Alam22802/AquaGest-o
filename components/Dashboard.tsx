@@ -63,12 +63,21 @@ const Dashboard: React.FC<Props> = ({ state }) => {
       let samplingInfo = "Peso Inicial";
 
       if (batchBiometries.length > 0) {
-        const sortedLogsByDate = [...batchBiometries].sort((a, b) => b.date.localeCompare(a.date));
-        const latestSamplingDate = sortedLogsByDate[0].date;
-        const latestSamplingLogs = batchBiometries.filter(b => b.date === latestSamplingDate);
-        const sumWeights = latestSamplingLogs.reduce((acc, b) => acc + b.averageWeight, 0);
-        currentAvgWeight = sumWeights / latestSamplingLogs.length;
-        samplingInfo = `Média de ${latestSamplingLogs.length} gaiolas em ${format(parseISO(latestSamplingDate), 'dd/MM')}`;
+        // Pegar a última biometria de cada gaiola que já foi pesada
+        const latestBiometryPerCage = new Map<string, { date: string, weight: number }>();
+        batchBiometries.forEach(log => {
+          const current = latestBiometryPerCage.get(log.cageId);
+          if (!current || log.date >= current.date) {
+            latestBiometryPerCage.set(log.cageId, { date: log.date, weight: log.averageWeight });
+          }
+        });
+
+        const latestWeights = Array.from(latestBiometryPerCage.values());
+        const sumWeights = latestWeights.reduce((acc, w) => acc + w.weight, 0);
+        currentAvgWeight = sumWeights / latestWeights.length;
+        
+        const latestDate = latestWeights.reduce((max, w) => w.date > max ? w.date : max, latestWeights[0].date);
+        samplingInfo = `Média de ${latestWeights.length} gaiolas (Ref: ${format(parseISO(latestDate), 'dd/MM')})`;
       }
 
       const totalBiomassKg = (currentTotalStock * currentAvgWeight) / 1000;
