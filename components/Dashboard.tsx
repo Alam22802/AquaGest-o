@@ -121,20 +121,26 @@ const Dashboard: React.FC<Props> = ({ state }) => {
     const batch = (state.batches || []).find(b => b.id === selectedBioBatchId);
     if (!batch) return [];
     const cageIds = (state.cages || []).filter(c => c.batchId === selectedBioBatchId).map(c => c.id);
-    const logs = (state.biometryLogs || []).filter(l => cageIds.includes(l.cageId));
+    const logs = (state.biometryLogs || []).filter(l => cageIds.includes(l.cageId)).sort((a, b) => a.date.localeCompare(b.date));
     
-    const grouped = logs.reduce((acc: any, log) => {
-      if (!acc[log.date]) acc[log.date] = { sum: 0, count: 0 };
-      acc[log.date].sum += log.averageWeight;
-      acc[log.date].count += 1;
-      return acc;
-    }, {});
+    const uniqueDates = Array.from(new Set(logs.map(l => l.date))).sort();
+    const latestWeights = new Map<string, number>();
     
-    const data = Object.keys(grouped).map(date => ({ 
-      date: format(new Date(date + 'T12:00:00'), 'dd/MM'), 
-      fullDate: date, 
-      weight: Math.round(grouped[date].sum / grouped[date].count) 
-    })).sort((a, b) => a.fullDate.localeCompare(b.fullDate));
+    const data = uniqueDates.map(currentDate => {
+      // Atualizar pesos das gaiolas que tiveram biometria nesta data
+      logs.filter(l => l.date === currentDate).forEach(l => {
+        latestWeights.set(l.cageId, l.averageWeight);
+      });
+      
+      const weights = Array.from(latestWeights.values());
+      const avgWeight = weights.length > 0 ? weights.reduce((a, b) => a + b, 0) / weights.length : batch.initialUnitWeight;
+
+      return {
+        date: format(new Date(currentDate + 'T12:00:00'), 'dd/MM'),
+        fullDate: currentDate,
+        weight: Math.round(avgWeight)
+      };
+    });
     
     return [{ date: 'Início', weight: batch.initialUnitWeight }, ...data];
   }, [state.biometryLogs, state.batches, state.cages, selectedBioBatchId]);
