@@ -13,8 +13,19 @@ interface Props {
   onUpdate: (newState: AppState) => void;
 }
 
-const CloudSettings: React.FC<Props> = ({ state, onUpdate }) => {
+const CloudSettings: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
   const [isSyncing, setIsSyncing] = useState(false);
+
+  if (!currentUser.isMaster) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 text-center space-y-4">
+        <Cloud className="w-16 h-16 text-slate-200" />
+        <h3 className="text-xl font-black text-slate-400 uppercase tracking-widest italic">Acesso Restrito</h3>
+        <p className="text-slate-400 font-bold uppercase text-xs max-w-md">Apenas o administrador mestre tem permissão para configurar a sincronização em nuvem.</p>
+      </div>
+    );
+  }
+
   const [isTesting, setIsTesting] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<'none' | 'success' | 'error'>('none');
   const [errorMessage, setErrorMessage] = useState('');

@@ -19,7 +19,9 @@ import SlaughterHouse from './components/SlaughterHouse.tsx';
 import Login from './components/Login.tsx';
 import { loadState, saveState, getSession, saveSession, ensureStateIntegrity, fetchRemoteState } from './store.ts';
 import { AppState, User } from './types.ts';
-import { Loader2, RefreshCw } from 'lucide-react';
+import { Loader2, RefreshCw, AlertTriangle, X } from 'lucide-react';
+
+import { checkAndTriggerAlerts } from './src/services/alertService.ts';
 
 const App: React.FC = () => {
   const [state, setState] = useState<AppState | null>(null);
@@ -27,6 +29,8 @@ const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSyncingBackground, setIsSyncingBackground] = useState(false);
+  const [lastAlertCheck, setLastAlertCheck] = useState(0);
+  const [activeAlert, setActiveAlert] = useState<{title: string, message: string} | null>(null);
   
   const isSavingRef = useRef(false);
 
@@ -78,8 +82,19 @@ const App: React.FC = () => {
       saveState(state).finally(() => {
         isSavingRef.current = false;
       });
+
+      // Verificar alertas a cada 5 minutos ou quando o estado mudar significativamente
+      const now = Date.now();
+      if (now - lastAlertCheck > 300000) { // 5 minutos
+        const alert = checkAndTriggerAlerts(state);
+        if (alert) {
+          setActiveAlert(alert);
+          setTimeout(() => setActiveAlert(null), 10000);
+        }
+        setLastAlertCheck(now);
+      }
     }
-  }, [state, isLoading]);
+  }, [state, isLoading, lastAlertCheck]);
 
   useEffect(() => {
     const interval = setInterval(backgroundSync, 30000); 
@@ -164,19 +179,19 @@ const App: React.FC = () => {
     switch (activeTab) {
       case 'dashboard': return <Dashboard state={state} />;
       case 'water': return <WaterQuality state={state} onUpdate={handleStateUpdate} currentUser={currentUser} />;
-      case 'inventory': return <CageInventory state={state} onUpdate={handleStateUpdate} />;
-      case 'maintenance': return <Maintenance state={state} onUpdate={handleStateUpdate} />;
-      case 'protocols': return <ProtocolManagement state={state} onUpdate={handleStateUpdate} />;
+      case 'inventory': return <CageInventory state={state} onUpdate={handleStateUpdate} currentUser={currentUser} />;
+      case 'maintenance': return <Maintenance state={state} onUpdate={handleStateUpdate} currentUser={currentUser} />;
+      case 'protocols': return <ProtocolManagement state={state} onUpdate={handleStateUpdate} currentUser={currentUser} />;
       case 'batches': return <BatchManagement state={state} onUpdate={handleStateUpdate} currentUser={currentUser} />;
       case 'lines': return <LineManagement state={state} onUpdate={handleStateUpdate} currentUser={currentUser} />;
       case 'cages': return <CageManagement state={state} onUpdate={handleStateUpdate} currentUser={currentUser} />;
-      case 'feed': return <FeedManagement state={state} onUpdate={handleStateUpdate} />;
+      case 'feed': return <FeedManagement state={state} onUpdate={handleStateUpdate} currentUser={currentUser} />;
       case 'feeding': return <FeedingLog state={state} onUpdate={handleStateUpdate} currentUser={currentUser} />;
       case 'biometry': return <BiometryLog state={state} onUpdate={handleStateUpdate} currentUser={currentUser} />;
       case 'mortality': return <MortalityLog state={state} onUpdate={handleStateUpdate} currentUser={currentUser} />;
       case 'slaughter': return <SlaughterHouse state={state} onUpdate={handleStateUpdate} currentUser={currentUser} />;
-      case 'users': return <UserManagement state={state} onUpdate={handleStateUpdate} />;
-      case 'cloud': return <CloudSettings state={state} onUpdate={handleStateUpdate} />;
+      case 'users': return <UserManagement state={state} onUpdate={handleStateUpdate} currentUser={currentUser} />;
+      case 'cloud': return <CloudSettings state={state} onUpdate={handleStateUpdate} currentUser={currentUser} />;
       default: return <Dashboard state={state} />;
     }
   };
@@ -196,6 +211,20 @@ const App: React.FC = () => {
         <div className="fixed top-2 left-1/2 -translate-x-1/2 z-[100] bg-white/80 backdrop-blur px-3 py-1 rounded-full shadow-sm border border-blue-100 flex items-center gap-2 pointer-events-none">
           <RefreshCw className="w-3 h-3 text-blue-500 animate-spin" />
           <span className="text-[9px] font-black text-blue-600 uppercase tracking-widest">Sincronizando Nuvem...</span>
+        </div>
+      )}
+      {activeAlert && (
+        <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-[100] bg-red-600 text-white px-6 py-4 rounded-3xl shadow-2xl border border-red-500 flex items-start gap-4 animate-in slide-in-from-bottom-10 duration-500 max-w-md w-[90%]">
+          <div className="p-2 bg-white/20 rounded-xl">
+            <AlertTriangle className="w-6 h-6" />
+          </div>
+          <div className="flex-1">
+            <h4 className="text-sm font-black uppercase tracking-tighter italic">{activeAlert.title}</h4>
+            <p className="text-[10px] font-bold opacity-90 uppercase leading-relaxed mt-1">{activeAlert.message}</p>
+          </div>
+          <button onClick={() => setActiveAlert(null)} className="p-1 hover:bg-white/10 rounded-lg transition-colors">
+            <X className="w-4 h-4" />
+          </button>
         </div>
       )}
       {!currentUser ? (

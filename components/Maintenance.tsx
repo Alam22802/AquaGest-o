@@ -9,7 +9,9 @@ interface Props {
   onUpdate: (newState: AppState) => void;
 }
 
-const Maintenance: React.FC<Props> = ({ state, onUpdate }) => {
+const Maintenance: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
+  const hasPermission = currentUser.isMaster || currentUser.canEdit;
+
   const [formData, setFormData] = useState({
     cageId: '',
     status: 'Manutenção' as CageStatus,
@@ -19,6 +21,7 @@ const Maintenance: React.FC<Props> = ({ state, onUpdate }) => {
 
   const handleUpdateStatus = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!hasPermission) return;
     if (!formData.cageId) return;
 
     const updatedCages = state.cages.map(c => {
@@ -59,57 +62,65 @@ const Maintenance: React.FC<Props> = ({ state, onUpdate }) => {
 
   return (
     <div className="space-y-8 pb-20">
-      <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200 max-w-xl mx-auto">
-        <h3 className="text-lg font-black text-slate-800 mb-6 flex items-center gap-2 uppercase tracking-tighter">
-          <Settings className="w-5 h-5 text-red-500" />
-          Gerenciar Status da Gaiola
-        </h3>
-        
-        <form onSubmit={handleUpdateStatus} className="space-y-4">
-          <div>
-            <label className="block text-xs font-black text-slate-400 uppercase mb-1">Escolher Gaiola</label>
-            <select required className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-red-500 font-bold" value={formData.cageId} onChange={(e) => setFormData({...formData, cageId: e.target.value})}>
-              <option value="">Selecione...</option>
-              {state.cages.map(c => (
-                <option key={c.id} value={c.id}>{c.name} ({c.status})</option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-xs font-black text-slate-400 uppercase mb-1">Novo Momento/Status</label>
-            <div className="grid grid-cols-2 gap-2">
-              {['Disponível', 'Manutenção', 'Limpeza'].map((s) => (
-                <button
-                  key={s}
-                  type="button"
-                  onClick={() => setFormData({...formData, status: s as CageStatus})}
-                  className={`px-4 py-3 rounded-xl border text-xs font-black uppercase tracking-widest transition-all ${formData.status === s ? 'bg-red-600 text-white border-red-600 shadow-lg shadow-red-500/20' : 'bg-white text-slate-400 border-slate-200 hover:border-red-200'}`}
-                >
-                  {s}
-                </button>
-              ))}
+      {hasPermission ? (
+        <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200 max-w-xl mx-auto">
+          <h3 className="text-lg font-black text-slate-800 mb-6 flex items-center gap-2 uppercase tracking-tighter">
+            <Settings className="w-5 h-5 text-red-500" />
+            Gerenciar Status da Gaiola
+          </h3>
+          
+          <form onSubmit={handleUpdateStatus} className="space-y-4">
+            <div>
+              <label className="block text-xs font-black text-slate-400 uppercase mb-1">Escolher Gaiola</label>
+              <select required className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-red-500 font-bold" value={formData.cageId} onChange={(e) => setFormData({...formData, cageId: e.target.value})}>
+                <option value="">Selecione...</option>
+                {state.cages.map(c => (
+                  <option key={c.id} value={c.id}>{c.name} ({c.status})</option>
+                ))}
+              </select>
             </div>
-          </div>
 
-          {(formData.status === 'Manutenção' || formData.status === 'Limpeza') && (
-            <div className="grid grid-cols-2 gap-3 animate-in fade-in slide-in-from-top-2 duration-300">
-              <div>
-                <label className="block text-xs font-black text-slate-400 uppercase mb-1">Data de Entrada</label>
-                <input type="date" required className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none font-bold" value={formData.startDate} onChange={(e) => setFormData({...formData, startDate: e.target.value})} />
-              </div>
-              <div>
-                <label className="block text-xs font-black text-slate-400 uppercase mb-1">Previsão de Retorno</label>
-                <input type="date" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none font-bold" value={formData.endDate} onChange={(e) => setFormData({...formData, endDate: e.target.value})} />
+            <div>
+              <label className="block text-xs font-black text-slate-400 uppercase mb-1">Novo Momento/Status</label>
+              <div className="grid grid-cols-2 gap-2">
+                {['Disponível', 'Manutenção', 'Limpeza'].map((s) => (
+                  <button
+                    key={s}
+                    type="button"
+                    onClick={() => setFormData({...formData, status: s as CageStatus})}
+                    className={`px-4 py-3 rounded-xl border text-xs font-black uppercase tracking-widest transition-all ${formData.status === s ? 'bg-red-600 text-white border-red-600 shadow-lg shadow-red-500/20' : 'bg-white text-slate-400 border-slate-200 hover:border-red-200'}`}
+                  >
+                    {s}
+                  </button>
+                ))}
               </div>
             </div>
-          )}
 
-          <button type="submit" className="w-full py-4 bg-slate-900 text-white rounded-2xl font-black uppercase tracking-widest text-xs shadow-xl active:scale-95 transition-all mt-4">
-            Atualizar Status da Gaiola
-          </button>
-        </form>
-      </div>
+            {(formData.status === 'Manutenção' || formData.status === 'Limpeza') && (
+              <div className="grid grid-cols-2 gap-3 animate-in fade-in slide-in-from-top-2 duration-300">
+                <div>
+                  <label className="block text-xs font-black text-slate-400 uppercase mb-1">Data de Entrada</label>
+                  <input type="date" required className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none font-bold" value={formData.startDate} onChange={(e) => setFormData({...formData, startDate: e.target.value})} />
+                </div>
+                <div>
+                  <label className="block text-xs font-black text-slate-400 uppercase mb-1">Previsão de Retorno</label>
+                  <input type="date" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none font-bold" value={formData.endDate} onChange={(e) => setFormData({...formData, endDate: e.target.value})} />
+                </div>
+              </div>
+            )}
+
+            <button type="submit" className="w-full py-4 bg-slate-900 text-white rounded-2xl font-black uppercase tracking-widest text-xs shadow-xl active:scale-95 transition-all mt-4">
+              Atualizar Status da Gaiola
+            </button>
+          </form>
+        </div>
+      ) : (
+        <div className="bg-slate-100 p-12 rounded-3xl border border-dashed border-slate-300 flex flex-col items-center gap-4 text-center max-w-xl mx-auto">
+          <Settings className="w-12 h-12 text-slate-300" />
+          <h4 className="text-sm font-black uppercase tracking-widest text-slate-400">Modo Leitura Ativo</h4>
+          <p className="text-xs font-bold text-slate-400 uppercase">Você não possui permissão para gerenciar o status das gaiolas.</p>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {state.cages.map(cage => (

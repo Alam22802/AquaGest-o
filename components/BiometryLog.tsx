@@ -15,6 +15,8 @@ const BiometryLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
   
+  const hasPermission = currentUser.isMaster || currentUser.canEdit;
+
   const [formData, setFormData] = useState({
     cageId: '',
     averageWeight: '',
@@ -35,6 +37,7 @@ const BiometryLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!hasPermission) return;
     if (!formData.cageId || !formData.averageWeight) return;
 
     if (editingId) {
@@ -64,6 +67,7 @@ const BiometryLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
   };
 
   const startEdit = (log: IBiometryLog) => {
+    if (!hasPermission) return;
     const cage = state.cages.find(c => c.id === log.cageId);
     if (cage) setSelectedLineId(cage.lineId || '');
     setEditingId(log.id);
@@ -71,6 +75,7 @@ const BiometryLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
   };
 
   const removeLog = (id: string) => {
+    if (!hasPermission) return;
     if (!confirm('Excluir esta pesagem?')) return;
     onUpdate({ ...state, biometryLogs: state.biometryLogs.filter(b => b.id !== id) });
   };
@@ -78,30 +83,38 @@ const BiometryLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
       <div className="lg:col-span-1">
-        <div className={`bg-white p-6 rounded-3xl border transition-all ${editingId ? 'border-amber-200 ring-4 ring-amber-50 shadow-sm' : 'border-slate-200 shadow-sm'}`}>
-          <h3 className="text-lg font-black text-slate-800 mb-6 flex items-center justify-between uppercase tracking-tighter italic">
-            <div className="flex items-center gap-2">
-              <Scale className={`w-5 h-5 ${editingId ? 'text-amber-500' : 'text-blue-500'}`} />
-              {editingId ? 'Editar Pesagem' : 'Registrar Pesagem'}
-            </div>
-            {editingId && <button onClick={resetForm}><X className="w-5 h-5 text-slate-400" /></button>}
-          </h3>
-          <form onSubmit={handleSave} className="space-y-4">
-            <select required className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none" value={selectedLineId} onChange={e => setSelectedLineId(e.target.value)}>
-              <option value="">Linha...</option>
-              {state.lines.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
-            </select>
-            <select required disabled={!selectedLineId} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none" value={formData.cageId} onChange={e => setFormData({...formData, cageId: e.target.value})}>
-              <option value="">Gaiola...</option>
-              {state.cages.filter(c => c.lineId === selectedLineId).map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
-            <input type="number" required placeholder="Peso Médio (g)" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none" value={formData.averageWeight} onChange={e => setFormData({...formData, averageWeight: e.target.value})} />
-            <input type="date" required className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none" value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} />
-            <button type="submit" className={`w-full py-4 rounded-2xl font-black uppercase tracking-widest text-xs text-white shadow-xl transition-all active:scale-95 ${editingId ? 'bg-amber-600 shadow-amber-600/20' : 'bg-blue-600 shadow-blue-600/20'}`}>
-              {editingId ? 'Salvar Edição' : 'Registrar Biometria'}
-            </button>
-          </form>
-        </div>
+        {hasPermission ? (
+          <div className={`bg-white p-6 rounded-3xl border transition-all ${editingId ? 'border-amber-200 ring-4 ring-amber-50 shadow-sm' : 'border-slate-200 shadow-sm'}`}>
+            <h3 className="text-lg font-black text-slate-800 mb-6 flex items-center justify-between uppercase tracking-tighter italic">
+              <div className="flex items-center gap-2">
+                <Scale className={`w-5 h-5 ${editingId ? 'text-amber-500' : 'text-blue-500'}`} />
+                {editingId ? 'Editar Pesagem' : 'Registrar Pesagem'}
+              </div>
+              {editingId && <button onClick={resetForm}><X className="w-5 h-5 text-slate-400" /></button>}
+            </h3>
+            <form onSubmit={handleSave} className="space-y-4">
+              <select required className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none" value={selectedLineId} onChange={e => setSelectedLineId(e.target.value)}>
+                <option value="">Linha...</option>
+                {state.lines.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
+              </select>
+              <select required disabled={!selectedLineId} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none" value={formData.cageId} onChange={e => setFormData({...formData, cageId: e.target.value})}>
+                <option value="">Gaiola...</option>
+                {state.cages.filter(c => c.lineId === selectedLineId).map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+              <input type="number" required placeholder="Peso Médio (g)" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none" value={formData.averageWeight} onChange={e => setFormData({...formData, averageWeight: e.target.value})} />
+              <input type="date" required className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none" value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} />
+              <button type="submit" className={`w-full py-4 rounded-2xl font-black uppercase tracking-widest text-xs text-white shadow-xl transition-all active:scale-95 ${editingId ? 'bg-amber-600 shadow-amber-600/20' : 'bg-blue-600 shadow-blue-600/20'}`}>
+                {editingId ? 'Salvar Edição' : 'Registrar Biometria'}
+              </button>
+            </form>
+          </div>
+        ) : (
+          <div className="bg-slate-100 p-8 rounded-3xl border border-dashed border-slate-300 flex flex-col items-center gap-4 text-center">
+            <Scale className="w-10 h-10 text-slate-300" />
+            <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Modo Leitura Ativo</h4>
+            <p className="text-[9px] font-bold text-slate-400 uppercase leading-relaxed">Você não possui permissão para registrar biometrias.</p>
+          </div>
+        )}
       </div>
 
       <div className="lg:col-span-2 space-y-4">
@@ -119,7 +132,7 @@ const BiometryLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                 <th className="px-6 py-4">Data</th>
                 <th className="px-6 py-4">Peso (g)</th>
                 <th className="px-6 py-4">Lançado por</th>
-                <th className="px-6 py-4 text-center">Ações</th>
+                {hasPermission && <th className="px-6 py-4 text-center">Ações</th>}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -134,12 +147,14 @@ const BiometryLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                     </td>
                     <td className="px-6 py-4 font-black text-blue-600">{log.averageWeight}g</td>
                     <td className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase">@{user?.username || '---'}</td>
-                    <td className="px-6 py-4 text-center">
-                      <div className="flex justify-center gap-2">
-                        <button onClick={() => startEdit(log)} className="p-2 text-slate-300 hover:text-amber-500 transition-colors"><Edit3 className="w-4 h-4" /></button>
-                        <button onClick={() => removeLog(log.id)} className="p-2 text-slate-300 hover:text-red-500 transition-colors"><Trash2 className="w-4 h-4" /></button>
-                      </div>
-                    </td>
+                    {hasPermission && (
+                      <td className="px-6 py-4 text-center">
+                        <div className="flex justify-center gap-2">
+                          <button onClick={() => startEdit(log)} className="p-2 text-slate-300 hover:text-amber-500 transition-colors"><Edit3 className="w-4 h-4" /></button>
+                          <button onClick={() => removeLog(log.id)} className="p-2 text-slate-300 hover:text-red-500 transition-colors"><Trash2 className="w-4 h-4" /></button>
+                        </div>
+                      </td>
+                    )}
                   </tr>
                 );
               })}

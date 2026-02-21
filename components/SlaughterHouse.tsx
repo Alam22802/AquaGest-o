@@ -90,9 +90,11 @@ const SlaughterHouse: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     }).filter(d => d.recep > 0); 
   }, [state.slaughterLogs, chartMonth, chartYear]);
 
+  const hasPermission = currentUser.isMaster || currentUser.canEdit;
+
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
-    
+    if (!hasPermission) return;
     if (!formData.producer.trim()) {
       alert('Por favor, informe o nome do Produtor.');
       return;
@@ -171,6 +173,7 @@ const SlaughterHouse: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
   };
 
   const startEdit = (log: SlaughterLog) => {
+    if (!hasPermission) return;
     setEditingId(log.id);
     setFormData({
       producer: log.producer,
@@ -188,6 +191,7 @@ const SlaughterHouse: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
   };
 
   const removeLog = (id: string) => {
+    if (!hasPermission) return;
     if (!confirm('Deseja excluir este registro de frigorífico?')) return;
     onUpdate({ 
       ...state, 
@@ -392,84 +396,92 @@ const SlaughterHouse: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       )}
 
       {/* Formulário de Registro */}
-      <div className={`bg-white p-8 rounded-[2.5rem] shadow-sm border transition-all ${editingId ? 'border-amber-200 ring-4 ring-amber-50' : 'border-slate-200'}`}>
-        <h3 className="text-xl font-black text-slate-800 mb-8 flex items-center justify-between uppercase tracking-tighter italic">
-          <div className="flex items-center gap-3">
-            <Factory className={`w-6 h-6 ${editingId ? 'text-amber-500' : 'text-slate-900'}`} />
-            {editingId ? 'Editar Registro de Abate' : 'Novo Registro - Frigorífico'}
-          </div>
-          {editingId && <button onClick={resetForm} className="p-2 bg-slate-100 rounded-full hover:bg-slate-200"><X className="w-5 h-5 text-slate-400" /></button>}
-        </h3>
-
-        <form onSubmit={handleSave} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          <div className="space-y-1 group">
-            <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-widest">Produtor *</label>
-            <input type="text" required placeholder="Nome do produtor" className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none focus:ring-2 focus:ring-slate-900/10 transition-all" value={formData.producer} onChange={e => setFormData({...formData, producer: e.target.value})} />
-          </div>
-
-          <div className="space-y-1">
-            <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-widest">Data do Abate</label>
-            <input type="date" required className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none" value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} />
-          </div>
-
-          <div className="space-y-1">
-            <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-widest">Lote Abate *</label>
-            <input type="text" required placeholder="Identificação do lote" className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none" value={formData.slaughterBatch} onChange={e => setFormData({...formData, slaughterBatch: e.target.value})} />
-          </div>
-
-          <div className="space-y-1">
-            <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-widest">Peso Filé Congelado (kg)</label>
-            <div className="relative">
-              <Scale className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-300" />
-              <input type="number" step="0.01" placeholder="0.00" className="w-full pl-12 pr-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none" value={formData.gtaWeight} onChange={e => setFormData({...formData, gtaWeight: e.target.value})} />
+      {hasPermission ? (
+        <div className={`bg-white p-8 rounded-[2.5rem] shadow-sm border transition-all ${editingId ? 'border-amber-200 ring-4 ring-amber-50' : 'border-slate-200'}`}>
+          <h3 className="text-xl font-black text-slate-800 mb-8 flex items-center justify-between uppercase tracking-tighter italic">
+            <div className="flex items-center gap-3">
+              <Factory className={`w-6 h-6 ${editingId ? 'text-amber-500' : 'text-slate-900'}`} />
+              {editingId ? 'Editar Registro de Abate' : 'Novo Registro - Frigorífico'}
             </div>
-          </div>
+            {editingId && <button onClick={resetForm} className="p-2 bg-slate-100 rounded-full hover:bg-slate-200"><X className="w-5 h-5 text-slate-400" /></button>}
+          </h3>
 
-          <div className="space-y-1">
-            <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-widest">Peso Recepção (kg)</label>
-            <div className="relative">
-              <Scale className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-300" />
-              <input type="number" step="0.01" placeholder="0.00" className="w-full pl-12 pr-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none" value={formData.receptionWeight} onChange={e => setFormData({...formData, receptionWeight: e.target.value})} />
+          <form onSubmit={handleSave} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="space-y-1 group">
+              <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-widest">Produtor *</label>
+              <input type="text" required placeholder="Nome do produtor" className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none focus:ring-2 focus:ring-slate-900/10 transition-all" value={formData.producer} onChange={e => setFormData({...formData, producer: e.target.value})} />
             </div>
-          </div>
 
-          <div className="space-y-1">
-            <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-widest">Romaneio (kg)</label>
-            <div className="relative">
-              <Scale className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-300" />
-              <input type="number" step="0.01" placeholder="0.00" className="w-full pl-12 pr-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none" value={formData.packingList} onChange={e => setFormData({...formData, packingList: e.target.value})} />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
-              <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-widest">Início Abate</label>
-              <input type="time" className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none" value={formData.startTime} onChange={e => setFormData({...formData, startTime: e.target.value})} />
+              <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-widest">Data do Abate</label>
+              <input type="date" required className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none" value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} />
             </div>
+
             <div className="space-y-1">
-              <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-widest">Término Abate</label>
-              <input type="time" className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none" value={formData.endTime} onChange={e => setFormData({...formData, endTime: e.target.value})} />
+              <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-widest">Lote Abate *</label>
+              <input type="text" required placeholder="Identificação do lote" className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none" value={formData.slaughterBatch} onChange={e => setFormData({...formData, slaughterBatch: e.target.value})} />
             </div>
-          </div>
 
-          <div className="space-y-1">
-            <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-widest">Embalado (kg)</label>
-            <div className="relative">
-              <Scale className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-300" />
-              <input type="number" step="0.01" placeholder="0.00" className="w-full pl-12 pr-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none" value={formData.packedQuantity} onChange={e => setFormData({...formData, packedQuantity: e.target.value})} />
+            <div className="space-y-1">
+              <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-widest">Peso Filé Congelado (kg)</label>
+              <div className="relative">
+                <Scale className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-300" />
+                <input type="number" step="0.01" placeholder="0.00" className="w-full pl-12 pr-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none" value={formData.gtaWeight} onChange={e => setFormData({...formData, gtaWeight: e.target.value})} />
+              </div>
             </div>
-          </div>
 
-          <div className="space-y-1">
-            <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-widest">Lote Embalagem</label>
-            <input type="text" placeholder="Cód. Embalagem" className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none" value={formData.packagingBatch} onChange={e => setFormData({...formData, packagingBatch: e.target.value})} />
-          </div>
+            <div className="space-y-1">
+              <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-widest">Peso Recepção (kg)</label>
+              <div className="relative">
+                <Scale className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-300" />
+                <input type="number" step="0.01" placeholder="0.00" className="w-full pl-12 pr-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none" value={formData.receptionWeight} onChange={e => setFormData({...formData, receptionWeight: e.target.value})} />
+              </div>
+            </div>
 
-          <button type="submit" className={`md:col-span-2 lg:col-span-3 py-4 rounded-[1.5rem] font-black uppercase tracking-widest text-xs text-white shadow-xl transition-all active:scale-95 mt-4 ${editingId ? 'bg-amber-600 shadow-amber-600/20' : 'bg-[#344434] shadow-slate-900/20 hover:bg-[#2a382a]'}`}>
-            {editingId ? 'Salvar Alterações' : 'Registrar no Frigorífico'}
-          </button>
-        </form>
-      </div>
+            <div className="space-y-1">
+              <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-widest">Romaneio (kg)</label>
+              <div className="relative">
+                <Scale className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-300" />
+                <input type="number" step="0.01" placeholder="0.00" className="w-full pl-12 pr-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none" value={formData.packingList} onChange={e => setFormData({...formData, packingList: e.target.value})} />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-widest">Início Abate</label>
+                <input type="time" className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none" value={formData.startTime} onChange={e => setFormData({...formData, startTime: e.target.value})} />
+              </div>
+              <div className="space-y-1">
+                <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-widest">Término Abate</label>
+                <input type="time" className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none" value={formData.endTime} onChange={e => setFormData({...formData, endTime: e.target.value})} />
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-widest">Embalado (kg)</label>
+              <div className="relative">
+                <Scale className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-300" />
+                <input type="number" step="0.01" placeholder="0.00" className="w-full pl-12 pr-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none" value={formData.packedQuantity} onChange={e => setFormData({...formData, packedQuantity: e.target.value})} />
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-widest">Lote Embalagem</label>
+              <input type="text" placeholder="Cód. Embalagem" className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none" value={formData.packagingBatch} onChange={e => setFormData({...formData, packagingBatch: e.target.value})} />
+            </div>
+
+            <button type="submit" className={`md:col-span-2 lg:col-span-3 py-4 rounded-[1.5rem] font-black uppercase tracking-widest text-xs text-white shadow-xl transition-all active:scale-95 mt-4 ${editingId ? 'bg-amber-600 shadow-amber-600/20' : 'bg-[#344434] shadow-slate-900/20 hover:bg-[#2a382a]'}`}>
+              {editingId ? 'Salvar Alterações' : 'Registrar no Frigorífico'}
+            </button>
+          </form>
+        </div>
+      ) : (
+        <div className="bg-slate-100 p-12 rounded-[2.5rem] border border-dashed border-slate-300 flex flex-col items-center gap-4 text-center">
+          <Factory className="w-12 h-12 text-slate-300" />
+          <h4 className="text-sm font-black uppercase tracking-widest text-slate-400">Modo Leitura Ativo</h4>
+          <p className="text-xs font-bold text-slate-400 uppercase">Você não possui permissão para registrar ou editar dados de abate.</p>
+        </div>
+      )}
 
       {/* Histórico e Filtros da Tabela */}
       <div className="space-y-6">
@@ -499,7 +511,7 @@ const SlaughterHouse: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                 <th className="px-8 py-5">Horário Abate</th>
                 <th className="px-8 py-5">Embalado (kg)</th>
                 <th className="px-8 py-5">Registrado por</th>
-                <th className="px-8 py-5 text-center">Ações</th>
+                {hasPermission && <th className="px-8 py-5 text-center">Ações</th>}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -542,12 +554,14 @@ const SlaughterHouse: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                          <UserIcon className="w-3 h-3" /> @{user?.username || 'desconhecido'}
                       </div>
                     </td>
-                    <td className="px-8 py-6 text-center">
-                      <div className="flex justify-center gap-2">
-                        <button onClick={() => startEdit(log)} className="p-3 text-slate-300 hover:text-amber-500 hover:bg-amber-50 rounded-2xl transition-all"><Edit3 className="w-4 h-4" /></button>
-                        <button onClick={() => removeLog(log.id)} className="p-3 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-2xl transition-all"><Trash2 className="w-4 h-4" /></button>
-                      </div>
-                    </td>
+                    {hasPermission && (
+                      <td className="px-8 py-6 text-center">
+                        <div className="flex justify-center gap-2">
+                          <button onClick={() => startEdit(log)} className="p-3 text-slate-300 hover:text-amber-500 hover:bg-amber-50 rounded-2xl transition-all"><Edit3 className="w-4 h-4" /></button>
+                          <button onClick={() => removeLog(log.id)} className="p-3 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-2xl transition-all"><Trash2 className="w-4 h-4" /></button>
+                        </div>
+                      </td>
+                    )}
                   </tr>
                 );
               })}

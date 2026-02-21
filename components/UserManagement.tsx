@@ -8,8 +8,19 @@ interface Props {
   onUpdate: (newState: AppState) => void;
 }
 
-const UserManagement: React.FC<Props> = ({ state, onUpdate }) => {
+const UserManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
+  
+  if (!currentUser.isMaster) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 text-center space-y-4">
+        <Shield className="w-16 h-16 text-slate-200" />
+        <h3 className="text-xl font-black text-slate-400 uppercase tracking-widest italic">Acesso Restrito</h3>
+        <p className="text-slate-400 font-bold uppercase text-xs max-w-md">Apenas o administrador mestre tem permissão para gerenciar usuários e configurações de alertas.</p>
+      </div>
+    );
+  }
+
   const [formData, setFormData] = useState({
     name: '',
     username: '',

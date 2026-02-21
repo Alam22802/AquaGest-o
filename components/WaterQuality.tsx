@@ -13,6 +13,9 @@ interface Props {
 const WaterQuality: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
+
+  const hasPermission = currentUser.isMaster || currentUser.canEdit;
+
   const [formData, setFormData] = useState({
     date: new Date().toISOString().split('T')[0],
     time: format(new Date(), 'HH:mm'),
@@ -32,6 +35,7 @@ const WaterQuality: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!hasPermission) return;
     if (editingId) {
       onUpdate({
         ...state,
@@ -60,11 +64,13 @@ const WaterQuality: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
   };
 
   const startEdit = (log: WaterLog) => {
+    if (!hasPermission) return;
     setEditingId(log.id);
     setFormData({ date: log.date, time: log.time, temperature: log.temperature.toString(), ph: log.ph.toString(), oxygen: log.oxygen.toString(), transparency: log.transparency.toString() });
   };
 
   const removeLog = (id: string) => {
+    if (!hasPermission) return;
     if (!confirm('Excluir esta medição?')) return;
     onUpdate({ ...state, waterLogs: state.waterLogs.filter(l => l.id !== id) });
   };
@@ -72,30 +78,38 @@ const WaterQuality: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
       <div className="lg:col-span-1">
-        <div className={`bg-white p-6 rounded-3xl border transition-all ${editingId ? 'border-amber-200 ring-4 ring-amber-50 shadow-sm' : 'border-slate-200 shadow-sm'}`}>
-          <h3 className="text-lg font-black text-slate-800 mb-6 flex items-center justify-between uppercase tracking-tighter italic">
-            <div className="flex items-center gap-2">
-              <Droplets className={`w-5 h-5 ${editingId ? 'text-amber-500' : 'text-blue-500'}`} />
-              {editingId ? 'Editar Medição' : 'Registrar Medição'}
-            </div>
-            {editingId && <button onClick={resetForm}><X className="w-5 h-5 text-slate-400" /></button>}
-          </h3>
-          <form onSubmit={handleSave} className="space-y-4">
-            <div className="grid grid-cols-2 gap-3">
-              <input type="date" required className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none" value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} />
-              <input type="time" required className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none" value={formData.time} onChange={e => setFormData({...formData, time: e.target.value})} />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <InputItem label="Temp (°C)" value={formData.temperature} onChange={val => setFormData({...formData, temperature: val})} icon={<Thermometer className="w-3 h-3" />} />
-              <InputItem label="pH" value={formData.ph} onChange={val => setFormData({...formData, ph: val})} icon={<Wind className="w-3 h-3" />} />
-              <InputItem label="O2 (mg/L)" value={formData.oxygen} onChange={val => setFormData({...formData, oxygen: val})} icon={<Wind className="w-3 h-3" />} />
-              <InputItem label="Visib (cm)" value={formData.transparency} onChange={val => setFormData({...formData, transparency: val})} icon={<Droplets className="w-3 h-3" />} />
-            </div>
-            <button type="submit" className={`w-full py-4 rounded-2xl font-black uppercase tracking-widest text-xs text-white shadow-xl transition-all active:scale-95 ${editingId ? 'bg-amber-600 shadow-amber-600/20' : 'bg-blue-600 shadow-blue-600/20'}`}>
-              {editingId ? 'Salvar Edição' : 'Salvar Medição'}
-            </button>
-          </form>
-        </div>
+        {hasPermission ? (
+          <div className={`bg-white p-6 rounded-3xl border transition-all ${editingId ? 'border-amber-200 ring-4 ring-amber-50 shadow-sm' : 'border-slate-200 shadow-sm'}`}>
+            <h3 className="text-lg font-black text-slate-800 mb-6 flex items-center justify-between uppercase tracking-tighter italic">
+              <div className="flex items-center gap-2">
+                <Droplets className={`w-5 h-5 ${editingId ? 'text-amber-500' : 'text-blue-500'}`} />
+                {editingId ? 'Editar Medição' : 'Registrar Medição'}
+              </div>
+              {editingId && <button onClick={resetForm}><X className="w-5 h-5 text-slate-400" /></button>}
+            </h3>
+            <form onSubmit={handleSave} className="space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <input type="date" required className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none" value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} />
+                <input type="time" required className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none" value={formData.time} onChange={e => setFormData({...formData, time: e.target.value})} />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <InputItem label="Temp (°C)" value={formData.temperature} onChange={val => setFormData({...formData, temperature: val})} icon={<Thermometer className="w-3 h-3" />} />
+                <InputItem label="pH" value={formData.ph} onChange={val => setFormData({...formData, ph: val})} icon={<Wind className="w-3 h-3" />} />
+                <InputItem label="O2 (mg/L)" value={formData.oxygen} onChange={val => setFormData({...formData, oxygen: val})} icon={<Wind className="w-3 h-3" />} />
+                <InputItem label="Visib (cm)" value={formData.transparency} onChange={val => setFormData({...formData, transparency: val})} icon={<Droplets className="w-3 h-3" />} />
+              </div>
+              <button type="submit" className={`w-full py-4 rounded-2xl font-black uppercase tracking-widest text-xs text-white shadow-xl transition-all active:scale-95 ${editingId ? 'bg-amber-600 shadow-amber-600/20' : 'bg-blue-600 shadow-blue-600/20'}`}>
+                {editingId ? 'Salvar Edição' : 'Salvar Medição'}
+              </button>
+            </form>
+          </div>
+        ) : (
+          <div className="bg-slate-100 p-8 rounded-3xl border border-dashed border-slate-300 flex flex-col items-center gap-4 text-center">
+            <Droplets className="w-10 h-10 text-slate-300" />
+            <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Modo Leitura Ativo</h4>
+            <p className="text-[9px] font-bold text-slate-400 uppercase leading-relaxed">Você não possui permissão para registrar medições de água.</p>
+          </div>
+        )}
       </div>
 
       <div className="lg:col-span-2 space-y-4">
@@ -122,10 +136,12 @@ const WaterQuality: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                     <LogStat label="Lançado por" value={`@${user?.username || '---'}`} />
                   </div>
                 </div>
-                <div className="flex gap-2">
-                  <button onClick={() => startEdit(log)} className="p-2 text-slate-300 hover:text-amber-500 transition-colors"><Edit3 className="w-4 h-4" /></button>
-                  <button onClick={() => removeLog(log.id)} className="p-2 text-slate-300 hover:text-red-500 transition-colors"><Trash2 className="w-4 h-4" /></button>
-                </div>
+                {hasPermission && (
+                  <div className="flex gap-2">
+                    <button onClick={() => startEdit(log)} className="p-2 text-slate-300 hover:text-amber-500 transition-colors"><Edit3 className="w-4 h-4" /></button>
+                    <button onClick={() => removeLog(log.id)} className="p-2 text-slate-300 hover:text-red-500 transition-colors"><Trash2 className="w-4 h-4" /></button>
+                  </div>
+                )}
               </div>
             );
           })}
