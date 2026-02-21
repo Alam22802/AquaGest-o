@@ -217,24 +217,48 @@ export const loadState = async (): Promise<AppState> => {
   return state;
 };
 
-export const saveState = async (state: AppState): Promise<void> => {
+export const saveState = async (state: AppState, userConfig?: {url: string, key: string}): Promise<void> => {
   const integrityState = ensureStateIntegrity(state);
   localStorage.setItem(STORAGE_KEY, JSON.stringify(integrityState));
   
-  if (integrityState.supabaseConfig) {
-    localStorage.setItem(SUPABASE_CONFIG_KEY, JSON.stringify(integrityState.supabaseConfig));
+  const configToUse = userConfig || integrityState.supabaseConfig;
+  
+  if (configToUse) {
+    localStorage.setItem(SUPABASE_CONFIG_KEY, JSON.stringify(configToUse));
   }
 
-  const supabase = getSupabase(integrityState.supabaseConfig);
+  const supabase = getSupabase(configToUse);
   if (supabase) {
     try {
-      const remote = await fetchRemoteState(integrityState.supabaseConfig);
+      const remote = await fetchRemoteState(configToUse);
       const finalState = remote ? ensureStateIntegrity(integrityState, remote, 'local') : integrityState;
       await supabase.from('farm_data').upsert({ id: 'singleton', state: finalState, last_sync: new Date().toISOString() });
     } catch (err) {
       console.error('Erro de sincronização:', err);
     }
   }
+};
+
+export const subscribeToRemoteChanges = (config: {url: string, key: string}, callback: (newState: AppState) => void) => {
+  const supabase = getSupabase(config);
+  if (!supabase) return null;
+
+  const channel = supabase
+    .channel('farm_changes')
+    .on(
+      'postgres_changes',
+      { event: 'UPDATE', schema: 'public', table: 'farm_data', filter: 'id=eq.singleton' },
+      (payload) => {
+        if (payload.new && payload.new.state) {
+          callback(payload.new.state);
+        }
+      }
+    )
+    .subscribe();
+
+  return () => {
+    supabase.removeChannel(channel);
+  };
 };
 
 export const exportData = (state: AppState) => {

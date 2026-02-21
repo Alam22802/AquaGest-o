@@ -17,9 +17,9 @@ import WaterQuality from './components/WaterQuality.tsx';
 import ProtocolManagement from './components/ProtocolManagement.tsx';
 import SlaughterHouse from './components/SlaughterHouse.tsx';
 import Login from './components/Login.tsx';
-import { loadState, saveState, getSession, saveSession, ensureStateIntegrity, fetchRemoteState } from './store.ts';
+import { loadState, saveState, getSession, saveSession, ensureStateIntegrity, fetchRemoteState, subscribeToRemoteChanges } from './store.ts';
 import { AppState, User } from './types.ts';
-import { Loader2, RefreshCw, AlertTriangle, X } from 'lucide-react';
+import { Loader2, RefreshCw, AlertTriangle, X, Cloud, CheckCircle2 } from 'lucide-react';
 
 import { checkAndTriggerAlerts } from './src/services/alertService.ts';
 
@@ -33,16 +33,34 @@ const App: React.FC = () => {
   const [activeAlert, setActiveAlert] = useState<{title: string, message: string} | null>(null);
   
   const isSavingRef = useRef(false);
+  const lastRemoteStateRef = useRef<string>('');
+  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const initApp = useCallback(async () => {
     try {
       const data = await loadState();
       setState(data);
+      lastRemoteStateRef.current = JSON.stringify(data);
+      
       const savedUser = getSession();
       if (savedUser) {
         const updatedUser = data.users.find(u => u.id === savedUser.id);
         if (updatedUser && updatedUser.isApproved) {
           setCurrentUser(updatedUser);
+          
+          // Se o usuário tem uma config diferente da global, forçar um sync remoto agora
+          if (updatedUser.supabaseConfig && 
+              (updatedUser.supabaseConfig.url !== data.supabaseConfig?.url || 
+               updatedUser.supabaseConfig.key !== data.supabaseConfig?.key)) {
+             setIsSyncingBackground(true);
+             const remote = await fetchRemoteState(updatedUser.supabaseConfig);
+             if (remote) {
+               const merged = ensureStateIntegrity(data, remote, 'remote');
+               setState(merged);
+               lastRemoteStateRef.current = JSON.stringify(merged);
+             }
+             setIsSyncingBackground(false);
+          }
         } else if (updatedUser && !updatedUser.isApproved) {
           setCurrentUser(null);
           saveSession(null);
@@ -62,10 +80,25 @@ const App: React.FC = () => {
     
     setIsSyncingBackground(true);
     try {
-      const remote = await fetchRemoteState(state.supabaseConfig);
+      const configToUse = currentUser.supabaseConfig || state.supabaseConfig;
+      const remote = await fetchRemoteState(configToUse);
+      
       if (remote) {
-        const merged = ensureStateIntegrity(state, remote, 'local');
-        setState(merged);
+        const remoteStr = JSON.stringify(remote);
+        if (remoteStr === lastRemoteStateRef.current) {
+          setIsSyncingBackground(false);
+          return;
+        }
+
+        const merged = ensureStateIntegrity(state, remote, 'remote');
+        
+        const updatedUsers = merged.users.map(u => 
+          u.id === currentUser.id ? { ...u, lastSync: new Date().toISOString() } : u
+        );
+        
+        const finalState = { ...merged, users: updatedUsers };
+        setState(finalState);
+        lastRemoteStateRef.current = JSON.stringify(merged);
       }
     } catch (err) {
       console.warn('Erro na sincronização de background:', err);
@@ -76,16 +109,57 @@ const App: React.FC = () => {
 
   useEffect(() => { initApp(); }, [initApp]);
 
+  // Realtime Subscription
+  useEffect(() => {
+    if (!state || !currentUser || isLoading) return;
+
+    const configToUse = currentUser.supabaseConfig || state.supabaseConfig;
+    if (!configToUse) return;
+
+    const unsubscribe = subscribeToRemoteChanges(configToUse, (remoteState) => {
+      if (isSavingRef.current) return;
+
+      const remoteStr = JSON.stringify(remoteState);
+      if (remoteStr === lastRemoteStateRef.current) return;
+
+      setState(prev => {
+        if (!prev) return remoteState;
+        const merged = ensureStateIntegrity(prev, remoteState, 'remote');
+        lastRemoteStateRef.current = JSON.stringify(remoteState);
+        return merged;
+      });
+    });
+
+    return () => {
+      if (unsubscribe) unsubscribe();
+    };
+  }, [currentUser?.supabaseConfig, state?.supabaseConfig, isLoading]);
+
   useEffect(() => {
     if (state && !isLoading) {
-      isSavingRef.current = true;
-      saveState(state).finally(() => {
-        isSavingRef.current = false;
-      });
+      // Verificar se o estado mudou em relação ao último estado remoto conhecido
+      // para evitar salvar o que acabamos de baixar
+      const currentStateStr = JSON.stringify(state);
+      if (currentStateStr === lastRemoteStateRef.current) return;
 
-      // Verificar alertas a cada 5 minutos ou quando o estado mudar significativamente
+      // Debounce saving
+      if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+      
+      saveTimeoutRef.current = setTimeout(() => {
+        isSavingRef.current = true;
+        const configToUse = currentUser?.supabaseConfig || state.supabaseConfig;
+        
+        saveState(state, configToUse).then(() => {
+          // Após salvar, o estado remoto é igual ao nosso estado local atual
+          lastRemoteStateRef.current = JSON.stringify(state);
+        }).finally(() => {
+          isSavingRef.current = false;
+        });
+      }, 2000); // 2 segundos de debounce
+
+      // Verificar alertas
       const now = Date.now();
-      if (now - lastAlertCheck > 300000) { // 5 minutos
+      if (now - lastAlertCheck > 300000) {
         const alert = checkAndTriggerAlerts(state);
         if (alert) {
           setActiveAlert(alert);
@@ -94,7 +168,11 @@ const App: React.FC = () => {
         setLastAlertCheck(now);
       }
     }
-  }, [state, isLoading, lastAlertCheck]);
+    
+    return () => {
+      if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+    };
+  }, [state, isLoading, lastAlertCheck, currentUser?.supabaseConfig]);
 
   useEffect(() => {
     const interval = setInterval(backgroundSync, 30000); 
@@ -207,10 +285,15 @@ const App: React.FC = () => {
 
   return (
     <>
-      {isSyncingBackground && (
+      {isSyncingBackground ? (
         <div className="fixed top-2 left-1/2 -translate-x-1/2 z-[100] bg-white/80 backdrop-blur px-3 py-1 rounded-full shadow-sm border border-blue-100 flex items-center gap-2 pointer-events-none">
           <RefreshCw className="w-3 h-3 text-blue-500 animate-spin" />
-          <span className="text-[9px] font-black text-blue-600 uppercase tracking-widest">Sincronizando Nuvem...</span>
+          <span className="text-[9px] font-black text-blue-600 uppercase tracking-widest">Sincronizando...</span>
+        </div>
+      ) : (
+        <div className="fixed top-2 left-1/2 -translate-x-1/2 z-[100] bg-white/40 backdrop-blur px-3 py-1 rounded-full shadow-sm border border-emerald-100/50 flex items-center gap-2 pointer-events-none opacity-0 hover:opacity-100 transition-opacity">
+          <CheckCircle2 className="w-3 h-3 text-emerald-500" />
+          <span className="text-[9px] font-black text-emerald-600 uppercase tracking-widest">Nuvem Ativa</span>
         </div>
       )}
       {activeAlert && (

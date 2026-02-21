@@ -10,6 +10,8 @@ export interface User {
   isApproved: boolean;
   canEdit: boolean;
   receiveNotifications: boolean; 
+  supabaseConfig?: { url: string; key: string };
+  lastSync?: string;
   updatedAt?: number;
 }
 

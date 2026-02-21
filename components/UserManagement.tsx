@@ -1,15 +1,17 @@
 
 import React, { useState, useEffect } from 'react';
 import { User, AppState, NotificationSettings } from '../types';
-import { UserPlus, Trash2, Shield, Phone, Mail, Key, Eye, Edit3, User as UserIcon, CheckCircle, XCircle, Clock, Bell, Settings2, Save, X, AlertTriangle } from 'lucide-react';
+import { UserPlus, Trash2, Shield, Phone, Mail, Key, Eye, Edit3, User as UserIcon, CheckCircle, XCircle, Clock, Bell, Settings2, Save, X, AlertTriangle, Cloud, Database, Copy, RefreshCw } from 'lucide-react';
 
 interface Props {
   state: AppState;
   onUpdate: (newState: AppState) => void;
+  currentUser: User;
 }
 
 const UserManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
+  const [showDbConfigId, setShowDbConfigId] = useState<string | null>(null);
   
   if (!currentUser.isMaster) {
     return (
@@ -29,6 +31,11 @@ const UserManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     password: '',
     canEdit: true,
     receiveNotifications: true
+  });
+
+  const [dbConfig, setDbConfig] = useState({
+    url: '',
+    key: ''
   });
 
   const masterUser = state.users.find(u => u.isMaster);
@@ -82,7 +89,9 @@ const UserManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
         isApproved: true,
         canEdit: formData.canEdit,
         receiveNotifications: formData.receiveNotifications,
-        updatedAt: Date.now()
+        updatedAt: Date.now(),
+        // Replicar config do mestre por padrão
+        supabaseConfig: state.supabaseConfig
       };
 
       onUpdate({
@@ -92,6 +101,35 @@ const UserManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     }
     
     setFormData({ name: '', username: '', phone: '', email: '', password: '', canEdit: true, receiveNotifications: true });
+  };
+
+  const handleSaveDbConfig = (userId: string) => {
+    onUpdate({
+      ...state,
+      users: state.users.map(u => u.id === userId ? {
+        ...u,
+        supabaseConfig: dbConfig.url && dbConfig.key ? { ...dbConfig } : undefined,
+        updatedAt: Date.now()
+      } : u)
+    });
+    setShowDbConfigId(null);
+    alert('Configuração de banco de dados atualizada para o usuário.');
+  };
+
+  const replicateMasterConfig = (userId: string) => {
+    if (!state.supabaseConfig) {
+      alert('Configuração do mestre não encontrada.');
+      return;
+    }
+    onUpdate({
+      ...state,
+      users: state.users.map(u => u.id === userId ? {
+        ...u,
+        supabaseConfig: state.supabaseConfig,
+        updatedAt: Date.now()
+      } : u)
+    });
+    alert('Configuração do mestre replicada com sucesso.');
   };
 
   const startEditUser = (user: User) => {
@@ -106,6 +144,14 @@ const UserManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       receiveNotifications: user.receiveNotifications
     });
     window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const startEditDbConfig = (user: User) => {
+    setShowDbConfigId(user.id);
+    setDbConfig({
+      url: user.supabaseConfig?.url || '',
+      key: user.supabaseConfig?.key || ''
+    });
   };
 
   const cancelEdit = () => {
@@ -156,6 +202,62 @@ const UserManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
 
   return (
     <div className="space-y-8 pb-20">
+      {/* Modal de Configuração de Banco de Dados */}
+      {showDbConfigId && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="bg-white w-full max-w-md rounded-[2.5rem] shadow-2xl overflow-hidden border border-slate-200">
+            <div className="p-8">
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-lg font-black text-slate-800 flex items-center gap-3 uppercase tracking-tighter italic">
+                  <Database className="w-6 h-6 text-blue-500" /> Configurar Banco de Dados
+                </h3>
+                <button onClick={() => setShowDbConfigId(null)} className="p-2 bg-slate-50 rounded-full text-slate-400 hover:text-red-500 transition-all">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-[10px] font-black text-slate-400 uppercase mb-1.5 ml-1 tracking-widest">Supabase URL</label>
+                  <input 
+                    type="text" 
+                    className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl outline-none font-bold text-sm focus:bg-white focus:border-blue-500/30 transition-all"
+                    placeholder="https://xyz.supabase.co"
+                    value={dbConfig.url}
+                    onChange={(e) => setDbConfig({...dbConfig, url: e.target.value})}
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-black text-slate-400 uppercase mb-1.5 ml-1 tracking-widest">Supabase Anon Key</label>
+                  <input 
+                    type="password" 
+                    className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl outline-none font-bold text-sm focus:bg-white focus:border-blue-500/30 transition-all"
+                    placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                    value={dbConfig.key}
+                    onChange={(e) => setDbConfig({...dbConfig, key: e.target.value})}
+                  />
+                </div>
+                
+                <div className="pt-4 flex flex-col gap-3">
+                  <button 
+                    onClick={() => handleSaveDbConfig(showDbConfigId)}
+                    className="w-full py-4 bg-blue-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-blue-600/20 hover:bg-blue-700 transition-all active:scale-95"
+                  >
+                    Salvar Configuração
+                  </button>
+                  <button 
+                    onClick={() => replicateMasterConfig(showDbConfigId)}
+                    className="w-full py-4 bg-slate-100 text-slate-600 rounded-2xl font-black text-xs uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-slate-200 transition-all"
+                  >
+                    <Copy className="w-4 h-4" /> Replicar Configuração do Mestre
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Configurações Globais de Alertas */}
       <div className="bg-[#344434] p-8 rounded-[2.5rem] shadow-2xl border border-white/5 text-[#e4e4d4] overflow-hidden relative">
         <div className="relative z-10">
@@ -321,6 +423,9 @@ const UserManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                     </div>
                   </div>
                   <div className="flex gap-1">
+                    <button onClick={() => startEditDbConfig(user)} className={`p-2.5 rounded-xl transition-all ${user.supabaseConfig ? 'bg-blue-50 text-blue-500' : 'bg-slate-50 text-slate-300'} hover:bg-blue-100`} title="Configurar Banco de Dados">
+                      <Database className="w-4 h-4" />
+                    </button>
                     <button onClick={() => startEditUser(user)} className="p-2.5 bg-slate-50 text-slate-300 hover:text-amber-500 hover:bg-amber-50 rounded-xl transition-all" title="Editar Usuário">
                       <Edit3 className="w-4 h-4" />
                     </button>
@@ -331,7 +436,19 @@ const UserManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                     )}
                   </div>
                 </div>
-                <div className="mt-6 pt-5 border-t border-slate-50 grid grid-cols-1 gap-3">
+                
+                {/* Status de Sincronização */}
+                <div className="mt-4 flex items-center justify-between px-3 py-2 bg-slate-50 rounded-xl border border-slate-100">
+                  <div className="flex items-center gap-2">
+                    <Cloud className={`w-3.5 h-3.5 ${user.lastSync ? 'text-emerald-500' : 'text-slate-300'}`} />
+                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Última Sincronia:</span>
+                  </div>
+                  <span className="text-[9px] font-black text-slate-600 uppercase">
+                    {user.lastSync ? new Date(user.lastSync).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : 'Nunca'}
+                  </span>
+                </div>
+
+                <div className="mt-4 pt-5 border-t border-slate-50 grid grid-cols-1 gap-3">
                   <div className="flex items-center gap-3 text-[11px] font-bold text-slate-500">
                     <Mail className="w-3.5 h-3.5 opacity-30"/> 
                     <span className="truncate">{user.email}</span>
