@@ -1,8 +1,8 @@
 
 import React, { useState, useMemo } from 'react';
 import { Batch, AppState, User } from '../types';
-import { Plus, Trash2, Tag, Calendar, Scale, Hash, Edit, X, BookOpen, Eye, TrendingUp, Fish } from 'lucide-react';
-import { format } from 'date-fns';
+import { Plus, Trash2, Tag, Calendar, Scale, Hash, Edit, X, BookOpen, Eye, TrendingUp, Fish, AlertCircle } from 'lucide-react';
+import { format, differenceInDays, parseISO, startOfDay } from 'date-fns';
 
 interface Props {
   state: AppState;
@@ -17,7 +17,8 @@ const BatchManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     settlementDate: new Date().toISOString().split('T')[0],
     initialQuantity: '',
     initialUnitWeight: '',
-    protocolId: ''
+    protocolId: '',
+    expectedHarvestDate: ''
   });
 
   const hasPermission = currentUser.isMaster || currentUser.canEdit;
@@ -35,7 +36,8 @@ const BatchManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
           settlementDate: formData.settlementDate,
           initialQuantity: Number(formData.initialQuantity),
           initialUnitWeight: Number(formData.initialUnitWeight),
-          protocolId: formData.protocolId
+          protocolId: formData.protocolId,
+          expectedHarvestDate: formData.expectedHarvestDate || undefined
         } : b
       );
       onUpdate({ ...state, batches: updatedBatches });
@@ -47,7 +49,8 @@ const BatchManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
         settlementDate: formData.settlementDate,
         initialQuantity: Number(formData.initialQuantity),
         initialUnitWeight: Number(formData.initialUnitWeight),
-        protocolId: formData.protocolId
+        protocolId: formData.protocolId,
+        expectedHarvestDate: formData.expectedHarvestDate || undefined
       };
       onUpdate({ ...state, batches: [...state.batches, newBatch] });
     }
@@ -57,7 +60,8 @@ const BatchManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       settlementDate: new Date().toISOString().split('T')[0],
       initialQuantity: '',
       initialUnitWeight: '',
-      protocolId: ''
+      protocolId: '',
+      expectedHarvestDate: ''
     });
   };
 
@@ -69,7 +73,8 @@ const BatchManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       settlementDate: batch.settlementDate,
       initialQuantity: batch.initialQuantity.toString(),
       initialUnitWeight: batch.initialUnitWeight.toString(),
-      protocolId: batch.protocolId || ''
+      protocolId: batch.protocolId || '',
+      expectedHarvestDate: batch.expectedHarvestDate || ''
     });
   };
 
@@ -92,7 +97,7 @@ const BatchManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
               {editingId ? 'Editar Lote' : 'Cadastrar Novo Lote'}
             </div>
             {editingId && (
-              <button onClick={() => { setEditingId(null); setFormData({name:'', settlementDate: new Date().toISOString().split('T')[0], initialQuantity: '', initialUnitWeight: '', protocolId: ''}); }} className="text-slate-400 hover:text-slate-600">
+              <button onClick={() => { setEditingId(null); setFormData({name:'', settlementDate: new Date().toISOString().split('T')[0], initialQuantity: '', initialUnitWeight: '', protocolId: '', expectedHarvestDate: ''}); }} className="text-slate-400 hover:text-slate-600">
                 <X className="w-5 h-5" />
               </button>
             )}
@@ -125,6 +130,12 @@ const BatchManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
               <label className="block text-xs font-black text-slate-400 uppercase mb-1">Peso Médio Inicial (g)</label>
               <input type="number" required placeholder="Ex: 5" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 font-bold" value={formData.initialUnitWeight} onChange={(e) => setFormData({...formData, initialUnitWeight: e.target.value})} />
             </div>
+
+            <div className="col-span-2 md:col-span-1">
+              <label className="block text-xs font-black text-slate-400 uppercase mb-1">Data Prevista Despesca</label>
+              <input type="date" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 font-bold" value={formData.expectedHarvestDate} onChange={(e) => setFormData({...formData, expectedHarvestDate: e.target.value})} />
+            </div>
+
             <button type="submit" className={`col-span-2 py-4 rounded-2xl font-black uppercase tracking-widest text-xs text-white shadow-xl transition-all active:scale-95 mt-2 ${editingId ? 'bg-amber-600 shadow-amber-600/20' : 'bg-blue-600 shadow-blue-600/20'}`}>
               {editingId ? 'Salvar Lote' : 'Povoar Lote'}
             </button>
@@ -156,6 +167,25 @@ const BatchManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
           
           const protocol = (state.protocols || []).find(p => p.id === batch.protocolId);
           
+          // Alerta de Povoamento baseado na Data de Povoamento (se for futura)
+          let settlementAlert = null;
+          if (batch.settlementDate) {
+            const today = startOfDay(new Date());
+            const settlement = startOfDay(parseISO(batch.settlementDate));
+            const daysDiff = differenceInDays(settlement, today);
+            
+            if (daysDiff >= 0 && daysDiff <= 5) {
+              settlementAlert = (
+                <div className="bg-amber-50 border border-amber-200 p-3 rounded-2xl flex items-center gap-3 animate-pulse">
+                  <AlertCircle className="w-4 h-4 text-amber-600" />
+                  <span className="text-[10px] font-black text-amber-700 uppercase tracking-widest">
+                    Povoamento em {daysDiff === 0 ? 'HOJE' : `${daysDiff} dias`}
+                  </span>
+                </div>
+              );
+            }
+          }
+
           return (
             <div key={batch.id} className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden hover:border-blue-200 transition-all">
               <div className="p-4 bg-slate-50 border-b border-slate-100 flex justify-between items-center">
@@ -171,6 +201,7 @@ const BatchManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                 )}
               </div>
               <div className="p-6 space-y-4">
+                {settlementAlert}
                 <div className="flex items-center justify-between">
                   {protocol ? (
                      <div className="flex items-center gap-2 px-3 py-1.5 bg-indigo-50 rounded-xl border border-indigo-100">
@@ -186,9 +217,18 @@ const BatchManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                   </div>
                 </div>
 
-                <div className="flex justify-between items-center">
-                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1"><Calendar className="w-3 h-3 opacity-30" /> Povoamento</span>
-                  <span className="text-xs font-black text-slate-700">{format(new Date(batch.settlementDate + 'T12:00:00'), 'dd/MM/yyyy')}</span>
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center">
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1"><Calendar className="w-3 h-3 opacity-30" /> Povoamento</span>
+                    <span className="text-xs font-black text-slate-700">{format(new Date(batch.settlementDate + 'T12:00:00'), 'dd/MM/yyyy')}</span>
+                  </div>
+
+                  {batch.expectedHarvestDate && (
+                    <div className="flex justify-between items-center">
+                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1"><Calendar className="w-3 h-3 opacity-30 text-blue-400" /> Prev. Despesca</span>
+                      <span className="text-xs font-black text-blue-600">{format(new Date(batch.expectedHarvestDate + 'T12:00:00'), 'dd/MM/yyyy')}</span>
+                    </div>
+                  )}
                 </div>
 
                 {/* Barra de Progresso do Rendimento */}
