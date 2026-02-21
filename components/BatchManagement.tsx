@@ -165,6 +165,22 @@ const BatchManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
           const liveFish = batch.initialQuantity - mortality;
           const yieldPercentage = batch.initialQuantity > 0 ? (liveFish / batch.initialQuantity) * 100 : 0;
           
+          // Cálculo de Biometria e Biomassa
+          const batchBiometries = (state.biometryLogs || []).filter(b => cageIds.includes(b.cageId));
+          let currentAvgWeight = batch.initialUnitWeight;
+          
+          if (batchBiometries.length > 0) {
+            // Encontrar a última data em que houve biometria para este lote
+            const lastDate = batchBiometries.reduce((max, log) => log.date > max ? log.date : max, "");
+            const lastDayLogs = batchBiometries.filter(log => log.date === lastDate);
+            
+            // Média dos pesos registrados apenas no último dia
+            const sumWeights = lastDayLogs.reduce((acc, log) => acc + log.averageWeight, 0);
+            currentAvgWeight = sumWeights / lastDayLogs.length;
+          }
+
+          const totalBiomassKg = (liveFish * currentAvgWeight) / 1000;
+          
           const protocol = (state.protocols || []).find(p => p.id === batch.protocolId);
           
           // Alerta de Povoamento baseado na Data de Povoamento (se for futura)
@@ -242,9 +258,24 @@ const BatchManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                 <div className="grid grid-cols-2 gap-4 pt-3 border-t border-slate-50">
                   <div className="flex flex-col">
                     <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1">
+                      <Scale className="w-2.5 h-2.5" /> Peso Médio
+                    </span>
+                    <span className="text-lg font-black text-blue-600 leading-none mt-1">{currentAvgWeight.toFixed(1)}g</span>
+                  </div>
+                  <div className="flex flex-col items-end">
+                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1">
+                      <TrendingUp className="w-2.5 h-2.5" /> Biomassa Est.
+                    </span>
+                    <span className="text-lg font-black text-emerald-600 leading-none mt-1">{totalBiomassKg.toFixed(1)}kg</span>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4 pt-3 border-t border-slate-50">
+                  <div className="flex flex-col">
+                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1">
                       <Fish className="w-2.5 h-2.5" /> Peixes Vivos
                     </span>
-                    <span className="text-lg font-black text-emerald-600 leading-none mt-1">{liveFish} un</span>
+                    <span className="text-lg font-black text-slate-700 leading-none mt-1">{liveFish} un</span>
                   </div>
                   <div className="flex flex-col items-end">
                     <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Saldo Aloj.</span>

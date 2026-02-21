@@ -25,17 +25,13 @@ const MiniStat = ({ label, value, icon, color, subtext }: any) => (
 );
 
 const Dashboard: React.FC<Props> = ({ state }) => {
-  const [selectedMainBatchId, setSelectedMainBatchId] = useState<string>('');
-  const [selectedBioBatchId, setSelectedBioBatchId] = useState<string>('');
-  const [selectedMortBatchId, setSelectedMortBatchId] = useState<string>('');
+  const [selectedBatchId, setSelectedBatchId] = useState<string>('');
   const [reportStartDate, setReportStartDate] = useState<string>(format(subDays(new Date(), 30), 'yyyy-MM-dd'));
   const [reportEndDate, setReportEndDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'));
 
   useEffect(() => {
     if (state.batches && state.batches.length > 0) {
-      if (!selectedMainBatchId) setSelectedMainBatchId(state.batches[0].id);
-      if (!selectedBioBatchId) setSelectedBioBatchId(state.batches[0].id);
-      if (!selectedMortBatchId) setSelectedMortBatchId(state.batches[0].id);
+      if (!selectedBatchId) setSelectedBatchId(state.batches[0].id);
     }
   }, [state.batches]);
 
@@ -63,21 +59,15 @@ const Dashboard: React.FC<Props> = ({ state }) => {
       let samplingInfo = "Peso Inicial";
 
       if (batchBiometries.length > 0) {
-        // Pegar a última biometria de cada gaiola que já foi pesada
-        const latestBiometryPerCage = new Map<string, { date: string, weight: number }>();
-        batchBiometries.forEach(log => {
-          const current = latestBiometryPerCage.get(log.cageId);
-          if (!current || log.date >= current.date) {
-            latestBiometryPerCage.set(log.cageId, { date: log.date, weight: log.averageWeight });
-          }
-        });
-
-        const latestWeights = Array.from(latestBiometryPerCage.values());
-        const sumWeights = latestWeights.reduce((acc, w) => acc + w.weight, 0);
-        currentAvgWeight = sumWeights / latestWeights.length;
+        // Encontrar a última data em que houve biometria para este lote
+        const lastDate = batchBiometries.reduce((max, log) => log.date > max ? log.date : max, "");
+        const lastDayLogs = batchBiometries.filter(log => log.date === lastDate);
         
-        const latestDate = latestWeights.reduce((max, w) => w.date > max ? w.date : max, latestWeights[0].date);
-        samplingInfo = `Média de ${latestWeights.length} gaiolas (Ref: ${format(parseISO(latestDate), 'dd/MM')})`;
+        // Média dos pesos registrados apenas no último dia
+        const sumWeights = lastDayLogs.reduce((acc, log) => acc + log.averageWeight, 0);
+        currentAvgWeight = sumWeights / lastDayLogs.length;
+        
+        samplingInfo = `Média de ${lastDayLogs.length} gaiolas (Dia: ${format(parseISO(lastDate), 'dd/MM')})`;
       }
 
       const totalBiomassKg = (currentTotalStock * currentAvgWeight) / 1000;
@@ -113,27 +103,21 @@ const Dashboard: React.FC<Props> = ({ state }) => {
   }, [state.batches, state.cages, state.mortalityLogs, state.biometryLogs, state.feedingLogs, state.feedTypes]);
 
   const selectedBatchData = useMemo(() => {
-    return batchStats.find(b => b.id === selectedMainBatchId) || { stock: 0, biomass: 0, feed: 0, fca: '0.00', feedBreakdown: [], avgWeight: 0, samplingInfo: 'Sem dados' };
-  }, [batchStats, selectedMainBatchId]);
+    return batchStats.find(b => b.id === selectedBatchId) || { stock: 0, biomass: 0, feed: 0, fca: '0.00', feedBreakdown: [], avgWeight: 0, samplingInfo: 'Sem dados' };
+  }, [batchStats, selectedBatchId]);
 
   const biometryEvolutionData = useMemo(() => {
-    if (!selectedBioBatchId) return [];
-    const batch = (state.batches || []).find(b => b.id === selectedBioBatchId);
+    if (!selectedBatchId) return [];
+    const batch = (state.batches || []).find(b => b.id === selectedBatchId);
     if (!batch) return [];
-    const cageIds = (state.cages || []).filter(c => c.batchId === selectedBioBatchId).map(c => c.id);
+    const cageIds = (state.cages || []).filter(c => c.batchId === selectedBatchId).map(c => c.id);
     const logs = (state.biometryLogs || []).filter(l => cageIds.includes(l.cageId)).sort((a, b) => a.date.localeCompare(b.date));
     
     const uniqueDates = Array.from(new Set(logs.map(l => l.date))).sort();
-    const latestWeights = new Map<string, number>();
     
     const data = uniqueDates.map(currentDate => {
-      // Atualizar pesos das gaiolas que tiveram biometria nesta data
-      logs.filter(l => l.date === currentDate).forEach(l => {
-        latestWeights.set(l.cageId, l.averageWeight);
-      });
-      
-      const weights = Array.from(latestWeights.values());
-      const avgWeight = weights.length > 0 ? weights.reduce((a, b) => a + b, 0) / weights.length : batch.initialUnitWeight;
+      const dayLogs = logs.filter(l => l.date === currentDate);
+      const avgWeight = dayLogs.reduce((a, b) => a + b.averageWeight, 0) / dayLogs.length;
 
       return {
         date: format(new Date(currentDate + 'T12:00:00'), 'dd/MM'),
@@ -143,11 +127,11 @@ const Dashboard: React.FC<Props> = ({ state }) => {
     });
     
     return [{ date: 'Início', weight: batch.initialUnitWeight }, ...data];
-  }, [state.biometryLogs, state.batches, state.cages, selectedBioBatchId]);
+  }, [state.biometryLogs, state.batches, state.cages, selectedBatchId]);
 
   const mortalityEvolutionData = useMemo(() => {
-    if (!selectedMortBatchId) return [];
-    const cageIds = (state.cages || []).filter(c => c.batchId === selectedMortBatchId).map(c => c.id);
+    if (!selectedBatchId) return [];
+    const cageIds = (state.cages || []).filter(c => c.batchId === selectedBatchId).map(c => c.id);
     const logs = (state.mortalityLogs || []).filter(m => cageIds.includes(m.cageId));
     const grouped = logs.reduce((acc: any, log) => {
       if (!acc[log.date]) acc[log.date] = 0;
@@ -159,7 +143,7 @@ const Dashboard: React.FC<Props> = ({ state }) => {
       fullDate: date, 
       count: grouped[date] 
     })).sort((a, b) => a.fullDate.localeCompare(b.fullDate));
-  }, [state.mortalityLogs, state.cages, selectedMortBatchId]);
+  }, [state.mortalityLogs, state.cages, selectedBatchId]);
 
   const totalMortalityInChart = useMemo(() => {
     return mortalityEvolutionData.reduce((acc, curr) => acc + curr.count, 0);
@@ -337,8 +321,8 @@ const Dashboard: React.FC<Props> = ({ state }) => {
             <div>
               <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Lote Selecionado</h3>
               <select 
-                value={selectedMainBatchId} 
-                onChange={e => setSelectedMainBatchId(e.target.value)}
+                value={selectedBatchId} 
+                onChange={e => setSelectedBatchId(e.target.value)}
                 className="text-lg font-black text-slate-800 bg-transparent border-none outline-none focus:ring-0 p-0 cursor-pointer"
               >
                 {state.batches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
@@ -395,7 +379,6 @@ const Dashboard: React.FC<Props> = ({ state }) => {
         <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
           <div className="flex justify-between items-center mb-6">
             <h3 className="text-sm font-black text-slate-400 uppercase tracking-widest flex items-center gap-2 italic"><TrendingUp className="w-4 h-4" /> Evolução de Peso (Lote)</h3>
-            <select className="text-[10px] font-black border-none bg-slate-100 rounded-lg px-2 py-1 outline-none" value={selectedBioBatchId} onChange={e => setSelectedBioBatchId(e.target.value)}>{state.batches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}</select>
           </div>
           <div className="h-[250px]">
             <ResponsiveContainer width="100%" height="100%">
@@ -413,7 +396,6 @@ const Dashboard: React.FC<Props> = ({ state }) => {
           <div className="mb-6">
             <div className="flex justify-between items-center">
               <h3 className="text-sm font-black text-slate-400 uppercase tracking-widest flex items-center gap-2 italic"><FishOff className="w-4 h-4" /> Mortalidade Registrada</h3>
-              <select className="text-[10px] font-black border-none bg-slate-100 rounded-lg px-2 py-1 outline-none" value={selectedMortBatchId} onChange={e => setSelectedMortBatchId(e.target.value)}>{state.batches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}</select>
             </div>
             <div className="mt-1"><span className="text-[10px] font-black text-red-600 bg-red-50 px-2 py-0.5 rounded-lg">Perdas Totais: {totalMortalityInChart} un</span></div>
           </div>
