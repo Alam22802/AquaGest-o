@@ -547,6 +547,11 @@ const SlaughterHouse: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                     </td>
                     <td className="px-8 py-6">
                       <div className="font-black text-blue-600 text-xs">{log.packedQuantity ? `${log.packedQuantity} kg` : '---'}</div>
+                      {log.receptionWeight > 0 && (
+                        <div className="text-[10px] font-black text-emerald-600 mt-1 uppercase tracking-widest">
+                          Rend: {((log.packedQuantity / log.receptionWeight) * 100).toFixed(1)}%
+                        </div>
+                      )}
                       <div className="text-[9px] font-black text-slate-400 uppercase mt-1">LOTE EMB: {log.packagingBatch || 'N/A'}</div>
                     </td>
                     <td className="px-8 py-6">
