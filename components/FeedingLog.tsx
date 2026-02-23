@@ -14,6 +14,8 @@ const FeedingLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
   const [selectedLineId, setSelectedLineId] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 50;
   
   const hasPermission = currentUser.isMaster || currentUser.canEdit;
 
@@ -29,6 +31,13 @@ const FeedingLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     if (!editingId) setFormData(prev => ({ ...prev, cageId: '' }));
   }, [selectedLineId]);
 
+  const { cageMap, feedMap, userMap } = useMemo(() => {
+    const cages = new Map(state.cages.map(c => [c.id, c]));
+    const feeds = new Map(state.feedTypes.map(f => [f.id, f]));
+    const users = new Map(state.users.map(u => [u.id, u]));
+    return { cageMap: cages, feedMap: feeds, userMap: users };
+  }, [state.cages, state.feedTypes, state.users]);
+
   const sortedLogs = useMemo(() => {
     const logs = Array.isArray(state.feedingLogs) ? [...state.feedingLogs] : [];
     return logs.sort((a, b) => {
@@ -37,6 +46,13 @@ const FeedingLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       return sortOrder === 'desc' ? dateB - dateA : dateA - dateB;
     });
   }, [state.feedingLogs, sortOrder]);
+
+  const paginatedLogs = useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    return sortedLogs.slice(startIndex, startIndex + itemsPerPage);
+  }, [sortedLogs, currentPage]);
+
+  const totalPages = Math.ceil(sortedLogs.length / itemsPerPage);
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
@@ -47,7 +63,7 @@ const FeedingLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       return;
     }
 
-    const selectedFeed = state.feedTypes.find(f => f.id === formData.feedTypeId);
+    const selectedFeed = feedMap.get(formData.feedTypeId);
     if (!selectedFeed) return;
 
     if (editingId) {
@@ -103,7 +119,7 @@ const FeedingLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
 
   const startEdit = (log: IFeedingLog) => {
     if (!hasPermission) return;
-    const cage = state.cages.find(c => c.id === log.cageId);
+    const cage = cageMap.get(log.cageId);
     if (cage) setSelectedLineId(cage.lineId || '');
     const [d, t] = log.timestamp.split('T');
     setEditingId(log.id);
@@ -207,10 +223,10 @@ const FeedingLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {sortedLogs.map(log => {
-                const cage = state.cages.find(c => c.id === log.cageId);
-                const feed = state.feedTypes.find(f => f.id === log.feedTypeId);
-                const user = state.users.find(u => u.id === log.userId);
+              {paginatedLogs.map(log => {
+                const cage = cageMap.get(log.cageId);
+                const feed = feedMap.get(log.feedTypeId);
+                const user = userMap.get(log.userId);
                 return (
                   <tr key={log.id} className="hover:bg-slate-50 transition-colors">
                     <td className="px-6 py-4">
@@ -234,7 +250,7 @@ const FeedingLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                   </tr>
                 );
               })}
-              {sortedLogs.length === 0 && (
+              {paginatedLogs.length === 0 && (
                 <tr>
                   <td colSpan={hasPermission ? 5 : 4} className="px-6 py-10 text-center text-slate-400 font-bold uppercase text-[10px] tracking-widest italic">Nenhum trato registrado.</td>
                 </tr>
@@ -242,6 +258,28 @@ const FeedingLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
             </tbody>
           </table>
         </div>
+
+        {totalPages > 1 && (
+          <div className="flex justify-center items-center gap-4 py-4">
+            <button 
+              disabled={currentPage === 1}
+              onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+              className="px-4 py-2 bg-slate-100 rounded-xl text-[10px] font-black uppercase tracking-widest disabled:opacity-30"
+            >
+              Anterior
+            </button>
+            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+              Página {currentPage} de {totalPages}
+            </span>
+            <button 
+              disabled={currentPage === totalPages}
+              onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+              className="px-4 py-2 bg-slate-100 rounded-xl text-[10px] font-black uppercase tracking-widest disabled:opacity-30"
+            >
+              Próxima
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
