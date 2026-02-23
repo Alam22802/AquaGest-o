@@ -1,5 +1,5 @@
 
-import { AppState, NotificationSettings } from '../types';
+import { AppState, NotificationSettings, User } from '../../types';
 
 export const sendEmailAlert = async (to: string, subject: string, body: string, settings?: NotificationSettings) => {
   console.log(`[ALERT] Enviando e-mail para: ${to}`);
@@ -17,7 +17,7 @@ export const checkAndTriggerAlerts = (state: AppState): {title: string, message:
   const settings = state.notificationSettings;
   if (!settings) return null;
 
-  const masterUser = state.users.find(u => u.isMaster);
+  const masterUser = state.users.find((u: User) => u.isMaster);
   const targetEmail = settings.systemEmailSender || masterUser?.email;
 
   if (!targetEmail) return null;
@@ -38,7 +38,7 @@ export const checkAndTriggerAlerts = (state: AppState): {title: string, message:
 
   // 2. Alerta de Novos Usuários
   if (settings.notifyMasterOnNewUser) {
-    const pendingCount = state.users.filter(u => !u.isApproved).length;
+    const pendingCount = state.users.filter((u: User) => !u.isApproved).length;
     if (pendingCount > 0) {
       const title = `ALERTA: Novos Usuários Pendentes`;
       const message = `Existem ${pendingCount} usuários aguardando aprovação no sistema.`;

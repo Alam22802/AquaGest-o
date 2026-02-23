@@ -14,7 +14,8 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
   const [formData, setFormData] = useState({ 
     name: '',
     maxCapacity: '1000',
-    minStockPercentage: '20'
+    minStockPercentage: '20',
+    currentStockKg: '0'
   });
 
   const hasPermission = currentUser.isMaster || currentUser.canEdit;
@@ -37,7 +38,8 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
             ...f,
             name: formData.name,
             maxCapacity: Number(formData.maxCapacity),
-            minStockPercentage: Number(formData.minStockPercentage)
+            minStockPercentage: Number(formData.minStockPercentage),
+            totalStock: Number(formData.currentStockKg) * 1000
           };
         }
         return f;
@@ -48,7 +50,7 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       const newFeed: FeedType = {
         id: crypto.randomUUID(),
         name: formData.name,
-        totalStock: 0,
+        totalStock: Number(formData.currentStockKg) * 1000,
         maxCapacity: Number(formData.maxCapacity),
         minStockPercentage: Number(formData.minStockPercentage)
       };
@@ -57,7 +59,7 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
         feedTypes: [...state.feedTypes, newFeed]
       });
     }
-    setFormData({ name: '', maxCapacity: '1000', minStockPercentage: '20' });
+    setFormData({ name: '', maxCapacity: '1000', minStockPercentage: '20', currentStockKg: '0' });
   };
 
   const startEdit = (feed: FeedType) => {
@@ -66,7 +68,8 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     setFormData({
       name: feed.name,
       maxCapacity: feed.maxCapacity.toString(),
-      minStockPercentage: feed.minStockPercentage.toString()
+      minStockPercentage: feed.minStockPercentage.toString(),
+      currentStockKg: (feed.totalStock / 1000).toString()
     });
   };
 
@@ -137,6 +140,11 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                   <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Alerta Mínimo (%)</label>
                   <input type="number" required className="w-full px-4 py-2 border border-slate-300 rounded-lg outline-none" value={formData.minStockPercentage} onChange={(e) => setFormData({ ...formData, minStockPercentage: e.target.value })} />
                 </div>
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Saldo Atual (Kg)</label>
+                <input type="number" required className="w-full px-4 py-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-amber-500/20" value={formData.currentStockKg} onChange={(e) => setFormData({ ...formData, currentStockKg: e.target.value })} />
+                <p className="text-[10px] text-slate-400 mt-1 font-bold uppercase tracking-tight">Ajuste o saldo para bater com o estoque físico se necessário.</p>
               </div>
               <button type="submit" className={`w-full ${editingId ? 'bg-amber-600' : 'bg-blue-600'} text-white py-3 rounded-xl font-bold mt-2 shadow-lg`}>
                 {editingId ? 'Atualizar Modelo' : 'Cadastrar Modelo'}
