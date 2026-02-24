@@ -15,6 +15,8 @@ const FeedingLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
   const [currentPage, setCurrentPage] = useState(1);
+  const [selectedBatchId, setSelectedBatchId] = useState('');
+  const [selectedLogIds, setSelectedLogIds] = useState<Set<string>>(new Set());
   const itemsPerPage = 50;
   
   const hasPermission = currentUser.isMaster || currentUser.canEdit;
@@ -39,7 +41,15 @@ const FeedingLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
   }, [state.cages, state.feedTypes, state.users]);
 
   const sortedLogs = useMemo(() => {
-    const logs = Array.isArray(state.feedingLogs) ? [...state.feedingLogs] : [];
+    let logs = Array.isArray(state.feedingLogs) ? [...state.feedingLogs] : [];
+    
+    if (selectedBatchId) {
+      logs = logs.filter(log => {
+        const cage = cageMap.get(log.cageId);
+        return cage?.batchId === selectedBatchId;
+      });
+    }
+
     return logs.sort((a, b) => {
       const dateA = new Date(a.timestamp).getTime();
       const dateB = new Date(b.timestamp).getTime();
@@ -53,6 +63,51 @@ const FeedingLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
   }, [sortedLogs, currentPage]);
 
   const totalPages = Math.ceil(sortedLogs.length / itemsPerPage);
+
+  const toggleSelectAll = () => {
+    if (selectedLogIds.size === paginatedLogs.length && paginatedLogs.length > 0) {
+      setSelectedLogIds(new Set());
+    } else {
+      setSelectedLogIds(new Set(paginatedLogs.map(l => l.id)));
+    }
+  };
+
+  const toggleSelectLog = (id: string) => {
+    const newSelected = new Set(selectedLogIds);
+    if (newSelected.has(id)) {
+      newSelected.delete(id);
+    } else {
+      newSelected.add(id);
+    }
+    setSelectedLogIds(newSelected);
+  };
+
+  const removeSelectedLogs = () => {
+    if (!hasPermission || selectedLogIds.size === 0) return;
+    if (!confirm(`Deseja excluir ${selectedLogIds.size} tratos selecionados? O estoque será devolvido.`)) return;
+
+    const logsToRemove = state.feedingLogs.filter(l => selectedLogIds.has(l.id));
+    
+    // Group by feed type to update stock
+    const feedUpdates = new Map<string, number>();
+    logsToRemove.forEach(log => {
+      const current = feedUpdates.get(log.feedTypeId) || 0;
+      feedUpdates.set(log.feedTypeId, current + log.amount);
+    });
+
+    const updatedFeeds = state.feedTypes.map(f => {
+      const refund = feedUpdates.get(f.id);
+      if (refund) return { ...f, totalStock: f.totalStock + refund };
+      return f;
+    });
+
+    onUpdate({
+      ...state,
+      feedingLogs: state.feedingLogs.filter(l => !selectedLogIds.has(l.id)),
+      feedTypes: updatedFeeds
+    });
+    setSelectedLogIds(new Set());
+  };
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
@@ -205,16 +260,50 @@ const FeedingLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       </div>
 
       <div className="lg:col-span-2 space-y-4">
-        <div className="flex justify-between items-center">
+        <div className="flex flex-wrap justify-between items-center gap-4">
           <h3 className="text-sm font-black text-slate-400 uppercase tracking-widest italic">Histórico de Alimentação</h3>
-          <button onClick={() => setSortOrder(prev => prev === 'desc' ? 'asc' : 'desc')} className="flex items-center gap-2 text-[10px] font-black uppercase text-slate-500 bg-slate-100 px-3 py-1.5 rounded-lg hover:bg-slate-200 transition-colors">
-            <ArrowUpDown className="w-3 h-3" /> {sortOrder === 'desc' ? 'Mais Recentes' : 'Mais Antigos'}
-          </button>
+          <div className="flex items-center gap-2">
+            {selectedLogIds.size > 0 && (
+              <button 
+                onClick={removeSelectedLogs}
+                className="flex items-center gap-2 text-[10px] font-black uppercase text-white bg-red-500 px-3 py-1.5 rounded-lg hover:bg-red-600 transition-colors shadow-lg shadow-red-500/20"
+              >
+                <Trash2 className="w-3 h-3" /> Excluir ({selectedLogIds.size})
+              </button>
+            )}
+            <select 
+              className="text-[10px] font-black uppercase text-slate-500 bg-slate-100 px-3 py-1.5 rounded-lg outline-none border-none"
+              value={selectedBatchId}
+              onChange={e => {
+                setSelectedBatchId(e.target.value);
+                setCurrentPage(1);
+                setSelectedLogIds(new Set());
+              }}
+            >
+              <option value="">Todos os Lotes</option>
+              {state.batches.map(b => (
+                <option key={b.id} value={b.id}>{b.name}</option>
+              ))}
+            </select>
+            <button onClick={() => setSortOrder(prev => prev === 'desc' ? 'asc' : 'desc')} className="flex items-center gap-2 text-[10px] font-black uppercase text-slate-500 bg-slate-100 px-3 py-1.5 rounded-lg hover:bg-slate-200 transition-colors">
+              <ArrowUpDown className="w-3 h-3" /> {sortOrder === 'desc' ? 'Mais Recentes' : 'Mais Antigos'}
+            </button>
+          </div>
         </div>
         <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm overflow-x-auto">
           <table className="w-full text-left min-w-[600px]">
             <thead className="bg-slate-50 text-[10px] font-black text-slate-400 uppercase tracking-widest">
               <tr>
+                {hasPermission && (
+                  <th className="px-6 py-4 w-10">
+                    <input 
+                      type="checkbox" 
+                      className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                      checked={selectedLogIds.size === paginatedLogs.length && paginatedLogs.length > 0}
+                      onChange={toggleSelectAll}
+                    />
+                  </th>
+                )}
                 <th className="px-6 py-4">Gaiola / Ração</th>
                 <th className="px-6 py-4">Data/Hora</th>
                 <th className="px-6 py-4">Qtd</th>
@@ -227,8 +316,19 @@ const FeedingLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                 const cage = cageMap.get(log.cageId);
                 const feed = feedMap.get(log.feedTypeId);
                 const user = userMap.get(log.userId);
+                const isSelected = selectedLogIds.has(log.id);
                 return (
-                  <tr key={log.id} className="hover:bg-slate-50 transition-colors">
+                  <tr key={log.id} className={`hover:bg-slate-50 transition-colors ${isSelected ? 'bg-blue-50/50' : ''}`}>
+                    {hasPermission && (
+                      <td className="px-6 py-4">
+                        <input 
+                          type="checkbox" 
+                          className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                          checked={isSelected}
+                          onChange={() => toggleSelectLog(log.id)}
+                        />
+                      </td>
+                    )}
                     <td className="px-6 py-4">
                       <div className="font-black text-slate-800 uppercase">{cage?.name || '---'}</div>
                       <div className="text-[10px] font-bold text-blue-500 uppercase">{feed?.name || '---'}</div>
@@ -252,7 +352,7 @@ const FeedingLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
               })}
               {paginatedLogs.length === 0 && (
                 <tr>
-                  <td colSpan={hasPermission ? 5 : 4} className="px-6 py-10 text-center text-slate-400 font-bold uppercase text-[10px] tracking-widest italic">Nenhum trato registrado.</td>
+                  <td colSpan={hasPermission ? 6 : 4} className="px-6 py-10 text-center text-slate-400 font-bold uppercase text-[10px] tracking-widest italic">Nenhum trato registrado.</td>
                 </tr>
               )}
             </tbody>

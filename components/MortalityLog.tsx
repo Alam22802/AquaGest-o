@@ -14,6 +14,10 @@ const MortalityLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
   const [selectedLineId, setSelectedLineId] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [selectedBatchId, setSelectedBatchId] = useState('');
+  const [selectedLogIds, setSelectedLogIds] = useState<Set<string>>(new Set());
+  const itemsPerPage = 50;
 
   const hasPermission = currentUser.isMaster || currentUser.canEdit;
 
@@ -27,13 +31,64 @@ const MortalityLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     if (!editingId) setFormData(prev => ({ ...prev, cageId: '' }));
   }, [selectedLineId]);
 
+  const { cageMap, userMap } = useMemo(() => {
+    const cages = new Map(state.cages.map(c => [c.id, c]));
+    const users = new Map(state.users.map(u => [u.id, u]));
+    return { cageMap: cages, userMap: users };
+  }, [state.cages, state.users]);
+
   const sortedLogs = useMemo(() => {
-    return [...state.mortalityLogs].sort((a, b) => {
+    let logs = [...state.mortalityLogs];
+    
+    if (selectedBatchId) {
+      logs = logs.filter(log => {
+        const cage = cageMap.get(log.cageId);
+        return cage?.batchId === selectedBatchId;
+      });
+    }
+
+    return logs.sort((a, b) => {
       const dateA = new Date(a.date).getTime();
       const dateB = new Date(b.date).getTime();
       return sortOrder === 'desc' ? dateB - dateA : dateA - dateB;
     });
-  }, [state.mortalityLogs, sortOrder]);
+  }, [state.mortalityLogs, sortOrder, selectedBatchId, cageMap]);
+
+  const paginatedLogs = useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    return sortedLogs.slice(startIndex, startIndex + itemsPerPage);
+  }, [sortedLogs, currentPage]);
+
+  const totalPages = Math.ceil(sortedLogs.length / itemsPerPage);
+
+  const toggleSelectAll = () => {
+    if (selectedLogIds.size === paginatedLogs.length && paginatedLogs.length > 0) {
+      setSelectedLogIds(new Set());
+    } else {
+      setSelectedLogIds(new Set(paginatedLogs.map(l => l.id)));
+    }
+  };
+
+  const toggleSelectLog = (id: string) => {
+    const newSelected = new Set(selectedLogIds);
+    if (newSelected.has(id)) {
+      newSelected.delete(id);
+    } else {
+      newSelected.add(id);
+    }
+    setSelectedLogIds(newSelected);
+  };
+
+  const removeSelectedLogs = () => {
+    if (!hasPermission || selectedLogIds.size === 0) return;
+    if (!confirm(`Deseja excluir ${selectedLogIds.size} registros de perda selecionados?`)) return;
+
+    onUpdate({
+      ...state,
+      mortalityLogs: state.mortalityLogs.filter(l => !selectedLogIds.has(l.id))
+    });
+    setSelectedLogIds(new Set());
+  };
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
@@ -66,7 +121,7 @@ const MortalityLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
 
   const startEdit = (log: IMortalityLog) => {
     if (!hasPermission) return;
-    const cage = state.cages.find(c => c.id === log.cageId);
+    const cage = cageMap.get(log.cageId);
     if (cage) setSelectedLineId(cage.lineId || '');
     setEditingId(log.id);
     setFormData({ cageId: log.cageId, count: log.count.toString(), date: log.date });
@@ -116,16 +171,50 @@ const MortalityLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       </div>
 
       <div className="lg:col-span-2 space-y-4">
-        <div className="flex justify-between items-center">
+        <div className="flex flex-wrap justify-between items-center gap-4">
           <h3 className="text-sm font-black text-slate-400 uppercase tracking-widest italic">Histórico de Perdas</h3>
-          <button onClick={() => setSortOrder(prev => prev === 'desc' ? 'asc' : 'desc')} className="flex items-center gap-2 text-[10px] font-black uppercase text-slate-500 bg-slate-100 px-3 py-1.5 rounded-lg hover:bg-slate-200 transition-colors">
-            <ArrowUpDown className="w-3 h-3" /> {sortOrder === 'desc' ? 'Mais Recentes' : 'Mais Antigos'}
-          </button>
+          <div className="flex items-center gap-2">
+            {selectedLogIds.size > 0 && (
+              <button 
+                onClick={removeSelectedLogs}
+                className="flex items-center gap-2 text-[10px] font-black uppercase text-white bg-red-500 px-3 py-1.5 rounded-lg hover:bg-red-600 transition-colors shadow-lg shadow-red-500/20"
+              >
+                <Trash2 className="w-3 h-3" /> Excluir ({selectedLogIds.size})
+              </button>
+            )}
+            <select 
+              className="text-[10px] font-black uppercase text-slate-500 bg-slate-100 px-3 py-1.5 rounded-lg outline-none border-none"
+              value={selectedBatchId}
+              onChange={e => {
+                setSelectedBatchId(e.target.value);
+                setCurrentPage(1);
+                setSelectedLogIds(new Set());
+              }}
+            >
+              <option value="">Todos os Lotes</option>
+              {state.batches.map(b => (
+                <option key={b.id} value={b.id}>{b.name}</option>
+              ))}
+            </select>
+            <button onClick={() => setSortOrder(prev => prev === 'desc' ? 'asc' : 'desc')} className="flex items-center gap-2 text-[10px] font-black uppercase text-slate-500 bg-slate-100 px-3 py-1.5 rounded-lg hover:bg-slate-200 transition-colors">
+              <ArrowUpDown className="w-3 h-3" /> {sortOrder === 'desc' ? 'Mais Recentes' : 'Mais Antigos'}
+            </button>
+          </div>
         </div>
-        <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm">
-          <table className="w-full text-left">
+        <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm overflow-x-auto">
+          <table className="w-full text-left min-w-[600px]">
             <thead className="bg-slate-50 text-[10px] font-black text-slate-400 uppercase tracking-widest">
               <tr>
+                {hasPermission && (
+                  <th className="px-6 py-4 w-10">
+                    <input 
+                      type="checkbox" 
+                      className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                      checked={selectedLogIds.size === paginatedLogs.length && paginatedLogs.length > 0}
+                      onChange={toggleSelectAll}
+                    />
+                  </th>
+                )}
                 <th className="px-6 py-4">Gaiola</th>
                 <th className="px-6 py-4">Data</th>
                 <th className="px-6 py-4">Mortos</th>
@@ -134,11 +223,22 @@ const MortalityLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {sortedLogs.map(log => {
-                const cage = state.cages.find(c => c.id === log.cageId);
-                const user = state.users.find(u => u.id === log.userId);
+              {paginatedLogs.map(log => {
+                const cage = cageMap.get(log.cageId);
+                const user = userMap.get(log.userId);
+                const isSelected = selectedLogIds.has(log.id);
                 return (
-                  <tr key={log.id} className="hover:bg-slate-50 transition-colors">
+                  <tr key={log.id} className={`hover:bg-slate-50 transition-colors ${isSelected ? 'bg-blue-50/50' : ''}`}>
+                    {hasPermission && (
+                      <td className="px-6 py-4">
+                        <input 
+                          type="checkbox" 
+                          className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                          checked={isSelected}
+                          onChange={() => toggleSelectLog(log.id)}
+                        />
+                      </td>
+                    )}
                     <td className="px-6 py-4 font-black text-slate-800 uppercase">{cage?.name}</td>
                     <td className="px-6 py-4 text-xs font-bold text-slate-600">
                       <div className="flex items-center gap-1"><Calendar className="w-3 h-3 opacity-30" /> {format(new Date(log.date + 'T12:00:00'), 'dd/MM/yyyy')}</div>
@@ -156,9 +256,36 @@ const MortalityLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                   </tr>
                 );
               })}
+              {paginatedLogs.length === 0 && (
+                <tr>
+                  <td colSpan={hasPermission ? 6 : 4} className="px-6 py-10 text-center text-slate-400 font-bold uppercase text-[10px] tracking-widest italic">Nenhum registro de perda.</td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
+
+        {totalPages > 1 && (
+          <div className="flex justify-center items-center gap-4 py-4">
+            <button 
+              disabled={currentPage === 1}
+              onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+              className="px-4 py-2 bg-slate-100 rounded-xl text-[10px] font-black uppercase tracking-widest disabled:opacity-30"
+            >
+              Anterior
+            </button>
+            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+              Página {currentPage} de {totalPages}
+            </span>
+            <button 
+              disabled={currentPage === totalPages}
+              onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+              className="px-4 py-2 bg-slate-100 rounded-xl text-[10px] font-black uppercase tracking-widest disabled:opacity-30"
+            >
+              Próxima
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
