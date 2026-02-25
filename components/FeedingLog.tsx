@@ -16,7 +16,8 @@ const FeedingLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
   const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedBatchId, setSelectedBatchId] = useState('');
-  const [selectedDate, setSelectedDate] = useState('');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
   const [selectedLogIds, setSelectedLogIds] = useState<Set<string>>(new Set());
   const itemsPerPage = 50;
   
@@ -51,8 +52,11 @@ const FeedingLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       });
     }
 
-    if (selectedDate) {
-      logs = logs.filter(log => log.timestamp.startsWith(selectedDate));
+    if (startDate) {
+      logs = logs.filter(log => log.timestamp.split('T')[0] >= startDate);
+    }
+    if (endDate) {
+      logs = logs.filter(log => log.timestamp.split('T')[0] <= endDate);
     }
 
     return logs.sort((a, b) => {
@@ -290,16 +294,29 @@ const FeedingLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                 <option key={b.id} value={b.id}>{b.name}</option>
               ))}
             </select>
-            <input 
-              type="date"
-              className="text-[10px] font-black uppercase text-slate-500 bg-slate-100 px-3 py-1.5 rounded-lg outline-none border-none"
-              value={selectedDate}
-              onChange={e => {
-                setSelectedDate(e.target.value);
-                setCurrentPage(1);
-                setSelectedLogIds(new Set());
-              }}
-            />
+            <div className="flex items-center gap-1 bg-slate-100 px-2 py-1 rounded-lg">
+              <input 
+                type="date"
+                className="text-[10px] font-black uppercase text-slate-500 bg-transparent outline-none border-none"
+                value={startDate}
+                onChange={e => {
+                  setStartDate(e.target.value);
+                  setCurrentPage(1);
+                  setSelectedLogIds(new Set());
+                }}
+              />
+              <span className="text-[8px] font-black text-slate-300">ATÉ</span>
+              <input 
+                type="date"
+                className="text-[10px] font-black uppercase text-slate-500 bg-transparent outline-none border-none"
+                value={endDate}
+                onChange={e => {
+                  setEndDate(e.target.value);
+                  setCurrentPage(1);
+                  setSelectedLogIds(new Set());
+                }}
+              />
+            </div>
             <button onClick={() => setSortOrder(prev => prev === 'desc' ? 'asc' : 'desc')} className="flex items-center gap-2 text-[10px] font-black uppercase text-slate-500 bg-slate-100 px-3 py-1.5 rounded-lg hover:bg-slate-200 transition-colors">
               <ArrowUpDown className="w-3 h-3" /> {sortOrder === 'desc' ? 'Mais Recentes' : 'Mais Antigos'}
             </button>
