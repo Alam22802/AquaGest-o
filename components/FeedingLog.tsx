@@ -16,6 +16,7 @@ const FeedingLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
   const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedBatchId, setSelectedBatchId] = useState('');
+  const [selectedDate, setSelectedDate] = useState('');
   const [selectedLogIds, setSelectedLogIds] = useState<Set<string>>(new Set());
   const itemsPerPage = 50;
   
@@ -48,6 +49,10 @@ const FeedingLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
         const cage = cageMap.get(log.cageId);
         return cage?.batchId === selectedBatchId;
       });
+    }
+
+    if (selectedDate) {
+      logs = logs.filter(log => log.timestamp.startsWith(selectedDate));
     }
 
     return logs.sort((a, b) => {
@@ -206,8 +211,8 @@ const FeedingLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
   };
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-      <div className="lg:col-span-1">
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
+      <div className="lg:col-span-1 sticky top-4">
         {hasPermission ? (
           <div className={`bg-white p-6 rounded-3xl shadow-sm border transition-all ${editingId ? 'border-amber-200 ring-4 ring-amber-50' : 'border-slate-200'}`}>
             <h3 className="text-lg font-black text-slate-800 mb-6 flex items-center justify-between uppercase tracking-tighter italic">
@@ -285,6 +290,16 @@ const FeedingLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                 <option key={b.id} value={b.id}>{b.name}</option>
               ))}
             </select>
+            <input 
+              type="date"
+              className="text-[10px] font-black uppercase text-slate-500 bg-slate-100 px-3 py-1.5 rounded-lg outline-none border-none"
+              value={selectedDate}
+              onChange={e => {
+                setSelectedDate(e.target.value);
+                setCurrentPage(1);
+                setSelectedLogIds(new Set());
+              }}
+            />
             <button onClick={() => setSortOrder(prev => prev === 'desc' ? 'asc' : 'desc')} className="flex items-center gap-2 text-[10px] font-black uppercase text-slate-500 bg-slate-100 px-3 py-1.5 rounded-lg hover:bg-slate-200 transition-colors">
               <ArrowUpDown className="w-3 h-3" /> {sortOrder === 'desc' ? 'Mais Recentes' : 'Mais Antigos'}
             </button>
