@@ -17,9 +17,9 @@ const MiniStat = ({ label, value, icon, color, subtext }: any) => (
   <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-4 transition-all hover:shadow-md h-full">
     <div className={`p-3 rounded-xl bg-slate-50 shadow-sm ${color} shrink-0`}>{icon}</div>
     <div className="flex-1 min-w-0">
-      <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">{label}</div>
+      <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">{label}</div>
       <div className="text-slate-800">{value}</div>
-      {subtext && <div className="text-[8px] font-bold text-slate-400 mt-1 uppercase tracking-tight">{subtext}</div>}
+      {subtext && <div className="text-[9px] font-bold text-slate-400 mt-1 uppercase tracking-tight">{subtext}</div>}
     </div>
   </div>
 );
@@ -307,13 +307,13 @@ const Dashboard: React.FC<Props> = ({ state }) => {
             <h3 className="text-sm font-black text-red-800 uppercase tracking-widest italic">Estoque Crítico de Ração!</h3>
             <div className="mt-2 flex flex-wrap gap-2 justify-center md:justify-start">
               {lowStockFeeds.map(feed => (
-                <span key={feed.id} className="px-3 py-1 bg-white border border-red-100 rounded-xl text-[10px] font-black text-red-600 uppercase flex items-center gap-2">
+                <span key={feed.id} className="px-3 py-1 bg-white border border-red-100 rounded-xl text-[11px] font-black text-red-600 uppercase flex items-center gap-2">
                   <PackageSearch className="w-3 h-3" /> {feed.name}: {(feed.totalStock/1000).toFixed(0)}kg restantes
                 </span>
               ))}
             </div>
           </div>
-          <div className="hidden lg:block text-[9px] font-black text-red-400 uppercase tracking-widest max-w-[150px] text-right">
+          <div className="hidden lg:block text-[10px] font-black text-red-400 uppercase tracking-widest max-w-[150px] text-right">
             Providencie a compra imediata para evitar falhas no trato.
           </div>
         </div>
@@ -325,7 +325,7 @@ const Dashboard: React.FC<Props> = ({ state }) => {
           <div className="flex items-center gap-4">
             <div className="p-3 bg-blue-50 text-blue-600 rounded-xl shadow-sm"><Layers className="w-6 h-6" /></div>
             <div>
-              <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Lote Selecionado</h3>
+              <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Lote Selecionado</h3>
               <select 
                 value={selectedBatchId} 
                 onChange={e => setSelectedBatchId(e.target.value)}
@@ -338,21 +338,21 @@ const Dashboard: React.FC<Props> = ({ state }) => {
           </div>
         </div>
 
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col sm:flex-row items-center gap-4">
-          <div className="flex items-center gap-3 flex-1 w-full">
-            <div className="p-3 bg-emerald-50 text-emerald-600 rounded-xl shadow-sm"><Calendar className="w-6 h-6" /></div>
-            <div className="flex-1 grid grid-cols-2 gap-2">
+        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col xl:flex-row items-center gap-4">
+          <div className="flex flex-col sm:flex-row items-center gap-3 flex-1 w-full">
+            <div className="p-3 bg-emerald-50 text-emerald-600 rounded-xl shadow-sm hidden sm:block"><Calendar className="w-6 h-6" /></div>
+            <div className="flex-1 grid grid-cols-2 gap-3 w-full">
               <div>
-                <label className="text-[9px] font-black text-slate-400 uppercase block mb-1">Início Relatório</label>
+                <label className="text-[10px] font-black text-slate-400 uppercase block mb-1">Início Relatório</label>
                 <input type="date" value={reportStartDate} onChange={e => setReportStartDate(e.target.value)} className="w-full text-xs font-bold text-slate-700 bg-slate-50 border border-slate-100 rounded-lg p-2 outline-none" />
               </div>
               <div>
-                <label className="text-[9px] font-black text-slate-400 uppercase block mb-1">Fim Relatório</label>
+                <label className="text-[10px] font-black text-slate-400 uppercase block mb-1">Fim Relatório</label>
                 <input type="date" value={reportEndDate} onChange={e => setReportEndDate(e.target.value)} className="w-full text-xs font-bold text-slate-700 bg-slate-50 border border-slate-100 rounded-lg p-2 outline-none" />
               </div>
             </div>
           </div>
-          <button onClick={handleDownloadReport} className="w-full sm:w-auto px-6 py-3 bg-emerald-600 text-white rounded-xl font-black text-xs uppercase tracking-widest flex items-center justify-center gap-2 shadow-lg hover:bg-emerald-700 transition-all active:scale-95">
+          <button onClick={handleDownloadReport} className="w-full xl:w-auto px-6 py-3 bg-emerald-600 text-white rounded-xl font-black text-xs uppercase tracking-widest flex items-center justify-center gap-2 shadow-lg hover:bg-emerald-700 transition-all active:scale-95 whitespace-nowrap">
             <Download className="w-4 h-4" /> Relatório Período (Excel)
           </button>
         </div>
@@ -369,11 +369,11 @@ const Dashboard: React.FC<Props> = ({ state }) => {
               <div className="text-xl font-black text-slate-800 leading-none mb-2">{selectedBatchData.feed.toFixed(1)}kg</div>
               <div className="space-y-1 pt-2 border-t border-slate-100">
                 {selectedBatchData.feedBreakdown.length > 0 ? selectedBatchData.feedBreakdown.map((item: any) => (
-                  <div key={item.name} className="flex justify-between items-center text-[8px]">
+                  <div key={item.name} className="flex justify-between items-center text-[9px]">
                     <span className="font-bold text-slate-400 uppercase truncate">{item.name}</span>
                     <span className="font-black text-slate-600 ml-1">{item.amountKg.toFixed(1)}k</span>
                   </div>
-                )) : <span className="text-[8px] font-bold text-slate-300 italic">Sem consumo</span>}
+                )) : <span className="text-[9px] font-bold text-slate-300 italic">Sem consumo</span>}
               </div>
             </div>
           } icon={<Utensils className="w-5 h-5" />} color="text-amber-600" />
@@ -403,7 +403,7 @@ const Dashboard: React.FC<Props> = ({ state }) => {
             <div className="flex justify-between items-center">
               <h3 className="text-sm font-black text-slate-400 uppercase tracking-widest flex items-center gap-2 italic"><FishOff className="w-4 h-4" /> Mortalidade Registrada</h3>
             </div>
-            <div className="mt-1"><span className="text-[10px] font-black text-red-600 bg-red-50 px-2 py-0.5 rounded-lg">Perdas Totais: {totalMortalityInChart} un</span></div>
+            <div className="mt-1"><span className="text-[11px] font-black text-red-600 bg-red-50 px-2 py-0.5 rounded-lg">Perdas Totais: {totalMortalityInChart} un</span></div>
           </div>
           <div className="h-[250px]">
             <ResponsiveContainer width="100%" height="100%">

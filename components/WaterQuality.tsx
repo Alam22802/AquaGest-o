@@ -153,15 +153,15 @@ const WaterQuality: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
 
 const InputItem = ({ label, value, onChange, icon }: any) => (
   <div>
-    <label className="flex items-center gap-1 text-[10px] font-black text-slate-400 uppercase mb-1 tracking-widest">{icon} {label}</label>
+    <label className="flex items-center gap-1 text-[11px] font-black text-slate-400 uppercase mb-1 tracking-widest">{icon} {label}</label>
     <input type="number" step="0.1" required className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl font-bold text-sm outline-none" value={value} onChange={e => onChange(e.target.value)} />
   </div>
 );
 
 const LogStat = ({ label, value }: any) => (
   <div>
-    <div className="text-[10px] font-black text-slate-400 uppercase tracking-tighter">{label}</div>
-    <div className="text-[11px] font-black text-slate-800">{value}</div>
+    <div className="text-[11px] font-black text-slate-400 uppercase tracking-tighter">{label}</div>
+    <div className="text-[12px] font-black text-slate-800">{value}</div>
   </div>
 );
 

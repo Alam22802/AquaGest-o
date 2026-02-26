@@ -208,7 +208,7 @@ const MortalityLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
             <div className="flex items-center gap-1 bg-slate-100 px-2 py-1 rounded-lg">
               <input 
                 type="date"
-                className="text-[10px] font-black uppercase text-slate-500 bg-transparent outline-none border-none"
+                className="text-[11px] font-black uppercase text-slate-500 bg-transparent outline-none border-none"
                 value={startDate}
                 onChange={e => {
                   setStartDate(e.target.value);
@@ -216,10 +216,10 @@ const MortalityLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                   setSelectedLogIds(new Set());
                 }}
               />
-              <span className="text-[8px] font-black text-slate-300">ATÉ</span>
+              <span className="text-[9px] font-black text-slate-300">ATÉ</span>
               <input 
                 type="date"
-                className="text-[10px] font-black uppercase text-slate-500 bg-transparent outline-none border-none"
+                className="text-[11px] font-black uppercase text-slate-500 bg-transparent outline-none border-none"
                 value={endDate}
                 onChange={e => {
                   setEndDate(e.target.value);

@@ -241,7 +241,7 @@ const FeedingLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
               </select>
               <div className="relative">
                 <input type="number" required placeholder="Quantidade (gramas)" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none" value={formData.amount} onChange={e => setFormData({...formData, amount: e.target.value})} />
-                <div className="absolute right-4 top-1/2 -translate-y-1/2 text-[10px] font-black text-slate-300 uppercase">GRAMAS</div>
+                <div className="absolute right-4 top-1/2 -translate-y-1/2 text-[11px] font-black text-slate-300 uppercase">GRAMAS</div>
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <input type="date" required className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none" value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} />
@@ -297,7 +297,7 @@ const FeedingLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
             <div className="flex items-center gap-1 bg-slate-100 px-2 py-1 rounded-lg">
               <input 
                 type="date"
-                className="text-[10px] font-black uppercase text-slate-500 bg-transparent outline-none border-none"
+                className="text-[11px] font-black uppercase text-slate-500 bg-transparent outline-none border-none"
                 value={startDate}
                 onChange={e => {
                   setStartDate(e.target.value);
@@ -305,10 +305,10 @@ const FeedingLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                   setSelectedLogIds(new Set());
                 }}
               />
-              <span className="text-[8px] font-black text-slate-300">ATÉ</span>
+              <span className="text-[9px] font-black text-slate-300">ATÉ</span>
               <input 
                 type="date"
-                className="text-[10px] font-black uppercase text-slate-500 bg-transparent outline-none border-none"
+                className="text-[11px] font-black uppercase text-slate-500 bg-transparent outline-none border-none"
                 value={endDate}
                 onChange={e => {
                   setEndDate(e.target.value);

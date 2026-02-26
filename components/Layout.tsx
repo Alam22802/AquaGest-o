@@ -41,7 +41,7 @@ const Layout: React.FC<Props> = ({ children, activeTab, setActiveTab, currentUse
         <div className="relative">
           <Users className="w-5 h-5" />
           {currentUser.isMaster && pendingUsersCount > 0 && (
-            <span className="absolute -top-2 -right-2 bg-red-500 text-white text-[8px] font-black w-4 h-4 rounded-full flex items-center justify-center animate-bounce border border-[#344434]">
+            <span className="absolute -top-2 -right-2 bg-red-500 text-white text-[9px] font-black w-4 h-4 rounded-full flex items-center justify-center animate-bounce border border-[#344434]">
               {pendingUsersCount}
             </span>
           )}
@@ -78,7 +78,7 @@ const Layout: React.FC<Props> = ({ children, activeTab, setActiveTab, currentUse
             </div>
             <h1 className="text-xl font-black text-[#e4e4d4] tracking-tighter italic">AquaGestão</h1>
           </div>
-          <span className="text-[8px] font-black uppercase tracking-widest text-[#e4e4d4] opacity-60">CostaFoods Brasil</span>
+          <span className="text-[9px] font-black uppercase tracking-widest text-[#e4e4d4] opacity-60">CostaFoods Brasil</span>
           
           <button 
             onClick={() => setIsMenuOpen(false)}
@@ -144,7 +144,7 @@ const Layout: React.FC<Props> = ({ children, activeTab, setActiveTab, currentUse
           </div>
           <div className="text-center">
             <h1 className="text-sm font-black text-slate-800 uppercase tracking-tighter italic">AquaGestão</h1>
-            <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">CostaFoods Brasil</p>
+            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">CostaFoods Brasil</p>
           </div>
           <div className={`w-10 h-10 rounded-xl text-white flex items-center justify-center font-black text-lg shadow-md ${currentUser.isMaster ? 'bg-amber-600' : 'bg-[#344434]'}`}>
             {currentUser.name.charAt(0)}
