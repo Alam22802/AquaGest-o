@@ -338,7 +338,10 @@ const Dashboard: React.FC<Props> = ({ state }) => {
           </div>
         </div>
 
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col xl:flex-row items-center gap-4">
+        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col xl:flex-row-reverse items-center gap-4">
+          <button onClick={handleDownloadReport} className="w-full xl:w-auto px-6 py-3 bg-emerald-600 text-white rounded-xl font-black text-xs uppercase tracking-widest flex items-center justify-center gap-2 shadow-lg hover:bg-emerald-700 transition-all active:scale-95 whitespace-nowrap">
+            <Download className="w-4 h-4" /> RELATÓRIO (EXCEL)
+          </button>
           <div className="flex flex-col sm:flex-row items-center gap-3 flex-1 w-full">
             <div className="p-3 bg-emerald-50 text-emerald-600 rounded-xl shadow-sm hidden sm:block"><Calendar className="w-6 h-6" /></div>
             <div className="flex-1 grid grid-cols-2 gap-3 w-full">
@@ -352,9 +355,6 @@ const Dashboard: React.FC<Props> = ({ state }) => {
               </div>
             </div>
           </div>
-          <button onClick={handleDownloadReport} className="w-full xl:w-auto px-6 py-3 bg-emerald-600 text-white rounded-xl font-black text-xs uppercase tracking-widest flex items-center justify-center gap-2 shadow-lg hover:bg-emerald-700 transition-all active:scale-95 whitespace-nowrap">
-            <Download className="w-4 h-4" /> Relatório Período (Excel)
-          </button>
         </div>
       </div>
 
