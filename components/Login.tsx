@@ -142,19 +142,19 @@ const Login: React.FC<Props> = ({ state, onLogin, onRegister }) => {
         
         <div className="p-8">
           {showLinkInput && !isCloudActive && (
-            <div className="mb-6 p-5 bg-blue-50 border border-blue-200 rounded-3xl space-y-3 animate-in fade-in slide-in-from-top-2 duration-300">
-              <h4 className="text-[10px] font-black text-blue-800 uppercase tracking-widest flex items-center gap-2">
+            <div className="mb-6 p-5 bg-emerald-50 border border-emerald-200 rounded-3xl space-y-3 animate-in fade-in slide-in-from-top-2 duration-300">
+              <h4 className="text-[10px] font-black text-emerald-800 uppercase tracking-widest flex items-center gap-2">
                 <LinkIcon className="w-4 h-4" /> Colar Link de Convite
               </h4>
-              <p className="text-[9px] font-bold text-blue-600 uppercase">Se você salvou na tela inicial e perdeu a conexão, cole o link enviado pelo administrador aqui.</p>
+              <p className="text-[9px] font-bold text-emerald-600 uppercase">Se você salvou na tela inicial e perdeu a conexão, cole o link enviado pelo administrador aqui.</p>
               <input 
                 type="text" 
                 placeholder="Cole o link completo aqui..." 
-                className="w-full px-4 py-3 bg-white border border-blue-100 rounded-2xl text-xs font-bold outline-none"
+                className="w-full px-4 py-3 bg-white border border-emerald-100 rounded-2xl text-xs font-bold outline-none"
                 value={inviteLink}
                 onChange={e => setInviteLink(e.target.value)}
               />
-              <button onClick={handleApplyInviteLink} className="w-full bg-blue-600 text-white py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-blue-700 transition-all shadow-lg shadow-blue-600/20">
+              <button onClick={handleApplyInviteLink} className="w-full bg-emerald-600 text-white py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-600/20">
                 Ativar Nuvem no Celular
               </button>
             </div>

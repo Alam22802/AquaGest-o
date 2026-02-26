@@ -362,7 +362,7 @@ const Dashboard: React.FC<Props> = ({ state }) => {
             <div className="flex flex-col">
               <div className="text-xl font-black text-slate-800 leading-none mb-2">{selectedBatchData.feed.toFixed(1)}kg</div>
               <div className="space-y-1 pt-2 border-t border-slate-100">
-                {selectedBatchData.feedBreakdown.length > 0 ? selectedBatchData.feedBreakdown.slice(0, 2).map((item: any) => (
+                {selectedBatchData.feedBreakdown.length > 0 ? selectedBatchData.feedBreakdown.map((item: any) => (
                   <div key={item.name} className="flex justify-between items-center text-[8px]">
                     <span className="font-bold text-slate-400 uppercase truncate">{item.name}</span>
                     <span className="font-black text-slate-600 ml-1">{item.amountKg.toFixed(1)}k</span>

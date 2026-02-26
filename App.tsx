@@ -276,9 +276,9 @@ const App: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center text-white">
-        <Loader2 className="w-12 h-12 text-blue-500 animate-spin mb-4" />
-        <h2 className="text-xl font-black tracking-widest uppercase italic">AquaGestão</h2>
+      <div className="min-h-screen bg-[#1a1f1a] flex flex-col items-center justify-center text-[#e4e4d4]">
+        <Loader2 className="w-12 h-12 text-[#e4e4d4] animate-spin mb-4 opacity-40" />
+        <h2 className="text-xl font-black tracking-widest uppercase italic opacity-80">AquaGestão</h2>
       </div>
     );
   }
@@ -286,9 +286,9 @@ const App: React.FC = () => {
   return (
     <>
       {isSyncingBackground ? (
-        <div className="fixed top-2 left-1/2 -translate-x-1/2 z-[100] bg-white/80 backdrop-blur px-3 py-1 rounded-full shadow-sm border border-blue-100 flex items-center gap-2 pointer-events-none">
-          <RefreshCw className="w-3 h-3 text-blue-500 animate-spin" />
-          <span className="text-[9px] font-black text-blue-600 uppercase tracking-widest">Sincronizando...</span>
+        <div className="fixed top-2 left-1/2 -translate-x-1/2 z-[100] bg-white/80 backdrop-blur px-3 py-1 rounded-full shadow-sm border-emerald-100 flex items-center gap-2 pointer-events-none">
+          <RefreshCw className="w-3 h-3 text-emerald-500 animate-spin" />
+          <span className="text-[9px] font-black text-emerald-600 uppercase tracking-widest">Sincronizando...</span>
         </div>
       ) : (
         <div className="fixed top-2 left-1/2 -translate-x-1/2 z-[100] bg-white/40 backdrop-blur px-3 py-1 rounded-full shadow-sm border border-emerald-100/50 flex items-center gap-2 pointer-events-none opacity-0 hover:opacity-100 transition-opacity">
