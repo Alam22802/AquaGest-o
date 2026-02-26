@@ -50,11 +50,13 @@ const Dashboard: React.FC<Props> = ({ state }) => {
       
       const totalInitial = batchCages.reduce((acc, c) => acc + (c.initialFishCount || 0), 0);
       const totalMortality = (state.mortalityLogs || [])
-        .filter(m => cageIds.includes(m.cageId))
+        .filter(m => cageIds.includes(m.cageId) && m.date >= batch.settlementDate)
         .reduce((acc, m) => acc + m.count, 0);
       const currentTotalStock = totalInitial - totalMortality;
 
-      const batchBiometries = (state.biometryLogs || []).filter(b => cageIds.includes(b.cageId));
+      const batchBiometries = (state.biometryLogs || []).filter(b => 
+        cageIds.includes(b.cageId) && b.date >= batch.settlementDate
+      );
       let currentAvgWeight = batch.initialUnitWeight;
       let samplingInfo = "Peso Inicial";
 
@@ -71,7 +73,9 @@ const Dashboard: React.FC<Props> = ({ state }) => {
       }
 
       const totalBiomassKg = (currentTotalStock * currentAvgWeight) / 1000;
-      const feedingLogsForBatch = (state.feedingLogs || []).filter(f => cageIds.includes(f.cageId));
+      const feedingLogsForBatch = (state.feedingLogs || []).filter(f => 
+        cageIds.includes(f.cageId) && f.timestamp >= batch.settlementDate
+      );
       const totalFeedKg = feedingLogsForBatch.reduce((acc, f) => acc + f.amount, 0) / 1000;
 
       const feedBreakdownObj: { [name: string]: number } = {};
@@ -156,9 +160,11 @@ const Dashboard: React.FC<Props> = ({ state }) => {
     const end = endOfDay(parseISO(reportEndDate));
 
     // Função auxiliar para filtrar logs por data
-    const filterByDate = (dateString: string) => {
+    const filterByDate = (dateString: string | undefined) => {
+      if (!dateString) return false;
       try {
         const itemDate = parseISO(dateString);
+        if (isNaN(itemDate.getTime())) return false;
         return isWithinInterval(itemDate, { start, end });
       } catch {
         return false;
@@ -218,7 +224,7 @@ const Dashboard: React.FC<Props> = ({ state }) => {
     XLSX.utils.book_append_sheet(wb, wsCages, "Inventário Gaiolas");
 
     // 5. ABA: TRATOS (ALIMENTAÇÃO) - FILTRADO
-    const filteredFeedingLogs = state.feedingLogs.filter(f => filterByDate(f.timestamp));
+    const filteredFeedingLogs = (state.feedingLogs || []).filter(f => filterByDate(f.timestamp));
     const wsFeeding = XLSX.utils.json_to_sheet(filteredFeedingLogs.map(f => ({
       "Data/Hora": f.timestamp,
       "Gaiola": cageMap.get(f.cageId) || f.cageId,
@@ -229,7 +235,7 @@ const Dashboard: React.FC<Props> = ({ state }) => {
     XLSX.utils.book_append_sheet(wb, wsFeeding, "Tratos Alimentares");
 
     // 6. ABA: MORTALIDADE - FILTRADO
-    const filteredMortalityLogs = state.mortalityLogs.filter(m => filterByDate(m.date));
+    const filteredMortalityLogs = (state.mortalityLogs || []).filter(m => filterByDate(m.date));
     const wsMortality = XLSX.utils.json_to_sheet(filteredMortalityLogs.map(m => ({
       "Data": m.date,
       "Gaiola": cageMap.get(m.cageId) || m.cageId,
@@ -239,7 +245,7 @@ const Dashboard: React.FC<Props> = ({ state }) => {
     XLSX.utils.book_append_sheet(wb, wsMortality, "Mortalidade");
 
     // 7. ABA: BIOMETRIA - FILTRADO
-    const filteredBiometryLogs = state.biometryLogs.filter(b => filterByDate(b.date));
+    const filteredBiometryLogs = (state.biometryLogs || []).filter(b => filterByDate(b.date));
     const wsBiometry = XLSX.utils.json_to_sheet(filteredBiometryLogs.map(b => ({
       "Data": b.date,
       "Gaiola": cageMap.get(b.cageId) || b.cageId,
@@ -249,7 +255,7 @@ const Dashboard: React.FC<Props> = ({ state }) => {
     XLSX.utils.book_append_sheet(wb, wsBiometry, "Biometria");
 
     // 8. ABA: QUALIDADE ÁGUA - FILTRADO
-    const filteredWaterLogs = state.waterLogs.filter(w => filterByDate(w.date));
+    const filteredWaterLogs = (state.waterLogs || []).filter(w => filterByDate(w.date));
     const wsWater = XLSX.utils.json_to_sheet(filteredWaterLogs.map(w => ({
       "Data": w.date,
       "Hora": w.time,
@@ -262,7 +268,7 @@ const Dashboard: React.FC<Props> = ({ state }) => {
     XLSX.utils.book_append_sheet(wb, wsWater, "Qualidade Água");
 
     // 9. ABA: ESTOQUE RAÇÃO
-    const wsFeedStock = XLSX.utils.json_to_sheet(state.feedTypes.map(f => ({
+    const wsFeedStock = XLSX.utils.json_to_sheet((state.feedTypes || []).map(f => ({
       "Ração": f.name,
       "Estoque Atual (kg)": f.totalStock / 1000,
       "Capacidade Silo (kg)": f.maxCapacity,
@@ -271,7 +277,7 @@ const Dashboard: React.FC<Props> = ({ state }) => {
     XLSX.utils.book_append_sheet(wb, wsFeedStock, "Estoque Ração");
 
     // 10. ABA: FRIGORÍFICO - FILTRADO
-    const filteredSlaughterLogs = state.slaughterLogs.filter(s => filterByDate(s.date));
+    const filteredSlaughterLogs = (state.slaughterLogs || []).filter(s => filterByDate(s.date));
     const wsSlaughter = XLSX.utils.json_to_sheet(filteredSlaughterLogs.map(s => ({
       "Data": s.date,
       "Lote Abate": s.slaughterBatch,
