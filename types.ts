@@ -143,6 +143,18 @@ export interface SlaughterLog {
   updatedAt?: number;
 }
 
+export type FeedStockLogType = 'Entrada' | 'Ajuste';
+
+export interface FeedStockLog {
+  id: string;
+  feedTypeId: string;
+  amount: number; // em gramas
+  type: FeedStockLogType;
+  timestamp: string;
+  userId: string;
+  updatedAt?: number;
+}
+
 export interface AppState {
   users: User[];
   lines: Line[];
@@ -150,6 +162,7 @@ export interface AppState {
   cages: Cage[];
   feedTypes: FeedType[];
   feedingLogs: FeedingLog[];
+  feedStockLogs: FeedStockLog[];
   mortalityLogs: MortalityLog[];
   biometryLogs: BiometryLog[];
   waterLogs: WaterLog[];
