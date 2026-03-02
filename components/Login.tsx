@@ -4,6 +4,8 @@ import { User, AppState } from '../types';
 import { Lock, User as UserIcon, LogIn, ArrowLeft, Clock, Eye, EyeOff, ShieldCheck, Cloud, RefreshCw, AlertTriangle, Link as LinkIcon } from 'lucide-react';
 import { loadState, applyConfigFromLink } from '../store';
 
+import Logo from './Logo';
+
 interface Props {
   state: AppState;
   onLogin: (user: User) => void;
@@ -115,10 +117,7 @@ const Login: React.FC<Props> = ({ state, onLogin, onRegister }) => {
       <div className="max-w-md w-full bg-white rounded-[2.5rem] shadow-2xl overflow-hidden border border-white/10">
         
         <div className="bg-[#344434] p-10 text-center relative">
-          <div className="flex flex-col items-center">
-             <div className="text-[#e4e4d4] text-[9px] font-black mb-3 tracking-[0.35em] uppercase opacity-60">COSTAFOODS BRASIL</div>
-             <h1 className="text-4xl font-black text-[#e4e4d4] uppercase tracking-tighter italic leading-none">AquaGestão</h1>
-          </div>
+           <Logo className="text-[#e4e4d4]" variant="large" />
           
           {isCloudActive ? (
              <button onClick={handleSync} className="absolute top-4 right-4 flex items-center gap-2 px-3 py-2 bg-white/10 rounded-2xl text-[#e4e4d4] hover:bg-white/20 transition-all border border-white/5 active:scale-95">

@@ -5,6 +5,8 @@ import {
 } from 'lucide-react';
 import { User, AppState } from '../types.ts';
 
+import Logo from './Logo';
+
 interface Props {
   children: React.ReactNode;
   activeTab: string;
@@ -72,13 +74,7 @@ const Layout: React.FC<Props> = ({ children, activeTab, setActiveTab, currentUse
           className="p-6 flex flex-col items-center gap-2 border-b border-black/10 shrink-0 relative"
           style={{ paddingTop: 'calc(1.5rem + env(safe-area-inset-top, 0px))' }}
         >
-          <div className="flex items-center gap-3">
-            <div className="bg-white/10 p-2 rounded-lg">
-               <Waves className="w-6 h-6 text-[#e4e4d4]" />
-            </div>
-            <h1 className="text-xl font-black text-[#e4e4d4] tracking-tighter italic">AquaGestão</h1>
-          </div>
-          <span className="text-[9px] font-black uppercase tracking-widest text-[#e4e4d4] opacity-60">CostaFoods Brasil</span>
+          <Logo className="text-[#e4e4d4]" variant="small" />
           
           <button 
             onClick={() => setIsMenuOpen(false)}
