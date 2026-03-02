@@ -20,7 +20,7 @@ const Layout: React.FC<Props> = ({ children, activeTab, setActiveTab, currentUse
   const pendingUsersCount = state?.users?.filter(u => !u.isApproved).length || 0;
 
   const menuItems = [
-    { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard className="w-5 h-5" /> },
+    { id: 'dashboard', label: 'Visão Geral', icon: <LayoutDashboard className="w-5 h-5" /> },
     { id: 'water', label: 'Qualidade Água', icon: <Droplets className="w-5 h-5" /> },
     { id: 'inventory', label: 'Cadastro Gaiolas', icon: <Box className="w-5 h-5" /> },
     { id: 'maintenance', label: 'Manutenção', icon: <Settings className="w-5 h-5" /> },
