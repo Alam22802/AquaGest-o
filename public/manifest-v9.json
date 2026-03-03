@@ -1,0 +1,24 @@
+{
+  "short_name": "AquaGestão 9",
+  "name": "AquaGestão - Piscicultura",
+  "icons": [
+    {
+      "src": "/fish-icon-v9.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/fish-icon-v9.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ],
+  "start_url": "/?v=9",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#344434",
+  "theme_color": "#344434"
+}
