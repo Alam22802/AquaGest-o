@@ -1,28 +1,28 @@
 
 {
-  "short_name": "AquaGestão v5",
-  "name": "AquaGestão - Piscicultura Inteligente",
+  "short_name": "AquaGestão PRO",
+  "name": "AquaGestão - Gestão de Piscicultura",
   "icons": [
     {
-      "src": "/pwa-final-v5.svg",
+      "src": "/aquagestao-v6.svg",
       "sizes": "192x192",
       "type": "image/svg+xml",
       "purpose": "any"
     },
     {
-      "src": "/pwa-final-v5.svg",
+      "src": "/aquagestao-v6.svg",
       "sizes": "512x512",
       "type": "image/svg+xml",
       "purpose": "any"
     },
     {
-      "src": "/pwa-final-v5.svg",
+      "src": "/aquagestao-v6.svg",
       "sizes": "512x512",
       "type": "image/svg+xml",
       "purpose": "maskable"
     }
   ],
-  "start_url": "/?v=5",
+  "start_url": "/?v=6",
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait",
