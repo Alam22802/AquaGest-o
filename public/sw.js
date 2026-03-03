@@ -1,11 +1,11 @@
 
-const CACHE_NAME = 'aquagestao-v3';
+const CACHE_NAME = 'aquagestao-v4';
 const ASSETS = [
   '/',
   '/index.html',
   '/index.tsx',
-  '/manifest.json',
-  '/aquagestao-logo.svg',
+  '/manifest.json?v=4',
+  '/pwa-icon-v4.svg',
   'https://cdn.tailwindcss.com',
   'https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap'
 ];
