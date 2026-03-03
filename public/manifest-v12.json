@@ -3,25 +3,25 @@
   "name": "AquaGestão - Piscicultura",
   "icons": [
     {
-      "src": "/pwa-icon-final.svg",
+      "src": "/pwa-icon-v12.svg",
       "sizes": "192x192",
       "type": "image/svg+xml",
       "purpose": "any"
     },
     {
-      "src": "/pwa-icon-final.svg",
+      "src": "/pwa-icon-v12.svg",
       "sizes": "512x512",
       "type": "image/svg+xml",
       "purpose": "any"
     },
     {
-      "src": "/pwa-icon-final.svg",
+      "src": "/pwa-icon-v12.svg",
       "sizes": "512x512",
       "type": "image/svg+xml",
       "purpose": "maskable"
     }
   ],
-  "start_url": "/?v=final",
+  "start_url": "/?v=12",
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait",
