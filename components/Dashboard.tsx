@@ -44,47 +44,89 @@ const Dashboard: React.FC<Props> = ({ state }) => {
   }, [state.feedTypes]);
 
   const batchStats = useMemo(() => {
+    const cagesByBatch = new Map<string, typeof state.cages>();
+    state.cages.forEach(c => {
+      if (c.batchId) {
+        const list = cagesByBatch.get(c.batchId) || [];
+        list.push(c);
+        cagesByBatch.set(c.batchId, list);
+      }
+    });
+
+    const mortalityByCage = new Map<string, typeof state.mortalityLogs>();
+    state.mortalityLogs.forEach(m => {
+      const list = mortalityByCage.get(m.cageId) || [];
+      list.push(m);
+      mortalityByCage.set(m.cageId, list);
+    });
+
+    const biometryByCage = new Map<string, typeof state.biometryLogs>();
+    (state.biometryLogs || []).forEach(b => {
+      const list = biometryByCage.get(b.cageId) || [];
+      list.push(b);
+      biometryByCage.set(b.cageId, list);
+    });
+
+    const feedingByCage = new Map<string, typeof state.feedingLogs>();
+    (state.feedingLogs || []).forEach(f => {
+      const list = feedingByCage.get(f.cageId) || [];
+      list.push(f);
+      feedingByCage.set(f.cageId, list);
+    });
+
     return (state.batches || []).map(batch => {
-      const batchCages = (state.cages || []).filter(c => c.batchId === batch.id);
-      const cageIds = batchCages.map(c => c.id);
+      const batchCages = cagesByBatch.get(batch.id) || [];
+      const cageIds = new Set(batchCages.map(c => c.id));
       
       const totalInitial = batchCages.reduce((acc, c) => acc + (c.initialFishCount || 0), 0);
-      const totalMortality = (state.mortalityLogs || [])
-        .filter(m => cageIds.includes(m.cageId) && m.date >= batch.settlementDate)
-        .reduce((acc, m) => acc + m.count, 0);
+      
+      let totalMortality = 0;
+      batchCages.forEach(c => {
+        const logs = mortalityByCage.get(c.id) || [];
+        logs.forEach(m => {
+          if (m.date >= batch.settlementDate) totalMortality += m.count;
+        });
+      });
+
       const currentTotalStock = totalInitial - totalMortality;
 
-      const batchBiometries = (state.biometryLogs || []).filter(b => 
-        cageIds.includes(b.cageId) && b.date >= batch.settlementDate
-      );
+      const batchBiometries: typeof state.biometryLogs = [];
+      batchCages.forEach(c => {
+        const logs = biometryByCage.get(c.id) || [];
+        logs.forEach(b => {
+          if (b.date >= batch.settlementDate) batchBiometries.push(b);
+        });
+      });
+
       let currentAvgWeight = batch.initialUnitWeight;
       let samplingInfo = "Peso Inicial";
 
       if (batchBiometries.length > 0) {
-        // Encontrar a última data em que houve biometria para este lote
         const lastDate = batchBiometries.reduce((max, log) => log.date > max ? log.date : max, "");
         const lastDayLogs = batchBiometries.filter(log => log.date === lastDate);
-        
-        // Média dos pesos registrados apenas no último dia
         const sumWeights = lastDayLogs.reduce((acc, log) => acc + log.averageWeight, 0);
         currentAvgWeight = sumWeights / lastDayLogs.length;
-        
         samplingInfo = `Média de ${lastDayLogs.length} gaiolas (Dia: ${format(parseISO(lastDate), 'dd/MM')})`;
       }
 
       const totalBiomassKg = (currentTotalStock * currentAvgWeight) / 1000;
-      const feedingLogsForBatch = (state.feedingLogs || []).filter(f => 
-        cageIds.includes(f.cageId) && f.timestamp >= batch.settlementDate
-      );
-      const totalFeedKg = feedingLogsForBatch.reduce((acc, f) => acc + f.amount, 0) / 1000;
-
+      
+      let totalFeedAmount = 0;
       const feedBreakdownObj: { [name: string]: number } = {};
-      feedingLogsForBatch.forEach(log => {
-        const feedType = state.feedTypes.find(ft => ft.id === log.feedTypeId);
-        const name = feedType ? feedType.name : 'Ração S/ Ident.';
-        feedBreakdownObj[name] = (feedBreakdownObj[name] || 0) + log.amount;
+      
+      batchCages.forEach(c => {
+        const logs = feedingByCage.get(c.id) || [];
+        logs.forEach(f => {
+          if (f.timestamp >= batch.settlementDate) {
+            totalFeedAmount += f.amount;
+            const feedType = state.feedTypes.find(ft => ft.id === f.feedTypeId);
+            const name = feedType ? feedType.name : 'Ração S/ Ident.';
+            feedBreakdownObj[name] = (feedBreakdownObj[name] || 0) + f.amount;
+          }
+        });
       });
 
+      const totalFeedKg = totalFeedAmount / 1000;
       const feedBreakdown = Object.entries(feedBreakdownObj).map(([name, amount]) => ({
         name,
         amountKg: amount / 1000

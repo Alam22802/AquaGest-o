@@ -33,14 +33,14 @@ const App: React.FC = () => {
   const [activeAlert, setActiveAlert] = useState<{title: string, message: string} | null>(null);
   
   const isSavingRef = useRef(false);
-  const lastRemoteStateRef = useRef<string>('');
+  const lastSavedStateRef = useRef<AppState | null>(null);
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const initApp = useCallback(async () => {
     try {
       const data = await loadState();
       setState(data);
-      lastRemoteStateRef.current = JSON.stringify(data);
+      lastSavedStateRef.current = data;
       
       const savedUser = getSession();
       if (savedUser) {
@@ -57,7 +57,7 @@ const App: React.FC = () => {
              if (remote) {
                const merged = ensureStateIntegrity(data, remote, 'remote');
                setState(merged);
-               lastRemoteStateRef.current = JSON.stringify(merged);
+               lastSavedStateRef.current = merged;
              }
              setIsSyncingBackground(false);
           }
@@ -84,8 +84,8 @@ const App: React.FC = () => {
       const remote = await fetchRemoteState(configToUse);
       
       if (remote) {
-        const remoteStr = JSON.stringify(remote);
-        if (remoteStr === lastRemoteStateRef.current) {
+        // Simple check to avoid unnecessary updates if remote is same as local
+        if (lastSavedStateRef.current && JSON.stringify(remote) === JSON.stringify(lastSavedStateRef.current)) {
           setIsSyncingBackground(false);
           return;
         }
@@ -98,7 +98,7 @@ const App: React.FC = () => {
         
         const finalState = { ...merged, users: updatedUsers };
         setState(finalState);
-        lastRemoteStateRef.current = JSON.stringify(merged);
+        lastSavedStateRef.current = merged;
       }
     } catch (err) {
       console.warn('Erro na sincronização de background:', err);
@@ -119,13 +119,13 @@ const App: React.FC = () => {
     const unsubscribe = subscribeToRemoteChanges(configToUse, (remoteState) => {
       if (isSavingRef.current) return;
 
-      const remoteStr = JSON.stringify(remoteState);
-      if (remoteStr === lastRemoteStateRef.current) return;
-
       setState(prev => {
         if (!prev) return remoteState;
+        // Only update if remote state is actually different
+        if (JSON.stringify(remoteState) === JSON.stringify(lastSavedStateRef.current)) return prev;
+        
         const merged = ensureStateIntegrity(prev, remoteState, 'remote');
-        lastRemoteStateRef.current = JSON.stringify(remoteState);
+        lastSavedStateRef.current = remoteState;
         return merged;
       });
     });
@@ -137,10 +137,8 @@ const App: React.FC = () => {
 
   useEffect(() => {
     if (state && !isLoading) {
-      // Verificar se o estado mudou em relação ao último estado remoto conhecido
-      // para evitar salvar o que acabamos de baixar
-      const currentStateStr = JSON.stringify(state);
-      if (currentStateStr === lastRemoteStateRef.current) return;
+      // Avoid saving if state hasn't changed from what we last saved or loaded
+      if (lastSavedStateRef.current === state) return;
 
       // Debounce saving
       if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
@@ -150,12 +148,11 @@ const App: React.FC = () => {
         const configToUse = currentUser?.supabaseConfig || state.supabaseConfig;
         
         saveState(state, configToUse).then(() => {
-          // Após salvar, o estado remoto é igual ao nosso estado local atual
-          lastRemoteStateRef.current = JSON.stringify(state);
+          lastSavedStateRef.current = state;
         }).finally(() => {
           isSavingRef.current = false;
         });
-      }, 2000); // 2 segundos de debounce
+      }, 2000); 
 
       // Verificar alertas
       const now = Date.now();
@@ -182,14 +179,31 @@ const App: React.FC = () => {
   const handleStateUpdate = (newState: AppState) => {
     if (!state) return;
 
+    // Optimized timestamp injection: only for items that actually changed
+    // and only if the list itself is different by reference
     const injectTimestamps = (oldList: any[], newList: any[]) => {
+      if (oldList === newList) return oldList;
+      
       const oldMap = new Map(oldList.map(i => [i.id, i]));
       return newList.map(item => {
         const oldItem = oldMap.get(item.id);
-        if (!oldItem || JSON.stringify({...oldItem, updatedAt: 0}) !== JSON.stringify({...item, updatedAt: 0})) {
+        // Shallow comparison is much faster than JSON.stringify
+        if (!oldItem) return { ...item, updatedAt: Date.now() };
+        
+        let hasChanged = false;
+        const keys = Object.keys(item) as (keyof typeof item)[];
+        for (const key of keys) {
+          if (key === 'updatedAt') continue;
+          if (item[key] !== oldItem[key]) {
+            hasChanged = true;
+            break;
+          }
+        }
+        
+        if (hasChanged) {
           return { ...item, updatedAt: Date.now() };
         }
-        return item;
+        return oldItem; // Keep old reference if unchanged
       });
     };
 
@@ -210,6 +224,7 @@ const App: React.FC = () => {
     };
 
     const findDeleted = (oldList: any[], newList: any[]) => {
+      if (oldList === newList) return [];
       const newIds = new Set(newList.map(i => i.id));
       return oldList.filter(i => !newIds.has(i.id)).map(i => i.id);
     };

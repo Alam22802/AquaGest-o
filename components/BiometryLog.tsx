@@ -28,10 +28,11 @@ const BiometryLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
   }, [selectedLineId]);
 
   const sortedLogs = useMemo(() => {
-    return [...state.biometryLogs].sort((a, b) => {
-      const dateA = new Date(a.date).getTime();
-      const dateB = new Date(b.date).getTime();
-      return sortOrder === 'desc' ? dateB - dateA : dateA - dateB;
+    const logs = Array.isArray(state.biometryLogs) ? state.biometryLogs : [];
+    return [...logs].sort((a, b) => {
+      return sortOrder === 'desc' 
+        ? b.date.localeCompare(a.date) 
+        : a.date.localeCompare(b.date);
     });
   }, [state.biometryLogs, sortOrder]);
 

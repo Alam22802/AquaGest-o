@@ -87,6 +87,94 @@ const BatchManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     });
   };
 
+  const batchStats = useMemo(() => {
+    const cagesByBatch = new Map<string, typeof state.cages>();
+    state.cages.forEach(c => {
+      if (c.batchId) {
+        const list = cagesByBatch.get(c.batchId) || [];
+        list.push(c);
+        cagesByBatch.set(c.batchId, list);
+      }
+    });
+
+    const mortalityByCage = new Map<string, number>();
+    state.mortalityLogs.forEach(m => {
+      mortalityByCage.set(m.cageId, (mortalityByCage.get(m.cageId) || 0) + m.count);
+    });
+
+    const biometryByCage = new Map<string, typeof state.biometryLogs>();
+    (state.biometryLogs || []).forEach(b => {
+      const list = biometryByCage.get(b.cageId) || [];
+      list.push(b);
+      biometryByCage.set(b.cageId, list);
+    });
+
+    return state.batches.map(batch => {
+      const batchCages = cagesByBatch.get(batch.id) || [];
+      const cageIds = batchCages.map(c => c.id);
+      
+      const usedFish = batchCages.reduce((acc, curr) => acc + (curr.initialFishCount || 0), 0);
+      const balance = batch.initialQuantity - usedFish;
+      
+      let mortality = 0;
+      cageIds.forEach(id => {
+        mortality += mortalityByCage.get(id) || 0;
+      });
+      
+      const liveFish = batch.initialQuantity - mortality;
+      const yieldPercentage = batch.initialQuantity > 0 ? (liveFish / batch.initialQuantity) * 100 : 0;
+      
+      const batchBiometries: typeof state.biometryLogs = [];
+      cageIds.forEach(id => {
+        const logs = biometryByCage.get(id);
+        if (logs) batchBiometries.push(...logs);
+      });
+
+      let currentAvgWeight = batch.initialUnitWeight;
+      if (batchBiometries.length > 0) {
+        const lastDate = batchBiometries.reduce((max, log) => log.date > max ? log.date : max, "");
+        const lastDayLogs = batchBiometries.filter(log => log.date === lastDate);
+        const sumWeights = lastDayLogs.reduce((acc, log) => acc + log.averageWeight, 0);
+        currentAvgWeight = sumWeights / lastDayLogs.length;
+      }
+
+      const totalBiomassKg = (liveFish * currentAvgWeight) / 1000;
+      const protocol = (state.protocols || []).find(p => p.id === batch.protocolId);
+
+      let settlementAlert = null;
+      if (batch.settlementDate) {
+        const today = startOfDay(new Date());
+        const settlement = startOfDay(parseISO(batch.settlementDate));
+        const daysDiff = differenceInDays(settlement, today);
+        
+        if (daysDiff >= 0 && daysDiff <= 5) {
+          settlementAlert = (
+            <div className="bg-amber-50 border border-amber-200 p-3 rounded-2xl flex items-center gap-3 animate-pulse">
+              <AlertCircle className="w-4 h-4 text-amber-600" />
+              <span className="text-[10px] font-black text-amber-700 uppercase tracking-widest">
+                Povoamento em {daysDiff === 0 ? 'HOJE' : `${daysDiff} dias`}
+              </span>
+            </div>
+          );
+        }
+      }
+
+      return {
+        ...batch,
+        batchCages,
+        usedFish,
+        balance,
+        mortality,
+        liveFish,
+        yieldPercentage,
+        currentAvgWeight,
+        totalBiomassKg,
+        protocol,
+        settlementAlert
+      };
+    });
+  }, [state.batches, state.cages, state.mortalityLogs, state.biometryLogs, state.protocols]);
+
   return (
     <div className="space-y-8 pb-20">
       {hasPermission ? (
@@ -150,58 +238,7 @@ const BatchManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {state.batches.map(batch => {
-          const batchCages = state.cages.filter(c => c.batchId === batch.id);
-          const cageIds = batchCages.map(c => c.id);
-          
-          const usedFish = batchCages.reduce((acc, curr) => acc + (curr.initialFishCount || 0), 0);
-          const balance = batch.initialQuantity - usedFish;
-          
-          // Cálculo de Mortalidade e Peixes Vivos
-          const mortality = state.mortalityLogs
-            .filter(m => cageIds.includes(m.cageId))
-            .reduce((acc, curr) => acc + curr.count, 0);
-          
-          const liveFish = batch.initialQuantity - mortality;
-          const yieldPercentage = batch.initialQuantity > 0 ? (liveFish / batch.initialQuantity) * 100 : 0;
-          
-          // Cálculo de Biometria e Biomassa
-          const batchBiometries = (state.biometryLogs || []).filter(b => cageIds.includes(b.cageId));
-          let currentAvgWeight = batch.initialUnitWeight;
-          
-          if (batchBiometries.length > 0) {
-            // Encontrar a última data em que houve biometria para este lote
-            const lastDate = batchBiometries.reduce((max, log) => log.date > max ? log.date : max, "");
-            const lastDayLogs = batchBiometries.filter(log => log.date === lastDate);
-            
-            // Média dos pesos registrados apenas no último dia
-            const sumWeights = lastDayLogs.reduce((acc, log) => acc + log.averageWeight, 0);
-            currentAvgWeight = sumWeights / lastDayLogs.length;
-          }
-
-          const totalBiomassKg = (liveFish * currentAvgWeight) / 1000;
-          
-          const protocol = (state.protocols || []).find(p => p.id === batch.protocolId);
-          
-          // Alerta de Povoamento baseado na Data de Povoamento (se for futura)
-          let settlementAlert = null;
-          if (batch.settlementDate) {
-            const today = startOfDay(new Date());
-            const settlement = startOfDay(parseISO(batch.settlementDate));
-            const daysDiff = differenceInDays(settlement, today);
-            
-            if (daysDiff >= 0 && daysDiff <= 5) {
-              settlementAlert = (
-                <div className="bg-amber-50 border border-amber-200 p-3 rounded-2xl flex items-center gap-3 animate-pulse">
-                  <AlertCircle className="w-4 h-4 text-amber-600" />
-                  <span className="text-[10px] font-black text-amber-700 uppercase tracking-widest">
-                    Povoamento em {daysDiff === 0 ? 'HOJE' : `${daysDiff} dias`}
-                  </span>
-                </div>
-              );
-            }
-          }
-
+        {batchStats.map(batch => {
           return (
             <div key={batch.id} className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden hover:border-blue-200 transition-all">
               <div className="p-4 bg-slate-50 border-b border-slate-100 flex justify-between items-center">
@@ -217,19 +254,19 @@ const BatchManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                 )}
               </div>
               <div className="p-6 space-y-4">
-                {settlementAlert}
+                {batch.settlementAlert}
                 <div className="flex items-center justify-between">
-                  {protocol ? (
+                  {batch.protocol ? (
                      <div className="flex items-center gap-2 px-3 py-1.5 bg-indigo-50 rounded-xl border border-indigo-100">
                        <BookOpen className="w-3 h-3 text-indigo-600" />
-                       <span className="text-[10px] font-black text-indigo-700 uppercase tracking-widest">{protocol.name}</span>
+                       <span className="text-[10px] font-black text-indigo-700 uppercase tracking-widest">{batch.protocol.name}</span>
                      </div>
                   ) : <div></div>}
                   
                   {/* Rendimento */}
                   <div className="flex items-center gap-2 px-3 py-1.5 bg-emerald-50 rounded-xl border border-emerald-100">
                     <TrendingUp className="w-3 h-3 text-emerald-600" />
-                    <span className="text-[10px] font-black text-emerald-700 uppercase tracking-widest">Rend: {yieldPercentage.toFixed(1)}%</span>
+                    <span className="text-[10px] font-black text-emerald-700 uppercase tracking-widest">Rend: {batch.yieldPercentage.toFixed(1)}%</span>
                   </div>
                 </div>
 
@@ -250,8 +287,8 @@ const BatchManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                 {/* Barra de Progresso do Rendimento */}
                 <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden mt-2">
                   <div 
-                    className={`h-full transition-all duration-500 ${yieldPercentage > 90 ? 'bg-emerald-500' : (yieldPercentage > 70 ? 'bg-blue-500' : 'bg-amber-500')}`} 
-                    style={{ width: `${yieldPercentage}%` }} 
+                    className={`h-full transition-all duration-500 ${batch.yieldPercentage > 90 ? 'bg-emerald-500' : (batch.yieldPercentage > 70 ? 'bg-blue-500' : 'bg-amber-500')}`} 
+                    style={{ width: `${batch.yieldPercentage}%` }} 
                   />
                 </div>
 
@@ -260,13 +297,13 @@ const BatchManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                     <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1">
                       <Scale className="w-2.5 h-2.5" /> Peso Médio
                     </span>
-                    <span className="text-lg font-black text-blue-600 leading-none mt-1">{currentAvgWeight.toFixed(1)}g</span>
+                    <span className="text-lg font-black text-blue-600 leading-none mt-1">{batch.currentAvgWeight.toFixed(1)}g</span>
                   </div>
                   <div className="flex flex-col items-end">
                     <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1">
                       <TrendingUp className="w-2.5 h-2.5" /> Biomassa Est.
                     </span>
-                    <span className="text-lg font-black text-emerald-600 leading-none mt-1">{totalBiomassKg.toFixed(1)}kg</span>
+                    <span className="text-lg font-black text-emerald-600 leading-none mt-1">{batch.totalBiomassKg.toFixed(1)}kg</span>
                   </div>
                 </div>
 
@@ -275,11 +312,11 @@ const BatchManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                     <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1">
                       <Fish className="w-2.5 h-2.5" /> Peixes Vivos
                     </span>
-                    <span className="text-lg font-black text-slate-700 leading-none mt-1">{liveFish} un</span>
+                    <span className="text-lg font-black text-slate-700 leading-none mt-1">{batch.liveFish} un</span>
                   </div>
                   <div className="flex flex-col items-end">
                     <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Saldo Aloj.</span>
-                    <span className={`text-lg font-black mt-1 leading-none ${balance > 0 ? 'text-blue-600' : 'text-slate-400'}`}>{balance} un</span>
+                    <span className={`text-lg font-black mt-1 leading-none ${batch.balance > 0 ? 'text-blue-600' : 'text-slate-400'}`}>{batch.balance} un</span>
                   </div>
                 </div>
 
@@ -290,7 +327,7 @@ const BatchManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                   </div>
                   <div className="flex flex-col items-end">
                     <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Mortalidade</span>
-                    <span className="text-sm font-black text-red-500">{mortality} un</span>
+                    <span className="text-sm font-black text-red-500">{batch.mortality} un</span>
                   </div>
                 </div>
               </div>

@@ -40,28 +40,27 @@ const MortalityLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
   }, [state.cages, state.users]);
 
   const sortedLogs = useMemo(() => {
-    let logs = [...state.mortalityLogs];
+    const logs = Array.isArray(state.mortalityLogs) ? state.mortalityLogs : [];
+    let filtered = logs;
     
-    if (selectedBatchId) {
-      logs = logs.filter(log => {
-        const cage = cageMap.get(log.cageId);
-        return cage?.batchId === selectedBatchId;
+    if (selectedBatchId || startDate || endDate) {
+      filtered = logs.filter(log => {
+        if (selectedBatchId) {
+          const cage = cageMap.get(log.cageId);
+          if (cage?.batchId !== selectedBatchId) return false;
+        }
+        if (startDate && log.date < startDate) return false;
+        if (endDate && log.date > endDate) return false;
+        return true;
       });
     }
 
-    if (startDate) {
-      logs = logs.filter(log => log.date >= startDate);
-    }
-    if (endDate) {
-      logs = logs.filter(log => log.date <= endDate);
-    }
-
-    return logs.sort((a, b) => {
-      const dateA = new Date(a.date).getTime();
-      const dateB = new Date(b.date).getTime();
-      return sortOrder === 'desc' ? dateB - dateA : dateA - dateB;
+    return [...filtered].sort((a, b) => {
+      return sortOrder === 'desc' 
+        ? b.date.localeCompare(a.date) 
+        : a.date.localeCompare(b.date);
     });
-  }, [state.mortalityLogs, sortOrder, selectedBatchId, cageMap]);
+  }, [state.mortalityLogs, sortOrder, selectedBatchId, startDate, endDate, cageMap]);
 
   const paginatedLogs = useMemo(() => {
     const startIndex = (currentPage - 1) * itemsPerPage;

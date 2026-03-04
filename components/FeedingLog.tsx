@@ -43,28 +43,27 @@ const FeedingLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
   }, [state.cages, state.feedTypes, state.users]);
 
   const sortedLogs = useMemo(() => {
-    let logs = Array.isArray(state.feedingLogs) ? [...state.feedingLogs] : [];
+    const logs = Array.isArray(state.feedingLogs) ? state.feedingLogs : [];
+    let filtered = logs;
     
-    if (selectedBatchId) {
-      logs = logs.filter(log => {
-        const cage = cageMap.get(log.cageId);
-        return cage?.batchId === selectedBatchId;
+    if (selectedBatchId || startDate || endDate) {
+      filtered = logs.filter(log => {
+        if (selectedBatchId) {
+          const cage = cageMap.get(log.cageId);
+          if (cage?.batchId !== selectedBatchId) return false;
+        }
+        if (startDate && log.timestamp.split('T')[0] < startDate) return false;
+        if (endDate && log.timestamp.split('T')[0] > endDate) return false;
+        return true;
       });
     }
 
-    if (startDate) {
-      logs = logs.filter(log => log.timestamp.split('T')[0] >= startDate);
-    }
-    if (endDate) {
-      logs = logs.filter(log => log.timestamp.split('T')[0] <= endDate);
-    }
-
-    return logs.sort((a, b) => {
-      const dateA = new Date(a.timestamp).getTime();
-      const dateB = new Date(b.timestamp).getTime();
-      return sortOrder === 'desc' ? dateB - dateA : dateA - dateB;
+    return [...filtered].sort((a, b) => {
+      return sortOrder === 'desc' 
+        ? b.timestamp.localeCompare(a.timestamp) 
+        : a.timestamp.localeCompare(b.timestamp);
     });
-  }, [state.feedingLogs, sortOrder]);
+  }, [state.feedingLogs, sortOrder, selectedBatchId, startDate, endDate, cageMap]);
 
   const paginatedLogs = useMemo(() => {
     const startIndex = (currentPage - 1) * itemsPerPage;
