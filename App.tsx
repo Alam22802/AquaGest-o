@@ -172,6 +172,16 @@ const App: React.FC = () => {
   }, [state, isLoading, lastAlertCheck, currentUser?.supabaseConfig]);
 
   useEffect(() => {
+    if (state && currentUser) {
+      const updatedUser = state.users.find(u => u.id === currentUser.id);
+      if (updatedUser && JSON.stringify(updatedUser) !== JSON.stringify(currentUser)) {
+        setCurrentUser(updatedUser);
+        saveSession(updatedUser);
+      }
+    }
+  }, [state, currentUser]);
+
+  useEffect(() => {
     const interval = setInterval(backgroundSync, 30000); 
     return () => clearInterval(interval);
   }, [backgroundSync]);

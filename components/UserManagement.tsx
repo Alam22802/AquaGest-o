@@ -103,7 +103,16 @@ const UserManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       });
     }
     
-    setFormData({ name: '', username: '', phone: '', email: '', password: '', canEdit: true, receiveNotifications: true });
+    setFormData({ 
+      name: '', 
+      username: '', 
+      phone: '', 
+      email: '', 
+      password: '', 
+      canEdit: true, 
+      receiveNotifications: true,
+      allowedTabs: []
+    });
   };
 
   const handleSaveDbConfig = (userId: string) => {
@@ -428,11 +437,12 @@ const UserManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                           <input 
                             type="checkbox" 
                             className="w-3 h-3 rounded text-emerald-500 focus:ring-0"
-                            checked={formData.allowedTabs.includes(tab.id)}
+                            checked={(formData.allowedTabs || []).includes(tab.id)}
                             onChange={e => {
+                              const currentTabs = formData.allowedTabs || [];
                               const newTabs = e.target.checked 
-                                ? [...formData.allowedTabs, tab.id]
-                                : formData.allowedTabs.filter(t => t !== tab.id);
+                                ? [...currentTabs, tab.id]
+                                : currentTabs.filter(t => t !== tab.id);
                               setFormData({...formData, allowedTabs: newTabs});
                             }}
                           />
