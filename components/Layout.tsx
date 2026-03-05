@@ -54,7 +54,7 @@ const Layout: React.FC<Props> = ({ children, activeTab, setActiveTab, currentUse
   ];
 
   const filteredMenuItems = menuItems.filter(item => {
-    if (item.id === 'dashboard') return true;
+    if (item.id === 'dashboard' || item.id === 'capex') return true;
     if (item.masterOnly && !currentUser.isMaster) return false;
     if (!currentUser.isMaster && currentUser.allowedTabs && !currentUser.allowedTabs.includes(item.id)) return false;
     return true;
