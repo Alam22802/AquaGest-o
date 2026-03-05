@@ -420,6 +420,7 @@ const UserManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                     <label className="block text-[10px] font-black text-slate-400 uppercase mb-3 tracking-widest">Acesso às Abas</label>
                     <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto pr-2 scrollbar-thin">
                       {[
+                        { id: 'capex', label: 'Investimentos CAPEX' },
                         { id: 'inventory', label: 'Cadastro Gaiolas' },
                         { id: 'maintenance', label: 'Manutenção' },
                         { id: 'protocols', label: 'Modelos de Produção' },
