@@ -417,7 +417,32 @@ const UserManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                   </div>
 
                   <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
-                    <label className="block text-[10px] font-black text-slate-400 uppercase mb-3 tracking-widest">Acesso às Abas</label>
+                    <div className="flex justify-between items-center mb-3">
+                      <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">Acesso às Abas</label>
+                      {(() => {
+                        const allTabs = [
+                          'capex', 'inventory', 'maintenance', 'protocols', 'batches', 
+                          'lines', 'cages', 'feed', 'feeding', 'biometry', 
+                          'mortality', 'slaughter', 'cloud'
+                        ];
+                        const isAllSelected = allTabs.every(id => (formData.allowedTabs || []).includes(id));
+                        return (
+                          <button 
+                            type="button"
+                            onClick={() => {
+                              if (isAllSelected) {
+                                setFormData({...formData, allowedTabs: []});
+                              } else {
+                                setFormData({...formData, allowedTabs: allTabs});
+                              }
+                            }}
+                            className={`text-[9px] font-black uppercase tracking-tighter px-2 py-1 rounded-md transition-all ${isAllSelected ? 'bg-red-50 text-red-500 hover:bg-red-100' : 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100'}`}
+                          >
+                            {isAllSelected ? 'Desmarcar Tudo' : 'Marcar Tudo'}
+                          </button>
+                        );
+                      })()}
+                    </div>
                     <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto pr-2 scrollbar-thin">
                       {[
                         { id: 'capex', label: 'Investimentos CAPEX' },
