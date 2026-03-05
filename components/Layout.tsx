@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { 
-  LayoutDashboard, Layers, Box, Utensils, FishOff, Waves, Package, Users, LogOut, Cloud, Scale, Tag, Droplets, Settings, ClipboardList, BookOpen, Menu, X, Home, Bell, Factory
+  LayoutDashboard, Layers, Box, Utensils, FishOff, Waves, Package, Users, LogOut, Cloud, Scale, Tag, Settings, ClipboardList, BookOpen, Menu, X, Home, Bell, Factory, DollarSign
 } from 'lucide-react';
 import { User, AppState } from '../types.ts';
 
@@ -23,7 +23,7 @@ const Layout: React.FC<Props> = ({ children, activeTab, setActiveTab, currentUse
 
   const menuItems = [
     { id: 'dashboard', label: 'Visão Geral', icon: <LayoutDashboard className="w-5 h-5" /> },
-    { id: 'water', label: 'Qualidade Água', icon: <Droplets className="w-5 h-5" /> },
+    { id: 'capex', label: 'Investimentos CAPEX', icon: <DollarSign className="w-5 h-5" /> },
     { id: 'inventory', label: 'Cadastro Gaiolas', icon: <Box className="w-5 h-5" /> },
     { id: 'maintenance', label: 'Manutenção', icon: <Settings className="w-5 h-5" /> },
     { id: 'protocols', label: 'Modelos de Produção', icon: <BookOpen className="w-5 h-5" /> },
@@ -54,7 +54,9 @@ const Layout: React.FC<Props> = ({ children, activeTab, setActiveTab, currentUse
   ];
 
   const filteredMenuItems = menuItems.filter(item => {
+    if (item.id === 'dashboard') return true;
     if (item.masterOnly && !currentUser.isMaster) return false;
+    if (!currentUser.isMaster && currentUser.allowedTabs && !currentUser.allowedTabs.includes(item.id)) return false;
     return true;
   });
 

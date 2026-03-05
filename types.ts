@@ -9,6 +9,7 @@ export interface User {
   isMaster?: boolean;
   isApproved: boolean;
   canEdit: boolean;
+  allowedTabs?: string[];
   receiveNotifications: boolean; 
   supabaseConfig?: { url: string; key: string };
   lastSync?: string;
@@ -18,7 +19,6 @@ export interface User {
 export interface NotificationSettings {
   notifyMasterOnNewUser: boolean;
   notifyOnLowFeed: boolean;
-  notifyOnWaterCritical: boolean;
   systemEmailSender: string;
   updatedAt?: number;
 }
@@ -114,18 +114,6 @@ export interface BiometryLog {
   updatedAt?: number;
 }
 
-export interface WaterLog {
-  id: string;
-  date: string;
-  time: string;
-  temperature: number;
-  ph: number;
-  oxygen: number;
-  transparency: number;
-  userId: string;
-  updatedAt?: number;
-}
-
 export interface SlaughterLog {
   id: string;
   producer: string;
@@ -155,6 +143,51 @@ export interface FeedStockLog {
   updatedAt?: number;
 }
 
+export interface InvestmentPortfolio {
+  id: string;
+  name: string;
+  totalValue: number;
+  startDate: string;
+  endDate: string;
+  manager: string;
+  userId?: string;
+  updatedAt?: number;
+}
+
+export interface CapexProject {
+  id: string;
+  portfolioId: string;
+  name: string;
+  costCenter: string;
+  plannedValue: number;
+  startDate: string;
+  endDate: string;
+  responsible: string;
+  investmentArea: string;
+  userId?: string;
+  updatedAt?: number;
+}
+
+export type CapexInvoiceType = 'Prestação de Serviço' | 'Aquisição';
+
+export interface CapexInvoice {
+  id: string;
+  portfolioId: string;
+  projectId: string;
+  invoiceNumber: string;
+  supplier: string;
+  cnpj: string;
+  items: string;
+  type: CapexInvoiceType;
+  value: number;
+  date: string;
+  deliveryDate: string;
+  description: string;
+  userId: string;
+  timestamp: string;
+  updatedAt?: number;
+}
+
 export interface AppState {
   users: User[];
   lines: Line[];
@@ -165,9 +198,11 @@ export interface AppState {
   feedStockLogs: FeedStockLog[];
   mortalityLogs: MortalityLog[];
   biometryLogs: BiometryLog[];
-  waterLogs: WaterLog[];
   slaughterLogs: SlaughterLog[];
   protocols: ProductionProtocol[];
+  portfolios: InvestmentPortfolio[];
+  capexProjects: CapexProject[];
+  capexInvoices: CapexInvoice[];
   notificationSettings?: NotificationSettings;
   supabaseConfig?: { url: string; key: string };
   lastSync?: string;

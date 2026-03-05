@@ -296,20 +296,7 @@ const Dashboard: React.FC<Props> = ({ state }) => {
     })));
     XLSX.utils.book_append_sheet(wb, wsBiometry, "Biometria");
 
-    // 8. ABA: QUALIDADE ÁGUA - FILTRADO
-    const filteredWaterLogs = (state.waterLogs || []).filter(w => filterByDate(w.date));
-    const wsWater = XLSX.utils.json_to_sheet(filteredWaterLogs.map(w => ({
-      "Data": w.date,
-      "Hora": w.time,
-      "Temp (°C)": w.temperature,
-      "pH": w.ph,
-      "O2 (mg/L)": w.oxygen,
-      "Transp. (cm)": w.transparency,
-      "Lançado por": userMap.get(w.userId) || w.userId
-    })));
-    XLSX.utils.book_append_sheet(wb, wsWater, "Qualidade Água");
-
-    // 9. ABA: ESTOQUE RAÇÃO
+    // 8. ABA: ESTOQUE RAÇÃO
     const wsFeedStock = XLSX.utils.json_to_sheet((state.feedTypes || []).map(f => ({
       "Ração": f.name,
       "Estoque Atual (kg)": f.totalStock / 1000,

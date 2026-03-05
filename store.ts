@@ -23,7 +23,6 @@ const initialMaster: User = {
 const defaultNotificationSettings: NotificationSettings = {
   notifyMasterOnNewUser: true,
   notifyOnLowFeed: true,
-  notifyOnWaterCritical: true,
   systemEmailSender: 'noreply@aquagestao.com',
   updatedAt: 1
 };
@@ -38,9 +37,11 @@ const initialState: AppState = {
   feedStockLogs: [],
   mortalityLogs: [],
   biometryLogs: [],
-  waterLogs: [],
   slaughterLogs: [],
   protocols: [],
+  portfolios: [],
+  capexProjects: [],
+  capexInvoices: [],
   notificationSettings: defaultNotificationSettings,
   deletedIds: []
 };
@@ -104,9 +105,11 @@ export const ensureStateIntegrity = (state: any, mergeWith?: AppState, priority:
     feedStockLogs: filterByTombstone(base.feedStockLogs || []),
     mortalityLogs: filterByTombstone(base.mortalityLogs),
     biometryLogs: filterByTombstone(base.biometryLogs),
-    waterLogs: filterByTombstone(base.waterLogs),
     slaughterLogs: filterByTombstone(base.slaughterLogs),
     protocols: filterByTombstone(base.protocols),
+    portfolios: filterByTombstone(base.portfolios || []),
+    capexProjects: filterByTombstone(base.capexProjects || []),
+    capexInvoices: filterByTombstone(base.capexInvoices || []),
   };
 
   if (mergeWith) {
@@ -122,8 +125,10 @@ export const ensureStateIntegrity = (state: any, mergeWith?: AppState, priority:
       feedStockLogs: mergeArraysById(result.feedStockLogs || [], mergeWith.feedStockLogs || [], combinedDeletedIds, priority),
       mortalityLogs: mergeArraysById(result.mortalityLogs, mergeWith.mortalityLogs, combinedDeletedIds, priority),
       biometryLogs: mergeArraysById(result.biometryLogs, mergeWith.biometryLogs, combinedDeletedIds, priority),
-      waterLogs: mergeArraysById(result.waterLogs, mergeWith.waterLogs, combinedDeletedIds, priority),
       protocols: mergeArraysById(result.protocols, mergeWith.protocols, combinedDeletedIds, priority),
+      portfolios: mergeArraysById(result.portfolios || [], mergeWith.portfolios || [], combinedDeletedIds, priority),
+      capexProjects: mergeArraysById(result.capexProjects || [], mergeWith.capexProjects || [], combinedDeletedIds, priority),
+      capexInvoices: mergeArraysById(result.capexInvoices || [], mergeWith.capexInvoices || [], combinedDeletedIds, priority),
     };
   }
   return result;

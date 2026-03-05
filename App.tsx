@@ -13,8 +13,8 @@ import BiometryLog from './components/BiometryLog.tsx';
 import FeedManagement from './components/FeedManagement.tsx';
 import UserManagement from './components/UserManagement.tsx';
 import CloudSettings from './components/CloudSettings.tsx';
-import WaterQuality from './components/WaterQuality.tsx';
 import ProtocolManagement from './components/ProtocolManagement.tsx';
+import CapexManagement from './components/CapexManagement.tsx';
 import SlaughterHouse from './components/SlaughterHouse.tsx';
 import Login from './components/Login.tsx';
 import { loadState, saveState, getSession, saveSession, ensureStateIntegrity, fetchRemoteState, subscribeToRemoteChanges } from './store.ts';
@@ -176,6 +176,15 @@ const App: React.FC = () => {
     return () => clearInterval(interval);
   }, [backgroundSync]);
 
+  useEffect(() => {
+    if (currentUser && !currentUser.isMaster && activeTab !== 'dashboard') {
+      const allowedTabs = currentUser.allowedTabs || [];
+      if (!allowedTabs.includes(activeTab)) {
+        setActiveTab('dashboard');
+      }
+    }
+  }, [activeTab, currentUser]);
+
   const handleStateUpdate = (newState: AppState) => {
     if (!state) return;
 
@@ -218,9 +227,11 @@ const App: React.FC = () => {
       feedStockLogs: injectTimestamps(state.feedStockLogs || [], newState.feedStockLogs || []),
       mortalityLogs: injectTimestamps(state.mortalityLogs, newState.mortalityLogs),
       biometryLogs: injectTimestamps(state.biometryLogs, newState.biometryLogs),
-      waterLogs: injectTimestamps(state.waterLogs, newState.waterLogs),
       slaughterLogs: injectTimestamps(state.slaughterLogs, newState.slaughterLogs),
       protocols: injectTimestamps(state.protocols, newState.protocols),
+      portfolios: injectTimestamps(state.portfolios || [], newState.portfolios || []),
+      capexProjects: injectTimestamps(state.capexProjects || [], newState.capexProjects || []),
+      capexInvoices: injectTimestamps(state.capexInvoices || [], newState.capexInvoices || []),
     };
 
     const findDeleted = (oldList: any[], newList: any[]) => {
@@ -239,9 +250,11 @@ const App: React.FC = () => {
       ...findDeleted(state.feedStockLogs || [], stateWithTimestamps.feedStockLogs || []),
       ...findDeleted(state.mortalityLogs, stateWithTimestamps.mortalityLogs),
       ...findDeleted(state.biometryLogs, stateWithTimestamps.biometryLogs),
-      ...findDeleted(state.waterLogs, stateWithTimestamps.waterLogs),
       ...findDeleted(state.slaughterLogs, stateWithTimestamps.slaughterLogs),
       ...findDeleted(state.protocols, stateWithTimestamps.protocols),
+      ...findDeleted(state.portfolios || [], stateWithTimestamps.portfolios || []),
+      ...findDeleted(state.capexProjects || [], stateWithTimestamps.capexProjects || []),
+      ...findDeleted(state.capexInvoices || [], stateWithTimestamps.capexInvoices || []),
     ];
 
     if (deleted.length > 0) {
@@ -273,7 +286,7 @@ const App: React.FC = () => {
     if (!state || !currentUser) return null;
     switch (activeTab) {
       case 'dashboard': return <Dashboard state={state} />;
-      case 'water': return <WaterQuality state={state} onUpdate={handleStateUpdate} currentUser={currentUser} />;
+      case 'capex': return <CapexManagement state={state} onUpdate={handleStateUpdate} currentUser={currentUser} />;
       case 'inventory': return <CageInventory state={state} onUpdate={handleStateUpdate} currentUser={currentUser} />;
       case 'maintenance': return <Maintenance state={state} onUpdate={handleStateUpdate} currentUser={currentUser} />;
       case 'protocols': return <ProtocolManagement state={state} onUpdate={handleStateUpdate} currentUser={currentUser} />;

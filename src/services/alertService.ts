@@ -47,18 +47,5 @@ export const checkAndTriggerAlerts = (state: AppState): {title: string, message:
     }
   }
 
-  // 3. Alerta de Qualidade da Água (Parâmetros Críticos)
-  if (settings.notifyOnWaterCritical) {
-    const lastLog = state.waterLogs[state.waterLogs.length - 1];
-    if (lastLog) {
-      if (lastLog.oxygen < 3 || lastLog.temperature > 32 || lastLog.ph < 6 || lastLog.ph > 9) {
-        const title = `ALERTA CRÍTICO: Qualidade da Água`;
-        const message = `Parâmetros fora do normal detectados em ${lastLog.date} ${lastLog.time}. O2: ${lastLog.oxygen}, Temp: ${lastLog.temperature}, pH: ${lastLog.ph}`;
-        sendEmailAlert(targetEmail, title, message, settings);
-        return { title, message };
-      }
-    }
-  }
-
   return null;
 };

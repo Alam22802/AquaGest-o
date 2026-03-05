@@ -30,7 +30,8 @@ const UserManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     email: '',
     password: '',
     canEdit: true,
-    receiveNotifications: true
+    receiveNotifications: true,
+    allowedTabs: [] as string[]
   });
 
   const [dbConfig, setDbConfig] = useState({
@@ -72,6 +73,7 @@ const UserManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
           email: formData.email,
           password: formData.password,
           canEdit: u.isMaster ? true : formData.canEdit, // Mestre sempre pode editar
+          allowedTabs: u.isMaster ? undefined : formData.allowedTabs,
           receiveNotifications: formData.receiveNotifications,
           updatedAt: Date.now()
         } : u)
@@ -88,6 +90,7 @@ const UserManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
         password: formData.password,
         isApproved: true,
         canEdit: formData.canEdit,
+        allowedTabs: formData.allowedTabs,
         receiveNotifications: formData.receiveNotifications,
         updatedAt: Date.now(),
         // Replicar config do mestre por padrão
@@ -141,7 +144,8 @@ const UserManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       email: user.email,
       password: user.password,
       canEdit: user.canEdit,
-      receiveNotifications: user.receiveNotifications
+      receiveNotifications: user.receiveNotifications,
+      allowedTabs: user.allowedTabs || []
     });
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -156,7 +160,16 @@ const UserManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
 
   const cancelEdit = () => {
     setEditingUserId(null);
-    setFormData({ name: '', username: '', phone: '', email: '', password: '', canEdit: true, receiveNotifications: true });
+    setFormData({ 
+      name: '', 
+      username: '', 
+      phone: '', 
+      email: '', 
+      password: '', 
+      canEdit: true, 
+      receiveNotifications: true,
+      allowedTabs: []
+    });
   };
 
   const saveSystemSettings = () => {
@@ -385,13 +398,51 @@ const UserManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
               </div>
 
               {!state.users.find(u => u.id === editingUserId)?.isMaster && (
-                <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
-                  <label className="block text-[10px] font-black text-slate-400 uppercase mb-3 tracking-widest">Nível de Acesso</label>
-                  <div className="flex gap-3">
-                     <button type="button" onClick={() => setFormData({...formData, canEdit: true})} className={`flex-1 py-3 rounded-xl text-[10px] font-black border-2 transition-all ${formData.canEdit ? 'bg-[#344434] border-[#344434] text-white' : 'bg-white border-slate-200 text-slate-400'}`}>EDITOR</button>
-                     <button type="button" onClick={() => setFormData({...formData, canEdit: false})} className={`flex-1 py-3 rounded-xl text-[10px] font-black border-2 transition-all ${!formData.canEdit ? 'bg-amber-500 border-amber-500 text-white' : 'bg-white border-slate-200 text-slate-400'}`}>LEITOR</button>
+                <>
+                  <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                    <label className="block text-[10px] font-black text-slate-400 uppercase mb-3 tracking-widest">Nível de Acesso</label>
+                    <div className="flex gap-3">
+                       <button type="button" onClick={() => setFormData({...formData, canEdit: true})} className={`flex-1 py-3 rounded-xl text-[10px] font-black border-2 transition-all ${formData.canEdit ? 'bg-[#344434] border-[#344434] text-white' : 'bg-white border-slate-200 text-slate-400'}`}>EDITOR</button>
+                       <button type="button" onClick={() => setFormData({...formData, canEdit: false})} className={`flex-1 py-3 rounded-xl text-[10px] font-black border-2 transition-all ${!formData.canEdit ? 'bg-amber-500 border-amber-500 text-white' : 'bg-white border-slate-200 text-slate-400'}`}>LEITOR</button>
+                    </div>
                   </div>
-                </div>
+
+                  <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                    <label className="block text-[10px] font-black text-slate-400 uppercase mb-3 tracking-widest">Acesso às Abas</label>
+                    <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto pr-2 scrollbar-thin">
+                      {[
+                        { id: 'capex', label: 'Investimentos CAPEX' },
+                        { id: 'inventory', label: 'Cadastro Gaiolas' },
+                        { id: 'maintenance', label: 'Manutenção' },
+                        { id: 'protocols', label: 'Modelos de Produção' },
+                        { id: 'batches', label: 'Lotes (Estoque)' },
+                        { id: 'lines', label: 'Linhas/Setores' },
+                        { id: 'cages', label: 'Alojamento' },
+                        { id: 'feed', label: 'Estoque Ração' },
+                        { id: 'feeding', label: 'Trato Diário' },
+                        { id: 'biometry', label: 'Biometria' },
+                        { id: 'mortality', label: 'Mortalidade' },
+                        { id: 'slaughter', label: 'Frigorífico' },
+                        { id: 'cloud', label: 'Backup/Nuvem' }
+                      ].map(tab => (
+                        <label key={tab.id} className="flex items-center gap-2 p-2 bg-white rounded-lg border border-slate-200 cursor-pointer hover:border-emerald-500 transition-all">
+                          <input 
+                            type="checkbox" 
+                            className="w-3 h-3 rounded text-emerald-500 focus:ring-0"
+                            checked={formData.allowedTabs.includes(tab.id)}
+                            onChange={e => {
+                              const newTabs = e.target.checked 
+                                ? [...formData.allowedTabs, tab.id]
+                                : formData.allowedTabs.filter(t => t !== tab.id);
+                              setFormData({...formData, allowedTabs: newTabs});
+                            }}
+                          />
+                          <span className="text-[9px] font-black text-slate-600 uppercase truncate">{tab.label}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                </>
               )}
 
               <button type="submit" className={`w-full py-5 rounded-2xl font-black text-xs uppercase tracking-widest text-white shadow-xl transition-all active:scale-95 ${editingUserId ? 'bg-amber-600 hover:bg-amber-700 shadow-amber-600/20' : 'bg-[#344434] hover:bg-[#2a382a] shadow-slate-900/20'}`}>
@@ -420,6 +471,15 @@ const UserManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                         <span className="text-[10px] font-black text-blue-500 uppercase tracking-widest">@{user.username}</span>
                         {user.receiveNotifications && <Bell className="w-3 h-3 text-emerald-500" />}
                       </div>
+                      {!user.isMaster && user.allowedTabs && user.allowedTabs.length > 0 && (
+                        <div className="flex flex-wrap gap-1 mt-2">
+                          {user.allowedTabs.map(tabId => (
+                            <span key={tabId} className="text-[7px] font-black bg-slate-100 text-slate-400 px-1.5 py-0.5 rounded uppercase tracking-tighter">
+                              {tabId}
+                            </span>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   </div>
                   <div className="flex gap-1">
