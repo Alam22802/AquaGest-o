@@ -418,7 +418,7 @@ const CapexManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                       {/* Tabela de Notas Recentes do Projeto */}
                       <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm">
                         <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest mb-6 flex items-center gap-2 italic">
-                          <ClipboardList className="w-5 h-5 text-amber-500" /> Últimos Lançamentos do Projeto
+                           <ClipboardList className="w-5 h-5 text-amber-500" /> Últimos Lançamentos do Projeto
                         </h3>
                         <div className="space-y-3">
                           {invoices.slice(0, 5).map(inv => (
@@ -495,6 +495,166 @@ const CapexManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                               <div className="text-sm font-black text-slate-800">{format(parseISO(project.startDate), 'dd/MM/yyyy')}</div>
                             </div>
                           </div>
+                        </div>
+                      </div>
+                    </div>
+                  </>
+                );
+              })()}
+            </div>
+          ) : selectedPortfolioId ? (
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+              {/* Card de Resumo da Carteira */}
+              {(() => {
+                const portfolio = portfolioStats.find(p => p.id === selectedPortfolioId);
+                const projects = (state.capexProjects || []).filter(p => p.portfolioId === selectedPortfolioId);
+                const invoices = (state.capexInvoices || []).filter(i => i.portfolioId === selectedPortfolioId);
+                if (!portfolio) return null;
+
+                return (
+                  <>
+                    <div className="lg:col-span-2 space-y-6">
+                      <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm relative overflow-hidden">
+                        <div className="relative z-10">
+                          <div className="flex justify-between items-start mb-8">
+                            <div>
+                              <span className="text-[10px] font-black bg-blue-100 text-blue-600 px-3 py-1 rounded-full uppercase tracking-widest mb-2 inline-block">
+                                Carteira de Investimento
+                              </span>
+                              <h2 className="text-3xl font-black text-slate-800 uppercase tracking-tighter italic leading-none">{portfolio.name}</h2>
+                              <p className="text-xs font-bold text-slate-400 uppercase mt-2">Gestor: {portfolio.manager} • {portfolio.projectsCount} Projetos Ativos</p>
+                            </div>
+                            <div className="text-right">
+                              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Execução Global</p>
+                              <div className="text-sm font-black text-blue-600 uppercase italic">
+                                {portfolio.executionPercentage.toFixed(1)}% Realizado
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                            <div className="bg-slate-50 p-6 rounded-3xl border border-slate-100">
+                              <div className="flex items-center gap-2 mb-2">
+                                <Wallet className="w-4 h-4 text-slate-400" />
+                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Orçamento Inicial</span>
+                              </div>
+                              <div className="text-2xl font-black text-slate-800">R$ {portfolio.totalValue.toLocaleString()}</div>
+                            </div>
+                            <div className="bg-slate-50 p-6 rounded-3xl border border-slate-100">
+                              <div className="flex items-center gap-2 mb-2">
+                                <Briefcase className="w-4 h-4 text-emerald-500" />
+                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Total Alocado</span>
+                              </div>
+                              <div className="text-2xl font-black text-emerald-600">R$ {portfolio.allocatedValue.toLocaleString()}</div>
+                            </div>
+                            <div className="bg-blue-50 p-6 rounded-3xl border border-blue-100">
+                              <div className="flex items-center gap-2 mb-2">
+                                <DollarSign className="w-4 h-4 text-blue-400" />
+                                <span className="text-[10px] font-black text-blue-400 uppercase tracking-widest">Saldo Livre</span>
+                              </div>
+                              <div className="text-2xl font-black text-blue-600">R$ {portfolio.balance.toLocaleString()}</div>
+                            </div>
+                          </div>
+
+                          <div className="mt-8">
+                            <div className="flex justify-between items-end mb-2">
+                              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                                <TrendingUp className="w-4 h-4" /> Progresso Financeiro da Carteira
+                              </span>
+                              <span className="text-xs font-black text-blue-600">
+                                R$ {portfolio.executedValue.toLocaleString()} Executados
+                              </span>
+                            </div>
+                            <div className="h-4 bg-slate-100 rounded-full overflow-hidden border border-slate-200 p-0.5">
+                              <div 
+                                className="h-full bg-blue-500 rounded-full transition-all duration-1000" 
+                                style={{ width: `${Math.min(100, portfolio.executionPercentage)}%` }} 
+                              />
+                            </div>
+                            <div className="flex justify-between mt-2 text-[9px] font-black text-slate-400 uppercase">
+                              <span>Início: {format(parseISO(portfolio.startDate), 'dd/MM/yyyy')}</span>
+                              <span>Fim: {portfolio.endDate ? format(parseISO(portfolio.endDate), 'dd/MM/yyyy') : 'Indeterminado'}</span>
+                            </div>
+                          </div>
+                        </div>
+                        <Building2 className="absolute -right-10 -bottom-10 w-64 h-64 text-slate-50 opacity-[0.03] pointer-events-none" />
+                      </div>
+
+                      {/* Lista de Projetos da Carteira */}
+                      <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm">
+                        <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest mb-6 flex items-center gap-2 italic">
+                          <Layers className="w-5 h-5 text-emerald-500" /> Projetos Vinculados
+                        </h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {projects.map(proj => {
+                            const stats = projectStats.find(s => s.id === proj.id);
+                            return (
+                              <div key={proj.id} className="p-4 bg-slate-50 rounded-2xl border border-slate-100 hover:border-emerald-200 transition-all cursor-pointer" onClick={() => setSelectedProjectId(proj.id)}>
+                                <div className="flex justify-between items-start mb-2">
+                                  <h4 className="text-xs font-black text-slate-800 uppercase truncate pr-2">{proj.name}</h4>
+                                  <ChevronRight className="w-4 h-4 text-slate-300" />
+                                </div>
+                                <div className="flex justify-between items-end">
+                                  <div>
+                                    <div className="text-[9px] font-black text-slate-400 uppercase">Alocado</div>
+                                    <div className="text-xs font-black text-slate-700">R$ {proj.plannedValue.toLocaleString()}</div>
+                                  </div>
+                                  <div className="text-right">
+                                    <div className="text-[9px] font-black text-slate-400 uppercase">Execução</div>
+                                    <div className="text-xs font-black text-emerald-600">{stats?.executionPercentage.toFixed(1)}%</div>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                          {projects.length === 0 && (
+                            <div className="col-span-2 text-center py-10 text-slate-400 font-bold uppercase text-[10px] tracking-widest italic">Nenhum projeto cadastrado nesta carteira.</div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="space-y-6">
+                      {/* Resumo Financeiro */}
+                      <div className="bg-blue-600 p-8 rounded-[2.5rem] shadow-xl text-white">
+                        <h3 className="text-xs font-black uppercase tracking-[0.2em] mb-6 opacity-60">Resumo Financeiro</h3>
+                        <div className="space-y-8">
+                          <div>
+                            <div className="text-3xl font-black italic tracking-tighter mb-1">
+                              R$ {portfolio.totalValue.toLocaleString()}
+                            </div>
+                            <div className="text-[9px] font-black uppercase tracking-widest opacity-50">Orçamento Total</div>
+                          </div>
+                          <div className="h-px bg-white/10" />
+                          <div>
+                            <div className="text-3xl font-black italic tracking-tighter mb-1">
+                              R$ {portfolio.allocatedValue.toLocaleString()}
+                            </div>
+                            <div className="text-[9px] font-black uppercase tracking-widest opacity-50">Total Comprometido</div>
+                          </div>
+                          <div className="h-px bg-white/10" />
+                          <div>
+                            <div className="text-3xl font-black italic tracking-tighter mb-1">
+                              R$ {portfolio.executedValue.toLocaleString()}
+                            </div>
+                            <div className="text-[9px] font-black uppercase tracking-widest opacity-50">Total Liquidado (Notas)</div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Notas Recentes da Carteira */}
+                      <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm">
+                        <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-6">Últimas Notas (Carteira)</h3>
+                        <div className="space-y-3">
+                          {invoices.slice(0, 3).map(inv => (
+                            <div key={inv.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-xl border border-slate-100">
+                              <div className="text-[10px] font-black text-slate-800 uppercase truncate max-w-[100px]">{inv.supplier}</div>
+                              <div className="text-[10px] font-black text-blue-600">R$ {inv.value.toLocaleString()}</div>
+                            </div>
+                          ))}
+                          {invoices.length === 0 && (
+                            <div className="text-center py-4 text-slate-400 font-bold uppercase text-[8px] tracking-widest italic">Sem lançamentos.</div>
+                          )}
                         </div>
                       </div>
                     </div>
