@@ -71,14 +71,16 @@ const CapexManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       
       const allocatedValue = portfolioProjects.reduce((acc, curr) => acc + curr.plannedValue, 0);
       const executedValue = portfolioInvoices.reduce((acc, curr) => acc + curr.value, 0);
-      const balance = p.totalValue - executedValue;
-      const executionPercentage = p.totalValue > 0 ? (executedValue / p.totalValue) * 100 : 0;
+      const totalBudget = p.totalValue + allocatedValue + executedValue;
+      const balance = p.totalValue;
+      const executionPercentage = totalBudget > 0 ? (executedValue / totalBudget) * 100 : 0;
 
       return {
         ...p,
         allocatedValue,
         executedValue,
         balance,
+        totalBudget,
         executionPercentage,
         projectsCount: portfolioProjects.length
       };
@@ -92,13 +94,15 @@ const CapexManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     return projects.map(p => {
       const projectInvoices = invoices.filter(inv => inv.projectId === p.id);
       const executedValue = projectInvoices.reduce((acc, curr) => acc + curr.value, 0);
-      const balance = p.plannedValue - executedValue;
-      const executionPercentage = p.plannedValue > 0 ? (executedValue / p.plannedValue) * 100 : 0;
+      const totalBudget = p.plannedValue + executedValue;
+      const balance = p.plannedValue;
+      const executionPercentage = totalBudget > 0 ? (executedValue / totalBudget) * 100 : 0;
 
       return {
         ...p,
         executedValue,
         balance,
+        totalBudget,
         executionPercentage
       };
     });
@@ -133,12 +137,25 @@ const CapexManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     e.preventDefault();
     if (!hasPermission) return;
 
+    const portfolio = (state.portfolios || []).find(p => p.id === projectForm.portfolioId);
+    if (!portfolio) return;
+
+    const oldValue = editingProjectId ? (state.capexProjects || []).find(p => p.id === editingProjectId)?.plannedValue || 0 : 0;
+    const newValue = Number(projectForm.plannedValue);
+    const diff = newValue - oldValue;
+
+    // Verificar se há saldo na carteira (apenas para novos valores positivos)
+    if (diff > portfolio.totalValue) {
+      alert(`Saldo insuficiente na carteira! Saldo disponível: R$ ${portfolio.totalValue.toLocaleString()}`);
+      return;
+    }
+
     const newProject: CapexProject = {
       id: editingProjectId || crypto.randomUUID(),
       portfolioId: projectForm.portfolioId,
       name: projectForm.name,
       costCenter: projectForm.costCenter,
-      plannedValue: Number(projectForm.plannedValue),
+      plannedValue: newValue,
       startDate: projectForm.startDate,
       endDate: projectForm.endDate,
       responsible: projectForm.responsible,
@@ -147,11 +164,16 @@ const CapexManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       updatedAt: Date.now()
     };
 
+    // Atualizar Carteira (Abater valor)
+    const updatedPortfolios = (state.portfolios || []).map(p => 
+      p.id === projectForm.portfolioId ? { ...p, totalValue: p.totalValue - diff, updatedAt: Date.now() } : p
+    );
+
     const updatedProjects = editingProjectId 
       ? (state.capexProjects || []).map(p => p.id === editingProjectId ? newProject : p)
       : [...(state.capexProjects || []), newProject];
 
-    onUpdate({ ...state, capexProjects: updatedProjects });
+    onUpdate({ ...state, portfolios: updatedPortfolios, capexProjects: updatedProjects });
     setEditingProjectId(null);
     setProjectForm({ portfolioId: '', name: '', costCenter: '', plannedValue: '', startDate: new Date().toISOString().split('T')[0], endDate: '', responsible: '', investmentArea: '' });
   };
@@ -159,6 +181,19 @@ const CapexManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
   const handleSaveInvoice = (e: React.FormEvent) => {
     e.preventDefault();
     if (!hasPermission) return;
+
+    const project = (state.capexProjects || []).find(p => p.id === invoiceForm.projectId);
+    if (!project) return;
+
+    const oldValue = editingInvoiceId ? (state.capexInvoices || []).find(i => i.id === editingInvoiceId)?.value || 0 : 0;
+    const newValue = Number(invoiceForm.value);
+    const diff = newValue - oldValue;
+
+    // Verificar se há saldo no CAPEX
+    if (diff > project.plannedValue) {
+      alert(`Saldo insuficiente no CAPEX! Saldo disponível: R$ ${project.plannedValue.toLocaleString()}`);
+      return;
+    }
 
     const newInvoice: CapexInvoice = {
       id: editingInvoiceId || crypto.randomUUID(),
@@ -169,7 +204,7 @@ const CapexManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       cnpj: invoiceForm.cnpj,
       items: invoiceForm.items,
       type: invoiceForm.type,
-      value: Number(invoiceForm.value),
+      value: newValue,
       date: invoiceForm.date,
       deliveryDate: invoiceForm.deliveryDate,
       description: invoiceForm.description,
@@ -178,11 +213,16 @@ const CapexManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       updatedAt: Date.now()
     };
 
+    // Atualizar Projeto (Abater valor)
+    const updatedProjects = (state.capexProjects || []).map(p => 
+      p.id === invoiceForm.projectId ? { ...p, plannedValue: p.plannedValue - diff, updatedAt: Date.now() } : p
+    );
+
     const updatedInvoices = editingInvoiceId 
       ? (state.capexInvoices || []).map(i => i.id === editingInvoiceId ? newInvoice : i)
       : [...(state.capexInvoices || []), newInvoice];
 
-    onUpdate({ ...state, capexInvoices: updatedInvoices });
+    onUpdate({ ...state, capexProjects: updatedProjects, capexInvoices: updatedInvoices });
     setEditingInvoiceId(null);
     setInvoiceForm({ 
       portfolioId: '', 
@@ -206,12 +246,36 @@ const CapexManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
 
   const removeProject = (id: string) => {
     if (!hasPermission || !confirm('Excluir este projeto?')) return;
-    onUpdate({ ...state, capexProjects: (state.capexProjects || []).filter(p => p.id !== id) });
+    const project = (state.capexProjects || []).find(p => p.id === id);
+    if (!project) return;
+
+    // Devolver valor para a Carteira
+    const updatedPortfolios = (state.portfolios || []).map(p => 
+      p.id === project.portfolioId ? { ...p, totalValue: p.totalValue + project.plannedValue, updatedAt: Date.now() } : p
+    );
+
+    onUpdate({ 
+      ...state, 
+      portfolios: updatedPortfolios,
+      capexProjects: (state.capexProjects || []).filter(p => p.id !== id) 
+    });
   };
 
   const removeInvoice = (id: string) => {
     if (!hasPermission || !confirm('Excluir este lançamento de nota?')) return;
-    onUpdate({ ...state, capexInvoices: (state.capexInvoices || []).filter(i => i.id !== id) });
+    const invoice = (state.capexInvoices || []).find(i => i.id === id);
+    if (!invoice) return;
+
+    // Devolver valor para o Projeto
+    const updatedProjects = (state.capexProjects || []).map(p => 
+      p.id === invoice.projectId ? { ...p, plannedValue: p.plannedValue + invoice.value, updatedAt: Date.now() } : p
+    );
+
+    onUpdate({ 
+      ...state, 
+      capexProjects: updatedProjects,
+      capexInvoices: (state.capexInvoices || []).filter(i => i.id !== id) 
+    });
   };
 
   return (
@@ -489,7 +553,7 @@ const CapexManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                   <input type="text" required className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none focus:ring-2 focus:ring-blue-500" value={portfolioForm.name} onChange={e => setPortfolioForm({...portfolioForm, name: e.target.value})} />
                 </div>
                 <div>
-                  <label className="block text-[10px] font-black text-slate-400 uppercase mb-1">Valor Total (R$)</label>
+                  <label className="block text-[10px] font-black text-slate-400 uppercase mb-1">Saldo Disponível (R$)</label>
                   <input type="number" required className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none focus:ring-2 focus:ring-blue-500" value={portfolioForm.totalValue} onChange={e => setPortfolioForm({...portfolioForm, totalValue: e.target.value})} />
                 </div>
                 <div>
@@ -526,12 +590,12 @@ const CapexManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                   </div>
                   <div className="grid grid-cols-2 gap-4 mb-4">
                     <div className="bg-slate-50 p-3 rounded-2xl border border-slate-100">
-                      <span className="text-[9px] font-black text-slate-400 uppercase block mb-1">Total Carteira</span>
-                      <span className="text-sm font-black text-slate-700">R$ {p.totalValue.toLocaleString()}</span>
+                      <span className="text-[9px] font-black text-slate-400 uppercase block mb-1">Orçamento Inicial</span>
+                      <span className="text-sm font-black text-slate-700">R$ {p.totalBudget.toLocaleString()}</span>
                     </div>
                     <div className="bg-blue-50 p-3 rounded-2xl border border-blue-100">
                       <span className="text-[9px] font-black text-blue-400 uppercase block mb-1">Saldo Disponível</span>
-                      <span className="text-sm font-black text-blue-700">R$ {p.balance.toLocaleString()}</span>
+                      <span className="text-sm font-black text-blue-700">R$ {p.totalValue.toLocaleString()}</span>
                     </div>
                   </div>
                   <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
@@ -570,7 +634,7 @@ const CapexManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                   <input type="text" required className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none focus:ring-2 focus:ring-emerald-500" value={projectForm.costCenter} onChange={e => setProjectForm({...projectForm, costCenter: e.target.value})} />
                 </div>
                 <div>
-                  <label className="block text-[10px] font-black text-slate-400 uppercase mb-1">Valor Previsto (R$)</label>
+                  <label className="block text-[10px] font-black text-slate-400 uppercase mb-1">Valor do CAPEX (R$)</label>
                   <input type="number" required className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none focus:ring-2 focus:ring-emerald-500" value={projectForm.plannedValue} onChange={e => setProjectForm({...projectForm, plannedValue: e.target.value})} />
                 </div>
                 <div>
@@ -616,12 +680,12 @@ const CapexManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                     </div>
                     <div className="grid grid-cols-2 gap-4 mb-4">
                       <div className="bg-slate-50 p-3 rounded-2xl border border-slate-100">
-                        <span className="text-[9px] font-black text-slate-400 uppercase block mb-1">Previsto Projeto</span>
-                        <span className="text-sm font-black text-slate-700">R$ {proj.plannedValue.toLocaleString()}</span>
+                        <span className="text-[9px] font-black text-slate-400 uppercase block mb-1">Valor Inicial CAPEX</span>
+                        <span className="text-sm font-black text-slate-700">R$ {proj.totalBudget.toLocaleString()}</span>
                       </div>
                       <div className="bg-emerald-50 p-3 rounded-2xl border border-emerald-100">
-                        <span className="text-[9px] font-black text-emerald-400 uppercase block mb-1">Saldo Projeto</span>
-                        <span className="text-sm font-black text-emerald-700">R$ {proj.balance.toLocaleString()}</span>
+                        <span className="text-[9px] font-black text-emerald-400 uppercase block mb-1">Saldo CAPEX</span>
+                        <span className="text-sm font-black text-emerald-700">R$ {proj.plannedValue.toLocaleString()}</span>
                       </div>
                     </div>
                     <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
