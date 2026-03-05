@@ -5,7 +5,7 @@ import {
   Wallet, Briefcase, FileText, Plus, Edit, Trash2, X, 
   Calendar, User as UserIcon, DollarSign, Layers, 
   ArrowRight, TrendingDown, CheckCircle2, AlertCircle,
-  Search, Filter, ChevronRight, Truck, ClipboardList, Building2
+  Search, Filter, ChevronRight, Truck, ClipboardList, Building2, TrendingUp
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 
@@ -16,7 +16,9 @@ interface Props {
 }
 
 const CapexManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
-  const [activeSubTab, setActiveSubTab] = useState<'planning' | 'execution'>(currentUser.isMaster ? 'planning' : 'execution');
+  const [activeSubTab, setActiveSubTab] = useState<'overview' | 'planning' | 'execution'>('overview');
+  const [selectedPortfolioId, setSelectedPortfolioId] = useState<string>('');
+  const [selectedProjectId, setSelectedProjectId] = useState<string>('');
   const [editingPortfolioId, setEditingPortfolioId] = useState<string | null>(null);
   const [editingProjectId, setEditingProjectId] = useState<string | null>(null);
   const [editingInvoiceId, setEditingInvoiceId] = useState<string | null>(null);
@@ -216,6 +218,12 @@ const CapexManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     <div className="space-y-6 pb-20">
       {/* Sub-Tabs */}
       <div className="flex gap-2 p-1 bg-slate-200/50 rounded-2xl w-fit mx-auto mb-8">
+        <button 
+          onClick={() => setActiveSubTab('overview')}
+          className={`px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all flex items-center gap-2 ${activeSubTab === 'overview' ? 'bg-[#344434] text-white shadow-lg' : 'text-slate-500 hover:bg-slate-200'}`}
+        >
+          <TrendingDown className="w-4 h-4" /> Visão Geral
+        </button>
         {currentUser.isMaster && (
           <button 
             onClick={() => setActiveSubTab('planning')}
@@ -226,13 +234,247 @@ const CapexManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
         )}
         <button 
           onClick={() => setActiveSubTab('execution')}
-          className={`px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all flex items-center gap-2 ${activeSubTab === 'execution' || !currentUser.isMaster ? 'bg-[#344434] text-white shadow-lg' : 'text-slate-500 hover:bg-slate-200'}`}
+          className={`px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all flex items-center gap-2 ${activeSubTab === 'execution' ? 'bg-[#344434] text-white shadow-lg' : 'text-slate-500 hover:bg-slate-200'}`}
         >
           <FileText className="w-4 h-4" /> Execução (Notas)
         </button>
       </div>
 
-      {(activeSubTab === 'planning' && currentUser.isMaster) ? (
+      {activeSubTab === 'overview' ? (
+        <div className="space-y-8">
+          {/* Seleção de Filtros */}
+          <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200 max-w-4xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <label className="block text-[10px] font-black text-slate-400 uppercase mb-2 ml-1 tracking-widest">Filtrar por Carteira</label>
+              <select 
+                className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl font-black text-sm outline-none focus:ring-2 focus:ring-[#344434] transition-all"
+                value={selectedPortfolioId}
+                onChange={(e) => {
+                  setSelectedPortfolioId(e.target.value);
+                  setSelectedProjectId('');
+                }}
+              >
+                <option value="">Todas as Carteiras</option>
+                {state.portfolios?.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-[10px] font-black text-slate-400 uppercase mb-2 ml-1 tracking-widest">Filtrar por Projeto</label>
+              <select 
+                className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl font-black text-sm outline-none focus:ring-2 focus:ring-[#344434] transition-all disabled:opacity-50"
+                value={selectedProjectId}
+                disabled={!selectedPortfolioId}
+                onChange={(e) => setSelectedProjectId(e.target.value)}
+              >
+                <option value="">Todos os Projetos</option>
+                {state.capexProjects?.filter(p => p.portfolioId === selectedPortfolioId).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+              </select>
+            </div>
+          </div>
+
+          {selectedProjectId ? (
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+              {/* Card de Resumo do Projeto */}
+              {(() => {
+                const project = projectStats.find(p => p.id === selectedProjectId);
+                const invoices = (state.capexInvoices || []).filter(i => i.projectId === selectedProjectId);
+                if (!project) return null;
+
+                const now = new Date();
+                const start = new Date(project.startDate);
+                const end = project.endDate ? new Date(project.endDate) : new Date();
+                const totalTime = end.getTime() - start.getTime();
+                const elapsedTime = now.getTime() - start.getTime();
+                const timeProgress = totalTime > 0 ? Math.max(0, Math.min(100, (elapsedTime / totalTime) * 100)) : 0;
+                
+                const isLate = now > end && project.executionPercentage < 100;
+
+                return (
+                  <>
+                    <div className="lg:col-span-2 space-y-6">
+                      <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm relative overflow-hidden">
+                        <div className="relative z-10">
+                          <div className="flex justify-between items-start mb-8">
+                            <div>
+                              <span className="text-[10px] font-black bg-emerald-100 text-emerald-600 px-3 py-1 rounded-full uppercase tracking-widest mb-2 inline-block">
+                                {project.investmentArea}
+                              </span>
+                              <h2 className="text-3xl font-black text-slate-800 uppercase tracking-tighter italic leading-none">{project.name}</h2>
+                              <p className="text-xs font-bold text-slate-400 uppercase mt-2">Centro de Custo: {project.costCenter} • Responsável: {project.responsible}</p>
+                            </div>
+                            <div className="text-right">
+                              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Status do Projeto</p>
+                              <div className={`text-sm font-black uppercase italic ${project.executionPercentage > 100 ? 'text-red-500' : 'text-emerald-500'}`}>
+                                {project.executionPercentage > 100 ? 'Orçamento Estourado' : (project.executionPercentage === 100 ? 'Concluído' : 'Em Execução')}
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                            <div className="bg-slate-50 p-6 rounded-3xl border border-slate-100">
+                              <div className="flex items-center gap-2 mb-2">
+                                <DollarSign className="w-4 h-4 text-slate-400" />
+                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Orçamento Previsto</span>
+                              </div>
+                              <div className="text-2xl font-black text-slate-800">R$ {project.plannedValue.toLocaleString()}</div>
+                            </div>
+                            <div className="bg-slate-50 p-6 rounded-3xl border border-slate-100">
+                              <div className="flex items-center gap-2 mb-2">
+                                <ArrowRight className="w-4 h-4 text-blue-500" />
+                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Total Executado</span>
+                              </div>
+                              <div className="text-2xl font-black text-blue-600">R$ {project.executedValue.toLocaleString()}</div>
+                            </div>
+                            <div className={`p-6 rounded-3xl border ${project.balance < 0 ? 'bg-red-50 border-red-100' : 'bg-emerald-50 border-emerald-100'}`}>
+                              <div className="flex items-center gap-2 mb-2">
+                                <Wallet className={`w-4 h-4 ${project.balance < 0 ? 'text-red-400' : 'text-emerald-400'}`} />
+                                <span className={`text-[10px] font-black uppercase tracking-widest ${project.balance < 0 ? 'text-red-400' : 'text-emerald-400'}`}>Saldo Disponível</span>
+                              </div>
+                              <div className={`text-2xl font-black ${project.balance < 0 ? 'text-red-600' : 'text-emerald-600'}`}>R$ {project.balance.toLocaleString()}</div>
+                            </div>
+                          </div>
+
+                          <div className="mt-8 space-y-6">
+                            <div>
+                              <div className="flex justify-between items-end mb-2">
+                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                                  <TrendingDown className="w-4 h-4" /> Aderência Orçamentária
+                                </span>
+                                <span className={`text-xs font-black ${project.executionPercentage > 100 ? 'text-red-500' : 'text-emerald-500'}`}>
+                                  {project.executionPercentage.toFixed(1)}% Utilizado
+                                </span>
+                              </div>
+                              <div className="h-4 bg-slate-100 rounded-full overflow-hidden border border-slate-200 p-0.5">
+                                <div 
+                                  className={`h-full rounded-full transition-all duration-1000 ${project.executionPercentage > 100 ? 'bg-red-500' : 'bg-emerald-500'}`} 
+                                  style={{ width: `${Math.min(100, project.executionPercentage)}%` }} 
+                                />
+                              </div>
+                            </div>
+
+                            <div>
+                              <div className="flex justify-between items-end mb-2">
+                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                                  <Calendar className="w-4 h-4" /> Aderência Cronograma
+                                </span>
+                                <span className={`text-xs font-black ${isLate ? 'text-red-500' : 'text-blue-500'}`}>
+                                  {timeProgress.toFixed(1)}% do Tempo Decorrido
+                                </span>
+                              </div>
+                              <div className="h-4 bg-slate-100 rounded-full overflow-hidden border border-slate-200 p-0.5">
+                                <div 
+                                  className={`h-full rounded-full transition-all duration-1000 ${isLate ? 'bg-red-500' : 'bg-blue-500'}`} 
+                                  style={{ width: `${timeProgress}%` }} 
+                                />
+                              </div>
+                              <div className="flex justify-between mt-2 text-[9px] font-black text-slate-400 uppercase">
+                                <span>Início: {format(parseISO(project.startDate), 'dd/MM/yyyy')}</span>
+                                <span>Fim: {project.endDate ? format(parseISO(project.endDate), 'dd/MM/yyyy') : 'Indeterminado'}</span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                        <Layers className="absolute -right-10 -bottom-10 w-64 h-64 text-slate-50 opacity-[0.03] pointer-events-none" />
+                      </div>
+
+                      {/* Tabela de Notas Recentes do Projeto */}
+                      <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm">
+                        <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest mb-6 flex items-center gap-2 italic">
+                          <ClipboardList className="w-5 h-5 text-amber-500" /> Últimos Lançamentos do Projeto
+                        </h3>
+                        <div className="space-y-3">
+                          {invoices.slice(0, 5).map(inv => (
+                            <div key={inv.id} className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-100 hover:border-amber-200 transition-all">
+                              <div className="flex items-center gap-4">
+                                <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center shadow-sm border border-slate-100">
+                                  <FileText className="w-5 h-5 text-slate-400" />
+                                </div>
+                                <div>
+                                  <div className="text-xs font-black text-slate-800 uppercase tracking-tight">NF {inv.invoiceNumber}</div>
+                                  <div className="text-[9px] font-bold text-slate-400 uppercase">{inv.supplier} • {format(parseISO(inv.date), 'dd/MM/yyyy')}</div>
+                                </div>
+                              </div>
+                              <div className="text-right">
+                                <div className="text-sm font-black text-slate-800">R$ {inv.value.toLocaleString()}</div>
+                                <div className="text-[8px] font-black text-amber-600 uppercase tracking-widest bg-amber-50 px-2 py-0.5 rounded-full">{inv.type}</div>
+                              </div>
+                            </div>
+                          ))}
+                          {invoices.length === 0 && (
+                            <div className="text-center py-10 text-slate-400 font-bold uppercase text-[10px] tracking-widest italic">Nenhum lançamento vinculado a este projeto.</div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="space-y-6">
+                      {/* KPIs de Eficiência */}
+                      <div className="bg-[#344434] p-8 rounded-[2.5rem] shadow-xl text-[#e4e4d4]">
+                        <h3 className="text-xs font-black uppercase tracking-[0.2em] mb-6 opacity-60">Indicadores de Eficiência</h3>
+                        <div className="space-y-8">
+                          <div>
+                            <div className="text-3xl font-black italic tracking-tighter mb-1">
+                              {invoices.length}
+                            </div>
+                            <div className="text-[9px] font-black uppercase tracking-widest opacity-50">Total de Notas Lançadas</div>
+                          </div>
+                          <div className="h-px bg-white/10" />
+                          <div>
+                            <div className="text-3xl font-black italic tracking-tighter mb-1">
+                              R$ {invoices.length > 0 ? (project.executedValue / invoices.length).toLocaleString(undefined, { maximumFractionDigits: 0 }) : '0'}
+                            </div>
+                            <div className="text-[9px] font-black uppercase tracking-widest opacity-50">Ticket Médio por Nota</div>
+                          </div>
+                          <div className="h-px bg-white/10" />
+                          <div>
+                            <div className="text-3xl font-black italic tracking-tighter mb-1">
+                              {project.executionPercentage > 90 ? 'Crítico' : (project.executionPercentage > 70 ? 'Alerta' : 'Saudável')}
+                            </div>
+                            <div className="text-[9px] font-black uppercase tracking-widest opacity-50">Saúde Orçamentária</div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Informações de Entrega */}
+                      <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm">
+                        <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-6">Próximas Entregas / Prazos</h3>
+                        <div className="space-y-4">
+                          <div className="flex items-center gap-4">
+                            <div className="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center text-blue-500">
+                              <Truck className="w-5 h-5" />
+                            </div>
+                            <div>
+                              <div className="text-[10px] font-black text-slate-400 uppercase">Previsão Conclusão</div>
+                              <div className="text-sm font-black text-slate-800">{project.endDate ? format(parseISO(project.endDate), 'dd/MM/yyyy') : 'Não Definida'}</div>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-4">
+                            <div className="w-10 h-10 bg-emerald-50 rounded-xl flex items-center justify-center text-emerald-500">
+                              <CheckCircle2 className="w-5 h-5" />
+                            </div>
+                            <div>
+                              <div className="text-[10px] font-black text-slate-400 uppercase">Início Realizado</div>
+                              <div className="text-sm font-black text-slate-800">{format(parseISO(project.startDate), 'dd/MM/yyyy')}</div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </>
+                );
+              })()}
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center py-20 text-center space-y-4 bg-white rounded-[3rem] border border-dashed border-slate-200">
+              <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mb-2">
+                <Search className="w-10 h-10 text-slate-200" />
+              </div>
+              <h3 className="text-xl font-black text-slate-400 uppercase tracking-widest italic">Aguardando Seleção</h3>
+              <p className="text-slate-400 font-bold uppercase text-[10px] max-w-xs">Selecione uma carteira e um projeto acima para visualizar o compilado de informações e aderência.</p>
+            </div>
+          )}
+        </div>
+      ) : (activeSubTab === 'planning' && currentUser.isMaster) ? (
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
           {/* Carteiras de Investimento */}
           <div className="space-y-6">
