@@ -12,6 +12,7 @@ interface Props {
 
 const FeedingLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
   const [selectedLineId, setSelectedLineId] = useState('');
+  const [formBatchId, setFormBatchId] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
   const [currentPage, setCurrentPage] = useState(1);
@@ -32,8 +33,26 @@ const FeedingLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
   });
 
   useEffect(() => {
+    if (!editingId) {
+      setSelectedLineId('');
+      setFormData(prev => ({ ...prev, cageId: '' }));
+    }
+  }, [formBatchId]);
+
+  useEffect(() => {
     if (!editingId) setFormData(prev => ({ ...prev, cageId: '' }));
   }, [selectedLineId]);
+
+  const filteredLines = useMemo(() => {
+    if (!formBatchId) return [];
+    const lineIdsInBatch = new Set(state.cages.filter(c => c.batchId === formBatchId).map(c => c.lineId));
+    return state.lines.filter(l => lineIdsInBatch.has(l.id));
+  }, [formBatchId, state.cages, state.lines]);
+
+  const filteredCages = useMemo(() => {
+    if (!formBatchId || !selectedLineId) return [];
+    return state.cages.filter(c => c.batchId === formBatchId && c.lineId === selectedLineId);
+  }, [formBatchId, selectedLineId, state.cages]);
 
   const { cageMap, feedMap, userMap } = useMemo(() => {
     const cages = new Map(state.cages.map(c => [c.id, c]));
@@ -177,13 +196,18 @@ const FeedingLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
 
   const resetForm = () => {
     setEditingId(null);
+    setFormBatchId('');
+    setSelectedLineId('');
     setFormData({ cageId: '', feedTypeId: '', amount: '', date: new Date().toISOString().split('T')[0], time: format(new Date(), 'HH:mm') });
   };
 
   const startEdit = (log: IFeedingLog) => {
     if (!hasPermission) return;
     const cage = cageMap.get(log.cageId);
-    if (cage) setSelectedLineId(cage.lineId || '');
+    if (cage) {
+      setFormBatchId(cage.batchId || '');
+      setSelectedLineId(cage.lineId || '');
+    }
     const [d, t] = log.timestamp.split('T');
     setEditingId(log.id);
     setFormData({ 
@@ -226,13 +250,17 @@ const FeedingLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
               {editingId && <button onClick={resetForm}><X className="w-5 h-5 text-slate-400" /></button>}
             </h3>
             <form onSubmit={handleSave} className="space-y-4">
-              <select required className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none" value={selectedLineId} onChange={e => setSelectedLineId(e.target.value)}>
+              <select required className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none" value={formBatchId} onChange={e => setFormBatchId(e.target.value)}>
+                <option value="">Escolher Lote...</option>
+                {state.batches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+              </select>
+              <select required disabled={!formBatchId} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none" value={selectedLineId} onChange={e => setSelectedLineId(e.target.value)}>
                 <option value="">Escolher Linha...</option>
-                {state.lines.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
+                {filteredLines.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
               </select>
               <select required disabled={!selectedLineId} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none" value={formData.cageId} onChange={e => setFormData({...formData, cageId: e.target.value})}>
                 <option value="">Escolher Gaiola...</option>
-                {state.cages.filter(c => c.lineId === selectedLineId).map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                {filteredCages.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
               <select required className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none" value={formData.feedTypeId} onChange={e => setFormData({...formData, feedTypeId: e.target.value})}>
                 <option value="">Tipo de Ração...</option>

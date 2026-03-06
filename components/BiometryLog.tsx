@@ -12,6 +12,7 @@ interface Props {
 
 const BiometryLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
   const [selectedLineId, setSelectedLineId] = useState('');
+  const [formBatchId, setFormBatchId] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
   
@@ -24,8 +25,26 @@ const BiometryLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
   });
 
   useEffect(() => {
+    if (!editingId) {
+      setSelectedLineId('');
+      setFormData(prev => ({ ...prev, cageId: '' }));
+    }
+  }, [formBatchId]);
+
+  useEffect(() => {
     if (!editingId) setFormData(prev => ({ ...prev, cageId: '' }));
   }, [selectedLineId]);
+
+  const filteredLines = useMemo(() => {
+    if (!formBatchId) return [];
+    const lineIdsInBatch = new Set(state.cages.filter(c => c.batchId === formBatchId).map(c => c.lineId));
+    return state.lines.filter(l => lineIdsInBatch.has(l.id));
+  }, [formBatchId, state.cages, state.lines]);
+
+  const filteredCages = useMemo(() => {
+    if (!formBatchId || !selectedLineId) return [];
+    return state.cages.filter(c => c.batchId === formBatchId && c.lineId === selectedLineId);
+  }, [formBatchId, selectedLineId, state.cages]);
 
   const sortedLogs = useMemo(() => {
     const logs = Array.isArray(state.biometryLogs) ? state.biometryLogs : [];
@@ -64,13 +83,18 @@ const BiometryLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
 
   const resetForm = () => {
     setEditingId(null);
+    setFormBatchId('');
+    setSelectedLineId('');
     setFormData({ cageId: '', averageWeight: '', date: new Date().toISOString().split('T')[0] });
   };
 
   const startEdit = (log: IBiometryLog) => {
     if (!hasPermission) return;
     const cage = state.cages.find(c => c.id === log.cageId);
-    if (cage) setSelectedLineId(cage.lineId || '');
+    if (cage) {
+      setFormBatchId(cage.batchId || '');
+      setSelectedLineId(cage.lineId || '');
+    }
     setEditingId(log.id);
     setFormData({ cageId: log.cageId, averageWeight: log.averageWeight.toString(), date: log.date });
   };
@@ -94,13 +118,17 @@ const BiometryLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
               {editingId && <button onClick={resetForm}><X className="w-5 h-5 text-slate-400" /></button>}
             </h3>
             <form onSubmit={handleSave} className="space-y-4">
-              <select required className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none" value={selectedLineId} onChange={e => setSelectedLineId(e.target.value)}>
+              <select required className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none" value={formBatchId} onChange={e => setFormBatchId(e.target.value)}>
+                <option value="">Lote...</option>
+                {state.batches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+              </select>
+              <select required disabled={!formBatchId} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none" value={selectedLineId} onChange={e => setSelectedLineId(e.target.value)}>
                 <option value="">Linha...</option>
-                {state.lines.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
+                {filteredLines.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
               </select>
               <select required disabled={!selectedLineId} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none" value={formData.cageId} onChange={e => setFormData({...formData, cageId: e.target.value})}>
                 <option value="">Gaiola...</option>
-                {state.cages.filter(c => c.lineId === selectedLineId).map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                {filteredCages.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
               <input type="number" required placeholder="Peso Médio (g)" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none" value={formData.averageWeight} onChange={e => setFormData({...formData, averageWeight: e.target.value})} />
               <input type="date" required className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none" value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} />
