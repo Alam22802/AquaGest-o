@@ -62,7 +62,7 @@ const Maintenance: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start pb-20">
-      <div className="lg:col-span-1 sticky top-4">
+      <div className="lg:col-span-1 lg:sticky lg:top-4">
         {hasPermission ? (
           <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200">
             <h3 className="text-lg font-black text-slate-800 mb-6 flex items-center gap-2 uppercase tracking-tighter">
