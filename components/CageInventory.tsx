@@ -1,11 +1,12 @@
 
-import React, { useState } from 'react';
-import { AppState, Cage } from '../types';
+import React, { useState, useMemo } from 'react';
+import { AppState, Cage, User } from '../types';
 import { Plus, Trash2, Box, Edit, X, Ruler, Users, Info, Layers } from 'lucide-react';
 
 interface Props {
   state: AppState;
   onUpdate: (newState: AppState) => void;
+  currentUser: User;
 }
 
 const CageInventory: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
