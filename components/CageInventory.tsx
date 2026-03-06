@@ -11,6 +11,7 @@ interface Props {
 
 const CageInventory: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [formData, setFormData] = useState({
     name: '',
     length: '',
@@ -35,6 +36,33 @@ const CageInventory: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
     if (!hasPermission) return;
+
+    // Bulk Edit Logic
+    if (selectedIds.length > 0 && !editingId) {
+      const updatedCages = state.cages.map(c => 
+        selectedIds.includes(c.id) ? {
+          ...c,
+          dimensions: {
+            length: formData.length ? Number(formData.length) : c.dimensions.length,
+            width: formData.width ? Number(formData.width) : c.dimensions.width,
+            depth: formData.depth ? Number(formData.depth) : c.dimensions.depth
+          },
+          stockingDensity: formData.stockingDensity ? Number(formData.stockingDensity) : c.stockingDensity,
+          stockingCapacity: formData.stockingDensity || formData.length || formData.width || formData.depth 
+            ? Math.floor((formData.length ? Number(formData.length) : c.dimensions.length) * 
+                         (formData.width ? Number(formData.width) : c.dimensions.width) * 
+                         (formData.depth ? Number(formData.depth) : c.dimensions.depth) * 
+                         (formData.stockingDensity ? Number(formData.stockingDensity) : c.stockingDensity))
+            : c.stockingCapacity
+        } : c
+      );
+      onUpdate({ ...state, cages: updatedCages });
+      setSelectedIds([]);
+      resetForm();
+      alert(`${selectedIds.length} gaiolas atualizadas com sucesso!`);
+      return;
+    }
+
     if (!formData.name) return;
 
     // Lógica para detecção de intervalo (ex: G01 - G40)
@@ -117,6 +145,7 @@ const CageInventory: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
 
   const resetForm = () => {
     setEditingId(null);
+    setSelectedIds([]);
     setFormData({
       name: '', length: '', width: '', depth: '',
       stockingDensity: '', stockingCapacity: ''
@@ -150,6 +179,35 @@ const CageInventory: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     });
   };
 
+  const toggleSelect = (id: string) => {
+    setSelectedIds(prev => 
+      prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+    );
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedIds.length === state.cages.length) {
+      setSelectedIds([]);
+    } else {
+      setSelectedIds(state.cages.map(c => c.id));
+    }
+  };
+
+  const removeSelected = () => {
+    if (!hasPermission) return;
+    const occupiedSelected = state.cages.filter(c => selectedIds.includes(c.id) && c.status === 'Ocupada');
+    if (occupiedSelected.length > 0) {
+      alert(`Não é possível remover ${occupiedSelected.length} gaiolas que estão OCUPADAS. Desocupe-as primeiro.`);
+      return;
+    }
+    if (!confirm(`Tem certeza que deseja remover as ${selectedIds.length} gaiolas selecionadas permanentemente?`)) return;
+    onUpdate({
+      ...state,
+      cages: state.cages.filter(c => !selectedIds.includes(c.id))
+    });
+    setSelectedIds([]);
+  };
+
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start pb-20">
       <div className="lg:col-span-1 sticky top-4">
@@ -158,9 +216,9 @@ const CageInventory: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
             <h3 className="text-lg font-black text-slate-800 mb-6 flex items-center justify-between uppercase tracking-tighter">
             <div className="flex items-center gap-2">
               <Box className="w-5 h-5 text-indigo-500" />
-              {editingId ? 'Editar Cadastro de Gaiola' : 'Cadastrar Nova Gaiola'}
+              {editingId ? 'Editar Cadastro de Gaiola' : selectedIds.length > 0 ? `Editar ${selectedIds.length} Selecionadas` : 'Cadastrar Nova Gaiola'}
             </div>
-            {editingId && (
+            {(editingId || selectedIds.length > 0) && (
               <button onClick={resetForm} className="text-slate-400 hover:text-slate-600">
                 <X className="w-5 h-5" />
               </button>
@@ -172,13 +230,14 @@ const CageInventory: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
               <label className="block text-xs font-black text-slate-400 uppercase mb-1">Identificação da Gaiola</label>
               <input 
                 type="text" 
-                required 
-                placeholder="Ex: G01 ou G01 - G40" 
-                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-indigo-500 font-bold" 
+                required={selectedIds.length === 0}
+                disabled={selectedIds.length > 0 && !editingId}
+                placeholder={selectedIds.length > 0 && !editingId ? "Nomes não editáveis em massa" : "Ex: G01 ou G01 - G40"} 
+                className={`w-full px-4 py-3 border rounded-2xl outline-none focus:ring-2 focus:ring-indigo-500 font-bold ${selectedIds.length > 0 && !editingId ? 'bg-slate-100 border-slate-200 text-slate-400 italic' : 'bg-slate-50 border-slate-200'}`}
                 value={formData.name} 
                 onChange={(e) => setFormData({...formData, name: e.target.value})} 
               />
-              {!editingId && (
+              {!editingId && selectedIds.length === 0 && (
                 <p className="mt-1 text-[10px] text-slate-400 font-bold uppercase flex items-center gap-1">
                   <Layers className="w-3 h-3" /> Dica: Use "-" para criar várias (ex: G01 - G10)
                 </p>
@@ -222,8 +281,8 @@ const CageInventory: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
               </div>
             </div>
 
-            <button type="submit" className={`col-span-2 py-4 rounded-2xl font-black uppercase tracking-widest text-xs text-white shadow-xl transition-all active:scale-95 mt-2 ${editingId ? 'bg-amber-600 shadow-amber-600/20' : 'bg-indigo-600 shadow-indigo-600/20'}`}>
-              {editingId ? 'Salvar Alterações' : 'Confirmar Cadastro'}
+            <button type="submit" className={`col-span-2 py-4 rounded-2xl font-black uppercase tracking-widest text-xs text-white shadow-xl transition-all active:scale-95 mt-2 ${editingId ? 'bg-amber-600 shadow-amber-600/20' : selectedIds.length > 0 ? 'bg-indigo-900 shadow-indigo-900/20' : 'bg-indigo-600 shadow-indigo-600/20'}`}>
+              {editingId ? 'Salvar Alterações' : selectedIds.length > 0 ? 'Atualizar Selecionadas' : 'Confirmar Cadastro'}
             </button>
           </form>
         </div>
@@ -236,16 +295,57 @@ const CageInventory: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       )}
     </div>
 
-      <div className="lg:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-6">
-        {state.cages.map(cage => (
-          <div key={cage.id} className={`bg-white rounded-3xl shadow-sm border overflow-hidden transition-all group ${cage.status === 'Ocupada' ? 'border-blue-100 bg-blue-50/10' : 'border-slate-200 hover:border-indigo-200'}`}>
-            <div className="p-4 bg-slate-50/50 border-b border-slate-100 flex justify-between items-center">
+      <div className="lg:col-span-2 space-y-4">
+        {state.cages.length > 0 && hasPermission && (
+          <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <button 
+                onClick={toggleSelectAll}
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border text-[10px] font-black uppercase tracking-widest transition-all ${selectedIds.length === state.cages.length ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-slate-500 border-slate-200 hover:border-indigo-200'}`}
+              >
+                {selectedIds.length === state.cages.length ? 'Desmarcar Tudo' : 'Marcar Tudo'}
+              </button>
+              {selectedIds.length > 0 && (
+                <span className="text-[10px] font-black text-indigo-600 uppercase tracking-widest">
+                  {selectedIds.length} selecionada(s)
+                </span>
+              )}
+            </div>
+            {selectedIds.length > 0 && (
               <div className="flex items-center gap-2">
-                <Box className={`w-4 h-4 ${cage.status === 'Ocupada' ? 'text-blue-500' : 'text-slate-400'}`} />
-                <span className="font-black text-slate-800 uppercase tracking-tighter">{cage.name}</span>
+                <button 
+                  onClick={removeSelected}
+                  className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-red-50 text-red-600 border border-red-100 text-[10px] font-black uppercase tracking-widest hover:bg-red-100 transition-all"
+                >
+                  <Trash2 className="w-3 h-3" /> Excluir Selecionadas
+                </button>
               </div>
-              {hasPermission && (
-                <div className="flex gap-1">
+            )}
+          </div>
+        )}
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {state.cages.map(cage => (
+            <div 
+              key={cage.id} 
+              onClick={() => hasPermission && toggleSelect(cage.id)}
+              className={`bg-white rounded-3xl shadow-sm border overflow-hidden transition-all group cursor-pointer relative ${selectedIds.includes(cage.id) ? 'ring-2 ring-indigo-500 border-transparent shadow-indigo-100' : cage.status === 'Ocupada' ? 'border-blue-100 bg-blue-50/10' : 'border-slate-200 hover:border-indigo-200'}`}
+            >
+              {selectedIds.includes(cage.id) && (
+                <div className="absolute top-3 right-3 z-10 bg-indigo-600 text-white rounded-full p-1 shadow-lg">
+                  <Plus className="w-3 h-3 rotate-45" />
+                </div>
+              )}
+              <div className="p-4 bg-slate-50/50 border-b border-slate-100 flex justify-between items-center">
+                <div className="flex items-center gap-2">
+                  <div className={`w-4 h-4 rounded border flex items-center justify-center transition-all ${selectedIds.includes(cage.id) ? 'bg-indigo-600 border-indigo-600' : 'bg-white border-slate-300'}`}>
+                    {selectedIds.includes(cage.id) && <Plus className="w-3 h-3 text-white rotate-45" />}
+                  </div>
+                  <Box className={`w-4 h-4 ${cage.status === 'Ocupada' ? 'text-blue-500' : 'text-slate-400'}`} />
+                  <span className="font-black text-slate-800 uppercase tracking-tighter">{cage.name}</span>
+                </div>
+                {hasPermission && (
+                  <div className="flex gap-1" onClick={e => e.stopPropagation()}>
                   <button 
                     onClick={() => startEdit(cage)} 
                     title="Editar"
@@ -296,7 +396,8 @@ const CageInventory: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
         )}
       </div>
     </div>
-  );
+  </div>
+);
 };
 
 export default CageInventory;
