@@ -15,10 +15,21 @@ const CageInventory: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     length: '',
     width: '',
     depth: '',
+    stockingDensity: '',
     stockingCapacity: ''
   });
 
   const hasPermission = currentUser.isMaster || currentUser.canEdit;
+
+  const volume = useMemo(() => {
+    const v = Number(formData.length) * Number(formData.width) * Number(formData.depth);
+    return isNaN(v) ? 0 : v;
+  }, [formData.length, formData.width, formData.depth]);
+
+  const calculatedCapacity = useMemo(() => {
+    const cap = Math.floor(volume * Number(formData.stockingDensity));
+    return isNaN(cap) ? 0 : cap;
+  }, [volume, formData.stockingDensity]);
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
@@ -55,7 +66,8 @@ const CageInventory: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
               width: Number(formData.width),
               depth: Number(formData.depth)
             },
-            stockingCapacity: Number(formData.stockingCapacity),
+            stockingDensity: Number(formData.stockingDensity),
+            stockingCapacity: calculatedCapacity,
             status: 'Disponível'
           });
         }
@@ -77,7 +89,8 @@ const CageInventory: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
             width: Number(formData.width),
             depth: Number(formData.depth)
           },
-          stockingCapacity: Number(formData.stockingCapacity)
+          stockingDensity: Number(formData.stockingDensity),
+          stockingCapacity: calculatedCapacity
         } : c
       );
       onUpdate({ ...state, cages: updatedCages });
@@ -91,7 +104,8 @@ const CageInventory: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
           width: Number(formData.width),
           depth: Number(formData.depth)
         },
-        stockingCapacity: Number(formData.stockingCapacity),
+        stockingDensity: Number(formData.stockingDensity),
+        stockingCapacity: calculatedCapacity,
         status: 'Disponível'
       };
       onUpdate({ ...state, cages: [...state.cages, newCage] });
@@ -104,7 +118,7 @@ const CageInventory: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     setEditingId(null);
     setFormData({
       name: '', length: '', width: '', depth: '',
-      stockingCapacity: ''
+      stockingDensity: '', stockingCapacity: ''
     });
   };
 
@@ -116,6 +130,7 @@ const CageInventory: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       length: cage.dimensions.length.toString(),
       width: cage.dimensions.width.toString(),
       depth: cage.dimensions.depth.toString(),
+      stockingDensity: (cage.stockingDensity || '').toString(),
       stockingCapacity: cage.stockingCapacity.toString()
     });
   };
@@ -169,16 +184,25 @@ const CageInventory: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
             </div>
             
             <div className="col-span-2 md:col-span-1">
-              <label className="block text-xs font-black text-slate-400 uppercase mb-1">Capacidade (Indivíduos)</label>
+              <label className="block text-xs font-black text-slate-400 uppercase mb-1">Densidade (Peixes por m³)</label>
               <div className="relative">
                 <Users className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                <input type="number" required placeholder="Ex: 2500" className="w-full pl-12 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none font-bold" value={formData.stockingCapacity} onChange={(e) => setFormData({...formData, stockingCapacity: e.target.value})} />
+                <input type="number" required placeholder="Ex: 60" className="w-full pl-12 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none font-bold" value={formData.stockingDensity} onChange={(e) => setFormData({...formData, stockingDensity: e.target.value})} />
+              </div>
+            </div>
+
+            <div className="col-span-2 md:col-span-1">
+              <label className="block text-xs font-black text-slate-400 uppercase mb-1">Capacidade Calculada</label>
+              <div className="relative">
+                <div className="absolute left-4 top-1/2 -translate-y-1/2 text-[10px] font-black text-indigo-500 uppercase">Total</div>
+                <input type="text" readOnly className="w-full pl-16 pr-4 py-3 bg-indigo-50 border border-indigo-100 rounded-2xl outline-none font-black text-indigo-600" value={`${calculatedCapacity} un`} />
               </div>
             </div>
 
             <div className="col-span-2">
-              <label className="block text-xs font-black text-slate-400 uppercase mb-1 flex items-center gap-1">
-                <Ruler className="w-3 h-3" /> Dimensões Físicas (metros)
+              <label className="block text-xs font-black text-slate-400 uppercase mb-1 flex items-center justify-between">
+                <span className="flex items-center gap-1"><Ruler className="w-3 h-3" /> Dimensões Físicas (metros)</span>
+                {volume > 0 && <span className="text-indigo-500 font-black">Volume: {volume.toFixed(2)} m³</span>}
               </label>
               <div className="grid grid-cols-3 gap-3">
                 <div className="relative">
@@ -245,7 +269,14 @@ const CageInventory: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
               </div>
               <div className="flex justify-between items-center border-t border-slate-50 pt-2">
                 <span className="text-[10px] font-black text-slate-400 uppercase">Capacidade</span>
-                <span className="text-sm font-black text-slate-700">{cage.stockingCapacity} un</span>
+                <div className="text-right">
+                  <span className="text-sm font-black text-slate-700 block">{cage.stockingCapacity} un</span>
+                  {cage.stockingDensity && <span className="text-[9px] font-bold text-slate-400 uppercase">{cage.stockingDensity} peixes/m³</span>}
+                </div>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-[10px] font-black text-slate-400 uppercase">Volume</span>
+                <span className="text-xs font-bold text-indigo-600">{(cage.dimensions.length * cage.dimensions.width * cage.dimensions.depth).toFixed(2)} m³</span>
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-[10px] font-black text-slate-400 uppercase">Medidas</span>

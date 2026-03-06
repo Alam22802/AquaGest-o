@@ -64,6 +64,7 @@ export interface Cage {
     width: number;
     depth: number;
   };
+  stockingDensity?: number;
   stockingCapacity: number;
   status: CageStatus;
   userId?: string;

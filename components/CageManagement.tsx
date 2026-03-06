@@ -176,8 +176,11 @@ const CageManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                     <Ruler className="w-4 h-4 text-blue-500" />
                   </div>
                   <div>
-                    <div className="text-[9px] font-black text-slate-400 uppercase">Dimensões</div>
-                    <div className="text-xs font-bold text-slate-700">{selectedCageDef.dimensions.length}x{selectedCageDef.dimensions.width}x{selectedCageDef.dimensions.depth}m</div>
+                    <div className="text-[9px] font-black text-slate-400 uppercase">Volume / Medidas</div>
+                    <div className="text-xs font-bold text-slate-700">
+                      {(selectedCageDef.dimensions.length * selectedCageDef.dimensions.width * selectedCageDef.dimensions.depth).toFixed(2)}m³ 
+                      <span className="text-[10px] text-slate-400 ml-1">({selectedCageDef.dimensions.length}x{selectedCageDef.dimensions.width}x{selectedCageDef.dimensions.depth}m)</span>
+                    </div>
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
@@ -185,8 +188,11 @@ const CageManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                     <Users className="w-4 h-4 text-blue-500" />
                   </div>
                   <div>
-                    <div className="text-[9px] font-black text-slate-400 uppercase">Capacidade Planejada</div>
-                    <div className="text-xs font-bold text-slate-700">{selectedCageDef.stockingCapacity} un</div>
+                    <div className="text-[9px] font-black text-slate-400 uppercase">Capacidade / Densidade</div>
+                    <div className="text-xs font-bold text-slate-700">
+                      {selectedCageDef.stockingCapacity} un
+                      {selectedCageDef.stockingDensity && <span className="text-[10px] text-slate-400 ml-1">({selectedCageDef.stockingDensity} p/m³)</span>}
+                    </div>
                   </div>
                 </div>
               </div>
