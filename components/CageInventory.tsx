@@ -151,10 +151,11 @@ const CageInventory: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
   };
 
   return (
-    <div className="space-y-8 pb-20">
-      {hasPermission ? (
-        <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200 max-w-2xl mx-auto">
-          <h3 className="text-lg font-black text-slate-800 mb-6 flex items-center justify-between uppercase tracking-tighter">
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start pb-20">
+      <div className="lg:col-span-1 sticky top-4">
+        {hasPermission ? (
+          <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200">
+            <h3 className="text-lg font-black text-slate-800 mb-6 flex items-center justify-between uppercase tracking-tighter">
             <div className="flex items-center gap-2">
               <Box className="w-5 h-5 text-indigo-500" />
               {editingId ? 'Editar Cadastro de Gaiola' : 'Cadastrar Nova Gaiola'}
@@ -227,14 +228,15 @@ const CageInventory: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
           </form>
         </div>
       ) : (
-        <div className="bg-slate-100 p-12 rounded-3xl border border-dashed border-slate-300 flex flex-col items-center gap-4 text-center max-w-2xl mx-auto">
+        <div className="bg-slate-100 p-12 rounded-3xl border border-dashed border-slate-300 flex flex-col items-center gap-4 text-center">
           <Box className="w-12 h-12 text-slate-300" />
           <h4 className="text-sm font-black uppercase tracking-widest text-slate-400">Modo Leitura Ativo</h4>
           <p className="text-xs font-bold text-slate-400 uppercase">Você não possui permissão para gerenciar o inventário de gaiolas.</p>
         </div>
       )}
+    </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="lg:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-6">
         {state.cages.map(cage => (
           <div key={cage.id} className={`bg-white rounded-3xl shadow-sm border overflow-hidden transition-all group ${cage.status === 'Ocupada' ? 'border-blue-100 bg-blue-50/10' : 'border-slate-200 hover:border-indigo-200'}`}>
             <div className="p-4 bg-slate-50/50 border-b border-slate-100 flex justify-between items-center">
