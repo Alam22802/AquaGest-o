@@ -69,9 +69,11 @@ const BiometryLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       });
       setEditingId(null);
     } else {
+      const cage = state.cages.find(c => c.id === formData.cageId);
       const newLog: IBiometryLog = {
         id: crypto.randomUUID(),
         cageId: formData.cageId,
+        batchId: cage?.batchId,
         averageWeight: Number(formData.averageWeight),
         date: formData.date,
         userId: currentUser.id

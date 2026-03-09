@@ -90,6 +90,7 @@ export interface FeedType {
 export interface FeedingLog {
   id: string;
   cageId: string;
+  batchId?: string;
   feedTypeId: string;
   amount: number;
   timestamp: string;
@@ -110,6 +111,7 @@ export interface MortalityLog {
 export interface BiometryLog {
   id: string;
   cageId: string;
+  batchId?: string;
   averageWeight: number;
   date: string;
   userId: string;

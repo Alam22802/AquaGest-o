@@ -504,22 +504,24 @@ const HarvestManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
                         {log.weight.toLocaleString()} kg
                       </td>
                       <td className="px-6 py-4 text-center">
-                        <div className="flex items-center justify-center gap-1">
-                          <button 
-                            onClick={() => startEdit(log)}
-                            className="p-2 text-slate-300 hover:text-blue-500 transition-colors"
-                            title="Editar"
-                          >
-                            <Edit3 className="w-4 h-4" />
-                          </button>
-                          <button 
-                            onClick={() => removeLog(log.id)}
-                            className="p-2 text-slate-300 hover:text-red-500 transition-colors"
-                            title="Excluir"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
+                        {hasPermission && (
+                          <div className="flex items-center justify-center gap-1">
+                            <button 
+                              onClick={() => startEdit(log)}
+                              className="p-2 text-slate-300 hover:text-blue-500 transition-colors"
+                              title="Editar"
+                            >
+                              <Edit3 className="w-4 h-4" />
+                            </button>
+                            <button 
+                              onClick={() => removeLog(log.id)}
+                              className="p-2 text-slate-300 hover:text-red-500 transition-colors"
+                              title="Excluir"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        )}
                       </td>
                     </tr>
                   );

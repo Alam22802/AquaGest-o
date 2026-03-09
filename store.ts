@@ -38,6 +38,7 @@ const initialState: AppState = {
   mortalityLogs: [],
   biometryLogs: [],
   slaughterLogs: [],
+  harvestLogs: [],
   protocols: [],
   portfolios: [],
   capexProjects: [],
@@ -110,6 +111,7 @@ export const ensureStateIntegrity = (state: any, mergeWith?: AppState, priority:
     portfolios: filterByTombstone(base.portfolios || []),
     capexProjects: filterByTombstone(base.capexProjects || []),
     capexInvoices: filterByTombstone(base.capexInvoices || []),
+    harvestLogs: filterByTombstone(base.harvestLogs || []),
   };
 
   if (mergeWith) {
@@ -129,6 +131,7 @@ export const ensureStateIntegrity = (state: any, mergeWith?: AppState, priority:
       portfolios: mergeArraysById(result.portfolios || [], mergeWith.portfolios || [], combinedDeletedIds, priority),
       capexProjects: mergeArraysById(result.capexProjects || [], mergeWith.capexProjects || [], combinedDeletedIds, priority),
       capexInvoices: mergeArraysById(result.capexInvoices || [], mergeWith.capexInvoices || [], combinedDeletedIds, priority),
+      harvestLogs: mergeArraysById(result.harvestLogs || [], mergeWith.harvestLogs || [], combinedDeletedIds, priority),
     };
   }
   return result;
