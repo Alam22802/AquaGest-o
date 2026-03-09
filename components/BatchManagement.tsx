@@ -100,11 +100,14 @@ const BatchManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     });
 
     const mortalityByBatch = new Map<string, number>();
+    const nurseryMortalityByBatch = new Map<string, number>();
     state.mortalityLogs.forEach(m => {
       if (m.batchId) {
         mortalityByBatch.set(m.batchId, (mortalityByBatch.get(m.batchId) || 0) + m.count);
+        if (!m.cageId) {
+          nurseryMortalityByBatch.set(m.batchId, (nurseryMortalityByBatch.get(m.batchId) || 0) + m.count);
+        }
       } else if (m.cageId) {
-        // Fallback for old logs
         const cage = state.cages.find(c => c.id === m.cageId);
         if (cage?.batchId) {
           mortalityByBatch.set(cage.batchId, (mortalityByBatch.get(cage.batchId) || 0) + m.count);
@@ -130,12 +133,16 @@ const BatchManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       
       const usedFish = batchCages.reduce((acc, curr) => acc + (curr.initialFishCount || 0), 0);
       const harvestedFish = harvestsByBatch.get(batch.id) || 0;
-      const balance = batch.initialQuantity - usedFish - harvestedFish;
+      const nurseryMortality = nurseryMortalityByBatch.get(batch.id) || 0;
+      
+      // Saldo Alojamento: Peixes que ainda não foram para gaiolas (descontando mortes no berçário)
+      const balance = Math.max(0, batch.initialQuantity - usedFish - nurseryMortality);
       
       const mortality = mortalityByBatch.get(batch.id) || 0;
       
-      const liveFish = batch.initialQuantity - mortality - harvestedFish;
-      const yieldPercentage = batch.initialQuantity > 0 ? (liveFish / batch.initialQuantity) * 100 : 0;
+      const liveFish = Math.max(0, batch.initialQuantity - mortality - harvestedFish);
+      // Rendimento baseado na sobrevivência (Povoado - Morto) / Povoado
+      const yieldPercentage = batch.initialQuantity > 0 ? ((batch.initialQuantity - mortality) / batch.initialQuantity) * 100 : 0;
 
       const expectedAtHarvest = batch.initialQuantity - mortality;
       const accuracy = expectedAtHarvest > 0 ? (harvestedFish / expectedAtHarvest) * 100 : 0;

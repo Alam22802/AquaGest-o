@@ -93,16 +93,22 @@ const Dashboard: React.FC<Props> = ({ state }) => {
       }
     });
 
-    const harvestsByBatch = new Map<string, number>();
+    const harvestsByBatch = new Map<string, { fishCount: number, weight: number }>();
     (state.harvestLogs || []).forEach(h => {
-      harvestsByBatch.set(h.batchId, (harvestsByBatch.get(h.batchId) || 0) + h.fishCount);
+      const current = harvestsByBatch.get(h.batchId) || { fishCount: 0, weight: 0 };
+      harvestsByBatch.set(h.batchId, {
+        fishCount: current.fishCount + h.fishCount,
+        weight: current.weight + h.weight
+      });
     });
 
     return (state.batches || []).map(batch => {
       const batchCages = cagesByBatch.get(batch.id) || [];
       
       const totalInitial = batch.initialQuantity;
-      const totalHarvested = harvestsByBatch.get(batch.id) || 0;
+      const harvestData = harvestsByBatch.get(batch.id) || { fishCount: 0, weight: 0 };
+      const totalHarvested = harvestData.fishCount;
+      const totalHarvestedWeight = harvestData.weight;
       const totalMortality = mortalityByBatch.get(batch.id) || 0;
 
       const currentTotalStock = Math.max(0, totalInitial - totalMortality - totalHarvested);
@@ -144,6 +150,7 @@ const Dashboard: React.FC<Props> = ({ state }) => {
         name: batch.name, 
         stock: currentTotalStock, 
         harvested: totalHarvested,
+        harvestedWeight: totalHarvestedWeight,
         mortality: totalMortality,
         biomass: totalBiomassKg, 
         feed: totalFeedKg, 
@@ -411,7 +418,18 @@ const Dashboard: React.FC<Props> = ({ state }) => {
       {/* Estatísticas Gerais do Lote */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         <MiniStat label="Estoque Vivo Atual" value={<span className="text-xl font-black">{selectedBatchData.stock} un</span>} icon={<Fish className="w-5 h-5" />} color="text-blue-600" subtext="Peixes atualmente na água" />
-        <MiniStat label="Total Despescado" value={<span className="text-xl font-black">{selectedBatchData.harvested} un</span>} icon={<Download className="w-5 h-5" />} color="text-indigo-600" subtext="Peixes retirados para abate" />
+        <MiniStat 
+          label="Total Despescado" 
+          value={
+            <div className="flex flex-col">
+              <span className="text-xl font-black text-indigo-600 leading-none">{selectedBatchData.harvested} un</span>
+              <span className="text-[10px] font-black text-slate-400 uppercase mt-1">Biomassa: {selectedBatchData.harvestedWeight.toFixed(1)}kg</span>
+            </div>
+          } 
+          icon={<Download className="w-5 h-5" />} 
+          color="text-indigo-600" 
+          subtext="Peixes retirados para abate" 
+        />
         <MiniStat label="Mortalidade Total" value={<span className="text-xl font-black">{selectedBatchData.mortality} un</span>} icon={<FishOff className="w-5 h-5" />} color="text-red-600" subtext="Perdas registradas no lote" />
         <MiniStat label="Biomassa Est. Atual" value={<span className="text-xl font-black">{selectedBatchData.biomass.toFixed(1)}kg</span>} icon={<Scale className="w-5 h-5" />} color="text-emerald-600" subtext={selectedBatchData.samplingInfo} />
         <MiniStat 
