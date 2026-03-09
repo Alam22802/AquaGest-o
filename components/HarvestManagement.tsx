@@ -90,6 +90,7 @@ const HarvestManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
         fishCount: Number(fishCount),
         weight: Number(weight),
         unitWeight: unitWeight ? Number(unitWeight) : undefined,
+        initialFishCount: selectedCage.initialFishCount,
         date,
         userId: currentUser.id,
         timestamp: new Date().toISOString()

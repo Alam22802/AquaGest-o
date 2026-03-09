@@ -101,15 +101,29 @@ const BatchManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
 
     const mortalityByBatch = new Map<string, number>();
     const activeCageMortalityByBatch = new Map<string, number>();
+    const nurseryMortalityByBatch = new Map<string, number>();
     (state.mortalityLogs || []).forEach(m => {
       let bId = m.batchId;
       const cage = m.cageId ? (state.cages || []).find(c => c.id === m.cageId) : null;
-      if (!bId && cage?.batchId) bId = cage.batchId;
+      
+      // Tenta encontrar o lote se não estiver no log
+      if (!bId && cage?.batchId) {
+        bId = cage.batchId;
+      } else if (!bId && m.cageId) {
+        // Se a gaiola já foi despescada, tenta encontrar o lote pelo log de despesca
+        const harvest = (state.harvestLogs || []).find(h => h.cageId === m.cageId && h.date >= m.date);
+        if (harvest) bId = harvest.batchId;
+      }
 
       if (bId) {
         mortalityByBatch.set(bId, (mortalityByBatch.get(bId) || 0) + m.count);
+        // Mortalidade em gaiola ATIVA (que ainda pertence ao lote)
         if (cage && cage.batchId === bId) {
           activeCageMortalityByBatch.set(bId, (activeCageMortalityByBatch.get(bId) || 0) + m.count);
+        }
+        // Mortalidade no berçário (sem gaiola)
+        if (!m.cageId) {
+          nurseryMortalityByBatch.set(bId, (nurseryMortalityByBatch.get(bId) || 0) + m.count);
         }
       }
     });
@@ -121,9 +135,23 @@ const BatchManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       biometryByCage.set(b.cageId, list);
     });
 
-    const harvestsByBatch = new Map<string, number>();
+    const harvestsByBatch = new Map<string, { fishCount: number, initialFishCount: number }>();
     (state.harvestLogs || []).forEach(h => {
-      harvestsByBatch.set(h.batchId, (harvestsByBatch.get(h.batchId) || 0) + h.fishCount);
+      const current = harvestsByBatch.get(h.batchId) || { fishCount: 0, initialFishCount: 0 };
+      
+      // Se não temos o initialFishCount no log (logs antigos), tentamos reconstruir com a mortalidade daquela gaiola
+      let initial = h.initialFishCount;
+      if (!initial) {
+        const cageMortality = (state.mortalityLogs || [])
+          .filter(m => m.cageId === h.cageId && m.date <= h.date)
+          .reduce((acc, curr) => acc + curr.count, 0);
+        initial = h.fishCount + cageMortality;
+      }
+
+      harvestsByBatch.set(h.batchId, {
+        fishCount: current.fishCount + h.fishCount,
+        initialFishCount: current.initialFishCount + initial
+      });
     });
 
     return (state.batches || []).map(batch => {
@@ -131,17 +159,21 @@ const BatchManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       const cageIds = batchCages.map(c => c.id);
       
       const usedFish = batchCages.reduce((acc, curr) => acc + (curr.initialFishCount || 0), 0);
-      const harvestedFish = harvestsByBatch.get(batch.id) || 0;
+      const harvestedFish = harvestsByBatch.get(batch.id)?.fishCount || 0;
       const totalMortality = mortalityByBatch.get(batch.id) || 0;
       const activeCageMortality = activeCageMortalityByBatch.get(batch.id) || 0;
       
-      // Saldo Alojamento: Peixes que ainda não saíram do berçário
-      // Saldo = Inicial - (Peixes atualmente em gaiolas) - (Peixes já despescados) - (Mortalidade total) + (Mortalidade em gaiolas ativas)
-      const balance = Math.max(0, batch.initialQuantity - usedFish - harvestedFish - (totalMortality - activeCageMortality));
+      // Peixes vivos totais (em gaiolas + berçário)
+      const totalLiveFish = Math.max(0, batch.initialQuantity - totalMortality - harvestedFish);
+      
+      // Peixes vivos atualmente nas gaiolas
+      const fishInActiveCages = Math.max(0, usedFish - activeCageMortality);
+      
+      // Saldo Alojamento: O que está vivo mas não está em gaiolas
+      const balance = Math.max(0, totalLiveFish - fishInActiveCages);
       
       const mortality = totalMortality;
-      
-      const liveFish = Math.max(0, batch.initialQuantity - mortality - harvestedFish);
+      const liveFish = totalLiveFish;
       // Rendimento baseado na sobrevivência (Povoado - Morto) / Povoado
       const yieldPercentage = batch.initialQuantity > 0 ? ((batch.initialQuantity - mortality) / batch.initialQuantity) * 100 : 0;
 

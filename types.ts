@@ -142,6 +142,7 @@ export interface HarvestLog {
   fishCount: number;
   weight: number;
   unitWeight?: number;
+  initialFishCount?: number; // Qtd inicial na gaiola no momento da despesca
   date: string;
   userId: string;
   timestamp: string;
