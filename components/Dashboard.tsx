@@ -45,7 +45,7 @@ const Dashboard: React.FC<Props> = ({ state }) => {
 
   const batchStats = useMemo(() => {
     const cagesByBatch = new Map<string, typeof state.cages>();
-    state.cages.forEach(c => {
+    (state.cages || []).forEach(c => {
       if (c.batchId) {
         const list = cagesByBatch.get(c.batchId) || [];
         list.push(c);
@@ -54,13 +54,13 @@ const Dashboard: React.FC<Props> = ({ state }) => {
     });
 
     const mortalityByBatch = new Map<string, number>();
-    state.mortalityLogs.forEach(m => {
+    (state.mortalityLogs || []).forEach(m => {
       if (m.batchId) {
         mortalityByBatch.set(m.batchId, (mortalityByBatch.get(m.batchId) || 0) + m.count);
       } else if (m.cageId) {
-        const cage = state.cages.find(c => c.id === m.cageId);
+        const cage = (state.cages || []).find(c => c.id === m.cageId);
         if (cage?.batchId) {
-          const batch = state.batches.find(b => b.id === cage.batchId);
+          const batch = (state.batches || []).find(b => b.id === cage.batchId);
           if (batch && m.date >= batch.settlementDate) {
             mortalityByBatch.set(cage.batchId, (mortalityByBatch.get(cage.batchId) || 0) + m.count);
           }
@@ -73,9 +73,9 @@ const Dashboard: React.FC<Props> = ({ state }) => {
     (state.feedingLogs || []).forEach(f => {
       let bId = f.batchId;
       if (!bId) {
-        const cage = state.cages.find(c => c.id === f.cageId);
+        const cage = (state.cages || []).find(c => c.id === f.cageId);
         if (cage?.batchId) {
-          const batch = state.batches.find(b => b.id === cage.batchId);
+          const batch = (state.batches || []).find(b => b.id === cage.batchId);
           if (batch && f.timestamp >= batch.settlementDate) {
             bId = cage.batchId;
           }
@@ -86,7 +86,7 @@ const Dashboard: React.FC<Props> = ({ state }) => {
         feedingByBatch.set(bId, (feedingByBatch.get(bId) || 0) + f.amount);
         
         const breakdown = feedBreakdownByBatch.get(bId) || {};
-        const feedType = state.feedTypes.find(ft => ft.id === f.feedTypeId);
+        const feedType = (state.feedTypes || []).find(ft => ft.id === f.feedTypeId);
         const name = feedType ? feedType.name : 'Ração S/ Ident.';
         breakdown[name] = (breakdown[name] || 0) + f.amount;
         feedBreakdownByBatch.set(bId, breakdown);
@@ -163,7 +163,18 @@ const Dashboard: React.FC<Props> = ({ state }) => {
   }, [state.batches, state.cages, state.mortalityLogs, state.biometryLogs, state.feedingLogs, state.feedTypes, state.harvestLogs]);
 
   const selectedBatchData = useMemo(() => {
-    return batchStats.find(b => b.id === selectedBatchId) || { stock: 0, harvested: 0, mortality: 0, biomass: 0, feed: 0, fca: '0.00', feedBreakdown: [], avgWeight: 0, samplingInfo: 'Sem dados' };
+    return batchStats.find(b => b.id === selectedBatchId) || { 
+      stock: 0, 
+      harvested: 0, 
+      harvestedWeight: 0,
+      mortality: 0, 
+      biomass: 0, 
+      feed: 0, 
+      fca: '0.00', 
+      feedBreakdown: [], 
+      avgWeight: 0, 
+      samplingInfo: 'Sem dados' 
+    };
   }, [batchStats, selectedBatchId]);
 
   const biometryEvolutionData = useMemo(() => {

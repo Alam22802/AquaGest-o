@@ -91,7 +91,7 @@ const BatchManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
 
   const batchStats = useMemo(() => {
     const cagesByBatch = new Map<string, typeof state.cages>();
-    state.cages.forEach(c => {
+    (state.cages || []).forEach(c => {
       if (c.batchId) {
         const list = cagesByBatch.get(c.batchId) || [];
         list.push(c);
@@ -101,14 +101,14 @@ const BatchManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
 
     const mortalityByBatch = new Map<string, number>();
     const nurseryMortalityByBatch = new Map<string, number>();
-    state.mortalityLogs.forEach(m => {
+    (state.mortalityLogs || []).forEach(m => {
       if (m.batchId) {
         mortalityByBatch.set(m.batchId, (mortalityByBatch.get(m.batchId) || 0) + m.count);
         if (!m.cageId) {
           nurseryMortalityByBatch.set(m.batchId, (nurseryMortalityByBatch.get(m.batchId) || 0) + m.count);
         }
       } else if (m.cageId) {
-        const cage = state.cages.find(c => c.id === m.cageId);
+        const cage = (state.cages || []).find(c => c.id === m.cageId);
         if (cage?.batchId) {
           mortalityByBatch.set(cage.batchId, (mortalityByBatch.get(cage.batchId) || 0) + m.count);
         }
@@ -127,7 +127,7 @@ const BatchManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       harvestsByBatch.set(h.batchId, (harvestsByBatch.get(h.batchId) || 0) + h.fishCount);
     });
 
-    return state.batches.map(batch => {
+    return (state.batches || []).map(batch => {
       const batchCages = cagesByBatch.get(batch.id) || [];
       const cageIds = batchCages.map(c => c.id);
       

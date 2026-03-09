@@ -228,45 +228,45 @@ const App: React.FC = () => {
 
     const stateWithTimestamps: AppState = {
       ...newState,
-      users: injectTimestamps(state.users, newState.users),
-      lines: injectTimestamps(state.lines, newState.lines),
-      batches: injectTimestamps(state.batches, newState.batches),
-      cages: injectTimestamps(state.cages, newState.cages),
-      feedTypes: injectTimestamps(state.feedTypes, newState.feedTypes),
-      feedingLogs: injectTimestamps(state.feedingLogs, newState.feedingLogs),
+      users: injectTimestamps(state.users || [], newState.users || []),
+      lines: injectTimestamps(state.lines || [], newState.lines || []),
+      batches: injectTimestamps(state.batches || [], newState.batches || []),
+      cages: injectTimestamps(state.cages || [], newState.cages || []),
+      feedTypes: injectTimestamps(state.feedTypes || [], newState.feedTypes || []),
+      feedingLogs: injectTimestamps(state.feedingLogs || [], newState.feedingLogs || []),
       feedStockLogs: injectTimestamps(state.feedStockLogs || [], newState.feedStockLogs || []),
-      mortalityLogs: injectTimestamps(state.mortalityLogs, newState.mortalityLogs),
-      biometryLogs: injectTimestamps(state.biometryLogs, newState.biometryLogs),
-      slaughterLogs: injectTimestamps(state.slaughterLogs, newState.slaughterLogs),
+      mortalityLogs: injectTimestamps(state.mortalityLogs || [], newState.mortalityLogs || []),
+      biometryLogs: injectTimestamps(state.biometryLogs || [], newState.biometryLogs || []),
+      slaughterLogs: injectTimestamps(state.slaughterLogs || [], newState.slaughterLogs || []),
       harvestLogs: injectTimestamps(state.harvestLogs || [], newState.harvestLogs || []),
-      protocols: injectTimestamps(state.protocols, newState.protocols),
+      protocols: injectTimestamps(state.protocols || [], newState.protocols || []),
       portfolios: injectTimestamps(state.portfolios || [], newState.portfolios || []),
       capexProjects: injectTimestamps(state.capexProjects || [], newState.capexProjects || []),
       capexInvoices: injectTimestamps(state.capexInvoices || [], newState.capexInvoices || []),
     };
 
     const findDeleted = (oldList: any[], newList: any[]) => {
-      if (oldList === newList) return [];
+      if (!oldList || !newList || oldList === newList) return [];
       const newIds = new Set(newList.map(i => i.id));
-      return oldList.filter(i => !newIds.has(i.id)).map(i => i.id);
+      return oldList.filter(i => i && i.id && !newIds.has(i.id)).map(i => i.id);
     };
 
     const deleted = [
-      ...findDeleted(state.users, stateWithTimestamps.users),
-      ...findDeleted(state.lines, stateWithTimestamps.lines),
-      ...findDeleted(state.batches, stateWithTimestamps.batches),
-      ...findDeleted(state.cages, stateWithTimestamps.cages),
-      ...findDeleted(state.feedTypes, stateWithTimestamps.feedTypes),
-      ...findDeleted(state.feedingLogs, stateWithTimestamps.feedingLogs),
-      ...findDeleted(state.feedStockLogs || [], stateWithTimestamps.feedStockLogs || []),
-      ...findDeleted(state.mortalityLogs, stateWithTimestamps.mortalityLogs),
-      ...findDeleted(state.biometryLogs, stateWithTimestamps.biometryLogs),
-      ...findDeleted(state.slaughterLogs, stateWithTimestamps.slaughterLogs),
-      ...findDeleted(state.harvestLogs || [], stateWithTimestamps.harvestLogs || []),
-      ...findDeleted(state.protocols, stateWithTimestamps.protocols),
-      ...findDeleted(state.portfolios || [], stateWithTimestamps.portfolios || []),
-      ...findDeleted(state.capexProjects || [], stateWithTimestamps.capexProjects || []),
-      ...findDeleted(state.capexInvoices || [], stateWithTimestamps.capexInvoices || []),
+      ...findDeleted(state.users || [], stateWithTimestamps.users),
+      ...findDeleted(state.lines || [], stateWithTimestamps.lines),
+      ...findDeleted(state.batches || [], stateWithTimestamps.batches),
+      ...findDeleted(state.cages || [], stateWithTimestamps.cages),
+      ...findDeleted(state.feedTypes || [], stateWithTimestamps.feedTypes),
+      ...findDeleted(state.feedingLogs || [], stateWithTimestamps.feedingLogs),
+      ...findDeleted(state.feedStockLogs || [], stateWithTimestamps.feedStockLogs),
+      ...findDeleted(state.mortalityLogs || [], stateWithTimestamps.mortalityLogs),
+      ...findDeleted(state.biometryLogs || [], stateWithTimestamps.biometryLogs),
+      ...findDeleted(state.slaughterLogs || [], stateWithTimestamps.slaughterLogs),
+      ...findDeleted(state.harvestLogs || [], stateWithTimestamps.harvestLogs),
+      ...findDeleted(state.protocols || [], stateWithTimestamps.protocols),
+      ...findDeleted(state.portfolios || [], stateWithTimestamps.portfolios),
+      ...findDeleted(state.capexProjects || [], stateWithTimestamps.capexProjects),
+      ...findDeleted(state.capexInvoices || [], stateWithTimestamps.capexInvoices),
     ];
 
     if (deleted.length > 0) {
