@@ -53,11 +53,17 @@ const Dashboard: React.FC<Props> = ({ state }) => {
       }
     });
 
-    const mortalityByCage = new Map<string, typeof state.mortalityLogs>();
+    const mortalityByBatch = new Map<string, number>();
     state.mortalityLogs.forEach(m => {
-      const list = mortalityByCage.get(m.cageId) || [];
-      list.push(m);
-      mortalityByCage.set(m.cageId, list);
+      if (m.batchId) {
+        mortalityByBatch.set(m.batchId, (mortalityByBatch.get(m.batchId) || 0) + m.count);
+      } else if (m.cageId) {
+        // Fallback for old logs
+        const cage = state.cages.find(c => c.id === m.cageId);
+        if (cage?.batchId) {
+          mortalityByBatch.set(cage.batchId, (mortalityByBatch.get(cage.batchId) || 0) + m.count);
+        }
+      }
     });
 
     const biometryByCage = new Map<string, typeof state.biometryLogs>();
@@ -74,19 +80,19 @@ const Dashboard: React.FC<Props> = ({ state }) => {
       feedingByCage.set(f.cageId, list);
     });
 
+    const harvestsByBatch = new Map<string, number>();
+    (state.harvestLogs || []).forEach(h => {
+      harvestsByBatch.set(h.batchId, (harvestsByBatch.get(h.batchId) || 0) + h.fishCount);
+    });
+
     return (state.batches || []).map(batch => {
       const batchCages = cagesByBatch.get(batch.id) || [];
       const cageIds = new Set(batchCages.map(c => c.id));
       
       const totalInitial = batchCages.reduce((acc, c) => acc + (c.initialFishCount || 0), 0);
+      const totalHarvested = harvestsByBatch.get(batch.id) || 0;
       
-      let totalMortality = 0;
-      batchCages.forEach(c => {
-        const logs = mortalityByCage.get(c.id) || [];
-        logs.forEach(m => {
-          if (m.date >= batch.settlementDate) totalMortality += m.count;
-        });
-      });
+      const totalMortality = mortalityByBatch.get(batch.id) || 0;
 
       const currentTotalStock = totalInitial - totalMortality;
 
@@ -138,6 +144,8 @@ const Dashboard: React.FC<Props> = ({ state }) => {
         id: batch.id, 
         name: batch.name, 
         stock: currentTotalStock, 
+        harvested: totalHarvested,
+        mortality: totalMortality,
         biomass: totalBiomassKg, 
         feed: totalFeedKg, 
         feedBreakdown,
@@ -146,10 +154,10 @@ const Dashboard: React.FC<Props> = ({ state }) => {
         samplingInfo
       };
     });
-  }, [state.batches, state.cages, state.mortalityLogs, state.biometryLogs, state.feedingLogs, state.feedTypes]);
+  }, [state.batches, state.cages, state.mortalityLogs, state.biometryLogs, state.feedingLogs, state.feedTypes, state.harvestLogs]);
 
   const selectedBatchData = useMemo(() => {
-    return batchStats.find(b => b.id === selectedBatchId) || { stock: 0, biomass: 0, feed: 0, fca: '0.00', feedBreakdown: [], avgWeight: 0, samplingInfo: 'Sem dados' };
+    return batchStats.find(b => b.id === selectedBatchId) || { stock: 0, harvested: 0, mortality: 0, biomass: 0, feed: 0, fca: '0.00', feedBreakdown: [], avgWeight: 0, samplingInfo: 'Sem dados' };
   }, [batchStats, selectedBatchId]);
 
   const biometryEvolutionData = useMemo(() => {
@@ -177,8 +185,7 @@ const Dashboard: React.FC<Props> = ({ state }) => {
 
   const mortalityEvolutionData = useMemo(() => {
     if (!selectedBatchId) return [];
-    const cageIds = (state.cages || []).filter(c => c.batchId === selectedBatchId).map(c => c.id);
-    const logs = (state.mortalityLogs || []).filter(m => cageIds.includes(m.cageId));
+    const logs = (state.mortalityLogs || []).filter(m => m.batchId === selectedBatchId);
     const grouped = logs.reduce((acc: any, log) => {
       if (!acc[log.date]) acc[log.date] = 0;
       acc[log.date] += log.count;
@@ -388,9 +395,11 @@ const Dashboard: React.FC<Props> = ({ state }) => {
       </div>
 
       {/* Estatísticas Gerais do Lote */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <MiniStat label="Estoque Vivo Total" value={<span className="text-xl font-black">{selectedBatchData.stock} un</span>} icon={<Fish className="w-5 h-5" />} color="text-blue-600" subtext="Todas as gaiolas do lote" />
-        <MiniStat label="Biomassa Est. Total" value={<span className="text-xl font-black">{selectedBatchData.biomass.toFixed(1)}kg</span>} icon={<Scale className="w-5 h-5" />} color="text-emerald-600" subtext={selectedBatchData.samplingInfo} />
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <MiniStat label="Estoque Vivo Atual" value={<span className="text-xl font-black">{selectedBatchData.stock} un</span>} icon={<Fish className="w-5 h-5" />} color="text-blue-600" subtext="Peixes atualmente na água" />
+        <MiniStat label="Total Despescado" value={<span className="text-xl font-black">{selectedBatchData.harvested} un</span>} icon={<Download className="w-5 h-5" />} color="text-indigo-600" subtext="Peixes retirados para abate" />
+        <MiniStat label="Mortalidade Total" value={<span className="text-xl font-black">{selectedBatchData.mortality} un</span>} icon={<FishOff className="w-5 h-5" />} color="text-red-600" subtext="Perdas registradas no lote" />
+        <MiniStat label="Biomassa Est. Atual" value={<span className="text-xl font-black">{selectedBatchData.biomass.toFixed(1)}kg</span>} icon={<Scale className="w-5 h-5" />} color="text-emerald-600" subtext={selectedBatchData.samplingInfo} />
         <MiniStat 
           label="Ração Consumida" 
           value={
@@ -406,7 +415,7 @@ const Dashboard: React.FC<Props> = ({ state }) => {
               </div>
             </div>
           } icon={<Utensils className="w-5 h-5" />} color="text-amber-600" />
-        <MiniStat label="FCA (Conversão)" value={<span className="text-xl font-black">{selectedBatchData.fca}</span>} icon={<TrendingUp className="w-5 h-5" />} color="text-indigo-600" subtext="Baseado na biomassa est." />
+        <MiniStat label="FCA (Conversão)" value={<span className="text-xl font-black">{selectedBatchData.fca}</span>} icon={<TrendingUp className="w-5 h-5" />} color="text-indigo-600" subtext="Baseado na biomassa atual" />
       </div>
 
       {/* Gráficos Evolutivos */}

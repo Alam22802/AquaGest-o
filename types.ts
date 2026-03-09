@@ -100,6 +100,7 @@ export interface FeedingLog {
 export interface MortalityLog {
   id: string;
   cageId: string;
+  batchId?: string;
   count: number;
   date: string;
   userId: string;
@@ -127,6 +128,19 @@ export interface SlaughterLog {
   endTime: string;
   packedQuantity: number;
   packagingBatch: string;
+  userId: string;
+  timestamp: string;
+  updatedAt?: number;
+}
+
+export interface HarvestLog {
+  id: string;
+  batchId: string;
+  cageId: string;
+  fishCount: number;
+  weight: number;
+  unitWeight?: number;
+  date: string;
   userId: string;
   timestamp: string;
   updatedAt?: number;
@@ -200,6 +214,7 @@ export interface AppState {
   mortalityLogs: MortalityLog[];
   biometryLogs: BiometryLog[];
   slaughterLogs: SlaughterLog[];
+  harvestLogs?: HarvestLog[];
   protocols: ProductionProtocol[];
   portfolios: InvestmentPortfolio[];
   capexProjects: CapexProject[];

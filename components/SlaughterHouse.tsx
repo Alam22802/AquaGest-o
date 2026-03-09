@@ -395,191 +395,186 @@ const SlaughterHouse: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
         </div>
       )}
 
-      {/* Formulário de Registro */}
-      {hasPermission ? (
-        <div className={`bg-white p-8 rounded-[2.5rem] shadow-sm border transition-all ${editingId ? 'border-amber-200 ring-4 ring-amber-50' : 'border-slate-200'}`}>
-          <h3 className="text-xl font-black text-slate-800 mb-8 flex items-center justify-between uppercase tracking-tighter italic">
-            <div className="flex items-center gap-3">
-              <Factory className={`w-6 h-6 ${editingId ? 'text-amber-500' : 'text-slate-900'}`} />
-              {editingId ? 'Editar Registro de Abate' : 'Novo Registro - Frigorífico'}
-            </div>
-            {editingId && <button onClick={resetForm} className="p-2 bg-slate-100 rounded-full hover:bg-slate-200"><X className="w-5 h-5 text-slate-400" /></button>}
-          </h3>
-
-          <form onSubmit={handleSave} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            <div className="space-y-1 group">
-              <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-widest">Produtor *</label>
-              <input type="text" required placeholder="Nome do produtor" className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none focus:ring-2 focus:ring-slate-900/10 transition-all" value={formData.producer} onChange={e => setFormData({...formData, producer: e.target.value})} />
-            </div>
-
-            <div className="space-y-1">
-              <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-widest">Data do Abate</label>
-              <input type="date" required className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none" value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} />
-            </div>
-
-            <div className="space-y-1">
-              <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-widest">Lote Abate *</label>
-              <input type="text" required placeholder="Identificação do lote" className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none" value={formData.slaughterBatch} onChange={e => setFormData({...formData, slaughterBatch: e.target.value})} />
-            </div>
-
-            <div className="space-y-1">
-              <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-widest">Peso Filé Congelado (kg)</label>
-              <div className="relative">
-                <Scale className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-300" />
-                <input type="number" step="0.01" placeholder="0.00" className="w-full pl-12 pr-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none" value={formData.gtaWeight} onChange={e => setFormData({...formData, gtaWeight: e.target.value})} />
-              </div>
-            </div>
-
-            <div className="space-y-1">
-              <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-widest">Peso Recepção (kg)</label>
-              <div className="relative">
-                <Scale className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-300" />
-                <input type="number" step="0.01" placeholder="0.00" className="w-full pl-12 pr-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none" value={formData.receptionWeight} onChange={e => setFormData({...formData, receptionWeight: e.target.value})} />
-              </div>
-            </div>
-
-            <div className="space-y-1">
-              <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-widest">Romaneio (kg)</label>
-              <div className="relative">
-                <Scale className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-300" />
-                <input type="number" step="0.01" placeholder="0.00" className="w-full pl-12 pr-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none" value={formData.packingList} onChange={e => setFormData({...formData, packingList: e.target.value})} />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-widest">Início Abate</label>
-                <input type="time" className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none" value={formData.startTime} onChange={e => setFormData({...formData, startTime: e.target.value})} />
-              </div>
-              <div className="space-y-1">
-                <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-widest">Término Abate</label>
-                <input type="time" className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none" value={formData.endTime} onChange={e => setFormData({...formData, endTime: e.target.value})} />
-              </div>
-            </div>
-
-            <div className="space-y-1">
-              <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-widest">Embalado (kg)</label>
-              <div className="relative">
-                <Scale className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-300" />
-                <input type="number" step="0.01" placeholder="0.00" className="w-full pl-12 pr-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none" value={formData.packedQuantity} onChange={e => setFormData({...formData, packedQuantity: e.target.value})} />
-              </div>
-            </div>
-
-            <div className="space-y-1">
-              <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-widest">Lote Embalagem</label>
-              <input type="text" placeholder="Cód. Embalagem" className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none" value={formData.packagingBatch} onChange={e => setFormData({...formData, packagingBatch: e.target.value})} />
-            </div>
-
-            <button type="submit" className={`md:col-span-2 lg:col-span-3 py-4 rounded-[1.5rem] font-black uppercase tracking-widest text-xs text-white shadow-xl transition-all active:scale-95 mt-4 ${editingId ? 'bg-amber-600 shadow-amber-600/20' : 'bg-[#344434] shadow-slate-900/20 hover:bg-[#2a382a]'}`}>
-              {editingId ? 'Salvar Alterações' : 'Registrar no Frigorífico'}
-            </button>
-          </form>
-        </div>
-      ) : (
-        <div className="bg-slate-100 p-12 rounded-[2.5rem] border border-dashed border-slate-300 flex flex-col items-center gap-4 text-center">
-          <Factory className="w-12 h-12 text-slate-300" />
-          <h4 className="text-sm font-black uppercase tracking-widest text-slate-400">Modo Leitura Ativo</h4>
-          <p className="text-xs font-bold text-slate-400 uppercase">Você não possui permissão para registrar ou editar dados de abate.</p>
-        </div>
-      )}
-
       {/* Histórico e Filtros da Tabela */}
-      <div className="space-y-6">
-        <div className="flex flex-col md:flex-row justify-between items-center gap-4 bg-white p-6 rounded-[2rem] border border-slate-200">
-          <div className="flex items-center gap-4 w-full md:w-auto">
-             <div className="p-3 bg-slate-100 rounded-xl"><Search className="w-5 h-5 text-slate-400" /></div>
-             <div className="flex gap-2">
-               <input type="date" className="text-xs font-black bg-slate-50 border-none rounded-lg p-2 outline-none" value={filterStartDate} onChange={e => setFilterStartDate(e.target.value)} />
-               <span className="text-slate-300 self-center">até</span>
-               <input type="date" className="text-xs font-black bg-slate-50 border-none rounded-lg p-2 outline-none" value={filterEndDate} onChange={e => setFilterEndDate(e.target.value)} />
-             </div>
-             {(filterStartDate || filterEndDate) && (
-               <button onClick={() => {setFilterStartDate(''); setFilterEndDate('');}} className="p-2 text-red-500 hover:bg-red-50 rounded-lg"><X className="w-4 h-4" /></button>
-             )}
-          </div>
-          <button onClick={() => setSortOrder(prev => prev === 'desc' ? 'asc' : 'desc')} className="w-full md:w-auto flex items-center justify-center gap-2 text-[10px] font-black uppercase text-slate-500 bg-slate-50 px-4 py-3 rounded-xl hover:bg-slate-100 transition-colors">
-            <ArrowUpDown className="w-3 h-3" /> {sortOrder === 'desc' ? 'Mais Recentes' : 'Mais Antigos'}
-          </button>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
+        <div className="lg:col-span-1 lg:sticky lg:top-8">
+          {/* Formulário de Registro */}
+          {hasPermission ? (
+            <div className={`bg-white p-8 rounded-[2.5rem] shadow-sm border transition-all ${editingId ? 'border-amber-200 ring-4 ring-amber-50' : 'border-slate-200'}`}>
+              <h3 className="text-xl font-black text-slate-800 mb-8 flex items-center justify-between uppercase tracking-tighter italic">
+                <div className="flex items-center gap-3">
+                  <Factory className={`w-6 h-6 ${editingId ? 'text-amber-500' : 'text-slate-900'}`} />
+                  {editingId ? 'Editar Abate' : 'Novo Registro'}
+                </div>
+                {editingId && <button onClick={resetForm} className="p-2 bg-slate-100 rounded-full hover:bg-slate-200"><X className="w-5 h-5 text-slate-400" /></button>}
+              </h3>
+
+              <form onSubmit={handleSave} className="space-y-4">
+                <div className="space-y-1 group">
+                  <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-widest">Produtor *</label>
+                  <input type="text" required placeholder="Nome do produtor" className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none focus:ring-2 focus:ring-slate-900/10 transition-all" value={formData.producer} onChange={e => setFormData({...formData, producer: e.target.value})} />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-widest">Data</label>
+                    <input type="date" required className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none text-xs" value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-widest">Lote Abate *</label>
+                    <input type="text" required placeholder="Lote" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none text-xs" value={formData.slaughterBatch} onChange={e => setFormData({...formData, slaughterBatch: e.target.value})} />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-widest">Recepção (kg)</label>
+                    <input type="number" step="0.01" placeholder="0.00" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none text-xs" value={formData.receptionWeight} onChange={e => setFormData({...formData, receptionWeight: e.target.value})} />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-widest">Embalado (kg)</label>
+                    <input type="number" step="0.01" placeholder="0.00" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none text-xs" value={formData.packedQuantity} onChange={e => setFormData({...formData, packedQuantity: e.target.value})} />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-widest">Filé Cong. (kg)</label>
+                    <input type="number" step="0.01" placeholder="0.00" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none text-xs" value={formData.gtaWeight} onChange={e => setFormData({...formData, gtaWeight: e.target.value})} />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-widest">Romaneio (kg)</label>
+                    <input type="number" step="0.01" placeholder="0.00" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none text-xs" value={formData.packingList} onChange={e => setFormData({...formData, packingList: e.target.value})} />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-widest">Início</label>
+                    <input type="time" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none text-xs" value={formData.startTime} onChange={e => setFormData({...formData, startTime: e.target.value})} />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-widest">Término</label>
+                    <input type="time" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none text-xs" value={formData.endTime} onChange={e => setFormData({...formData, endTime: e.target.value})} />
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-widest">Lote Embalagem</label>
+                  <input type="text" placeholder="Cód. Embalagem" className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none" value={formData.packagingBatch} onChange={e => setFormData({...formData, packagingBatch: e.target.value})} />
+                </div>
+
+                <button type="submit" className={`w-full py-4 rounded-[1.5rem] font-black uppercase tracking-widest text-xs text-white shadow-xl transition-all active:scale-95 mt-4 ${editingId ? 'bg-amber-600 shadow-amber-600/20' : 'bg-[#344434] shadow-slate-900/20 hover:bg-[#2a382a]'}`}>
+                  {editingId ? 'Salvar Alterações' : 'Registrar Abate'}
+                </button>
+              </form>
+            </div>
+          ) : (
+            <div className="bg-slate-100 p-12 rounded-[2.5rem] border border-dashed border-slate-300 flex flex-col items-center gap-4 text-center">
+              <Factory className="w-12 h-12 text-slate-300" />
+              <h4 className="text-sm font-black uppercase tracking-widest text-slate-400">Modo Leitura</h4>
+              <p className="text-[10px] font-bold text-slate-400 uppercase">Sem permissão para editar.</p>
+            </div>
+          )}
         </div>
 
-        <div className="bg-white border border-slate-200 rounded-[2.5rem] overflow-hidden shadow-sm overflow-x-auto">
-          <table className="w-full text-left border-collapse min-w-[1000px]">
-            <thead className="bg-slate-50 text-[10px] font-black text-slate-400 uppercase tracking-widest">
-              <tr>
-                <th className="px-8 py-5">Lote / Produtor</th>
-                <th className="px-8 py-5">Pesos (Filé/Recep)</th>
-                <th className="px-8 py-5">Horário Abate</th>
-                <th className="px-8 py-5">Embalado (kg)</th>
-                <th className="px-8 py-5">Registrado por</th>
-                {hasPermission && <th className="px-8 py-5 text-center">Ações</th>}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {filteredLogs.map(log => {
-                const user = state.users.find(u => u.id === log.userId);
-                return (
-                  <tr key={log.id} className="hover:bg-slate-50/50 transition-colors">
-                    <td className="px-8 py-6">
-                      <div className="font-black text-slate-800 uppercase tracking-tighter italic leading-none">{log.slaughterBatch || 'N/A'}</div>
-                      <div className="text-[10px] font-bold text-slate-400 mt-1 uppercase tracking-widest">{log.producer || 'Desconhecido'}</div>
-                      <div className="flex items-center gap-1 mt-2 text-[10px] text-slate-400 font-bold">
-                        <Calendar className="w-3 h-3" /> {log.date ? format(parseISO(log.date), 'dd/MM/yyyy') : '--/--/----'}
-                      </div>
-                    </td>
-                    <td className="px-8 py-6">
-                      <div className="flex flex-col gap-1">
-                        <div className="flex items-center gap-2">
-                           <span className="text-[9px] font-black text-slate-400 uppercase w-10">FILÉ:</span>
-                           <span className="text-xs font-black text-slate-800">{(log.gtaWeight || 0).toFixed(2)}kg</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                           <span className="text-[9px] font-black text-slate-400 uppercase w-10">RECEP:</span>
-                           <span className="text-xs font-black text-emerald-600">{(log.receptionWeight || 0).toFixed(2)}kg</span>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-8 py-6 text-xs font-bold text-slate-600">
-                      <div className="flex items-center gap-2">
-                         <Clock className="w-3 h-3 text-slate-300" />
-                         <span>{log.startTime || '--:--'} às {log.endTime || '--:--'}</span>
-                      </div>
-                      <div className="text-[9px] font-black text-slate-400 uppercase mt-1">ROM: {log.packingList ? `${log.packingList} kg` : 'N/A'}</div>
-                    </td>
-                    <td className="px-8 py-6">
-                      <div className="font-black text-blue-600 text-xs">{log.packedQuantity ? `${log.packedQuantity} kg` : '---'}</div>
-                      {log.receptionWeight > 0 && (
-                        <div className="text-[10px] font-black text-emerald-600 mt-1 uppercase tracking-widest">
-                          Rend: {((log.packedQuantity / log.receptionWeight) * 100).toFixed(1)}%
-                        </div>
-                      )}
-                      <div className="text-[9px] font-black text-slate-400 uppercase mt-1">LOTE EMB: {log.packagingBatch || 'N/A'}</div>
-                    </td>
-                    <td className="px-8 py-6">
-                      <div className="flex items-center gap-2 text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                         <UserIcon className="w-3 h-3" /> @{user?.username || 'desconhecido'}
-                      </div>
-                    </td>
-                    {hasPermission && (
-                      <td className="px-8 py-6 text-center">
-                        <div className="flex justify-center gap-2">
-                          <button onClick={() => startEdit(log)} className="p-3 text-slate-300 hover:text-amber-500 hover:bg-amber-50 rounded-2xl transition-all"><Edit3 className="w-4 h-4" /></button>
-                          <button onClick={() => removeLog(log.id)} className="p-3 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-2xl transition-all"><Trash2 className="w-4 h-4" /></button>
+        <div className="lg:col-span-2 space-y-6">
+          <div className="flex flex-col md:flex-row justify-between items-center gap-4 bg-white p-6 rounded-[2rem] border border-slate-200 shadow-sm">
+            <div className="flex items-center gap-4 w-full md:w-auto">
+               <div className="p-3 bg-slate-100 rounded-xl"><Search className="w-5 h-5 text-slate-400" /></div>
+               <div className="flex gap-2">
+                 <input type="date" className="text-xs font-black bg-slate-50 border-none rounded-lg p-2 outline-none" value={filterStartDate} onChange={e => setFilterStartDate(e.target.value)} />
+                 <span className="text-slate-300 self-center">até</span>
+                 <input type="date" className="text-xs font-black bg-slate-50 border-none rounded-lg p-2 outline-none" value={filterEndDate} onChange={e => setFilterEndDate(e.target.value)} />
+               </div>
+               {(filterStartDate || filterEndDate) && (
+                 <button onClick={() => {setFilterStartDate(''); setFilterEndDate('');}} className="p-2 text-red-500 hover:bg-red-50 rounded-lg"><X className="w-4 h-4" /></button>
+               )}
+            </div>
+            <button onClick={() => setSortOrder(prev => prev === 'desc' ? 'asc' : 'desc')} className="w-full md:w-auto flex items-center justify-center gap-2 text-[10px] font-black uppercase text-slate-500 bg-slate-50 px-4 py-3 rounded-xl hover:bg-slate-100 transition-colors">
+              <ArrowUpDown className="w-3 h-3" /> {sortOrder === 'desc' ? 'Mais Recentes' : 'Mais Antigos'}
+            </button>
+          </div>
+
+          <div className="bg-white border border-slate-200 rounded-[2.5rem] overflow-hidden shadow-sm overflow-x-auto">
+            <table className="w-full text-left border-collapse min-w-[1000px]">
+              <thead className="bg-slate-50 text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                <tr>
+                  <th className="px-8 py-5">Lote / Produtor</th>
+                  <th className="px-8 py-5">Pesos (Filé/Recep)</th>
+                  <th className="px-8 py-5">Horário Abate</th>
+                  <th className="px-8 py-5">Embalado (kg)</th>
+                  <th className="px-8 py-5">Registrado por</th>
+                  {hasPermission && <th className="px-8 py-5 text-center">Ações</th>}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {filteredLogs.map(log => {
+                  const user = state.users.find(u => u.id === log.userId);
+                  return (
+                    <tr key={log.id} className="hover:bg-slate-50/50 transition-colors group">
+                      <td className="px-8 py-6">
+                        <div className="font-black text-slate-800 uppercase tracking-tighter italic leading-none">{log.slaughterBatch || 'N/A'}</div>
+                        <div className="text-[10px] font-bold text-slate-400 mt-1 uppercase tracking-widest">{log.producer || 'Desconhecido'}</div>
+                        <div className="flex items-center gap-1 mt-2 text-[10px] text-slate-400 font-bold">
+                          <Calendar className="w-3 h-3" /> {log.date ? format(parseISO(log.date), 'dd/MM/yyyy') : '--/--/----'}
                         </div>
                       </td>
-                    )}
+                      <td className="px-8 py-6">
+                        <div className="flex flex-col gap-1">
+                          <div className="flex items-center gap-2">
+                             <span className="text-[9px] font-black text-slate-400 uppercase w-10">FILÉ:</span>
+                             <span className="text-xs font-black text-slate-800">{(log.gtaWeight || 0).toFixed(2)}kg</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                             <span className="text-[9px] font-black text-slate-400 uppercase w-10">RECEP:</span>
+                             <span className="text-xs font-black text-emerald-600">{(log.receptionWeight || 0).toFixed(2)}kg</span>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-8 py-6 text-xs font-bold text-slate-600">
+                        <div className="flex items-center gap-2">
+                           <Clock className="w-3 h-3 text-slate-300" />
+                           <span>{log.startTime || '--:--'} às {log.endTime || '--:--'}</span>
+                        </div>
+                        <div className="text-[9px] font-black text-slate-400 uppercase mt-1">ROM: {log.packingList ? `${log.packingList} kg` : 'N/A'}</div>
+                      </td>
+                      <td className="px-8 py-6">
+                        <div className="font-black text-blue-600 text-xs">{log.packedQuantity ? `${log.packedQuantity} kg` : '---'}</div>
+                        {log.receptionWeight > 0 && (
+                          <div className="text-[10px] font-black text-emerald-600 mt-1 uppercase tracking-widest">
+                            Rend: {((log.packedQuantity / log.receptionWeight) * 100).toFixed(1)}%
+                          </div>
+                        )}
+                        <div className="text-[9px] font-black text-slate-400 uppercase mt-1">LOTE EMB: {log.packagingBatch || 'N/A'}</div>
+                      </td>
+                      <td className="px-8 py-6">
+                        <div className="flex items-center gap-2 text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                           <UserIcon className="w-3 h-3" /> @{user?.username || 'desconhecido'}
+                        </div>
+                      </td>
+                      {hasPermission && (
+                        <td className="px-8 py-6 text-center">
+                          <div className="flex justify-center gap-2">
+                            <button onClick={() => startEdit(log)} className="p-3 text-slate-300 hover:text-amber-500 hover:bg-amber-50 rounded-2xl transition-all"><Edit3 className="w-4 h-4" /></button>
+                            <button onClick={() => removeLog(log.id)} className="p-3 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-2xl transition-all"><Trash2 className="w-4 h-4" /></button>
+                          </div>
+                        </td>
+                      )}
+                    </tr>
+                  );
+                })}
+                {filteredLogs.length === 0 && (
+                  <tr>
+                    <td colSpan={6} className="px-8 py-20 text-center">
+                      <Factory className="w-12 h-12 text-slate-200 mx-auto mb-4" />
+                      <p className="text-slate-400 font-black uppercase tracking-widest text-[10px]">Nenhum registro encontrado para este período.</p>
+                    </td>
                   </tr>
-                );
-              })}
-              {filteredLogs.length === 0 && (
-                <tr>
-                  <td colSpan={6} className="px-8 py-20 text-center">
-                    <Factory className="w-12 h-12 text-slate-200 mx-auto mb-4" />
-                    <p className="text-slate-400 font-black uppercase tracking-widest text-[10px]">Nenhum registro encontrado para este período.</p>
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
     </div>
