@@ -230,7 +230,11 @@ const Dashboard: React.FC<Props> = ({ state }) => {
       if (m.batchId === selectedBatchId) return true;
       if (!m.batchId && m.cageId) {
         const cage = state.cages.find(c => c.id === m.cageId);
-        return cage?.batchId === selectedBatchId && m.date >= batch.settlementDate;
+        if (cage?.batchId === selectedBatchId && m.date >= batch.settlementDate) return true;
+        
+        // Fallback for harvested cages
+        const harvest = (state.harvestLogs || []).find(h => h.cageId === m.cageId && h.date >= m.date);
+        return harvest?.batchId === selectedBatchId;
       }
       return false;
     });
@@ -245,7 +249,7 @@ const Dashboard: React.FC<Props> = ({ state }) => {
       fullDate: date, 
       count: grouped[date] 
     })).sort((a, b) => a.fullDate.localeCompare(b.fullDate));
-  }, [state.mortalityLogs, state.cages, state.batches, selectedBatchId]);
+  }, [state.mortalityLogs, state.cages, state.batches, state.harvestLogs, selectedBatchId]);
 
   const totalMortalityInChart = useMemo(() => {
     return mortalityEvolutionData.reduce((acc, curr) => acc + curr.count, 0);
