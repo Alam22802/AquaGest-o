@@ -232,11 +232,9 @@ const BatchManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       const totalBiomassKg = (liveFish * currentAvgWeight) / 1000;
       const totalFeed = feedingByBatch.get(batch.id) || 0;
       
-      // FCA: Total Feed / (Total Weight Produced)
-      // Total Weight Produced = (Current Biomass) + (Harvested Weight) - (Initial Biomass)
-      const initialBiomassKg = (batch.initialQuantity * batch.initialUnitWeight) / 1000;
-      const weightProduced = totalBiomassKg + (harvestedWeight / 1000) - initialBiomassKg;
-      const fca = weightProduced > 0 ? (totalFeed / 1000) / weightProduced : 0;
+      // FCA: Total Feed / (Current Biomass + Harvested Weight)
+      const totalProducedWeightKg = totalBiomassKg + harvestedWeight;
+      const fca = totalProducedWeightKg > 0 ? (totalFeed / 1000) / totalProducedWeightKg : 0;
 
       const protocol = (state.protocols || []).find(p => p.id === batch.protocolId);
 

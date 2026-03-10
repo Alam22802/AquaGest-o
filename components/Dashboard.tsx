@@ -160,7 +160,8 @@ const Dashboard: React.FC<Props> = ({ state }) => {
         amountKg: amount / 1000
       })).sort((a, b) => a.name.localeCompare(b.name));
 
-      const fcaValue = totalBiomassKg > 0 ? (totalFeedKg / totalBiomassKg).toFixed(2) : '0.00';
+      const totalProducedWeightKg = totalBiomassKg + totalHarvestedWeight;
+      const fcaValue = totalProducedWeightKg > 0 ? (totalFeedKg / totalProducedWeightKg).toFixed(2) : '0.00';
 
       return { 
         id: batch.id, 
