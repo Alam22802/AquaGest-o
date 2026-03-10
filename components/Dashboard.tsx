@@ -201,9 +201,16 @@ const Dashboard: React.FC<Props> = ({ state }) => {
     if (!batch) return [];
     
     const logs = (state.biometryLogs || []).filter(l => {
-      if (l.batchId) return l.batchId === selectedBatchId;
-      const cage = state.cages.find(c => c.id === l.cageId);
-      return cage?.batchId === selectedBatchId && l.date >= batch.settlementDate;
+      if (l.batchId === selectedBatchId) return true;
+      if (!l.batchId && l.cageId) {
+        const cage = state.cages.find(c => c.id === l.cageId);
+        if (cage?.batchId === selectedBatchId && l.date >= batch.settlementDate) return true;
+        
+        // Fallback for harvested cages
+        const harvest = (state.harvestLogs || []).find(h => h.cageId === l.cageId && h.date >= l.date);
+        return harvest?.batchId === selectedBatchId;
+      }
+      return false;
     }).sort((a, b) => a.date.localeCompare(b.date));
     
     const uniqueDates = Array.from(new Set(logs.map(l => l.date))).sort();
@@ -220,7 +227,7 @@ const Dashboard: React.FC<Props> = ({ state }) => {
     });
     
     return [{ date: 'Início', weight: batch.initialUnitWeight }, ...data];
-  }, [state.biometryLogs, state.batches, state.cages, selectedBatchId]);
+  }, [state.biometryLogs, state.batches, state.cages, state.harvestLogs, selectedBatchId]);
 
   const mortalityEvolutionData = useMemo(() => {
     if (!selectedBatchId) return [];
