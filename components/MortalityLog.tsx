@@ -152,8 +152,8 @@ const MortalityLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
   const startEdit = (log: IMortalityLog) => {
     if (!hasPermission) return;
     const cage = cageMap.get(log.cageId);
+    setFormBatchId(log.batchId || cage?.batchId || '');
     if (cage) {
-      setFormBatchId(cage.batchId || '');
       setSelectedLineId(cage.lineId || '');
     }
     setEditingId(log.id);

@@ -150,10 +150,12 @@ const FeedingLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
 
     if (editingId) {
       const oldLog = state.feedingLogs.find(l => l.id === editingId);
+      const cage = cageMap.get(formData.cageId);
       const updatedLogs = state.feedingLogs.map(l => 
         l.id === editingId ? {
           ...l,
           cageId: formData.cageId,
+          batchId: cage?.batchId || l.batchId,
           feedTypeId: formData.feedTypeId,
           amount: amountNum,
           timestamp: `${formData.date}T${formData.time}:00`,

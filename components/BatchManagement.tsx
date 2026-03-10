@@ -128,16 +128,53 @@ const BatchManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       }
     });
 
-    const biometryByCage = new Map<string, typeof state.biometryLogs>();
+    const biometryByBatch = new Map<string, typeof state.biometryLogs>();
     (state.biometryLogs || []).forEach(b => {
-      const list = biometryByCage.get(b.cageId) || [];
-      list.push(b);
-      biometryByCage.set(b.cageId, list);
+      let bId = b.batchId;
+      if (!bId && b.cageId) {
+        const cage = (state.cages || []).find(c => c.id === b.cageId);
+        if (cage?.batchId) {
+          bId = cage.batchId;
+        } else {
+          const harvest = (state.harvestLogs || []).find(h => h.cageId === b.cageId && h.date >= b.date);
+          if (harvest) bId = harvest.batchId;
+        }
+      }
+      
+      if (bId) {
+        const list = biometryByBatch.get(bId) || [];
+        list.push(b);
+        biometryByBatch.set(bId, list);
+      }
     });
 
-    const harvestsByBatch = new Map<string, { fishCount: number, initialFishCount: number }>();
+    const feedingByBatch = new Map<string, number>();
+    (state.feedingLogs || []).forEach(f => {
+      let bId = f.batchId;
+      if (!bId && f.cageId) {
+        const cage = (state.cages || []).find(c => c.id === f.cageId);
+        if (cage?.batchId) {
+          const batch = (state.batches || []).find(b => b.id === cage.batchId);
+          const fDate = f.timestamp.split('T')[0];
+          if (batch && fDate >= batch.settlementDate) {
+            bId = cage.batchId;
+          }
+        } else {
+          // Fallback for harvested cages
+          const fDate = f.timestamp.split('T')[0];
+          const harvest = (state.harvestLogs || []).find(h => h.cageId === f.cageId && h.date >= fDate);
+          if (harvest) bId = harvest.batchId;
+        }
+      }
+      
+      if (bId) {
+        feedingByBatch.set(bId, (feedingByBatch.get(bId) || 0) + f.amount);
+      }
+    });
+
+    const harvestsByBatch = new Map<string, { fishCount: number, initialFishCount: number, weight: number }>();
     (state.harvestLogs || []).forEach(h => {
-      const current = harvestsByBatch.get(h.batchId) || { fishCount: 0, initialFishCount: 0 };
+      const current = harvestsByBatch.get(h.batchId) || { fishCount: 0, initialFishCount: 0, weight: 0 };
       
       // Se não temos o initialFishCount no log (logs antigos), tentamos reconstruir com a mortalidade daquela gaiola
       let initial = h.initialFishCount;
@@ -150,7 +187,8 @@ const BatchManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
 
       harvestsByBatch.set(h.batchId, {
         fishCount: current.fishCount + h.fishCount,
-        initialFishCount: current.initialFishCount + initial
+        initialFishCount: current.initialFishCount + initial,
+        weight: current.weight + h.weight
       });
     });
 
@@ -159,21 +197,19 @@ const BatchManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       const cageIds = batchCages.map(c => c.id);
       
       const usedFish = batchCages.reduce((acc, curr) => acc + (curr.initialFishCount || 0), 0);
-      const harvestedFish = harvestsByBatch.get(batch.id)?.fishCount || 0;
+      const harvestData = harvestsByBatch.get(batch.id) || { fishCount: 0, initialFishCount: 0, weight: 0 };
+      const harvestedFish = harvestData.fishCount;
+      const harvestedWeight = harvestData.weight;
+      const settledAndHarvested = harvestData.initialFishCount;
+      
       const totalMortality = mortalityByBatch.get(batch.id) || 0;
-      const activeCageMortality = activeCageMortalityByBatch.get(batch.id) || 0;
+      const nurseryMortality = nurseryMortalityByBatch.get(batch.id) || 0;
       
-      // Peixes vivos totais (em gaiolas + berçário)
-      const totalLiveFish = Math.max(0, batch.initialQuantity - totalMortality - harvestedFish);
-      
-      // Peixes vivos atualmente nas gaiolas
-      const fishInActiveCages = Math.max(0, usedFish - activeCageMortality);
-      
-      // Saldo Alojamento: O que está vivo mas não está em gaiolas
-      const balance = Math.max(0, totalLiveFish - fishInActiveCages);
+      // Saldo Alojamento: O que ainda não saiu do berçário
+      const balance = Math.max(0, batch.initialQuantity - usedFish - settledAndHarvested - nurseryMortality);
       
       const mortality = totalMortality;
-      const liveFish = totalLiveFish;
+      const liveFish = Math.max(0, batch.initialQuantity - mortality - harvestedFish);
       // Rendimento baseado na sobrevivência (Povoado - Morto) / Povoado
       const yieldPercentage = batch.initialQuantity > 0 ? ((batch.initialQuantity - mortality) / batch.initialQuantity) * 100 : 0;
 
@@ -181,11 +217,7 @@ const BatchManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       const accuracy = expectedAtHarvest > 0 ? (harvestedFish / expectedAtHarvest) * 100 : 0;
       const isFinalized = harvestedFish > 0 && batchCages.length === 0;
       
-      const batchBiometries: typeof state.biometryLogs = [];
-      cageIds.forEach(id => {
-        const logs = biometryByCage.get(id);
-        if (logs) batchBiometries.push(...logs);
-      });
+      const batchBiometries = biometryByBatch.get(batch.id) || [];
 
       let currentAvgWeight = batch.initialUnitWeight;
       if (batchBiometries.length > 0) {
@@ -196,6 +228,14 @@ const BatchManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       }
 
       const totalBiomassKg = (liveFish * currentAvgWeight) / 1000;
+      const totalFeed = feedingByBatch.get(batch.id) || 0;
+      
+      // FCA: Total Feed / (Total Weight Produced)
+      // Total Weight Produced = (Current Biomass) + (Harvested Weight) - (Initial Biomass)
+      const initialBiomassKg = (batch.initialQuantity * batch.initialUnitWeight) / 1000;
+      const weightProduced = totalBiomassKg + (harvestedWeight / 1000) - initialBiomassKg;
+      const fca = weightProduced > 0 ? (totalFeed / 1000) / weightProduced : 0;
+
       const protocol = (state.protocols || []).find(p => p.id === batch.protocolId);
 
       let settlementAlert = null;
@@ -227,6 +267,8 @@ const BatchManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
         yieldPercentage,
         currentAvgWeight,
         totalBiomassKg,
+        totalFeed,
+        fca,
         protocol,
         settlementAlert,
         accuracy,
@@ -398,6 +440,21 @@ const BatchManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                           <TrendingUp className="w-2.5 h-2.5" /> Biomassa Est.
                         </span>
                         <span className="text-lg font-black text-emerald-600 leading-none mt-1">{batch.totalBiomassKg.toFixed(1)}kg</span>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4 pt-3 border-t border-slate-50">
+                      <div className="flex flex-col">
+                        <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1">
+                          <Package className="w-2.5 h-2.5" /> Ração Total
+                        </span>
+                        <span className="text-lg font-black text-amber-600 leading-none mt-1">{(batch.totalFeed / 1000).toFixed(1)}kg</span>
+                      </div>
+                      <div className="flex flex-col items-end">
+                        <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1">
+                          <TrendingUp className="w-2.5 h-2.5" /> FCA
+                        </span>
+                        <span className="text-lg font-black text-indigo-600 leading-none mt-1">{batch.fca.toFixed(2)}</span>
                       </div>
                     </div>
 

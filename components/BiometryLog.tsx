@@ -64,7 +64,13 @@ const BiometryLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       onUpdate({
         ...state,
         biometryLogs: state.biometryLogs.map(log => 
-          log.id === editingId ? { ...log, cageId: formData.cageId, averageWeight: Number(formData.averageWeight), date: formData.date } : log
+          log.id === editingId ? { 
+            ...log, 
+            cageId: formData.cageId, 
+            batchId: formBatchId || log.batchId,
+            averageWeight: Number(formData.averageWeight), 
+            date: formData.date 
+          } : log
         )
       });
       setEditingId(null);
