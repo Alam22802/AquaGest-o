@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { Batch, AppState, User } from '../types';
-import { Plus, Trash2, Tag, Calendar, Scale, Hash, Edit, X, BookOpen, Eye, TrendingUp, Fish, AlertCircle, ShoppingCart, CheckCircle2 } from 'lucide-react';
+import { Plus, Trash2, Tag, Calendar, Scale, Hash, Edit, X, BookOpen, Eye, TrendingUp, Fish, AlertCircle, ShoppingCart, CheckCircle2, Package } from 'lucide-react';
 import { format, differenceInDays, parseISO, startOfDay } from 'date-fns';
 import HarvestManagement from './HarvestManagement';
 
@@ -223,8 +223,10 @@ const BatchManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       if (batchBiometries.length > 0) {
         const lastDate = batchBiometries.reduce((max, log) => log.date > max ? log.date : max, "");
         const lastDayLogs = batchBiometries.filter(log => log.date === lastDate);
-        const sumWeights = lastDayLogs.reduce((acc, log) => acc + log.averageWeight, 0);
-        currentAvgWeight = sumWeights / lastDayLogs.length;
+        if (lastDayLogs.length > 0) {
+          const sumWeights = lastDayLogs.reduce((acc, log) => acc + log.averageWeight, 0);
+          currentAvgWeight = sumWeights / lastDayLogs.length;
+        }
       }
 
       const totalBiomassKg = (liveFish * currentAvgWeight) / 1000;
@@ -409,13 +411,17 @@ const BatchManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                     <div className="space-y-2">
                       <div className="flex justify-between items-center">
                         <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1"><Calendar className="w-3 h-3 opacity-30" /> Povoamento</span>
-                        <span className="text-xs font-black text-slate-700">{format(new Date(batch.settlementDate + 'T12:00:00'), 'dd/MM/yyyy')}</span>
+                        <span className="text-xs font-black text-slate-700">
+                          {batch.settlementDate ? format(new Date(batch.settlementDate + 'T12:00:00'), 'dd/MM/yyyy') : '---'}
+                        </span>
                       </div>
 
                       {batch.expectedHarvestDate && (
                         <div className="flex justify-between items-center">
                           <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1"><Calendar className="w-3 h-3 opacity-30 text-blue-400" /> Prev. Despesca</span>
-                          <span className="text-xs font-black text-blue-600">{format(new Date(batch.expectedHarvestDate + 'T12:00:00'), 'dd/MM/yyyy')}</span>
+                          <span className="text-xs font-black text-blue-600">
+                            {format(new Date(batch.expectedHarvestDate + 'T12:00:00'), 'dd/MM/yyyy')}
+                          </span>
                         </div>
                       )}
                     </div>
