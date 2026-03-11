@@ -83,13 +83,13 @@ const Dashboard: React.FC<Props> = ({ state }) => {
         const cage = (state.cages || []).find(c => c.id === f.cageId);
         if (cage?.batchId) {
           const batch = (state.batches || []).find(b => b.id === cage.batchId);
-          const fDate = f.timestamp.split('T')[0];
+          const fDate = (f.timestamp || '').split('T')[0];
           if (batch && fDate >= batch.settlementDate) {
             bId = cage.batchId;
           }
         } else {
           // Fallback for harvested cages
-          const fDate = f.timestamp.split('T')[0];
+          const fDate = (f.timestamp || '').split('T')[0];
           const harvest = (state.harvestLogs || []).find(h => h.cageId === f.cageId && h.date >= fDate);
           if (harvest) bId = harvest.batchId;
         }
@@ -144,9 +144,15 @@ const Dashboard: React.FC<Props> = ({ state }) => {
       if (batchBiometries.length > 0) {
         const lastDate = batchBiometries.reduce((max, log) => log.date > max ? log.date : max, "");
         const lastDayLogs = batchBiometries.filter(log => log.date === lastDate);
-        const sumWeights = lastDayLogs.reduce((acc, log) => acc + log.averageWeight, 0);
-        currentAvgWeight = sumWeights / lastDayLogs.length;
-        samplingInfo = `Média de ${lastDayLogs.length} gaiolas (Dia: ${format(parseISO(lastDate), 'dd/MM')})`;
+        if (lastDayLogs.length > 0) {
+          const sumWeights = lastDayLogs.reduce((acc, log) => acc + log.averageWeight, 0);
+          currentAvgWeight = sumWeights / lastDayLogs.length;
+          try {
+            samplingInfo = `Média de ${lastDayLogs.length} gaiolas (Dia: ${format(parseISO(lastDate), 'dd/MM')})`;
+          } catch {
+            samplingInfo = `Média de ${lastDayLogs.length} gaiolas`;
+          }
+        }
       }
 
       const totalBiomassKg = (currentTotalStock * currentAvgWeight) / 1000;
@@ -219,8 +225,13 @@ const Dashboard: React.FC<Props> = ({ state }) => {
       const dayLogs = logs.filter(l => l.date === currentDate);
       const avgWeight = dayLogs.reduce((a, b) => a + b.averageWeight, 0) / dayLogs.length;
 
+      let dateLabel = currentDate;
+      try {
+        dateLabel = format(new Date(currentDate + 'T12:00:00'), 'dd/MM');
+      } catch {}
+
       return {
-        date: format(new Date(currentDate + 'T12:00:00'), 'dd/MM'),
+        date: dateLabel,
         fullDate: currentDate,
         weight: Math.round(avgWeight)
       };
@@ -252,11 +263,17 @@ const Dashboard: React.FC<Props> = ({ state }) => {
       acc[log.date] += log.count;
       return acc;
     }, {});
-    return Object.keys(grouped).map(date => ({ 
-      date: format(new Date(date + 'T12:00:00'), 'dd/MM'), 
-      fullDate: date, 
-      count: grouped[date] 
-    })).sort((a, b) => a.fullDate.localeCompare(b.fullDate));
+    return Object.keys(grouped).map(date => {
+      let dateLabel = date;
+      try {
+        dateLabel = format(new Date(date + 'T12:00:00'), 'dd/MM');
+      } catch {}
+      return { 
+        date: dateLabel, 
+        fullDate: date, 
+        count: grouped[date] 
+      };
+    }).sort((a, b) => a.fullDate.localeCompare(b.fullDate));
   }, [state.mortalityLogs, state.cages, state.batches, state.harvestLogs, selectedBatchId]);
 
   const totalMortalityInChart = useMemo(() => {

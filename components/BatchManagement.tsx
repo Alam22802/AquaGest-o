@@ -111,7 +111,7 @@ const BatchManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
         bId = cage.batchId;
       } else if (!bId && m.cageId) {
         // Se a gaiola já foi despescada, tenta encontrar o lote pelo log de despesca
-        const harvest = (state.harvestLogs || []).find(h => h.cageId === m.cageId && h.date >= m.date);
+        const harvest = (state.harvestLogs || []).find(h => h.cageId === m.cageId && h.date >= (m.date || ''));
         if (harvest) bId = harvest.batchId;
       }
 
@@ -136,7 +136,7 @@ const BatchManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
         if (cage?.batchId) {
           bId = cage.batchId;
         } else {
-          const harvest = (state.harvestLogs || []).find(h => h.cageId === b.cageId && h.date >= b.date);
+          const harvest = (state.harvestLogs || []).find(h => h.cageId === b.cageId && h.date >= (b.date || ''));
           if (harvest) bId = harvest.batchId;
         }
       }
@@ -155,13 +155,13 @@ const BatchManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
         const cage = (state.cages || []).find(c => c.id === f.cageId);
         if (cage?.batchId) {
           const batch = (state.batches || []).find(b => b.id === cage.batchId);
-          const fDate = f.timestamp.split('T')[0];
+          const fDate = (f.timestamp || '').split('T')[0];
           if (batch && fDate >= batch.settlementDate) {
             bId = cage.batchId;
           }
         } else {
           // Fallback for harvested cages
-          const fDate = f.timestamp.split('T')[0];
+          const fDate = (f.timestamp || '').split('T')[0];
           const harvest = (state.harvestLogs || []).find(h => h.cageId === f.cageId && h.date >= fDate);
           if (harvest) bId = harvest.batchId;
         }

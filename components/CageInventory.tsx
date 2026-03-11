@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo } from 'react';
-import { AppState, Cage, User } from '../types';
-import { Plus, Trash2, Box, Edit, X, Ruler, Users, Info, Layers } from 'lucide-react';
+import { AppState, Cage, User, CageStatus } from '../types';
+import { Plus, Trash2, Box, Edit, X, Ruler, Users, Info, Layers, Filter, CheckCircle2, Settings, Eraser } from 'lucide-react';
 
 interface Props {
   state: AppState;
@@ -12,6 +12,7 @@ interface Props {
 const CageInventory: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [filterStatus, setFilterStatus] = useState<CageStatus | 'Todos'>('Todos');
   const [formData, setFormData] = useState({
     name: '',
     length: '',
@@ -185,11 +186,16 @@ const CageInventory: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     );
   };
 
+  const filteredCages = useMemo(() => {
+    if (filterStatus === 'Todos') return state.cages;
+    return state.cages.filter(c => c.status === filterStatus);
+  }, [state.cages, filterStatus]);
+
   const toggleSelectAll = () => {
-    if (selectedIds.length === state.cages.length) {
+    if (selectedIds.length === filteredCages.length) {
       setSelectedIds([]);
     } else {
-      setSelectedIds(state.cages.map(c => c.id));
+      setSelectedIds(filteredCages.map(c => c.id));
     }
   };
 
@@ -206,6 +212,25 @@ const CageInventory: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       cages: state.cages.filter(c => !selectedIds.includes(c.id))
     });
     setSelectedIds([]);
+  };
+
+  const getStatusIcon = (status: CageStatus) => {
+    switch (status) {
+      case 'Disponível': return <CheckCircle2 className="w-3 h-3" />;
+      case 'Ocupada': return <Box className="w-3 h-3" />;
+      case 'Manutenção': return <Settings className="w-3 h-3" />;
+      case 'Limpeza': return <Eraser className="w-3 h-3" />;
+    }
+  };
+
+  const getStatusColor = (status: CageStatus) => {
+    switch (status) {
+      case 'Disponível': return 'bg-emerald-100 text-emerald-700 border-emerald-200';
+      case 'Ocupada': return 'bg-blue-100 text-blue-700 border-blue-200';
+      case 'Manutenção': return 'bg-red-100 text-red-700 border-red-200';
+      case 'Limpeza': return 'bg-amber-100 text-amber-700 border-amber-200';
+      default: return 'bg-slate-100 text-slate-700';
+    }
   };
 
   return (
@@ -305,15 +330,39 @@ const CageInventory: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
         )}
       </div>
 
-      <div className="lg:col-span-2 space-y-4">
+      <div className="lg:col-span-2 space-y-6">
+        {/* Filtros de Status */}
+        <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 flex flex-wrap items-center gap-2">
+          <div className="flex items-center gap-2 mr-2">
+            <Filter className="w-4 h-4 text-slate-400" />
+            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Filtrar Status:</span>
+          </div>
+          <button 
+            onClick={() => setFilterStatus('Todos')}
+            className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${filterStatus === 'Todos' ? 'bg-slate-900 text-white shadow-md' : 'bg-slate-50 text-slate-400 hover:bg-slate-100'}`}
+          >
+            Todos
+          </button>
+          {(['Disponível', 'Ocupada', 'Manutenção', 'Limpeza'] as CageStatus[]).map(status => (
+            <button 
+              key={status}
+              onClick={() => setFilterStatus(status)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border ${filterStatus === status ? getStatusColor(status) + ' shadow-md' : 'bg-white text-slate-400 border-slate-100 hover:border-slate-200'}`}
+            >
+              {getStatusIcon(status)}
+              {status}
+            </button>
+          ))}
+        </div>
+
         {state.cages.length > 0 && hasPermission && (
           <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 flex items-center justify-between sticky top-4 z-20">
             <div className="flex items-center gap-4">
               <button 
                 onClick={toggleSelectAll}
-                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border text-[10px] font-black uppercase tracking-widest transition-all ${selectedIds.length === state.cages.length ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-slate-500 border-slate-200 hover:border-indigo-200'}`}
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border text-[10px] font-black uppercase tracking-widest transition-all ${selectedIds.length === filteredCages.length && filteredCages.length > 0 ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-slate-500 border-slate-200 hover:border-indigo-200'}`}
               >
-                {selectedIds.length === state.cages.length ? 'Desmarcar Tudo' : 'Marcar Tudo'}
+                {selectedIds.length === filteredCages.length && filteredCages.length > 0 ? 'Desmarcar Tudo' : 'Marcar Tudo'}
               </button>
               {selectedIds.length > 0 && (
                 <span className="text-[10px] font-black text-indigo-600 uppercase tracking-widest">
@@ -335,7 +384,7 @@ const CageInventory: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
         )}
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {state.cages.map(cage => (
+          {filteredCages.map(cage => (
             <div 
               key={cage.id} 
               onClick={() => hasPermission && toggleSelect(cage.id)}
@@ -371,10 +420,27 @@ const CageInventory: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
               <div className="p-5 space-y-3">
                 <div className="flex justify-between items-center">
                   <span className="text-[10px] font-black text-slate-400 uppercase">Status</span>
-                  <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-md ${cage.status === 'Ocupada' ? 'bg-blue-100 text-blue-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                  <div className={`p-1.5 rounded-lg border flex items-center gap-1.5 text-[9px] font-black uppercase tracking-widest ${getStatusColor(cage.status)}`}>
+                    {getStatusIcon(cage.status)}
                     {cage.status}
-                  </span>
+                  </div>
                 </div>
+
+                {(cage.status === 'Manutenção' || cage.status === 'Limpeza') && cage.maintenanceStartDate && (
+                  <div className="p-3 bg-slate-50 rounded-xl border border-slate-100 space-y-2">
+                    <div className="flex justify-between items-center">
+                      <span className="text-[9px] font-black text-slate-400 uppercase">Início</span>
+                      <span className="text-[10px] font-black text-slate-700">{cage.maintenanceStartDate.split('-').reverse().join('/')}</span>
+                    </div>
+                    {cage.maintenanceEndDate && (
+                      <div className="flex justify-between items-center">
+                        <span className="text-[9px] font-black text-slate-400 uppercase">Previsão</span>
+                        <span className="text-[10px] font-black text-amber-600">{cage.maintenanceEndDate.split('-').reverse().join('/')}</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 <div className="flex justify-between items-center border-t border-slate-50 pt-2">
                   <span className="text-[10px] font-black text-slate-400 uppercase">Capacidade</span>
                   <div className="text-right">
@@ -393,10 +459,10 @@ const CageInventory: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
               </div>
             </div>
           ))}
-          {state.cages.length === 0 && (
+          {filteredCages.length === 0 && (
             <div className="col-span-full py-20 text-center bg-white rounded-3xl border-2 border-dashed border-slate-200">
               <Info className="w-12 h-12 text-slate-200 mx-auto mb-4" />
-              <p className="text-slate-400 font-bold uppercase tracking-widest text-xs">Nenhuma gaiola cadastrada.</p>
+              <p className="text-slate-400 font-bold uppercase tracking-widest text-xs">Nenhuma gaiola encontrada para este filtro.</p>
             </div>
           )}
         </div>
