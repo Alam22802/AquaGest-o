@@ -214,6 +214,23 @@ const CageInventory: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     setSelectedIds([]);
   };
 
+  const filterSummary = useMemo(() => {
+    if (filterStatus === 'Todos') return null;
+    
+    const totalCapacity = filteredCages.reduce((acc, c) => acc + c.stockingCapacity, 0);
+    const models = filteredCages.reduce((acc: Record<string, number>, c) => {
+      const modelKey = `${c.dimensions.length}x${c.dimensions.width}x${c.dimensions.depth}m`;
+      acc[modelKey] = (acc[modelKey] || 0) + 1;
+      return acc;
+    }, {});
+
+    return {
+      totalCapacity,
+      models,
+      count: filteredCages.length
+    };
+  }, [filteredCages, filterStatus]);
+
   const getStatusIcon = (status: CageStatus) => {
     switch (status) {
       case 'Disponível': return <CheckCircle2 className="w-3 h-3" />;
@@ -354,6 +371,31 @@ const CageInventory: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
             </button>
           ))}
         </div>
+
+        {filterSummary && (
+          <div className="bg-indigo-50 border border-indigo-100 rounded-2xl p-4 animate-in fade-in slide-in-from-top-2 duration-300">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className={`p-2 rounded-xl border shadow-sm ${getStatusColor(filterStatus as CageStatus)}`}>
+                  {getStatusIcon(filterStatus as CageStatus)}
+                </div>
+                <div>
+                  <h4 className="text-[11px] font-black text-indigo-900 uppercase tracking-widest">Resumo do Filtro: {filterStatus}</h4>
+                  <p className="text-[10px] font-bold text-indigo-600 uppercase mt-0.5">
+                    {filterSummary.count} gaiolas encontradas • Capacidade Total: {filterSummary.totalCapacity.toLocaleString()} un
+                  </p>
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {Object.entries(filterSummary.models).map(([model, count]) => (
+                  <div key={model} className="px-2 py-1 bg-white border border-indigo-100 rounded-lg text-[9px] font-black text-indigo-700 uppercase">
+                    {model}: {count} un
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
 
         {state.cages.length > 0 && hasPermission && (
           <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 flex items-center justify-between sticky top-4 z-20">
