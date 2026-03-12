@@ -10,9 +10,10 @@ interface Props {
   state: AppState;
   onLogin: (user: User) => void;
   onRegister: (user: User) => void;
+  onUpdateState: (newState: AppState) => void;
 }
 
-const Login: React.FC<Props> = ({ state, onLogin, onRegister }) => {
+const Login: React.FC<Props> = ({ state, onLogin, onRegister, onUpdateState }) => {
   const [isRegistering, setIsRegistering] = useState(false);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -22,6 +23,12 @@ const Login: React.FC<Props> = ({ state, onLogin, onRegister }) => {
   const [isSyncing, setIsSyncing] = useState(false);
   const [showLinkInput, setShowLinkInput] = useState(false);
   const [inviteLink, setInviteLink] = useState('');
+  const [isResettingPassword, setIsResettingPassword] = useState(false);
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
+  const [resetUsername, setResetUsername] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmNewPassword, setConfirmNewPassword] = useState('');
+  const [tempUser, setTempUser] = useState<User | null>(null);
 
   const isCloudActive = !!state.supabaseConfig?.url;
 
@@ -74,9 +81,70 @@ const Login: React.FC<Props> = ({ state, onLogin, onRegister }) => {
         setError('Acesso pendente. Peça ao Administrador para aprovar seu cadastro.');
         return;
       }
+
+      if (foundUser.needsPasswordReset) {
+        setTempUser(foundUser);
+        setIsChangingPassword(true);
+        return;
+      }
+
       onLogin(foundUser);
     } else {
       setError('Usuário ou senha incorretos.');
+    }
+  };
+
+  const handleForgotPassword = (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setSuccessMessage('');
+
+    const cleanUser = resetUsername.trim().toLowerCase();
+    const foundUser = state.users.find(u => u.username.toLowerCase() === cleanUser);
+
+    if (!foundUser) {
+      setError('Usuário não encontrado.');
+      return;
+    }
+
+    // Update state to mark password reset requested
+    const updatedUsers = state.users.map(u => 
+      u.id === foundUser.id ? { ...u, passwordResetRequested: true, updatedAt: Date.now() } : u
+    );
+    
+    onUpdateState({ ...state, users: updatedUsers });
+    
+    setSuccessMessage('Solicitação de nova senha enviada ao Administrador!');
+    setIsResettingPassword(false);
+  };
+
+  const handlePasswordChange = (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+
+    if (newPassword !== confirmNewPassword) {
+      setError('As senhas não conferem.');
+      return;
+    }
+
+    if (newPassword.length < 4) {
+      setError('A senha deve ter pelo menos 4 caracteres.');
+      return;
+    }
+
+    if (tempUser) {
+      const updatedUser = { 
+        ...tempUser, 
+        password: newPassword, 
+        needsPasswordReset: false, 
+        passwordResetRequested: false,
+        updatedAt: Date.now() 
+      };
+      
+      const updatedUsers = state.users.map(u => u.id === tempUser.id ? updatedUser : u);
+      onUpdateState({ ...state, users: updatedUsers });
+      
+      onLogin(updatedUser);
     }
   };
 
@@ -137,6 +205,14 @@ const Login: React.FC<Props> = ({ state, onLogin, onRegister }) => {
           {isRegistering && (
             <button onClick={() => setIsRegistering(false)} className="absolute left-6 top-10 text-[#e4e4d4] opacity-50 p-2"><ArrowLeft className="w-6 h-6" /></button>
           )}
+
+          {isResettingPassword && (
+            <button onClick={() => setIsResettingPassword(false)} className="absolute left-6 top-10 text-[#e4e4d4] opacity-50 p-2"><ArrowLeft className="w-6 h-6" /></button>
+          )}
+
+          {isChangingPassword && (
+            <button onClick={() => { setIsChangingPassword(false); setTempUser(null); }} className="absolute left-6 top-10 text-[#e4e4d4] opacity-50 p-2"><ArrowLeft className="w-6 h-6" /></button>
+          )}
         </div>
         
         <div className="p-8">
@@ -174,7 +250,45 @@ const Login: React.FC<Props> = ({ state, onLogin, onRegister }) => {
           {error && <div className="bg-red-50 text-red-600 p-4 rounded-2xl text-xs font-bold border border-red-100 mb-6 flex items-center gap-3 animate-pulse">{error}</div>}
           {successMessage && <div className="bg-emerald-50 text-emerald-600 p-4 rounded-2xl text-xs font-bold border border-emerald-100 mb-6 flex items-center gap-3">{successMessage}</div>}
 
-          {!isRegistering ? (
+          {isChangingPassword ? (
+            <form onSubmit={handlePasswordChange} className="space-y-5">
+              <div className="text-center mb-6">
+                <h2 className="text-lg font-black text-slate-800 uppercase italic">Definir Nova Senha</h2>
+                <p className="text-[10px] font-bold text-slate-400 uppercase mt-2">Você está usando uma senha temporária. Escolha uma senha definitiva.</p>
+              </div>
+              
+              <div className="space-y-4">
+                <div className="relative group">
+                  <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                  <input type="password" required className="w-full pl-12 pr-4 py-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none font-bold text-slate-800" placeholder="Nova Senha" value={newPassword} onChange={e => setNewPassword(e.target.value)} />
+                </div>
+                <div className="relative group">
+                  <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                  <input type="password" required className="w-full pl-12 pr-4 py-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none font-bold text-slate-800" placeholder="Confirmar Nova Senha" value={confirmNewPassword} onChange={e => setConfirmNewPassword(e.target.value)} />
+                </div>
+              </div>
+
+              <button type="submit" className="w-full bg-emerald-600 text-white py-5 rounded-2xl font-black text-sm uppercase tracking-widest shadow-xl active:scale-95 transition-all">
+                Salvar e Acessar
+              </button>
+            </form>
+          ) : isResettingPassword ? (
+            <form onSubmit={handleForgotPassword} className="space-y-5">
+              <div className="text-center mb-6">
+                <h2 className="text-lg font-black text-slate-800 uppercase italic">Recuperar Senha</h2>
+                <p className="text-[10px] font-bold text-slate-400 uppercase mt-2">Informe seu usuário para solicitar uma nova senha ao administrador.</p>
+              </div>
+              
+              <div className="relative group">
+                <UserIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                <input type="text" required autoCapitalize="none" className="w-full pl-12 pr-4 py-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none font-bold text-slate-800" placeholder="Seu Usuário" value={resetUsername} onChange={e => setResetUsername(e.target.value)} />
+              </div>
+
+              <button type="submit" className="w-full bg-[#344434] text-[#e4e4d4] py-5 rounded-2xl font-black text-sm uppercase tracking-widest shadow-xl active:scale-95 transition-all">
+                Solicitar Nova Senha
+              </button>
+            </form>
+          ) : !isRegistering ? (
             <form onSubmit={handleLogin} className="space-y-5">
               <div className="space-y-4">
                 <div className="relative group">
@@ -197,6 +311,9 @@ const Login: React.FC<Props> = ({ state, onLogin, onRegister }) => {
               <div className="flex flex-col items-center gap-4 pt-4">
                 <button type="button" onClick={() => setIsRegistering(true)} className="text-slate-400 text-[10px] font-black uppercase tracking-widest hover:text-[#344434]">
                   Solicitar Cadastro
+                </button>
+                <button type="button" onClick={() => setIsResettingPassword(true)} className="text-slate-400 text-[10px] font-black uppercase tracking-widest hover:text-red-500">
+                  Esqueci minha senha
                 </button>
               </div>
             </form>

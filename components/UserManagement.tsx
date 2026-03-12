@@ -201,6 +201,28 @@ const UserManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     });
   };
 
+  const generateTempPassword = (id: string) => {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    let tempPass = '';
+    for (let i = 0; i < 6; i++) {
+      tempPass += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+
+    onUpdate({
+      ...state,
+      users: state.users.map(u => u.id === id ? { 
+        ...u, 
+        password: tempPass, 
+        needsPasswordReset: true, 
+        passwordResetRequested: false,
+        updatedAt: Date.now() 
+      } : u)
+    });
+    
+    const user = state.users.find(u => u.id === id);
+    alert(`Senha temporária gerada para ${user?.name}: ${tempPass}\n\nEnvie esta senha ao usuário por e-mail.`);
+  };
+
   const removeUser = (id: string) => {
     const user = state.users.find(u => u.id === id);
     if (user?.isMaster) {
@@ -220,6 +242,7 @@ const UserManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
   };
 
   const pendingUsers = state.users.filter(u => !u.isApproved);
+  const resetRequests = state.users.filter(u => u.passwordResetRequested);
   const approvedUsers = state.users.filter(u => u.isApproved);
 
   return (
@@ -366,6 +389,50 @@ const UserManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
         </div>
       )}
 
+      {/* Seção de Recuperação de Senha */}
+      {resetRequests.length > 0 && (
+        <div className="bg-red-50 border border-red-200 rounded-[2rem] p-6 shadow-lg shadow-red-200/5">
+          <h3 className="text-red-800 font-black uppercase tracking-widest text-xs flex items-center gap-2 mb-4 italic">
+            <AlertTriangle className="w-4 h-4 animate-pulse" /> Solicitações de Nova Senha ({resetRequests.length})
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {resetRequests.map(user => (
+              <div key={user.id} className="bg-white p-5 rounded-2xl shadow-sm border border-red-100 flex flex-col justify-between">
+                <div className="mb-4">
+                  <div className="flex justify-between items-start mb-2">
+                    <h4 className="font-black text-slate-800 uppercase tracking-tighter text-sm">{user.name}</h4>
+                    <span className="bg-red-100 text-red-700 text-[8px] font-black px-2 py-0.5 rounded uppercase">Esqueci Senha</span>
+                  </div>
+                  <div className="space-y-1 text-[11px] text-slate-500 font-bold">
+                    <div className="flex items-center gap-2"><UserIcon className="w-3 h-3 opacity-30"/> @{user.username}</div>
+                    <div className="flex items-center gap-2"><Mail className="w-3 h-3 opacity-30"/> {user.email}</div>
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <button 
+                    onClick={() => generateTempPassword(user.id)}
+                    className="flex-1 bg-red-600 text-white py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-red-700 shadow-lg shadow-red-600/10"
+                  >
+                    <RefreshCw className="w-3 h-3" /> Gerar Senha Temporária
+                  </button>
+                  <button 
+                    onClick={() => {
+                      onUpdate({
+                        ...state,
+                        users: state.users.map(u => u.id === user.id ? { ...u, passwordResetRequested: false, updatedAt: Date.now() } : u)
+                      });
+                    }}
+                    className="p-2.5 bg-slate-100 text-slate-400 rounded-xl hover:bg-slate-200 transition-all"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
         <div className="xl:col-span-1">
           <div className={`bg-white p-8 rounded-[2rem] shadow-sm border transition-all ${editingUserId ? 'border-amber-300 ring-4 ring-amber-50' : 'border-slate-200'}`}>
@@ -397,7 +464,7 @@ const UserManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                 <label className="block text-[10px] font-black text-slate-400 uppercase mb-1.5 ml-1 tracking-widest">Senha de Acesso</label>
                 <div className="relative">
                   <Key className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-300" />
-                  <input type="text" required className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl outline-none font-bold text-sm" value={formData.password} onChange={(e) => setFormData({...formData, password: e.target.value})} />
+                  <input type="password" required className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl outline-none font-bold text-sm" value={formData.password} onChange={(e) => setFormData({...formData, password: e.target.value})} />
                 </div>
               </div>
               
@@ -553,7 +620,7 @@ const UserManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                       <Phone className="w-3.5 h-3.5 opacity-30"/> {user.phone || '(00) 00000-0000'}
                     </div>
                     <div className="flex items-center gap-2 px-2 py-1 bg-slate-50 rounded-lg text-[10px] font-black text-slate-400">
-                      <Key className="w-3 h-3 opacity-30"/> {user.password}
+                      <Key className="w-3 h-3 opacity-30"/> {user.password.replace(/./g, '*')}
                     </div>
                   </div>
                 </div>

@@ -11,6 +11,8 @@ export interface User {
   canEdit: boolean;
   allowedTabs?: string[];
   receiveNotifications: boolean; 
+  passwordResetRequested?: boolean;
+  needsPasswordReset?: boolean;
   supabaseConfig?: { url: string; key: string };
   lastSync?: string;
   updatedAt?: number;

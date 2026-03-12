@@ -353,7 +353,7 @@ const App: React.FC = () => {
         </div>
       )}
       {!currentUser ? (
-        <Login state={state!} onLogin={handleLogin} onRegister={handleRegister} />
+        <Login state={state!} onLogin={handleLogin} onRegister={handleRegister} onUpdateState={handleStateUpdate} />
       ) : (
         <Layout activeTab={activeTab} setActiveTab={setActiveTab} currentUser={currentUser} onLogout={handleLogout} state={state!}>
           {renderContent()}
