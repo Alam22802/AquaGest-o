@@ -72,6 +72,7 @@ const UserManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
           phone: formData.phone,
           email: formData.email,
           password: formData.password,
+          isApproved: true, // Ensure it's approved when saved from the form
           canEdit: u.isMaster ? true : formData.canEdit, // Mestre sempre pode editar
           allowedTabs: u.isMaster ? undefined : formData.allowedTabs,
           receiveNotifications: formData.receiveNotifications,
@@ -194,11 +195,21 @@ const UserManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     alert('E-mail de notificações e configurações salvas com sucesso!');
   };
 
-  const approveUser = (id: string) => {
-    onUpdate({
-      ...state,
-      users: state.users.map(u => u.id === id ? { ...u, isApproved: true, updatedAt: Date.now() } : u)
+  const approveUser = (user: User) => {
+    setEditingUserId(user.id);
+    setFormData({
+      name: user.name,
+      username: user.username,
+      phone: user.phone || '',
+      email: user.email,
+      password: user.password,
+      canEdit: true, // Default to editor on approval
+      receiveNotifications: user.receiveNotifications,
+      allowedTabs: user.allowedTabs || ['dashboard', 'feeding', 'biometry', 'mortality'] // Default tabs for new users
     });
+    // Mark as approved in the form data so it saves as approved
+    // We'll handle the actual isApproved: true in handleSaveUser
+    alert('Configure as permissões e abas permitidas para aprovar o usuário.');
   };
 
   const generateTempPassword = (id: string) => {
@@ -371,7 +382,7 @@ const UserManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                 </div>
                 <div className="flex gap-2">
                   <button 
-                    onClick={() => approveUser(user.id)}
+                    onClick={() => approveUser(user)}
                     className="flex-1 bg-emerald-600 text-white py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-emerald-700 shadow-lg shadow-emerald-600/10"
                   >
                     <CheckCircle className="w-3 h-3" /> Aprovar
@@ -568,7 +579,12 @@ const UserManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                       {user.isMaster ? <Shield className="w-6 h-6" /> : (user.canEdit ? <Edit3 className="w-6 h-6" /> : <Eye className="w-6 h-6" />)}
                     </div>
                     <div>
-                      <h4 className="font-black text-slate-800 uppercase tracking-tighter text-sm leading-none mb-1">{user.name}</h4>
+                      <div className="flex items-center gap-2 mb-1">
+                        <h4 className="font-black text-slate-800 uppercase tracking-tighter text-sm leading-none">{user.name}</h4>
+                        <span className={`px-2 py-0.5 rounded-md text-[8px] font-black uppercase tracking-widest ${user.canEdit ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : 'bg-amber-50 text-amber-600 border border-amber-100'}`}>
+                          {user.canEdit ? 'Editor' : 'Leitor'}
+                        </span>
+                      </div>
                       <div className="flex items-center gap-2">
                         <span className="text-[10px] font-black text-blue-500 uppercase tracking-widest">@{user.username}</span>
                         {user.receiveNotifications && <Bell className="w-3 h-3 text-emerald-500" />}

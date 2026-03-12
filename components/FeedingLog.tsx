@@ -163,11 +163,16 @@ const FeedingLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       );
 
       const updatedFeeds = state.feedTypes.map(f => {
-        if (f.id === formData.feedTypeId) {
-          const diff = (oldLog?.amount || 0) - amountNum;
-          return { ...f, totalStock: f.totalStock + diff };
+        let newStock = f.totalStock;
+        // Refund old amount if this was the old feed type
+        if (oldLog && f.id === oldLog.feedTypeId) {
+          newStock += oldLog.amount;
         }
-        return f;
+        // Deduct new amount if this is the new feed type
+        if (f.id === formData.feedTypeId) {
+          newStock -= amountNum;
+        }
+        return { ...f, totalStock: newStock };
       });
 
       onUpdate({ ...state, feedingLogs: updatedLogs, feedTypes: updatedFeeds });
