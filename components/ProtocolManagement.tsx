@@ -34,7 +34,8 @@ const ProtocolManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) =
           species: formData.species,
           targetWeight: Number(formData.targetWeight),
           expectedFca: Number(formData.expectedFca),
-          estimatedDays: Number(formData.estimatedDays)
+          estimatedDays: Number(formData.estimatedDays),
+          updatedAt: Date.now()
         } : p)
       });
       setEditingId(null);
@@ -45,7 +46,8 @@ const ProtocolManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) =
         species: formData.species,
         targetWeight: Number(formData.targetWeight),
         expectedFca: Number(formData.expectedFca),
-        estimatedDays: Number(formData.estimatedDays)
+        estimatedDays: Number(formData.estimatedDays),
+        updatedAt: Date.now()
       };
       onUpdate({ ...state, protocols: [...(state.protocols || []), newProtocol] });
     }

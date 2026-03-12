@@ -14,6 +14,275 @@ interface Props {
   currentUser: User;
 }
 
+// Sub-component for the summary board to prevent re-renders on form input
+const SlaughterSummary = React.memo(({ stats, startDate, endDate, onStartDateChange, onEndDateChange }: { 
+  stats: any, 
+  startDate: string, 
+  endDate: string, 
+  onStartDateChange: (val: string) => void, 
+  onEndDateChange: (val: string) => void 
+}) => {
+  return (
+    <div className="bg-[#344434] p-8 rounded-[2.5rem] text-[#e4e4d4] shadow-2xl shadow-black/20 relative overflow-hidden group border border-white/5">
+       <div className="relative z-10">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8">
+             <div>
+                <h3 className="text-[10px] font-black uppercase tracking-[0.3em] mb-2 opacity-60">Inteligência de Abate</h3>
+                <h2 className="text-3xl font-black uppercase italic tracking-tighter leading-none">Resultados Finais</h2>
+             </div>
+             
+             <div className="bg-white/10 backdrop-blur-md p-4 rounded-2xl border border-white/10 flex flex-col sm:flex-row items-center gap-3">
+                <div className="flex items-center gap-2">
+                   <Calendar className="w-4 h-4 opacity-50" />
+                   <span className="text-[9px] font-black uppercase tracking-widest opacity-60">Apuração:</span>
+                </div>
+                <div className="flex items-center gap-2">
+                   <input 
+                      type="date" 
+                      value={startDate} 
+                      onChange={e => onStartDateChange(e.target.value)}
+                      className="bg-transparent border-none text-[11px] font-black uppercase outline-none focus:ring-0 cursor-pointer text-white"
+                   />
+                   <span className="opacity-30">/</span>
+                   <input 
+                      type="date" 
+                      value={endDate} 
+                      onChange={e => onEndDateChange(e.target.value)}
+                      className="bg-transparent border-none text-[11px] font-black uppercase outline-none focus:ring-0 cursor-pointer text-white"
+                   />
+                </div>
+             </div>
+          </div>
+
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-8">
+             <div className="space-y-2 border-l-2 border-white/10 pl-6">
+                <div className="text-[9px] font-black opacity-40 uppercase tracking-widest">Total Recepção</div>
+                <div className="text-2xl font-black flex items-baseline gap-1">
+                   {stats.totalRecep.toLocaleString('pt-BR', { minimumFractionDigits: 0 })}
+                   <span className="text-[10px] opacity-40">kg</span>
+                </div>
+             </div>
+             <div className="space-y-2 border-l-2 border-emerald-500/30 pl-6">
+                <div className="text-[9px] font-black opacity-40 uppercase tracking-widest">Total Embalado</div>
+                <div className="text-2xl font-black text-emerald-400 flex items-baseline gap-1">
+                   {stats.totalPacked.toLocaleString('pt-BR', { minimumFractionDigits: 0 })}
+                   <span className="text-[10px] opacity-40">kg</span>
+                </div>
+             </div>
+             <div className="space-y-2 border-l-2 border-blue-500/30 pl-6">
+                <div className="text-[9px] font-black opacity-40 uppercase tracking-widest">Rendimento</div>
+                <div className="text-2xl font-black text-blue-300 flex items-baseline gap-1">
+                   {stats.yieldPercentage.toFixed(1)}
+                   <span className="text-[10px] opacity-40">%</span>
+                </div>
+             </div>
+             <div className="space-y-2 border-l-2 border-white/10 pl-6">
+                <div className="text-[9px] font-black opacity-40 uppercase tracking-widest">Total Filé Congelado</div>
+                <div className="text-2xl font-black flex items-baseline gap-1">
+                   {stats.totalGta.toLocaleString('pt-BR', { minimumFractionDigits: 0 })}
+                   <span className="text-[10px] opacity-40">kg</span>
+                </div>
+             </div>
+          </div>
+
+          <div className="mt-8 pt-6 border-t border-white/5 flex items-center gap-4 text-[9px] font-black uppercase tracking-widest opacity-40">
+             <div className="flex items-center gap-2">
+                <ClipboardCheck className="w-4 h-4" />
+                {stats.count} Lotes Processados no Período
+             </div>
+          </div>
+       </div>
+       <div className="absolute -right-10 -bottom-10 opacity-5 rotate-12 group-hover:scale-110 transition-transform duration-700">
+          <Factory className="w-64 h-64" />
+       </div>
+    </div>
+  );
+});
+
+// Sub-component for the chart to prevent re-renders on form input
+const SlaughterChart = React.memo(({ data, month, year, onMonthChange, onYearChange, months, years }: {
+  data: any[],
+  month: number,
+  year: number,
+  onMonthChange: (val: number) => void,
+  onYearChange: (val: number) => void,
+  months: string[],
+  years: number[]
+}) => {
+  return (
+    <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-200">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
+         <div className="flex items-center gap-3">
+            <div className="p-3 bg-blue-50 text-blue-600 rounded-2xl shadow-sm">
+               <TrendingUp className="w-6 h-6" />
+            </div>
+            <div>
+              <h3 className="text-sm font-black text-slate-800 uppercase tracking-tighter italic leading-none">Rendimento Diário (%)</h3>
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">Eficiência de Produção por Dia</p>
+            </div>
+         </div>
+
+         <div className="flex items-center gap-2 bg-slate-50 p-2 rounded-2xl border border-slate-100">
+           <select 
+             value={month} 
+             onChange={e => onMonthChange(Number(e.target.value))}
+             className="bg-transparent border-none text-[10px] font-black uppercase outline-none focus:ring-0 cursor-pointer text-slate-600 px-3"
+           >
+             {months.map((m, i) => <option key={m} value={i}>{m}</option>)}
+           </select>
+           <div className="w-[1px] h-4 bg-slate-200"></div>
+           <select 
+             value={year} 
+             onChange={e => onYearChange(Number(e.target.value))}
+             className="bg-transparent border-none text-[10px] font-black uppercase outline-none focus:ring-0 cursor-pointer text-slate-600 px-3"
+           >
+             {years.map(y => <option key={y} value={y}>{y}</option>)}
+           </select>
+         </div>
+      </div>
+
+      <div className="h-[300px] w-full">
+         <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={data}>
+               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+               <XAxis 
+                 dataKey="name" 
+                 axisLine={false} 
+                 tickLine={false} 
+                 tick={{fontSize: 9, fontWeight: 900, fill: '#94a3b8'}}
+                 label={{ value: 'Dia do Mês', position: 'insideBottom', offset: -5, fontSize: 8, fontWeight: 900, fill: '#cbd5e1' }}
+               />
+               <YAxis 
+                 axisLine={false} 
+                 tickLine={false} 
+                 tick={{fontSize: 9, fontWeight: 900, fill: '#94a3b8'}}
+                 domain={[0, 100]}
+                 tickFormatter={(val) => `${val}%`}
+               />
+               <Tooltip 
+                 cursor={{fill: '#f8fafc'}}
+                 contentStyle={{
+                   borderRadius: '20px',
+                   border: 'none',
+                   boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)',
+                   padding: '12px'
+                 }}
+                 itemStyle={{
+                   fontSize: '11px',
+                   fontWeight: 900,
+                   textTransform: 'uppercase'
+                 }}
+                 labelStyle={{
+                   fontSize: '10px',
+                   fontWeight: 900,
+                   textTransform: 'uppercase',
+                   color: '#64748b',
+                   marginBottom: '4px'
+                 }}
+               />
+               <Bar dataKey="yield" name="Rendimento" radius={[6, 6, 0, 0]}>
+                 {data.map((entry, index) => (
+                   <Cell key={`cell-${index}`} fill="#344434" />
+                 ))}
+               </Bar>
+            </BarChart>
+         </ResponsiveContainer>
+      </div>
+    </div>
+  );
+});
+
+// Sub-component for the history table to prevent re-renders on form input
+const SlaughterTable = React.memo(({ logs, users, hasPermission, onEdit, onDelete }: {
+  logs: SlaughterLog[],
+  users: User[],
+  hasPermission: boolean,
+  onEdit: (log: SlaughterLog) => void,
+  onDelete: (id: string) => void
+}) => {
+  return (
+    <div className="bg-white border border-slate-200 rounded-[2.5rem] overflow-hidden shadow-sm overflow-x-auto">
+      <table className="w-full text-left border-collapse min-w-[1000px]">
+        <thead className="bg-slate-50 text-[10px] font-black text-slate-400 uppercase tracking-widest">
+          <tr>
+            <th className="px-8 py-5">Lote / Produtor</th>
+            <th className="px-8 py-5">Pesos (Filé/Recep)</th>
+            <th className="px-8 py-5">Horário Abate</th>
+            <th className="px-8 py-5">Embalado (kg)</th>
+            <th className="px-8 py-5">Registrado por</th>
+            {hasPermission && <th className="px-8 py-5 text-center">Ações</th>}
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-slate-100">
+          {logs.map(log => {
+            const user = users.find(u => u.id === log.userId);
+            return (
+              <tr key={log.id} className="hover:bg-slate-50/50 transition-colors group">
+                <td className="px-8 py-6">
+                  <div className="font-black text-slate-800 uppercase tracking-tighter italic leading-none">{log.slaughterBatch || 'N/A'}</div>
+                  <div className="text-[10px] font-bold text-slate-400 mt-1 uppercase tracking-widest">{log.producer || 'Desconhecido'}</div>
+                  <div className="flex items-center gap-1 mt-2 text-[10px] text-slate-400 font-bold">
+                    <Calendar className="w-3 h-3" /> {log.date ? format(parseISO(log.date), 'dd/MM/yyyy') : '--/--/----'}
+                  </div>
+                </td>
+                <td className="px-8 py-6">
+                  <div className="flex flex-col gap-1">
+                    <div className="flex items-center gap-2">
+                       <span className="text-[9px] font-black text-slate-400 uppercase w-10">FILÉ:</span>
+                       <span className="text-xs font-black text-slate-800">{(log.gtaWeight || 0).toFixed(2)}kg</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                       <span className="text-[9px] font-black text-slate-400 uppercase w-10">RECEP:</span>
+                       <span className="text-xs font-black text-emerald-600">{(log.receptionWeight || 0).toFixed(2)}kg</span>
+                    </div>
+                  </div>
+                </td>
+                <td className="px-8 py-6 text-xs font-bold text-slate-600">
+                  <div className="flex items-center gap-2">
+                     <Clock className="w-3 h-3 text-slate-300" />
+                     <span>{log.startTime || '--:--'} às {log.endTime || '--:--'}</span>
+                  </div>
+                  <div className="text-[9px] font-black text-slate-400 uppercase mt-1">ROM: {log.packingList ? `${log.packingList} kg` : 'N/A'}</div>
+                </td>
+                <td className="px-8 py-6">
+                  <div className="font-black text-blue-600 text-xs">{log.packedQuantity ? `${log.packedQuantity} kg` : '---'}</div>
+                  {log.receptionWeight > 0 && (
+                    <div className="text-[10px] font-black text-emerald-600 mt-1 uppercase tracking-widest">
+                      Rend: {((log.packedQuantity / log.receptionWeight) * 100).toFixed(1)}%
+                    </div>
+                  )}
+                  <div className="text-[9px] font-black text-slate-400 uppercase mt-1">LOTE EMB: {log.packagingBatch || 'N/A'}</div>
+                </td>
+                <td className="px-8 py-6">
+                  <div className="flex items-center gap-2 text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                     <UserIcon className="w-3 h-3" /> @{user?.username || 'desconhecido'}
+                  </div>
+                </td>
+                {hasPermission && (
+                  <td className="px-8 py-6 text-center">
+                    <div className="flex justify-center gap-2">
+                      <button onClick={() => onEdit(log)} className="p-3 text-slate-300 hover:text-amber-500 hover:bg-amber-50 rounded-2xl transition-all"><Edit3 className="w-4 h-4" /></button>
+                      <button onClick={() => onDelete(log.id)} className="p-3 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-2xl transition-all"><Trash2 className="w-4 h-4" /></button>
+                    </div>
+                  </td>
+                )}
+              </tr>
+            );
+          })}
+          {logs.length === 0 && (
+            <tr>
+              <td colSpan={6} className="px-8 py-20 text-center">
+                <Factory className="w-12 h-12 text-slate-200 mx-auto mb-4" />
+                <p className="text-slate-400 font-black uppercase tracking-widest text-[10px]">Nenhum registro encontrado para este período.</p>
+              </td>
+            </tr>
+          )}
+        </tbody>
+      </table>
+    </div>
+  );
+});
+
 const SlaughterHouse: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [filterStartDate, setFilterStartDate] = useState('');
@@ -64,7 +333,7 @@ const SlaughterHouse: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     return { totalGta, totalRecep, totalPacked, yieldPercentage, count: filtered.length };
   }, [state.slaughterLogs, summaryStartDate, summaryEndDate]);
 
-  // Dados para o gráfico de rendimento diário
+  // Dados para o gráfico de rendimento diário - Otimizado
   const dailyYieldData = useMemo(() => {
     const baseDate = new Date(chartYear, chartMonth, 1);
     const start = startOfMonth(baseDate);
@@ -72,9 +341,20 @@ const SlaughterHouse: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     const days = eachDayOfInterval({ start, end });
 
     const logs = Array.isArray(state.slaughterLogs) ? state.slaughterLogs : [];
+    
+    // Agrupar logs por data para busca O(1)
+    const logsByDate = new Map<string, SlaughterLog[]>();
+    logs.forEach(log => {
+      if (!log.date) return;
+      if (!logsByDate.has(log.date)) {
+        logsByDate.set(log.date, []);
+      }
+      logsByDate.get(log.date)!.push(log);
+    });
 
     return days.map(day => {
-      const dayLogs = logs.filter(log => isSameDay(parseISO(log.date), day));
+      const dateKey = format(day, 'yyyy-MM-dd');
+      const dayLogs = logsByDate.get(dateKey) || [];
       
       const dayRecep = dayLogs.reduce((acc, l) => acc + (l.receptionWeight || 0), 0);
       const dayPacked = dayLogs.reduce((acc, l) => acc + (l.packedQuantity || 0), 0);
@@ -125,7 +405,7 @@ const SlaughterHouse: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       
       onUpdate({
         ...state,
-        slaughterLogs: updatedLogs
+        slaughterLogs: updatedLogs.map(l => l.id === editingId ? { ...l, updatedAt: Date.now() } : l)
       });
       setEditingId(null);
     } else {
@@ -142,7 +422,8 @@ const SlaughterHouse: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
         packedQuantity: Number(formData.packedQuantity) || 0,
         packagingBatch: formData.packagingBatch,
         userId: currentUser.id,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        updatedAt: Date.now()
       };
       
       onUpdate({ 
@@ -232,161 +513,24 @@ const SlaughterHouse: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
   return (
     <div className="space-y-8 pb-24">
       {/* Quadro de Resultados Finais - Consolidado */}
-      <div className="bg-[#344434] p-8 rounded-[2.5rem] text-[#e4e4d4] shadow-2xl shadow-black/20 relative overflow-hidden group border border-white/5">
-         <div className="relative z-10">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8">
-               <div>
-                  <h3 className="text-[10px] font-black uppercase tracking-[0.3em] mb-2 opacity-60">Inteligência de Abate</h3>
-                  <h2 className="text-3xl font-black uppercase italic tracking-tighter leading-none">Resultados Finais</h2>
-               </div>
-               
-               {/* Seletor de Período do Quadro */}
-               <div className="bg-white/10 backdrop-blur-md p-4 rounded-2xl border border-white/10 flex flex-col sm:flex-row items-center gap-3">
-                  <div className="flex items-center gap-2">
-                     <Calendar className="w-4 h-4 opacity-50" />
-                     <span className="text-[9px] font-black uppercase tracking-widest opacity-60">Apuração:</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                     <input 
-                        type="date" 
-                        value={summaryStartDate} 
-                        onChange={e => setSummaryStartDate(e.target.value)}
-                        className="bg-transparent border-none text-[11px] font-black uppercase outline-none focus:ring-0 cursor-pointer text-white"
-                     />
-                     <span className="opacity-30">/</span>
-                     <input 
-                        type="date" 
-                        value={summaryEndDate} 
-                        onChange={e => setSummaryEndDate(e.target.value)}
-                        className="bg-transparent border-none text-[11px] font-black uppercase outline-none focus:ring-0 cursor-pointer text-white"
-                     />
-                  </div>
-               </div>
-            </div>
-
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-8">
-               <div className="space-y-2 border-l-2 border-white/10 pl-6">
-                  <div className="text-[9px] font-black opacity-40 uppercase tracking-widest">Total Recepção</div>
-                  <div className="text-2xl font-black flex items-baseline gap-1">
-                     {slaughterStats.totalRecep.toLocaleString('pt-BR', { minimumFractionDigits: 0 })}
-                     <span className="text-[10px] opacity-40">kg</span>
-                  </div>
-               </div>
-               <div className="space-y-2 border-l-2 border-emerald-500/30 pl-6">
-                  <div className="text-[9px] font-black opacity-40 uppercase tracking-widest">Total Embalado</div>
-                  <div className="text-2xl font-black text-emerald-400 flex items-baseline gap-1">
-                     {slaughterStats.totalPacked.toLocaleString('pt-BR', { minimumFractionDigits: 0 })}
-                     <span className="text-[10px] opacity-40">kg</span>
-                  </div>
-               </div>
-               <div className="space-y-2 border-l-2 border-blue-500/30 pl-6">
-                  <div className="text-[9px] font-black opacity-40 uppercase tracking-widest">Rendimento</div>
-                  <div className="text-2xl font-black text-blue-300 flex items-baseline gap-1">
-                     {slaughterStats.yieldPercentage.toFixed(1)}
-                     <span className="text-[10px] opacity-40">%</span>
-                  </div>
-               </div>
-               <div className="space-y-2 border-l-2 border-white/10 pl-6">
-                  <div className="text-[9px] font-black opacity-40 uppercase tracking-widest">Total Filé Congelado</div>
-                  <div className="text-2xl font-black flex items-baseline gap-1">
-                     {slaughterStats.totalGta.toLocaleString('pt-BR', { minimumFractionDigits: 0 })}
-                     <span className="text-[10px] opacity-40">kg</span>
-                  </div>
-               </div>
-            </div>
-
-            <div className="mt-8 pt-6 border-t border-white/5 flex items-center gap-4 text-[9px] font-black uppercase tracking-widest opacity-40">
-               <div className="flex items-center gap-2">
-                  <ClipboardCheck className="w-4 h-4" />
-                  {slaughterStats.count} Lotes Processados no Período
-               </div>
-            </div>
-         </div>
-         <div className="absolute -right-10 -bottom-10 opacity-5 rotate-12 group-hover:scale-110 transition-transform duration-700">
-            <Factory className="w-64 h-64" />
-         </div>
-      </div>
+      <SlaughterSummary 
+        stats={slaughterStats} 
+        startDate={summaryStartDate} 
+        endDate={summaryEndDate} 
+        onStartDateChange={setSummaryStartDate} 
+        onEndDateChange={setSummaryEndDate} 
+      />
 
       {/* Gráfico de Rendimento Diário */}
-      <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-200">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
-           <div className="flex items-center gap-3">
-              <div className="p-3 bg-blue-50 text-blue-600 rounded-2xl shadow-sm">
-                 <TrendingUp className="w-6 h-6" />
-              </div>
-              <div>
-                <h3 className="text-sm font-black text-slate-800 uppercase tracking-tighter italic leading-none">Rendimento Diário (%)</h3>
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">Eficiência de Produção por Dia</p>
-              </div>
-           </div>
-
-           <div className="flex items-center gap-2 bg-slate-50 p-2 rounded-2xl border border-slate-100">
-             <select 
-               value={chartMonth} 
-               onChange={e => setChartMonth(Number(e.target.value))}
-               className="bg-transparent border-none text-[10px] font-black uppercase outline-none focus:ring-0 cursor-pointer text-slate-600 px-3"
-             >
-               {months.map((m, i) => <option key={m} value={i}>{m}</option>)}
-             </select>
-             <div className="w-[1px] h-4 bg-slate-200"></div>
-             <select 
-               value={chartYear} 
-               onChange={e => setChartYear(Number(e.target.value))}
-               className="bg-transparent border-none text-[10px] font-black uppercase outline-none focus:ring-0 cursor-pointer text-slate-600 px-3"
-             >
-               {years.map(y => <option key={y} value={y}>{y}</option>)}
-             </select>
-           </div>
-        </div>
-
-        <div className="h-[300px] w-full">
-           <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={dailyYieldData}>
-                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                 <XAxis 
-                   dataKey="name" 
-                   axisLine={false} 
-                   tickLine={false} 
-                   tick={{fontSize: 9, fontWeight: 900, fill: '#94a3b8'}}
-                   label={{ value: 'Dia do Mês', position: 'insideBottom', offset: -5, fontSize: 8, fontWeight: 900, fill: '#cbd5e1' }}
-                 />
-                 <YAxis 
-                   axisLine={false} 
-                   tickLine={false} 
-                   tick={{fontSize: 9, fontWeight: 900, fill: '#94a3b8'}}
-                   domain={[0, 100]}
-                   tickFormatter={(val) => `${val}%`}
-                 />
-                 <Tooltip 
-                   cursor={{fill: '#f8fafc'}}
-                   contentStyle={{
-                     borderRadius: '20px',
-                     border: 'none',
-                     boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)',
-                     padding: '12px'
-                   }}
-                   itemStyle={{
-                     fontSize: '11px',
-                     fontWeight: 900,
-                     textTransform: 'uppercase'
-                   }}
-                   labelStyle={{
-                     fontSize: '10px',
-                     fontWeight: 900,
-                     textTransform: 'uppercase',
-                     color: '#64748b',
-                     marginBottom: '4px'
-                   }}
-                 />
-                 <Bar dataKey="yield" name="Rendimento" radius={[6, 6, 0, 0]}>
-                   {dailyYieldData.map((entry, index) => (
-                     <Cell key={`cell-${index}`} fill="#344434" />
-                   ))}
-                 </Bar>
-              </BarChart>
-           </ResponsiveContainer>
-        </div>
-      </div>
+      <SlaughterChart 
+        data={dailyYieldData} 
+        month={chartMonth} 
+        year={chartYear} 
+        onMonthChange={setChartMonth} 
+        onYearChange={setChartYear} 
+        months={months} 
+        years={years} 
+      />
 
       {saveSuccess && (
         <div className="fixed top-24 right-8 z-50 bg-emerald-600 text-white px-6 py-3 rounded-2xl shadow-2xl flex items-center gap-3 animate-bounce">
@@ -496,85 +640,13 @@ const SlaughterHouse: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
             </button>
           </div>
 
-          <div className="bg-white border border-slate-200 rounded-[2.5rem] overflow-hidden shadow-sm overflow-x-auto">
-            <table className="w-full text-left border-collapse min-w-[1000px]">
-              <thead className="bg-slate-50 text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                <tr>
-                  <th className="px-8 py-5">Lote / Produtor</th>
-                  <th className="px-8 py-5">Pesos (Filé/Recep)</th>
-                  <th className="px-8 py-5">Horário Abate</th>
-                  <th className="px-8 py-5">Embalado (kg)</th>
-                  <th className="px-8 py-5">Registrado por</th>
-                  {hasPermission && <th className="px-8 py-5 text-center">Ações</th>}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {filteredLogs.map(log => {
-                  const user = state.users.find(u => u.id === log.userId);
-                  return (
-                    <tr key={log.id} className="hover:bg-slate-50/50 transition-colors group">
-                      <td className="px-8 py-6">
-                        <div className="font-black text-slate-800 uppercase tracking-tighter italic leading-none">{log.slaughterBatch || 'N/A'}</div>
-                        <div className="text-[10px] font-bold text-slate-400 mt-1 uppercase tracking-widest">{log.producer || 'Desconhecido'}</div>
-                        <div className="flex items-center gap-1 mt-2 text-[10px] text-slate-400 font-bold">
-                          <Calendar className="w-3 h-3" /> {log.date ? format(parseISO(log.date), 'dd/MM/yyyy') : '--/--/----'}
-                        </div>
-                      </td>
-                      <td className="px-8 py-6">
-                        <div className="flex flex-col gap-1">
-                          <div className="flex items-center gap-2">
-                             <span className="text-[9px] font-black text-slate-400 uppercase w-10">FILÉ:</span>
-                             <span className="text-xs font-black text-slate-800">{(log.gtaWeight || 0).toFixed(2)}kg</span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                             <span className="text-[9px] font-black text-slate-400 uppercase w-10">RECEP:</span>
-                             <span className="text-xs font-black text-emerald-600">{(log.receptionWeight || 0).toFixed(2)}kg</span>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-8 py-6 text-xs font-bold text-slate-600">
-                        <div className="flex items-center gap-2">
-                           <Clock className="w-3 h-3 text-slate-300" />
-                           <span>{log.startTime || '--:--'} às {log.endTime || '--:--'}</span>
-                        </div>
-                        <div className="text-[9px] font-black text-slate-400 uppercase mt-1">ROM: {log.packingList ? `${log.packingList} kg` : 'N/A'}</div>
-                      </td>
-                      <td className="px-8 py-6">
-                        <div className="font-black text-blue-600 text-xs">{log.packedQuantity ? `${log.packedQuantity} kg` : '---'}</div>
-                        {log.receptionWeight > 0 && (
-                          <div className="text-[10px] font-black text-emerald-600 mt-1 uppercase tracking-widest">
-                            Rend: {((log.packedQuantity / log.receptionWeight) * 100).toFixed(1)}%
-                          </div>
-                        )}
-                        <div className="text-[9px] font-black text-slate-400 uppercase mt-1">LOTE EMB: {log.packagingBatch || 'N/A'}</div>
-                      </td>
-                      <td className="px-8 py-6">
-                        <div className="flex items-center gap-2 text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                           <UserIcon className="w-3 h-3" /> @{user?.username || 'desconhecido'}
-                        </div>
-                      </td>
-                      {hasPermission && (
-                        <td className="px-8 py-6 text-center">
-                          <div className="flex justify-center gap-2">
-                            <button onClick={() => startEdit(log)} className="p-3 text-slate-300 hover:text-amber-500 hover:bg-amber-50 rounded-2xl transition-all"><Edit3 className="w-4 h-4" /></button>
-                            <button onClick={() => removeLog(log.id)} className="p-3 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-2xl transition-all"><Trash2 className="w-4 h-4" /></button>
-                          </div>
-                        </td>
-                      )}
-                    </tr>
-                  );
-                })}
-                {filteredLogs.length === 0 && (
-                  <tr>
-                    <td colSpan={6} className="px-8 py-20 text-center">
-                      <Factory className="w-12 h-12 text-slate-200 mx-auto mb-4" />
-                      <p className="text-slate-400 font-black uppercase tracking-widest text-[10px]">Nenhum registro encontrado para este período.</p>
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+          <SlaughterTable 
+            logs={filteredLogs} 
+            users={state.users} 
+            hasPermission={hasPermission} 
+            onEdit={startEdit} 
+            onDelete={removeLog} 
+          />
         </div>
       </div>
     </div>

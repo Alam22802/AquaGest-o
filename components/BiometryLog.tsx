@@ -69,7 +69,8 @@ const BiometryLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
             cageId: formData.cageId, 
             batchId: formBatchId || log.batchId,
             averageWeight: Number(formData.averageWeight), 
-            date: formData.date 
+            date: formData.date,
+            updatedAt: Date.now()
           } : log
         )
       });
@@ -82,7 +83,8 @@ const BiometryLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
         batchId: cage?.batchId,
         averageWeight: Number(formData.averageWeight),
         date: formData.date,
-        userId: currentUser.id
+        userId: currentUser.id,
+        updatedAt: Date.now()
       };
       onUpdate({ ...state, biometryLogs: [newLog, ...state.biometryLogs] });
     }

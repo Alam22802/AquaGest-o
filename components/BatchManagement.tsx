@@ -39,7 +39,8 @@ const BatchManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
           initialQuantity: Number(formData.initialQuantity),
           initialUnitWeight: Number(formData.initialUnitWeight),
           protocolId: formData.protocolId,
-          expectedHarvestDate: formData.expectedHarvestDate || undefined
+          expectedHarvestDate: formData.expectedHarvestDate || undefined,
+          updatedAt: Date.now()
         } : b
       );
       onUpdate({ ...state, batches: updatedBatches });
@@ -52,7 +53,8 @@ const BatchManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
         initialQuantity: Number(formData.initialQuantity),
         initialUnitWeight: Number(formData.initialUnitWeight),
         protocolId: formData.protocolId,
-        expectedHarvestDate: formData.expectedHarvestDate || undefined
+        expectedHarvestDate: formData.expectedHarvestDate || undefined,
+        updatedAt: Date.now()
       };
       onUpdate({ ...state, batches: [...state.batches, newBatch] });
     }

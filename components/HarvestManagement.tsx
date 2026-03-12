@@ -93,7 +93,8 @@ const HarvestManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
         initialFishCount: selectedCage.initialFishCount,
         date,
         userId: currentUser.id,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        updatedAt: Date.now()
       };
 
       // Update state: add harvest log and clear cage
@@ -105,7 +106,8 @@ const HarvestManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
           status: 'Disponível' as const,
           harvestDate: date,
           maintenanceStartDate: undefined,
-          maintenanceEndDate: undefined
+          maintenanceEndDate: undefined,
+          updatedAt: Date.now()
         } : c
       );
 

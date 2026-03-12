@@ -23,13 +23,14 @@ const LineManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     if (editingId) {
       onUpdate({
         ...state,
-        lines: state.lines.map(l => l.id === editingId ? { ...l, name: name.trim() } : l)
+        lines: state.lines.map(l => l.id === editingId ? { ...l, name: name.trim(), updatedAt: Date.now() } : l)
       });
       setEditingId(null);
     } else {
       const newLine: Line = {
         id: crypto.randomUUID(),
-        name: name.trim()
+        name: name.trim(),
+        updatedAt: Date.now()
       };
       onUpdate({
         ...state,

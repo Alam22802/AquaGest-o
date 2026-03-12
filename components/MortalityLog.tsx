@@ -125,7 +125,7 @@ const MortalityLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     if (editingId) {
       onUpdate({
         ...state,
-        mortalityLogs: state.mortalityLogs.map(m => m.id === editingId ? { ...m, cageId: formData.cageId, batchId: formBatchId, count: Number(formData.count), date: formData.date } : m)
+        mortalityLogs: state.mortalityLogs.map(m => m.id === editingId ? { ...m, cageId: formData.cageId, batchId: formBatchId, count: Number(formData.count), date: formData.date, updatedAt: Date.now() } : m)
       });
       setEditingId(null);
     } else {
@@ -135,7 +135,8 @@ const MortalityLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
         batchId: formBatchId,
         count: Number(formData.count),
         date: formData.date,
-        userId: currentUser.id
+        userId: currentUser.id,
+        updatedAt: Date.now()
       };
       onUpdate({ ...state, mortalityLogs: [newLog, ...state.mortalityLogs] });
     }

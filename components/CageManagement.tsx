@@ -61,7 +61,8 @@ const CageManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
           initialFishCount: Number(formData.initialFishCount),
           settlementDate: formData.settlementDate,
           harvestDate: formData.harvestDate,
-          status: 'Ocupada' as const
+          status: 'Ocupada' as const,
+          updatedAt: Date.now()
         };
       }
       if (editingId && c.id === editingId && c.id !== formData.cageId) {
@@ -71,7 +72,8 @@ const CageManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
           initialFishCount: undefined,
           settlementDate: undefined,
           harvestDate: undefined,
-          status: 'Disponível' as const
+          status: 'Disponível' as const,
+          updatedAt: Date.now()
         };
       }
       return c;

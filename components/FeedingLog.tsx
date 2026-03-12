@@ -159,6 +159,7 @@ const FeedingLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
           feedTypeId: formData.feedTypeId,
           amount: amountNum,
           timestamp: `${formData.date}T${formData.time}:00`,
+          updatedAt: Date.now()
         } : l
       );
 
@@ -172,7 +173,7 @@ const FeedingLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
         if (f.id === formData.feedTypeId) {
           newStock -= amountNum;
         }
-        return { ...f, totalStock: newStock };
+        return { ...f, totalStock: newStock, updatedAt: Date.now() };
       });
 
       onUpdate({ ...state, feedingLogs: updatedLogs, feedTypes: updatedFeeds });
@@ -186,11 +187,12 @@ const FeedingLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
         feedTypeId: formData.feedTypeId,
         amount: amountNum,
         timestamp: `${formData.date}T${formData.time}:00`,
-        userId: currentUser.id
+        userId: currentUser.id,
+        updatedAt: Date.now()
       };
       
       const updatedFeeds = state.feedTypes.map(f => {
-        if (f.id === formData.feedTypeId) return { ...f, totalStock: f.totalStock - amountNum };
+        if (f.id === formData.feedTypeId) return { ...f, totalStock: f.totalStock - amountNum, updatedAt: Date.now() };
         return f;
       });
 

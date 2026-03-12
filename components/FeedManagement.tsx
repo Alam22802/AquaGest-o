@@ -142,7 +142,7 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
 
     const updatedFeeds = state.feedTypes.map(f => {
       if (f.id === entryData.feedId) {
-        return { ...f, totalStock: f.totalStock + amountGrams };
+        return { ...f, totalStock: f.totalStock + amountGrams, updatedAt: Date.now() };
       }
       return f;
     });
@@ -153,7 +153,8 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       amount: amountGrams,
       type: 'Entrada',
       timestamp: `${entryData.date}T${format(new Date(), 'HH:mm:ss')}`,
-      userId: currentUser.id
+      userId: currentUser.id,
+      updatedAt: Date.now()
     };
 
     onUpdate({ 

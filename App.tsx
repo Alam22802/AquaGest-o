@@ -143,8 +143,8 @@ const App: React.FC = () => {
       // Debounce saving
       if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
       
+      isSavingRef.current = true; // Mark as saving/dirty immediately to protect local state
       saveTimeoutRef.current = setTimeout(() => {
-        isSavingRef.current = true;
         const configToUse = currentUser?.supabaseConfig || state.supabaseConfig;
         
         saveState(state, configToUse).then(() => {
@@ -196,85 +196,92 @@ const App: React.FC = () => {
   }, [activeTab, currentUser]);
 
   const handleStateUpdate = (newState: AppState) => {
-    if (!state) return;
+    setState(prev => {
+      if (!prev) return newState;
 
-    // Optimized timestamp injection: only for items that actually changed
-    // and only if the list itself is different by reference
-    const injectTimestamps = (oldList: any[], newList: any[]) => {
-      if (oldList === newList) return oldList;
-      
-      const oldMap = new Map(oldList.map(i => [i.id, i]));
-      return newList.map(item => {
-        const oldItem = oldMap.get(item.id);
-        // Shallow comparison is much faster than JSON.stringify
-        if (!oldItem) return { ...item, updatedAt: Date.now() };
+      // Optimized timestamp injection: only for items that actually changed
+      const injectTimestamps = (oldList: any[], newList: any[]) => {
+        if (oldList === newList) return oldList;
         
-        let hasChanged = false;
-        const keys = Object.keys(item) as (keyof typeof item)[];
-        for (const key of keys) {
-          if (key === 'updatedAt') continue;
-          if (item[key] !== oldItem[key]) {
-            hasChanged = true;
-            break;
+        const oldMap = new Map((oldList || []).map(i => [i.id, i]));
+        let listChanged = false;
+        
+        const updatedList = (newList || []).map(item => {
+          const oldItem = oldMap.get(item.id);
+          if (!oldItem) {
+            listChanged = true;
+            return { ...item, updatedAt: Date.now() };
           }
-        }
-        
-        if (hasChanged) {
-          return { ...item, updatedAt: Date.now() };
-        }
-        return oldItem; // Keep old reference if unchanged
-      });
-    };
+          
+          let hasChanged = false;
+          const keys = Object.keys(item) as (keyof typeof item)[];
+          for (const key of keys) {
+            if (key === 'updatedAt') continue;
+            if ((item as any)[key] !== (oldItem as any)[key]) {
+              hasChanged = true;
+              break;
+            }
+          }
+          
+          if (hasChanged) {
+            listChanged = true;
+            return { ...item, updatedAt: Date.now() };
+          }
+          return oldItem;
+        });
 
-    const stateWithTimestamps: AppState = {
-      ...newState,
-      users: injectTimestamps(state.users || [], newState.users || []),
-      lines: injectTimestamps(state.lines || [], newState.lines || []),
-      batches: injectTimestamps(state.batches || [], newState.batches || []),
-      cages: injectTimestamps(state.cages || [], newState.cages || []),
-      feedTypes: injectTimestamps(state.feedTypes || [], newState.feedTypes || []),
-      feedingLogs: injectTimestamps(state.feedingLogs || [], newState.feedingLogs || []),
-      feedStockLogs: injectTimestamps(state.feedStockLogs || [], newState.feedStockLogs || []),
-      mortalityLogs: injectTimestamps(state.mortalityLogs || [], newState.mortalityLogs || []),
-      biometryLogs: injectTimestamps(state.biometryLogs || [], newState.biometryLogs || []),
-      slaughterLogs: injectTimestamps(state.slaughterLogs || [], newState.slaughterLogs || []),
-      harvestLogs: injectTimestamps(state.harvestLogs || [], newState.harvestLogs || []),
-      protocols: injectTimestamps(state.protocols || [], newState.protocols || []),
-      portfolios: injectTimestamps(state.portfolios || [], newState.portfolios || []),
-      capexProjects: injectTimestamps(state.capexProjects || [], newState.capexProjects || []),
-      capexInvoices: injectTimestamps(state.capexInvoices || [], newState.capexInvoices || []),
-    };
+        return listChanged ? updatedList : oldList;
+      };
 
-    const findDeleted = (oldList: any[], newList: any[]) => {
-      if (!oldList || !newList || oldList === newList) return [];
-      const newIds = new Set(newList.map(i => i.id));
-      return oldList.filter(i => i && i.id && !newIds.has(i.id)).map(i => i.id);
-    };
+      const stateWithTimestamps: AppState = {
+        ...newState,
+        users: injectTimestamps(prev.users, newState.users),
+        lines: injectTimestamps(prev.lines, newState.lines),
+        batches: injectTimestamps(prev.batches, newState.batches),
+        cages: injectTimestamps(prev.cages, newState.cages),
+        feedTypes: injectTimestamps(prev.feedTypes, newState.feedTypes),
+        feedingLogs: injectTimestamps(prev.feedingLogs, newState.feedingLogs),
+        feedStockLogs: injectTimestamps(prev.feedStockLogs, newState.feedStockLogs),
+        mortalityLogs: injectTimestamps(prev.mortalityLogs, newState.mortalityLogs),
+        biometryLogs: injectTimestamps(prev.biometryLogs, newState.biometryLogs),
+        slaughterLogs: injectTimestamps(prev.slaughterLogs, newState.slaughterLogs),
+        harvestLogs: injectTimestamps(prev.harvestLogs || [], newState.harvestLogs || []),
+        protocols: injectTimestamps(prev.protocols, newState.protocols),
+        portfolios: injectTimestamps(prev.portfolios, newState.portfolios),
+        capexProjects: injectTimestamps(prev.capexProjects, newState.capexProjects),
+        capexInvoices: injectTimestamps(prev.capexInvoices, newState.capexInvoices),
+      };
 
-    const deleted = [
-      ...findDeleted(state.users || [], stateWithTimestamps.users),
-      ...findDeleted(state.lines || [], stateWithTimestamps.lines),
-      ...findDeleted(state.batches || [], stateWithTimestamps.batches),
-      ...findDeleted(state.cages || [], stateWithTimestamps.cages),
-      ...findDeleted(state.feedTypes || [], stateWithTimestamps.feedTypes),
-      ...findDeleted(state.feedingLogs || [], stateWithTimestamps.feedingLogs),
-      ...findDeleted(state.feedStockLogs || [], stateWithTimestamps.feedStockLogs),
-      ...findDeleted(state.mortalityLogs || [], stateWithTimestamps.mortalityLogs),
-      ...findDeleted(state.biometryLogs || [], stateWithTimestamps.biometryLogs),
-      ...findDeleted(state.slaughterLogs || [], stateWithTimestamps.slaughterLogs),
-      ...findDeleted(state.harvestLogs || [], stateWithTimestamps.harvestLogs),
-      ...findDeleted(state.protocols || [], stateWithTimestamps.protocols),
-      ...findDeleted(state.portfolios || [], stateWithTimestamps.portfolios),
-      ...findDeleted(state.capexProjects || [], stateWithTimestamps.capexProjects),
-      ...findDeleted(state.capexInvoices || [], stateWithTimestamps.capexInvoices),
-    ];
+      const findDeleted = (oldList: any[], newList: any[]) => {
+        if (!oldList || !newList || oldList === newList) return [];
+        const newIds = new Set(newList.map(i => i.id));
+        return oldList.filter(i => i && i.id && !newIds.has(i.id)).map(i => i.id);
+      };
 
-    if (deleted.length > 0) {
-      const updatedDeletedIds = Array.from(new Set([...(state.deletedIds || []), ...deleted]));
-      setState({ ...stateWithTimestamps, deletedIds: updatedDeletedIds });
-    } else {
-      setState(stateWithTimestamps);
-    }
+      const deleted = [
+        ...findDeleted(prev.users, stateWithTimestamps.users),
+        ...findDeleted(prev.lines, stateWithTimestamps.lines),
+        ...findDeleted(prev.batches, stateWithTimestamps.batches),
+        ...findDeleted(prev.cages, stateWithTimestamps.cages),
+        ...findDeleted(prev.feedTypes, stateWithTimestamps.feedTypes),
+        ...findDeleted(prev.feedingLogs, stateWithTimestamps.feedingLogs),
+        ...findDeleted(prev.feedStockLogs, stateWithTimestamps.feedStockLogs),
+        ...findDeleted(prev.mortalityLogs, stateWithTimestamps.mortalityLogs),
+        ...findDeleted(prev.biometryLogs, stateWithTimestamps.biometryLogs),
+        ...findDeleted(prev.slaughterLogs, stateWithTimestamps.slaughterLogs),
+        ...findDeleted(prev.harvestLogs || [], stateWithTimestamps.harvestLogs || []),
+        ...findDeleted(prev.protocols, stateWithTimestamps.protocols),
+        ...findDeleted(prev.portfolios, stateWithTimestamps.portfolios),
+        ...findDeleted(prev.capexProjects, stateWithTimestamps.capexProjects),
+        ...findDeleted(prev.capexInvoices, stateWithTimestamps.capexInvoices),
+      ];
+
+      if (deleted.length > 0) {
+        const updatedDeletedIds = Array.from(new Set([...(prev.deletedIds || []), ...deleted]));
+        return { ...stateWithTimestamps, deletedIds: updatedDeletedIds };
+      }
+      return stateWithTimestamps;
+    });
   };
 
   const handleLogin = (user: User) => {
