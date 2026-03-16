@@ -13,6 +13,10 @@ interface Props {
 
 const BatchManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
   const [activeSubTab, setActiveSubTab] = useState<'inventory' | 'harvest'>('inventory');
+  const [selectedPlanningBatchId, setSelectedPlanningBatchId] = useState('');
+  const [selectedPlanningCageIds, setSelectedPlanningCageIds] = useState<string[]>([]);
+  const [lastFeeding, setLastFeeding] = useState('');
+  const [plannedHarvestDate, setPlannedHarvestDate] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     name: '',
@@ -279,6 +283,37 @@ const BatchManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     });
   }, [state.batches, state.cages, state.mortalityLogs, state.biometryLogs, state.protocols, state.harvestLogs]);
 
+  const planningCages = useMemo(() => {
+    if (!selectedPlanningBatchId) return [];
+    
+    const batch = batchStats.find(b => b.id === selectedPlanningBatchId);
+    if (!batch) return [];
+
+    return batch.batchCages.map(cage => {
+      const mortality = state.mortalityLogs
+        .filter(m => m.cageId === cage.id)
+        .reduce((acc, curr) => acc + curr.count, 0);
+      
+      const currentCount = (cage.initialFishCount || 0) - mortality;
+      const biomass = (currentCount * batch.currentAvgWeight) / 1000;
+
+      return {
+        ...cage,
+        mortality,
+        currentCount,
+        biomass
+      };
+    }).sort((a, b) => b.mortality - a.mortality);
+  }, [selectedPlanningBatchId, batchStats, state.mortalityLogs]);
+
+  const selectedPlanningCagesData = useMemo(() => {
+    return planningCages.filter(c => selectedPlanningCageIds.includes(c.id));
+  }, [planningCages, selectedPlanningCageIds]);
+
+  const totalPlanningBiomass = useMemo(() => {
+    return selectedPlanningCagesData.reduce((acc, curr) => acc + curr.biomass, 0);
+  }, [selectedPlanningCagesData]);
+
   return (
     <div className="space-y-8 pb-20">
       {/* Sub-tabs */}
@@ -369,7 +404,162 @@ const BatchManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
             )}
           </div>
 
-          <div className="lg:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="lg:col-span-2 space-y-8">
+            {/* Indicação de Gaiola Box */}
+            <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-200">
+              <div className="flex items-center gap-3 mb-8">
+                <div className="p-3 bg-blue-50 rounded-2xl">
+                  <ShoppingCart className="w-6 h-6 text-blue-600" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-black text-slate-800 uppercase tracking-tighter italic">Indicação de Gaiolas para Despesca</h3>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Planejamento e Programação por Gaiola</p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div className="space-y-6">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-widest">Selecionar Lote</label>
+                    <select 
+                      className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none focus:ring-2 focus:ring-blue-500/10 text-sm"
+                      value={selectedPlanningBatchId}
+                      onChange={e => {
+                        setSelectedPlanningBatchId(e.target.value);
+                        setSelectedPlanningCageIds([]);
+                      }}
+                    >
+                      <option value="">Escolher Lote para Planejar</option>
+                      {batchStats.filter(b => !b.isFinalized).map(b => (
+                        <option key={b.id} value={b.id}>{b.name} ({b.batchCages.length} gaiolas)</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {selectedPlanningBatchId && (
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between px-1">
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Gaiolas Disponíveis (Maior Mortalidade Primeiro)</label>
+                        <span className="text-[10px] font-black text-blue-600 uppercase bg-blue-50 px-2 py-1 rounded-lg">
+                          {planningCages.length} Total
+                        </span>
+                      </div>
+                      <div className="space-y-2 max-h-[300px] overflow-y-auto pr-2 scrollbar-hide">
+                        {planningCages.map(cage => (
+                          <button
+                            key={cage.id}
+                            onClick={() => {
+                              if (selectedPlanningCageIds.includes(cage.id)) {
+                                setSelectedPlanningCageIds(selectedPlanningCageIds.filter(id => id !== cage.id));
+                              } else {
+                                setSelectedPlanningCageIds([...selectedPlanningCageIds, cage.id]);
+                              }
+                            }}
+                            className={`w-full flex items-center justify-between p-4 rounded-2xl border transition-all ${
+                              selectedPlanningCageIds.includes(cage.id)
+                                ? 'bg-blue-50 border-blue-200 ring-2 ring-blue-500/10'
+                                : 'bg-white border-slate-100 hover:border-slate-200'
+                            }`}
+                          >
+                            <div className="flex items-center gap-3">
+                              <div className={`p-2 rounded-xl ${selectedPlanningCageIds.includes(cage.id) ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-400'}`}>
+                                {selectedPlanningCageIds.includes(cage.id) ? <CheckCircle2 className="w-4 h-4" /> : <Box className="w-4 h-4" />}
+                              </div>
+                              <div className="text-left">
+                                <span className="text-sm font-black text-slate-800 uppercase italic">{cage.name}</span>
+                                <div className="flex gap-2 mt-0.5">
+                                  <span className="text-[9px] font-black text-blue-600 uppercase bg-blue-50 px-1.5 py-0.5 rounded-md">{cage.model || 'Padrão'}</span>
+                                  <span className="text-[9px] font-bold text-slate-400 uppercase">Mortalidade: {cage.mortality}</span>
+                                  <span className="text-[9px] font-bold text-slate-400 uppercase">•</span>
+                                  <span className="text-[9px] font-bold text-slate-400 uppercase">{cage.currentCount} peixes</span>
+                                </div>
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <span className="text-xs font-black text-blue-600">{cage.biomass.toFixed(1)}kg</span>
+                              <p className="text-[9px] font-bold text-slate-400 uppercase">Est. Biomassa</p>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div className="space-y-6">
+                  {selectedPlanningCageIds.length > 0 ? (
+                    <div className="bg-slate-50 p-6 rounded-[2rem] border border-slate-100 space-y-6 animate-in fade-in slide-in-from-right-4">
+                      <div className="flex items-center justify-between pb-4 border-b border-slate-200">
+                        <h4 className="text-xs font-black text-slate-800 uppercase tracking-widest italic">Resumo da Seleção</h4>
+                        <span className="px-3 py-1 bg-blue-600 text-white text-[10px] font-black rounded-full uppercase">
+                          {selectedPlanningCageIds.length} Gaiolas
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="bg-white p-4 rounded-2xl border border-slate-100">
+                          <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">Biomassa Total</span>
+                          <span className="text-xl font-black text-blue-600 italic">{totalPlanningBiomass.toFixed(1)}kg</span>
+                        </div>
+                        <div className="bg-white p-4 rounded-2xl border border-slate-100">
+                          <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">Modelos Selecionados</span>
+                          <div className="flex flex-wrap gap-1 mt-1">
+                            {Array.from(new Set(selectedPlanningCagesData.map(c => c.model || 'Padrão'))).map(m => (
+                              <span key={m} className="px-2 py-0.5 bg-blue-50 text-[8px] font-black text-blue-600 rounded-md uppercase border border-blue-100">{m}</span>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="space-y-4 pt-4">
+                        <div className="space-y-2">
+                          <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-widest flex items-center gap-2">
+                            <Utensils className="w-3 h-3" /> Data/Hora Última Alimentação
+                          </label>
+                          <input 
+                            type="datetime-local"
+                            className="w-full px-4 py-3 bg-white border border-slate-200 rounded-2xl font-bold outline-none focus:ring-2 focus:ring-blue-500/10 text-xs"
+                            value={lastFeeding}
+                            onChange={e => setLastFeeding(e.target.value)}
+                          />
+                        </div>
+
+                        <div className="space-y-2">
+                          <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-widest flex items-center gap-2">
+                            <Calendar className="w-3 h-3" /> Data da Despesca
+                          </label>
+                          <input 
+                            type="date"
+                            className="w-full px-4 py-3 bg-white border border-slate-200 rounded-2xl font-bold outline-none focus:ring-2 focus:ring-blue-500/10 text-xs"
+                            value={plannedHarvestDate}
+                            onChange={e => setPlannedHarvestDate(e.target.value)}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="p-4 bg-amber-50 border border-amber-100 rounded-2xl flex items-start gap-3">
+                        <Info className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                        <p className="text-[9px] font-bold text-amber-700 uppercase leading-relaxed">
+                          Esta ferramenta é apenas para planejamento. Nenhuma alteração será salva permanentemente no banco de dados.
+                        </p>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="h-full min-h-[300px] flex flex-col items-center justify-center text-center p-8 bg-slate-50 rounded-[2rem] border border-dashed border-slate-200">
+                      <div className="p-4 bg-white rounded-full shadow-sm mb-4">
+                        <CheckSquare className="w-8 h-8 text-slate-300" />
+                      </div>
+                      <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Aguardando Seleção</h4>
+                      <p className="text-[9px] font-bold text-slate-400 uppercase leading-relaxed mt-2 max-w-[200px]">
+                        Selecione as gaiolas na lista ao lado para programar a despesca.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="lg:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-6">
             {batchStats.map(batch => {
               return (
                 <div key={batch.id} className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden hover:border-blue-200 transition-all">
@@ -500,9 +690,10 @@ const BatchManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
             })}
           </div>
         </div>
-      )}
-    </div>
-  );
+      </div>
+    )}
+  </div>
+);
 };
 
 export default BatchManagement;

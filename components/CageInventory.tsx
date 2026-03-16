@@ -15,6 +15,7 @@ const CageInventory: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
   const [filterStatus, setFilterStatus] = useState<CageStatus | 'Todos'>('Todos');
   const [formData, setFormData] = useState({
     name: '',
+    model: '6x6' as Cage['model'],
     length: '',
     width: '',
     depth: '',
@@ -80,17 +81,17 @@ const CageInventory: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       const endNum = parseInt(endNumStr);
       const padding = startNumStr.length;
 
-      if (prefix1.trim() === prefix2.trim() && startNum < endNum) {
+      if (prefix1.trim() === prefix2.trim() && startNum <= endNum) {
         const newCages: Cage[] = [];
         const prefix = prefix1;
 
         for (let i = startNum; i <= endNum; i++) {
           const sequentialName = `${prefix}${String(i).padStart(padding, '0')}`;
           
-          // Evitar duplicidade de nomes se desejar, mas aqui seguiremos a criação em massa
           newCages.push({
             id: crypto.randomUUID(),
             name: sequentialName,
+            model: formData.model,
             dimensions: {
               length: Number(formData.length),
               width: Number(formData.width),
@@ -98,7 +99,8 @@ const CageInventory: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
             },
             stockingDensity: Number(formData.stockingDensity),
             stockingCapacity: calculatedCapacity,
-            status: 'Disponível'
+            status: 'Disponível',
+            updatedAt: Date.now()
           });
         }
 
@@ -114,13 +116,15 @@ const CageInventory: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
         c.id === editingId ? {
           ...c,
           name: formData.name,
+          model: formData.model,
           dimensions: {
             length: Number(formData.length),
             width: Number(formData.width),
             depth: Number(formData.depth)
           },
           stockingDensity: Number(formData.stockingDensity),
-          stockingCapacity: calculatedCapacity
+          stockingCapacity: calculatedCapacity,
+          updatedAt: Date.now()
         } : c
       );
       onUpdate({ ...state, cages: updatedCages });
@@ -129,6 +133,7 @@ const CageInventory: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       const newCage: Cage = {
         id: crypto.randomUUID(),
         name: formData.name,
+        model: formData.model,
         dimensions: {
           length: Number(formData.length),
           width: Number(formData.width),
@@ -136,7 +141,8 @@ const CageInventory: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
         },
         stockingDensity: Number(formData.stockingDensity),
         stockingCapacity: calculatedCapacity,
-        status: 'Disponível'
+        status: 'Disponível',
+        updatedAt: Date.now()
       };
       onUpdate({ ...state, cages: [...state.cages, newCage] });
     }
@@ -148,7 +154,7 @@ const CageInventory: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     setEditingId(null);
     setSelectedIds([]);
     setFormData({
-      name: '', length: '', width: '', depth: '',
+      name: '', model: '6x6', length: '', width: '', depth: '',
       stockingDensity: '', stockingCapacity: ''
     });
   };
@@ -158,6 +164,7 @@ const CageInventory: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     setEditingId(cage.id);
     setFormData({
       name: cage.name,
+      model: cage.model || '6x6',
       length: cage.dimensions.length.toString(),
       width: cage.dimensions.width.toString(),
       depth: cage.dimensions.depth.toString(),
@@ -215,11 +222,9 @@ const CageInventory: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
   };
 
   const filterSummary = useMemo(() => {
-    if (filterStatus === 'Todos') return null;
-    
     const totalCapacity = filteredCages.reduce((acc, c) => acc + c.stockingCapacity, 0);
     const models = filteredCages.reduce((acc: Record<string, number>, c) => {
-      const modelKey = `${c.dimensions.length}x${c.dimensions.width}x${c.dimensions.depth}m`;
+      const modelKey = c.model || 'Não definido';
       acc[modelKey] = (acc[modelKey] || 0) + 1;
       return acc;
     }, {});
@@ -229,7 +234,7 @@ const CageInventory: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       models,
       count: filteredCages.length
     };
-  }, [filteredCages, filterStatus]);
+  }, [filteredCages]);
 
   const getStatusIcon = (status: CageStatus) => {
     switch (status) {
@@ -277,6 +282,21 @@ const CageInventory: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
             )}
 
             <form onSubmit={handleSave} className="space-y-4">
+              <div>
+                <label className="block text-[10px] font-black text-slate-400 uppercase mb-1 tracking-widest">Modelo da Gaiola</label>
+                <select 
+                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-indigo-500 font-bold text-sm"
+                  value={formData.model}
+                  onChange={(e) => setFormData({...formData, model: e.target.value as Cage['model']})}
+                >
+                  <option value="4x4">4x4</option>
+                  <option value="6x6">6x6</option>
+                  <option value="8x8">8x8</option>
+                  <option value="12x12">12x12</option>
+                  <option value="Circular">Circular</option>
+                </select>
+              </div>
+
               <div>
                 <label className="block text-[10px] font-black text-slate-400 uppercase mb-1 tracking-widest">Identificação</label>
                 <input 
@@ -373,25 +393,42 @@ const CageInventory: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
         </div>
 
         {filterSummary && (
-          <div className="bg-indigo-50 border border-indigo-100 rounded-2xl p-4 animate-in fade-in slide-in-from-top-2 duration-300">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-              <div className="flex items-center gap-3">
-                <div className={`p-2 rounded-xl border shadow-sm ${getStatusColor(filterStatus as CageStatus)}`}>
-                  {getStatusIcon(filterStatus as CageStatus)}
+          <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm animate-in fade-in slide-in-from-top-2 duration-300">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+              <div className="flex items-center gap-4">
+                <div className="p-4 bg-indigo-50 rounded-2xl text-indigo-600 shadow-inner">
+                  <LayoutDashboard className="w-6 h-6" />
                 </div>
                 <div>
-                  <h4 className="text-[11px] font-black text-indigo-900 uppercase tracking-widest">Resumo do Filtro: {filterStatus}</h4>
-                  <p className="text-[10px] font-bold text-indigo-600 uppercase mt-0.5">
-                    {filterSummary.count} gaiolas encontradas • Capacidade Total: {filterSummary.totalCapacity.toLocaleString()} un
-                  </p>
+                  <h4 className="text-xs font-black text-slate-400 uppercase tracking-[0.2em] mb-1">Resumo do Inventário</h4>
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-3xl font-black text-slate-800 tracking-tighter">{filterSummary.count}</span>
+                    <span className="text-xs font-bold text-slate-400 uppercase">Gaiolas Filtradas</span>
+                  </div>
                 </div>
               </div>
-              <div className="flex flex-wrap gap-2">
-                {Object.entries(filterSummary.models).map(([model, count]) => (
-                  <div key={model} className="px-2 py-1 bg-white border border-indigo-100 rounded-lg text-[9px] font-black text-indigo-700 uppercase">
-                    {model}: {count} un
-                  </div>
-                ))}
+
+              <div className="h-12 w-px bg-slate-100 hidden md:block" />
+
+              <div>
+                <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Capacidade Total</h4>
+                <div className="text-xl font-black text-indigo-600 tracking-tight">
+                  {filterSummary.totalCapacity.toLocaleString()} <span className="text-xs">unidades</span>
+                </div>
+              </div>
+
+              <div className="h-12 w-px bg-slate-100 hidden md:block" />
+
+              <div className="flex-1">
+                <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Distribuição por Modelo</h4>
+                <div className="flex flex-wrap gap-2">
+                  {Object.entries(filterSummary.models).map(([model, count]) => (
+                    <div key={model} className="px-3 py-1.5 bg-slate-50 border border-slate-100 rounded-xl text-[10px] font-black text-slate-600 uppercase flex items-center gap-2">
+                      <span className="w-1.5 h-1.5 rounded-full bg-indigo-400" />
+                      {model}: <span className="text-indigo-600">{count}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
           </div>
@@ -438,7 +475,10 @@ const CageInventory: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                     {selectedIds.includes(cage.id) && <Plus className="w-3 h-3 text-white rotate-45" />}
                   </div>
                   <Box className={`w-4 h-4 ${cage.status === 'Ocupada' ? 'text-blue-500' : 'text-slate-400'}`} />
-                  <span className="font-black text-slate-800 uppercase tracking-tighter">{cage.name}</span>
+                  <div>
+                    <span className="font-black text-slate-800 uppercase tracking-tighter block leading-none">{cage.name}</span>
+                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{cage.model || 'Padrão'}</span>
+                  </div>
                 </div>
                 {hasPermission && (
                   <div className="flex gap-1" onClick={e => e.stopPropagation()}>
