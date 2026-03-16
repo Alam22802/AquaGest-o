@@ -132,6 +132,12 @@ export interface SlaughterLog {
   endTime: string;
   packedQuantity: number;
   packagingBatch: string;
+  freightValue?: number;
+  fieldCondemnation?: number;
+  slaughterCondemnation?: number;
+  revenuePerKg?: number;
+  waterConsumption?: number;
+  energyConsumption?: number;
   userId: string;
   timestamp: string;
   updatedAt?: number;
@@ -140,7 +146,7 @@ export interface SlaughterLog {
 export interface SlaughterExpense {
   id: string;
   description: string;
-  category: 'Energia' | 'Água' | 'Manutenção' | 'Insumos' | 'Prestação de Serviços' | 'Salário' | 'Frete' | 'Outros';
+  category: 'Energia' | 'Água' | 'Manutenção' | 'Insumos' | 'Prestação de Serviços' | 'Salário' | 'Outros';
   value: number;
   date: string;
   userId: string;
@@ -149,11 +155,23 @@ export interface SlaughterExpense {
 
 export interface SlaughterEmployee {
   id: string;
+  registrationNumber: string;
   name: string;
   role: string;
   department: string;
   admissionDate: string;
   status: 'Ativo' | 'Inativo';
+  updatedAt?: number;
+}
+
+export interface SlaughterHREntry {
+  id: string;
+  employeeIds: string[];
+  type: 'Falta' | 'Atestado' | 'Acidente' | 'Turnover';
+  date: string;
+  days?: number;
+  description?: string;
+  userId: string;
   updatedAt?: number;
 }
 
@@ -286,6 +304,7 @@ export interface AppState {
   slaughterExpenses?: SlaughterExpense[];
   slaughterEmployees?: SlaughterEmployee[];
   slaughterHRIndicators?: SlaughterHRIndicator[];
+  slaughterHREntries?: SlaughterHREntry[];
   slaughterSupplyItems?: SlaughterSupplyItem[];
   slaughterSuppliers?: SlaughterSupplier[];
   slaughterSupplyRequests?: SlaughterSupplyRequest[];

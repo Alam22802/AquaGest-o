@@ -144,7 +144,6 @@ const SlaughterFinance: React.FC<Props> = ({ state, onUpdate, currentUser }) => 
                     <option value="Insumos">Insumos</option>
                     <option value="Prestação de Serviços">Prestação de Serviços</option>
                     <option value="Salário">Salário</option>
-                    <option value="Frete">Frete</option>
                     <option value="Outros">Outros</option>
                   </select>
                 </div>
@@ -198,7 +197,6 @@ const SlaughterFinance: React.FC<Props> = ({ state, onUpdate, currentUser }) => 
               <option value="Insumos">Insumos</option>
               <option value="Prestação de Serviços">Prestação de Serviços</option>
               <option value="Salário">Salário</option>
-              <option value="Frete">Frete</option>
               <option value="Outros">Outros</option>
             </select>
           </div>

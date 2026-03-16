@@ -76,9 +76,71 @@ const SlaughterSummary = React.memo(({ stats, startDate, endDate, onStartDateCha
                    <span className="text-[10px] opacity-40">%</span>
                 </div>
              </div>
+             <div className="space-y-2 border-l-2 border-amber-500/30 pl-6">
+                <div className="text-[9px] font-black opacity-40 uppercase tracking-widest">Faturamento Total</div>
+                <div className="text-2xl font-black text-amber-300 flex items-baseline gap-1">
+                   <span className="text-[10px] opacity-40">R$</span>
+                   {stats.totalRevenue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                </div>
+             </div>
+          </div>
+
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-8 mt-8 pt-8 border-t border-white/5">
+             <div className="space-y-2 border-l-2 border-white/10 pl-6">
+                <div className="text-[9px] font-black opacity-40 uppercase tracking-widest">Água / kg Embalado</div>
+                <div className="text-xl font-black flex items-baseline gap-1">
+                   {stats.waterPerKg.toFixed(2)}
+                   <span className="text-[10px] opacity-40">L/kg</span>
+                </div>
+             </div>
+             <div className="space-y-2 border-l-2 border-white/10 pl-6">
+                <div className="text-[9px] font-black opacity-40 uppercase tracking-widest">Energia / Tonelada</div>
+                <div className="text-xl font-black flex items-baseline gap-1">
+                   <span className="text-[10px] opacity-40">R$</span>
+                   {stats.energyPerTon.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                </div>
+             </div>
+             <div className="space-y-2 border-l-2 border-white/10 pl-6">
+                <div className="text-[9px] font-black opacity-40 uppercase tracking-widest">Mão de Obra / Ton</div>
+                <div className="text-xl font-black flex items-baseline gap-1">
+                   <span className="text-[10px] opacity-40">R$</span>
+                   {stats.laborPerTon.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                </div>
+             </div>
+             <div className="space-y-2 border-l-2 border-white/10 pl-6">
+                <div className="text-[9px] font-black opacity-40 uppercase tracking-widest">Frete / kg Vivo</div>
+                <div className="text-xl font-black flex items-baseline gap-1">
+                   <span className="text-[10px] opacity-40">R$</span>
+                   {stats.freightPerKgLive.toFixed(2)}
+                </div>
+             </div>
+          </div>
+
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-8 mt-8">
+             <div className="space-y-2 border-l-2 border-red-500/30 pl-6">
+                <div className="text-[9px] font-black opacity-40 uppercase tracking-widest">Condenações Campo</div>
+                <div className="text-xl font-black text-red-400 flex items-baseline gap-1">
+                   {stats.totalFieldCondemnation.toLocaleString('pt-BR')}
+                   <span className="text-[10px] opacity-40">kg</span>
+                </div>
+             </div>
+             <div className="space-y-2 border-l-2 border-red-500/30 pl-6">
+                <div className="text-[9px] font-black opacity-40 uppercase tracking-widest">Condenações Frig.</div>
+                <div className="text-xl font-black text-red-400 flex items-baseline gap-1">
+                   {stats.totalSlaughterCondemnation.toLocaleString('pt-BR')}
+                   <span className="text-[10px] opacity-40">kg</span>
+                </div>
+             </div>
+             <div className="space-y-2 border-l-2 border-white/10 pl-6">
+                <div className="text-[9px] font-black opacity-40 uppercase tracking-widest">Faturamento / kg</div>
+                <div className="text-xl font-black flex items-baseline gap-1">
+                   <span className="text-[10px] opacity-40">R$</span>
+                   {stats.avgRevenuePerKg.toFixed(2)}
+                </div>
+             </div>
              <div className="space-y-2 border-l-2 border-white/10 pl-6">
                 <div className="text-[9px] font-black opacity-40 uppercase tracking-widest">Total Filé Congelado</div>
-                <div className="text-2xl font-black flex items-baseline gap-1">
+                <div className="text-xl font-black flex items-baseline gap-1">
                    {stats.totalGta.toLocaleString('pt-BR', { minimumFractionDigits: 0 })}
                    <span className="text-[10px] opacity-40">kg</span>
                 </div>
@@ -205,8 +267,10 @@ const SlaughterTable = React.memo(({ logs, users, hasPermission, onEdit, onDelet
           <tr>
             <th className="px-8 py-5">Lote / Produtor</th>
             <th className="px-8 py-5">Pesos (Filé/Recep)</th>
-            <th className="px-8 py-5">Horário Abate</th>
             <th className="px-8 py-5">Embalado (kg)</th>
+            <th className="px-8 py-5">Frete / kg</th>
+            <th className="px-8 py-5">Condenações</th>
+            <th className="px-8 py-5">Faturamento</th>
             <th className="px-8 py-5">Registrado por</th>
             {hasPermission && <th className="px-8 py-5 text-center">Ações</th>}
           </tr>
@@ -235,13 +299,6 @@ const SlaughterTable = React.memo(({ logs, users, hasPermission, onEdit, onDelet
                     </div>
                   </div>
                 </td>
-                <td className="px-8 py-6 text-xs font-bold text-slate-600">
-                  <div className="flex items-center gap-2">
-                     <Clock className="w-3 h-3 text-slate-300" />
-                     <span>{log.startTime || '--:--'} às {log.endTime || '--:--'}</span>
-                  </div>
-                  <div className="text-[9px] font-black text-slate-400 uppercase mt-1">ROM: {log.packingList ? `${log.packingList} kg` : 'N/A'}</div>
-                </td>
                 <td className="px-8 py-6">
                   <div className="font-black text-blue-600 text-xs">{log.packedQuantity ? `${log.packedQuantity} kg` : '---'}</div>
                   {log.receptionWeight > 0 && (
@@ -250,6 +307,22 @@ const SlaughterTable = React.memo(({ logs, users, hasPermission, onEdit, onDelet
                     </div>
                   )}
                   <div className="text-[9px] font-black text-slate-400 uppercase mt-1">LOTE EMB: {log.packagingBatch || 'N/A'}</div>
+                </td>
+                <td className="px-8 py-6">
+                  <div className="text-xs font-black text-slate-700">R$ {(log.freightValue || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
+                  <div className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">
+                    R$ {log.receptionWeight && log.freightValue ? (log.freightValue / log.receptionWeight).toFixed(2) : '0.00'}/kg
+                  </div>
+                </td>
+                <td className="px-8 py-6">
+                  <div className="text-[10px] font-black text-red-500 uppercase">Campo: {(log.fieldCondemnation || 0).toLocaleString('pt-BR')}kg</div>
+                  <div className="text-[10px] font-black text-red-500 uppercase">Frig: {(log.slaughterCondemnation || 0).toLocaleString('pt-BR')}kg</div>
+                </td>
+                <td className="px-8 py-6">
+                  <div className="text-xs font-black text-amber-600">R$ {(log.revenuePerKg || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}/kg</div>
+                  <div className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">
+                    Total: R$ {((log.revenuePerKg || 0) * (log.packedQuantity || 0)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  </div>
                 </td>
                 <td className="px-8 py-6">
                   <div className="flex items-center gap-2 text-[10px] font-black text-slate-400 uppercase tracking-widest">
@@ -304,15 +377,23 @@ const SlaughterOverview: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
     slaughterBatch: '',
     endTime: '',
     packedQuantity: '',
-    packagingBatch: ''
+    packagingBatch: '',
+    freightValue: '',
+    fieldCondemnation: '',
+    slaughterCondemnation: '',
+    revenuePerKg: '',
+    waterConsumption: '',
+    energyConsumption: ''
   });
 
   const slaughterStats = useMemo(() => {
     const logs = Array.isArray(state.slaughterLogs) ? state.slaughterLogs : [];
+    const expenses = Array.isArray(state.slaughterExpenses) ? state.slaughterExpenses : [];
+    
     const start = startOfDay(parseISO(summaryStartDate));
     const end = endOfDay(parseISO(summaryEndDate));
 
-    const filtered = logs.filter(log => {
+    const filteredLogs = logs.filter(log => {
       try {
         return isWithinInterval(parseISO(log.date), { start, end });
       } catch {
@@ -320,13 +401,53 @@ const SlaughterOverview: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
       }
     });
 
-    const totalGta = filtered.reduce((acc, l) => acc + (l.gtaWeight || 0), 0);
-    const totalRecep = filtered.reduce((acc, l) => acc + (l.receptionWeight || 0), 0);
-    const totalPacked = filtered.reduce((acc, l) => acc + (l.packedQuantity || 0), 0);
+    const filteredExpenses = expenses.filter(exp => {
+      try {
+        return isWithinInterval(parseISO(exp.date), { start, end });
+      } catch {
+        return false;
+      }
+    });
+
+    const totalGta = filteredLogs.reduce((acc, l) => acc + (l.gtaWeight || 0), 0);
+    const totalRecep = filteredLogs.reduce((acc, l) => acc + (l.receptionWeight || 0), 0);
+    const totalPacked = filteredLogs.reduce((acc, l) => acc + (l.packedQuantity || 0), 0);
     const yieldPercentage = totalRecep > 0 ? (totalPacked / totalRecep) * 100 : 0;
 
-    return { totalGta, totalRecep, totalPacked, yieldPercentage, count: filtered.length };
-  }, [state.slaughterLogs, summaryStartDate, summaryEndDate]);
+    const totalWaterLiters = filteredLogs.reduce((acc, l) => acc + (l.waterConsumption || 0), 0);
+    const waterPerKg = totalPacked > 0 ? totalWaterLiters / totalPacked : 0;
+
+    const totalEnergyValue = filteredExpenses.filter(e => e.category === 'Energia').reduce((acc, e) => acc + e.value, 0);
+    const energyPerTon = totalPacked > 0 ? (totalEnergyValue / (totalPacked / 1000)) : 0;
+
+    const totalSalaryValue = filteredExpenses.filter(e => e.category === 'Salário').reduce((acc, e) => acc + e.value, 0);
+    const laborPerTon = totalPacked > 0 ? (totalSalaryValue / (totalPacked / 1000)) : 0;
+
+    const totalFreightValue = filteredLogs.reduce((acc, l) => acc + (l.freightValue || 0), 0);
+    const freightPerKgLive = totalRecep > 0 ? totalFreightValue / totalRecep : 0;
+
+    const totalFieldCondemnation = filteredLogs.reduce((acc, l) => acc + (l.fieldCondemnation || 0), 0);
+    const totalSlaughterCondemnation = filteredLogs.reduce((acc, l) => acc + (l.slaughterCondemnation || 0), 0);
+
+    const totalRevenue = filteredLogs.reduce((acc, l) => acc + ((l.revenuePerKg || 0) * (l.packedQuantity || 0)), 0);
+    const avgRevenuePerKg = totalPacked > 0 ? totalRevenue / totalPacked : 0;
+
+    return { 
+      totalGta, 
+      totalRecep, 
+      totalPacked, 
+      yieldPercentage, 
+      count: filteredLogs.length,
+      waterPerKg,
+      energyPerTon,
+      laborPerTon,
+      freightPerKgLive,
+      totalFieldCondemnation,
+      totalSlaughterCondemnation,
+      totalRevenue,
+      avgRevenuePerKg
+    };
+  }, [state.slaughterLogs, state.slaughterExpenses, summaryStartDate, summaryEndDate]);
 
   const dailyYieldData = useMemo(() => {
     const baseDate = new Date(chartYear, chartMonth, 1);
@@ -390,7 +511,13 @@ const SlaughterOverview: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
           gtaWeight: Number(formData.gtaWeight) || 0,
           receptionWeight: Number(formData.receptionWeight) || 0,
           packingList: Number(formData.packingList) || 0,
-          packedQuantity: Number(formData.packedQuantity) || 0
+          packedQuantity: Number(formData.packedQuantity) || 0,
+          freightValue: Number(formData.freightValue) || 0,
+          fieldCondemnation: Number(formData.fieldCondemnation) || 0,
+          slaughterCondemnation: Number(formData.slaughterCondemnation) || 0,
+          revenuePerKg: Number(formData.revenuePerKg) || 0,
+          waterConsumption: Number(formData.waterConsumption) || 0,
+          energyConsumption: Number(formData.energyConsumption) || 0
         } : log
       );
       
@@ -412,6 +539,12 @@ const SlaughterOverview: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
         endTime: formData.endTime,
         packedQuantity: Number(formData.packedQuantity) || 0,
         packagingBatch: formData.packagingBatch,
+        freightValue: Number(formData.freightValue) || 0,
+        fieldCondemnation: Number(formData.fieldCondemnation) || 0,
+        slaughterCondemnation: Number(formData.slaughterCondemnation) || 0,
+        revenuePerKg: Number(formData.revenuePerKg) || 0,
+        waterConsumption: Number(formData.waterConsumption) || 0,
+        energyConsumption: Number(formData.energyConsumption) || 0,
         userId: currentUser.id,
         timestamp: new Date().toISOString(),
         updatedAt: Date.now()
@@ -440,7 +573,13 @@ const SlaughterOverview: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
       slaughterBatch: '',
       endTime: '',
       packedQuantity: '',
-      packagingBatch: ''
+      packagingBatch: '',
+      freightValue: '',
+      fieldCondemnation: '',
+      slaughterCondemnation: '',
+      revenuePerKg: '',
+      waterConsumption: '',
+      energyConsumption: ''
     });
   };
 
@@ -457,7 +596,13 @@ const SlaughterOverview: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
       slaughterBatch: log.slaughterBatch || '',
       endTime: log.endTime || '',
       packedQuantity: (log.packedQuantity || 0).toString(),
-      packagingBatch: log.packagingBatch || ''
+      packagingBatch: log.packagingBatch || '',
+      freightValue: (log.freightValue || 0).toString(),
+      fieldCondemnation: (log.fieldCondemnation || 0).toString(),
+      slaughterCondemnation: (log.slaughterCondemnation || 0).toString(),
+      revenuePerKg: (log.revenuePerKg || 0).toString(),
+      waterConsumption: (log.waterConsumption || 0).toString(),
+      energyConsumption: (log.energyConsumption || 0).toString()
     });
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -586,6 +731,39 @@ const SlaughterOverview: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
                 <div className="space-y-1">
                   <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-widest">Lote Embalagem</label>
                   <input type="text" placeholder="Cód. Embalagem" className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none" value={formData.packagingBatch} onChange={e => setFormData({...formData, packagingBatch: e.target.value})} />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-widest">Valor Frete (R$)</label>
+                    <input type="number" step="0.01" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none text-xs" value={formData.freightValue} onChange={e => setFormData({...formData, freightValue: e.target.value})} />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-widest">Faturamento / kg (R$)</label>
+                    <input type="number" step="0.01" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none text-xs" value={formData.revenuePerKg} onChange={e => setFormData({...formData, revenuePerKg: e.target.value})} />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-widest">Cond. Campo (kg)</label>
+                    <input type="number" step="0.01" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none text-xs" value={formData.fieldCondemnation} onChange={e => setFormData({...formData, fieldCondemnation: e.target.value})} />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-widest">Cond. Frig. (kg)</label>
+                    <input type="number" step="0.01" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none text-xs" value={formData.slaughterCondemnation} onChange={e => setFormData({...formData, slaughterCondemnation: e.target.value})} />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-widest">Consumo Água (L)</label>
+                    <input type="number" step="0.01" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none text-xs" value={formData.waterConsumption} onChange={e => setFormData({...formData, waterConsumption: e.target.value})} />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-widest">Consumo KW (kWh)</label>
+                    <input type="number" step="0.01" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none text-xs" value={formData.energyConsumption} onChange={e => setFormData({...formData, energyConsumption: e.target.value})} />
+                  </div>
                 </div>
 
                 <button type="submit" className={`w-full py-4 rounded-[1.5rem] font-black uppercase tracking-widest text-xs text-white shadow-xl transition-all active:scale-95 mt-4 ${editingId ? 'bg-amber-600 shadow-amber-600/20' : 'bg-[#344434] shadow-slate-900/20 hover:bg-[#2a382a]'}`}>
