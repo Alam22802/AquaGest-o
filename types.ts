@@ -137,6 +137,70 @@ export interface SlaughterLog {
   updatedAt?: number;
 }
 
+export interface SlaughterExpense {
+  id: string;
+  description: string;
+  category: 'Energia' | 'Água' | 'Manutenção' | 'Insumos' | 'Prestação de Serviços' | 'Salário' | 'Frete' | 'Outros';
+  value: number;
+  date: string;
+  userId: string;
+  updatedAt?: number;
+}
+
+export interface SlaughterEmployee {
+  id: string;
+  name: string;
+  role: string;
+  department: string;
+  admissionDate: string;
+  status: 'Ativo' | 'Inativo';
+  updatedAt?: number;
+}
+
+export interface SlaughterHRIndicator {
+  id: string;
+  month: number;
+  year: number;
+  turnover: number;
+  absenteeism: number;
+  accidents: number;
+  userId: string;
+  updatedAt?: number;
+}
+
+export interface SlaughterSupplyItem {
+  id: string;
+  code: string;
+  name: string;
+  category: 'Embalagem' | 'Químicos' | 'EPI' | 'Outros';
+  currentStock: number;
+  minStock: number;
+  unit: string;
+  updatedAt?: number;
+}
+
+export interface SlaughterSupplier {
+  id: string;
+  code: string;
+  name: string;
+  cnpj?: string;
+  contact?: string;
+  phone?: string;
+  userId: string;
+  updatedAt?: number;
+}
+
+export interface SlaughterSupplyRequest {
+  id: string;
+  itemId: string;
+  supplierId?: string;
+  quantity: number;
+  requesterId: string;
+  status: 'Pendente' | 'Aprovado' | 'Rejeitado';
+  date: string;
+  updatedAt?: number;
+}
+
 export interface HarvestLog {
   id: string;
   batchId: string;
@@ -219,6 +283,12 @@ export interface AppState {
   mortalityLogs: MortalityLog[];
   biometryLogs: BiometryLog[];
   slaughterLogs: SlaughterLog[];
+  slaughterExpenses?: SlaughterExpense[];
+  slaughterEmployees?: SlaughterEmployee[];
+  slaughterHRIndicators?: SlaughterHRIndicator[];
+  slaughterSupplyItems?: SlaughterSupplyItem[];
+  slaughterSuppliers?: SlaughterSupplier[];
+  slaughterSupplyRequests?: SlaughterSupplyRequest[];
   harvestLogs?: HarvestLog[];
   protocols: ProductionProtocol[];
   portfolios: InvestmentPortfolio[];
