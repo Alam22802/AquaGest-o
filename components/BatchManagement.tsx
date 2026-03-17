@@ -476,7 +476,7 @@ const BatchManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                               <div className="text-left">
                                 <span className="text-sm font-black text-slate-800 uppercase italic">{cage.name}</span>
                                 <div className="flex gap-2 mt-0.5">
-                                  <span className="text-[9px] font-black text-blue-600 uppercase bg-blue-50 px-1.5 py-0.5 rounded-md">{cage.model || 'Padrão'}</span>
+                                  <span className="text-[9px] font-black text-blue-600 uppercase bg-blue-50 px-1.5 py-0.5 rounded-md">{`${cage.dimensions.length}x${cage.dimensions.width}x${cage.dimensions.depth}m`}</span>
                                   <span className="text-[9px] font-bold text-slate-400 uppercase">Mortalidade: {cage.mortality}</span>
                                   <span className="text-[9px] font-bold text-slate-400 uppercase">•</span>
                                   <span className="text-[9px] font-bold text-slate-400 uppercase">{cage.currentCount} peixes</span>
@@ -512,7 +512,7 @@ const BatchManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                         <div className="bg-white p-4 rounded-2xl border border-slate-100">
                           <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">Modelos Selecionados</span>
                           <div className="flex flex-wrap gap-1 mt-1">
-                            {Array.from(new Set(selectedPlanningCagesData.map(c => c.model || 'Padrão'))).map(m => (
+                            {Array.from(new Set(selectedPlanningCagesData.map(c => `${c.dimensions.length}x${c.dimensions.width}x${c.dimensions.depth}m`))).map(m => (
                               <span key={m} className="px-2 py-0.5 bg-blue-50 text-[8px] font-black text-blue-600 rounded-md uppercase border border-blue-100">{m}</span>
                             ))}
                           </div>

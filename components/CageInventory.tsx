@@ -492,7 +492,7 @@ const CageInventory: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                   <Box className={`w-4 h-4 ${cage.status === 'Ocupada' ? 'text-blue-500' : 'text-slate-400'}`} />
                   <div>
                     <span className="font-black text-slate-800 uppercase tracking-tighter block leading-none">{cage.name}</span>
-                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{cage.model || 'Padrão'}</span>
+                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{`${cage.dimensions.length}x${cage.dimensions.width}x${cage.dimensions.depth}m`}</span>
                   </div>
                 </div>
                 {hasPermission && (
