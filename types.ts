@@ -136,9 +136,8 @@ export interface SlaughterLog {
   freightValue?: number;
   fieldCondemnation?: number;
   slaughterCondemnation?: number;
+  invoiceValue?: number;
   revenuePerKg?: number;
-  waterConsumption?: number;
-  energyConsumption?: number;
   userId: string;
   timestamp: string;
   updatedAt?: number;
@@ -149,6 +148,8 @@ export interface SlaughterExpense {
   description: string;
   category: 'Energia' | 'Água' | 'Manutenção' | 'Insumos' | 'Prestação de Serviços' | 'Salário' | 'Outros';
   value: number;
+  quantity?: number;
+  unitValue?: number;
   date: string;
   userId: string;
   updatedAt?: number;

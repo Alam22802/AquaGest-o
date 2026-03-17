@@ -77,10 +77,10 @@ const SlaughterSummary = React.memo(({ stats, startDate, endDate, onStartDateCha
                 </div>
              </div>
              <div className="space-y-2 border-l-2 border-amber-500/30 pl-6">
-                <div className="text-[9px] font-black opacity-40 uppercase tracking-widest">Faturamento Total</div>
+                <div className="text-[9px] font-black opacity-40 uppercase tracking-widest">Valor Total Notas</div>
                 <div className="text-2xl font-black text-amber-300 flex items-baseline gap-1">
                    <span className="text-[10px] opacity-40">R$</span>
-                   {stats.totalRevenue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                   {stats.totalInvoiceValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                 </div>
              </div>
           </div>
@@ -132,10 +132,10 @@ const SlaughterSummary = React.memo(({ stats, startDate, endDate, onStartDateCha
                 </div>
              </div>
              <div className="space-y-2 border-l-2 border-white/10 pl-6">
-                <div className="text-[9px] font-black opacity-40 uppercase tracking-widest">Faturamento / kg</div>
+                <div className="text-[9px] font-black opacity-40 uppercase tracking-widest">Valor KG Peixe Vivo</div>
                 <div className="text-xl font-black flex items-baseline gap-1">
                    <span className="text-[10px] opacity-40">R$</span>
-                   {stats.avgRevenuePerKg.toFixed(2)}
+                   {stats.avgLiveKgValue.toFixed(2)}
                 </div>
              </div>
              <div className="space-y-2 border-l-2 border-white/10 pl-6">
@@ -270,7 +270,7 @@ const SlaughterTable = React.memo(({ logs, users, hasPermission, onEdit, onDelet
             <th className="px-8 py-5">Embalado (kg)</th>
             <th className="px-8 py-5">Frete / kg</th>
             <th className="px-8 py-5">Condenações</th>
-            <th className="px-8 py-5">Faturamento</th>
+            <th className="px-8 py-5">Valor Nota / KG Vivo</th>
             <th className="px-8 py-5">Registrado por</th>
             {hasPermission && <th className="px-8 py-5 text-center">Ações</th>}
           </tr>
@@ -319,9 +319,9 @@ const SlaughterTable = React.memo(({ logs, users, hasPermission, onEdit, onDelet
                   <div className="text-[10px] font-black text-red-500 uppercase">Frig: {(log.slaughterCondemnation || 0).toLocaleString('pt-BR')}kg</div>
                 </td>
                 <td className="px-8 py-6">
-                  <div className="text-xs font-black text-amber-600">R$ {(log.revenuePerKg || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}/kg</div>
+                  <div className="text-xs font-black text-amber-600">R$ {(log.invoiceValue || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
                   <div className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">
-                    Total: R$ {((log.revenuePerKg || 0) * (log.packedQuantity || 0)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    KG Vivo: R$ {log.receptionWeight && log.invoiceValue ? (log.invoiceValue / log.receptionWeight).toFixed(2) : '0.00'}/kg
                   </div>
                 </td>
                 <td className="px-8 py-6">
@@ -389,9 +389,7 @@ const SlaughterOverview: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
     freightValue: '',
     fieldCondemnation: '',
     slaughterCondemnation: '',
-    revenuePerKg: '',
-    waterConsumption: '',
-    energyConsumption: ''
+    invoiceValue: ''
   });
 
   const slaughterStats = useMemo(() => {
@@ -422,7 +420,7 @@ const SlaughterOverview: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
     const totalPacked = filteredLogs.reduce((acc, l) => acc + (l.packedQuantity || 0), 0);
     const yieldPercentage = totalRecep > 0 ? (totalPacked / totalRecep) * 100 : 0;
 
-    const totalWaterLiters = filteredLogs.reduce((acc, l) => acc + (l.waterConsumption || 0), 0);
+    const totalWaterLiters = filteredExpenses.filter(e => e.category === 'Água').reduce((acc, e) => acc + (e.quantity || 0), 0);
     const waterPerKg = totalPacked > 0 ? totalWaterLiters / totalPacked : 0;
 
     const totalEnergyValue = filteredExpenses.filter(e => e.category === 'Energia').reduce((acc, e) => acc + e.value, 0);
@@ -437,8 +435,8 @@ const SlaughterOverview: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
     const totalFieldCondemnation = filteredLogs.reduce((acc, l) => acc + (l.fieldCondemnation || 0), 0);
     const totalSlaughterCondemnation = filteredLogs.reduce((acc, l) => acc + (l.slaughterCondemnation || 0), 0);
 
-    const totalRevenue = filteredLogs.reduce((acc, l) => acc + ((l.revenuePerKg || 0) * (l.packedQuantity || 0)), 0);
-    const avgRevenuePerKg = totalPacked > 0 ? totalRevenue / totalPacked : 0;
+    const totalInvoiceValue = filteredLogs.reduce((acc, l) => acc + (l.invoiceValue || 0), 0);
+    const avgLiveKgValue = totalRecep > 0 ? totalInvoiceValue / totalRecep : 0;
 
     return { 
       totalGta, 
@@ -452,8 +450,8 @@ const SlaughterOverview: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
       freightPerKgLive,
       totalFieldCondemnation,
       totalSlaughterCondemnation,
-      totalRevenue,
-      avgRevenuePerKg
+      totalInvoiceValue,
+      avgLiveKgValue
     };
   }, [state.slaughterLogs, state.slaughterExpenses, summaryStartDate, summaryEndDate]);
 
@@ -523,9 +521,7 @@ const SlaughterOverview: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
           freightValue: Number(formData.freightValue) || 0,
           fieldCondemnation: Number(formData.fieldCondemnation) || 0,
           slaughterCondemnation: Number(formData.slaughterCondemnation) || 0,
-          revenuePerKg: Number(formData.revenuePerKg) || 0,
-          waterConsumption: Number(formData.waterConsumption) || 0,
-          energyConsumption: Number(formData.energyConsumption) || 0
+          invoiceValue: Number(formData.invoiceValue) || 0
         } : log
       );
       
@@ -550,9 +546,7 @@ const SlaughterOverview: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
         freightValue: Number(formData.freightValue) || 0,
         fieldCondemnation: Number(formData.fieldCondemnation) || 0,
         slaughterCondemnation: Number(formData.slaughterCondemnation) || 0,
-        revenuePerKg: Number(formData.revenuePerKg) || 0,
-        waterConsumption: Number(formData.waterConsumption) || 0,
-        energyConsumption: Number(formData.energyConsumption) || 0,
+        invoiceValue: Number(formData.invoiceValue) || 0,
         userId: currentUser.id,
         timestamp: new Date().toISOString(),
         updatedAt: Date.now()
@@ -585,9 +579,7 @@ const SlaughterOverview: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
       freightValue: '',
       fieldCondemnation: '',
       slaughterCondemnation: '',
-      revenuePerKg: '',
-      waterConsumption: '',
-      energyConsumption: ''
+      invoiceValue: ''
     });
   };
 
@@ -608,9 +600,7 @@ const SlaughterOverview: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
       freightValue: (log.freightValue || 0).toString(),
       fieldCondemnation: (log.fieldCondemnation || 0).toString(),
       slaughterCondemnation: (log.slaughterCondemnation || 0).toString(),
-      revenuePerKg: (log.revenuePerKg || 0).toString(),
-      waterConsumption: (log.waterConsumption || 0).toString(),
-      energyConsumption: (log.energyConsumption || 0).toString()
+      invoiceValue: (log.invoiceValue || 0).toString()
     });
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -747,8 +737,8 @@ const SlaughterOverview: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
                     <input type="number" step="0.01" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none text-xs" value={formData.freightValue} onChange={e => setFormData({...formData, freightValue: e.target.value})} />
                   </div>
                   <div className="space-y-1">
-                    <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-widest">Faturamento / kg (R$)</label>
-                    <input type="number" step="0.01" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none text-xs" value={formData.revenuePerKg} onChange={e => setFormData({...formData, revenuePerKg: e.target.value})} />
+                    <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-widest">Valor da Nota (R$)</label>
+                    <input type="number" step="0.01" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none text-xs" value={formData.invoiceValue} onChange={e => setFormData({...formData, invoiceValue: e.target.value})} />
                   </div>
                 </div>
 
@@ -760,17 +750,6 @@ const SlaughterOverview: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
                   <div className="space-y-1">
                     <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-widest">Cond. Frig. (kg)</label>
                     <input type="number" step="0.01" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none text-xs" value={formData.slaughterCondemnation} onChange={e => setFormData({...formData, slaughterCondemnation: e.target.value})} />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-widest">Consumo Água (L)</label>
-                    <input type="number" step="0.01" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none text-xs" value={formData.waterConsumption} onChange={e => setFormData({...formData, waterConsumption: e.target.value})} />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-widest">Consumo KW (kWh)</label>
-                    <input type="number" step="0.01" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none text-xs" value={formData.energyConsumption} onChange={e => setFormData({...formData, energyConsumption: e.target.value})} />
                   </div>
                 </div>
 

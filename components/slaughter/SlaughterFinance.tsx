@@ -25,6 +25,8 @@ const SlaughterFinance: React.FC<Props> = ({ state, onUpdate, currentUser }) => 
     description: '',
     category: 'Outros' as SlaughterExpense['category'],
     value: '',
+    quantity: '',
+    unitValue: '',
     date: new Date().toISOString().split('T')[0]
   });
 
@@ -54,6 +56,8 @@ const SlaughterFinance: React.FC<Props> = ({ state, onUpdate, currentUser }) => 
       description: formData.description,
       category: formData.category,
       value: Number(formData.value),
+      quantity: (formData.category === 'Água' || formData.category === 'Energia') ? Number(formData.quantity) : undefined,
+      unitValue: (formData.category === 'Água' || formData.category === 'Energia') ? Number(formData.unitValue) : undefined,
       date: formData.date,
       userId: currentUser.id,
       updatedAt: Date.now()
@@ -69,6 +73,8 @@ const SlaughterFinance: React.FC<Props> = ({ state, onUpdate, currentUser }) => 
       description: '',
       category: 'Outros',
       value: '',
+      quantity: '',
+      unitValue: '',
       date: new Date().toISOString().split('T')[0]
     });
   };
@@ -79,6 +85,8 @@ const SlaughterFinance: React.FC<Props> = ({ state, onUpdate, currentUser }) => 
       description: expense.description,
       category: expense.category,
       value: expense.value.toString(),
+      quantity: (expense.quantity || '').toString(),
+      unitValue: (expense.unitValue || '').toString(),
       date: expense.date
     });
   };
@@ -86,6 +94,26 @@ const SlaughterFinance: React.FC<Props> = ({ state, onUpdate, currentUser }) => 
   const removeExpense = (id: string) => {
     if (!confirm('Deseja excluir este custo?')) return;
     onUpdate({ ...state, slaughterExpenses: expenses.filter(e => e.id !== id) });
+  };
+
+  const handleUnitCalculation = (field: 'qty' | 'unit', val: string) => {
+    const qty = field === 'qty' ? Number(val) : Number(formData.quantity);
+    const unit = field === 'unit' ? Number(val) : Number(formData.unitValue);
+    
+    if (qty && unit) {
+      setFormData(prev => ({
+        ...prev,
+        quantity: field === 'qty' ? val : prev.quantity,
+        unitValue: field === 'unit' ? val : prev.unitValue,
+        value: (qty * unit).toFixed(2)
+      }));
+    } else {
+      setFormData(prev => ({
+        ...prev,
+        quantity: field === 'qty' ? val : prev.quantity,
+        unitValue: field === 'unit' ? val : prev.unitValue
+      }));
+    }
   };
 
   return (
@@ -156,7 +184,7 @@ const SlaughterFinance: React.FC<Props> = ({ state, onUpdate, currentUser }) => 
                   </select>
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Valor (R$)</label>
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Valor Total (R$)</label>
                   <input 
                     type="number" 
                     step="0.01" 
@@ -167,6 +195,36 @@ const SlaughterFinance: React.FC<Props> = ({ state, onUpdate, currentUser }) => 
                   />
                 </div>
               </div>
+
+              {(formData.category === 'Água' || formData.category === 'Energia') && (
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">
+                      {formData.category === 'Água' ? 'Qtd Litros' : 'Qtd KW'}
+                    </label>
+                    <input 
+                      type="number" 
+                      step="0.01" 
+                      className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none"
+                      value={formData.quantity}
+                      onChange={e => handleUnitCalculation('qty', e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">
+                      {formData.category === 'Água' ? 'Valor/Litro' : 'Valor/KW'}
+                    </label>
+                    <input 
+                      type="number" 
+                      step="0.01" 
+                      className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none"
+                      value={formData.unitValue}
+                      onChange={e => handleUnitCalculation('unit', e.target.value)}
+                    />
+                  </div>
+                </div>
+              )}
+
               <div className="space-y-1">
                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Data</label>
                 <input 
@@ -216,6 +274,7 @@ const SlaughterFinance: React.FC<Props> = ({ state, onUpdate, currentUser }) => 
                   <th className="px-8 py-5">Descrição</th>
                   <th className="px-8 py-5">Categoria</th>
                   <th className="px-8 py-5">Data</th>
+                  <th className="px-8 py-5">Detalhes</th>
                   <th className="px-8 py-5">Valor</th>
                   <th className="px-8 py-5 text-center">Ações</th>
                 </tr>
@@ -230,6 +289,13 @@ const SlaughterFinance: React.FC<Props> = ({ state, onUpdate, currentUser }) => 
                       </span>
                     </td>
                     <td className="px-8 py-6 text-xs text-slate-500">{format(parseISO(expense.date), 'dd/MM/yyyy')}</td>
+                    <td className="px-8 py-6">
+                      {expense.quantity && expense.unitValue ? (
+                        <div className="text-[10px] font-bold text-slate-400 uppercase">
+                          {expense.quantity} {expense.category === 'Água' ? 'L' : 'KW'} x R$ {expense.unitValue.toFixed(2)}
+                        </div>
+                      ) : '-'}
+                    </td>
                     <td className="px-8 py-6 font-black text-slate-900">R$ {expense.value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
                     <td className="px-8 py-6">
                       <div className="flex justify-center gap-2">
