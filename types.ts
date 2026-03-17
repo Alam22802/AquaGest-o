@@ -226,7 +226,7 @@ export interface HarvestLog {
   batchId: string;
   cageId: string;
   fishCount: number;
-  weight: number;
+  totalWeight: number;
   unitWeight?: number;
   initialFishCount?: number; // Qtd inicial na gaiola no momento da despesca
   date: string;

@@ -21,7 +21,7 @@ const generateId = () => {
 const HarvestManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
   const [selectedBatchId, setSelectedBatchId] = useState('');
   const [selectedCageId, setSelectedCageId] = useState('');
-  const [weight, setWeight] = useState('');
+  const [totalWeight, setTotalWeight] = useState('');
   const [unitWeight, setUnitWeight] = useState('');
   const [fishCount, setFishCount] = useState('');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
@@ -66,7 +66,7 @@ const HarvestManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
     if (!hasPermission) return;
-    if (!selectedBatchId || !selectedCageId || !weight || !fishCount) {
+    if (!selectedBatchId || !selectedCageId || !totalWeight || !fishCount) {
       alert('Por favor, preencha todos os campos obrigatórios.');
       return;
     }
@@ -78,7 +78,7 @@ const HarvestManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
           batchId: selectedBatchId,
           cageId: selectedCageId,
           fishCount: Number(fishCount),
-          weight: Number(weight),
+          totalWeight: Number(totalWeight),
           unitWeight: unitWeight ? Number(unitWeight) : undefined,
           date,
           updatedAt: Date.now()
@@ -96,9 +96,9 @@ const HarvestManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
         batchId: selectedBatchId,
         cageId: selectedCageId,
         fishCount: Number(fishCount),
-        weight: Number(weight),
+        totalWeight: Number(totalWeight),
         unitWeight: unitWeight ? Number(unitWeight) : undefined,
-        initialFishCount: selectedCage.initialFishCount,
+        initialFishCount: selectedCage?.initialFishCount,
         date,
         userId: currentUser.id,
         timestamp: new Date().toISOString(),
@@ -138,7 +138,7 @@ const HarvestManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
   const resetForm = () => {
     setEditingId(null);
     setSelectedCageId('');
-    setWeight('');
+    setTotalWeight('');
     setUnitWeight('');
     setFishCount('');
     setDate(new Date().toISOString().split('T')[0]);
@@ -148,7 +148,7 @@ const HarvestManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
     setEditingId(log.id);
     setSelectedBatchId(log.batchId);
     setSelectedCageId(log.cageId);
-    setWeight(log.weight.toString());
+    setTotalWeight(log.totalWeight.toString());
     setUnitWeight(log.unitWeight?.toString() || '');
     setFishCount(log.fishCount.toString());
     setDate(log.date);
@@ -159,28 +159,25 @@ const HarvestManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
 
   // Auto-calculate logic
   const handleWeightChange = (val: string) => {
-    setWeight(val);
+    setTotalWeight(val);
     if (val && unitWeight && Number(unitWeight) > 0) {
       const count = Math.round((Number(val) * 1000) / Number(unitWeight));
       setFishCount(count.toString());
-    } else if (val && fishCount && Number(fishCount) > 0) {
-      const uw = (Number(val) * 1000) / Number(fishCount);
-      setUnitWeight(uw.toFixed(1));
     }
   };
 
   const handleUnitWeightChange = (val: string) => {
     setUnitWeight(val);
-    if (val && weight && Number(weight) > 0 && Number(val) > 0) {
-      const count = Math.round((Number(weight) * 1000) / Number(val));
+    if (val && totalWeight && Number(totalWeight) > 0 && Number(val) > 0) {
+      const count = Math.round((Number(totalWeight) * 1000) / Number(val));
       setFishCount(count.toString());
     }
   };
 
   const handleFishCountChange = (val: string) => {
     setFishCount(val);
-    if (val && weight && Number(weight) > 0 && Number(val) > 0) {
-      const uw = (Number(weight) * 1000) / Number(val);
+    if (val && totalWeight && Number(totalWeight) > 0 && Number(val) > 0) {
+      const uw = (Number(totalWeight) * 1000) / Number(val);
       setUnitWeight(uw.toFixed(1));
     }
   };
@@ -324,6 +321,18 @@ const HarvestManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1">
+                <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-widest">Peso Unitário (g) *</label>
+                <input 
+                  type="number" 
+                  step="0.1"
+                  required
+                  placeholder="0.0"
+                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none focus:ring-2 focus:ring-blue-500/10 text-xs"
+                  value={unitWeight}
+                  onChange={e => handleUnitWeightChange(e.target.value)}
+                />
+              </div>
+              <div className="space-y-1">
                 <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-widest">Peso Total Gaiola (kg) *</label>
                 <input 
                   type="number" 
@@ -331,19 +340,8 @@ const HarvestManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
                   required
                   placeholder="0.00"
                   className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none focus:ring-2 focus:ring-blue-500/10 text-xs"
-                  value={weight}
+                  value={totalWeight}
                   onChange={e => handleWeightChange(e.target.value)}
-                />
-              </div>
-              <div className="space-y-1">
-                <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-widest">Peso Unitário (g)</label>
-                <input 
-                  type="number" 
-                  step="0.1"
-                  placeholder="0.0"
-                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none focus:ring-2 focus:ring-blue-500/10 text-xs"
-                  value={unitWeight}
-                  onChange={e => handleUnitWeightChange(e.target.value)}
                 />
               </div>
             </div>
@@ -474,9 +472,9 @@ const HarvestManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
                   </th>
                   <th className="px-6 py-4">Data</th>
                   <th className="px-6 py-4">Lote / Gaiola</th>
-                  <th className="px-6 py-4 text-right">Qtd Peixes</th>
                   <th className="px-6 py-4 text-right">Peso Médio</th>
                   <th className="px-6 py-4 text-right">Peso Total</th>
+                  <th className="px-6 py-4 text-right">Qtd Peixes</th>
                   <th className="px-6 py-4 text-center">Ações</th>
                 </tr>
               </thead>
@@ -485,6 +483,12 @@ const HarvestManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
                   const batch = (state.batches || []).find(b => b.id === log.batchId);
                   const cage = (state.cages || []).find(c => c.id === log.cageId);
                   const isSelected = selectedLogIds.has(log.id);
+                  
+                  // Logic to calculate fish count based on total weight and unit weight
+                  const calculatedFishCount = log.unitWeight && log.unitWeight > 0 
+                    ? Math.round((log.totalWeight * 1000) / log.unitWeight) 
+                    : log.fishCount;
+
                   return (
                     <tr key={log.id} className={`hover:bg-slate-50/50 transition-colors ${isSelected ? 'bg-blue-50/50' : ''}`}>
                       <td className="px-6 py-4">
@@ -508,14 +512,14 @@ const HarvestManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
                           <span className="text-[10px] font-bold text-slate-400 uppercase">{cage?.name || 'Gaiola removida'}</span>
                         </div>
                       </td>
-                      <td className="px-6 py-4 text-right text-xs font-black text-blue-600">
-                        {log.fishCount.toLocaleString()} un
-                      </td>
                       <td className="px-6 py-4 text-right text-xs font-black text-indigo-600">
                         {log.unitWeight ? `${log.unitWeight.toLocaleString()} g` : '-'}
                       </td>
                       <td className="px-6 py-4 text-right text-xs font-black text-emerald-600">
-                        {log.weight.toLocaleString()} kg
+                        {log.totalWeight.toLocaleString()} kg
+                      </td>
+                      <td className="px-6 py-4 text-right text-xs font-black text-blue-600">
+                        {calculatedFishCount.toLocaleString()} un
                       </td>
                       <td className="px-6 py-4 text-center">
                         {hasPermission && (
