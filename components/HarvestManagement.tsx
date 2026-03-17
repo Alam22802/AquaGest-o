@@ -10,6 +10,14 @@ interface Props {
   currentUser: User;
 }
 
+const generateId = () => {
+  try {
+    return crypto.randomUUID();
+  } catch (e) {
+    return Date.now().toString(36) + Math.random().toString(36).substring(2);
+  }
+};
+
 const HarvestManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
   const [selectedBatchId, setSelectedBatchId] = useState('');
   const [selectedCageId, setSelectedCageId] = useState('');
@@ -44,7 +52,7 @@ const HarvestManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
   React.useEffect(() => {
     if (selectedCage) {
       // Calculate current fish count in cage (initial - mortality)
-      const cageMortality = state.mortalityLogs
+      const cageMortality = (state.mortalityLogs || [])
         .filter(m => m.cageId === selectedCage.id)
         .reduce((acc, curr) => acc + curr.count, 0);
       
@@ -84,7 +92,7 @@ const HarvestManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
       setEditingId(null);
     } else {
       const newLog: HarvestLog = {
-        id: crypto.randomUUID(),
+        id: generateId(),
         batchId: selectedBatchId,
         cageId: selectedCageId,
         fishCount: Number(fishCount),
@@ -180,7 +188,7 @@ const HarvestManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
       const hasCages = state.cages.some(c => c.batchId === batch.id);
       return hasHarvests && !hasCages;
     }).map(batch => {
-      const mortality = state.mortalityLogs
+      const mortality = (state.mortalityLogs || [])
         .filter(m => m.batchId === batch.id)
         .reduce((acc, curr) => acc + curr.count, 0);
 
@@ -471,8 +479,8 @@ const HarvestManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {harvestLogs.map(log => {
-                  const batch = state.batches.find(b => b.id === log.batchId);
-                  const cage = state.cages.find(c => c.id === log.cageId);
+                  const batch = (state.batches || []).find(b => b.id === log.batchId);
+                  const cage = (state.cages || []).find(c => c.id === log.cageId);
                   const isSelected = selectedLogIds.has(log.id);
                   return (
                     <tr key={log.id} className={`hover:bg-slate-50/50 transition-colors ${isSelected ? 'bg-blue-50/50' : ''}`}>

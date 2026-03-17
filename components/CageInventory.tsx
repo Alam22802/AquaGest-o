@@ -9,6 +9,14 @@ interface Props {
   currentUser: User;
 }
 
+const generateId = () => {
+  try {
+    return crypto.randomUUID();
+  } catch (e) {
+    return Date.now().toString(36) + Math.random().toString(36).substring(2);
+  }
+};
+
 const CageInventory: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -41,7 +49,7 @@ const CageInventory: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
 
     // Bulk Edit Logic
     if (selectedIds.length > 0 && !editingId) {
-      const updatedCages = state.cages.map(c => 
+      const updatedCages = (state.cages || []).map(c => 
         selectedIds.includes(c.id) ? {
           ...c,
           dimensions: {
@@ -89,7 +97,7 @@ const CageInventory: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
           const sequentialName = `${prefix}${String(i).padStart(padding, '0')}`;
           
           newCages.push({
-            id: crypto.randomUUID(),
+            id: generateId(),
             name: sequentialName,
             model: formData.model,
             dimensions: {
@@ -104,7 +112,7 @@ const CageInventory: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
           });
         }
 
-        onUpdate({ ...state, cages: [...state.cages, ...newCages] });
+        onUpdate({ ...state, cages: [...(state.cages || []), ...newCages] });
         resetForm();
         return;
       }
@@ -112,7 +120,7 @@ const CageInventory: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
 
     // Lógica padrão (Edição ou Cadastro Único)
     if (editingId) {
-      const updatedCages = state.cages.map(c => 
+      const updatedCages = (state.cages || []).map(c => 
         c.id === editingId ? {
           ...c,
           name: formData.name,
@@ -131,7 +139,7 @@ const CageInventory: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       setEditingId(null);
     } else {
       const newCage: Cage = {
-        id: crypto.randomUUID(),
+        id: generateId(),
         name: formData.name,
         model: formData.model,
         dimensions: {
@@ -144,7 +152,7 @@ const CageInventory: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
         status: 'Disponível',
         updatedAt: Date.now()
       };
-      onUpdate({ ...state, cages: [...state.cages, newCage] });
+      onUpdate({ ...state, cages: [...(state.cages || []), newCage] });
     }
 
     resetForm();
@@ -175,7 +183,7 @@ const CageInventory: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
 
   const removeCage = (id: string) => {
     if (!hasPermission) return;
-    const cage = state.cages.find(c => c.id === id);
+    const cage = (state.cages || []).find(c => c.id === id);
     if (cage?.status === 'Ocupada') {
       alert('Não é possível remover uma gaiola que está OCUPADA com peixes. Desocupe-a primeiro no menu Alojamento.');
       return;
@@ -183,7 +191,7 @@ const CageInventory: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     if (!confirm(`Tem certeza que deseja remover a gaiola "${cage?.name}" permanentemente?`)) return;
     onUpdate({
       ...state,
-      cages: state.cages.filter(c => c.id !== id)
+      cages: (state.cages || []).filter(c => c.id !== id)
     });
   };
 
@@ -194,8 +202,8 @@ const CageInventory: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
   };
 
   const filteredCages = useMemo(() => {
-    if (filterStatus === 'Todos') return state.cages;
-    return state.cages.filter(c => c.status === filterStatus);
+    if (filterStatus === 'Todos') return state.cages || [];
+    return (state.cages || []).filter(c => c.status === filterStatus);
   }, [state.cages, filterStatus]);
 
   const toggleSelectAll = () => {
@@ -208,7 +216,7 @@ const CageInventory: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
 
   const removeSelected = () => {
     if (!hasPermission) return;
-    const occupiedSelected = state.cages.filter(c => selectedIds.includes(c.id) && c.status === 'Ocupada');
+    const occupiedSelected = (state.cages || []).filter(c => selectedIds.includes(c.id) && c.status === 'Ocupada');
     if (occupiedSelected.length > 0) {
       alert(`Não é possível remover ${occupiedSelected.length} gaiolas que estão OCUPADAS. Desocupe-as primeiro.`);
       return;
@@ -216,7 +224,7 @@ const CageInventory: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     if (!confirm(`Tem certeza que deseja remover as ${selectedIds.length} gaiolas selecionadas permanentemente?`)) return;
     onUpdate({
       ...state,
-      cages: state.cages.filter(c => !selectedIds.includes(c.id))
+      cages: (state.cages || []).filter(c => !selectedIds.includes(c.id))
     });
     setSelectedIds([]);
   };
@@ -434,7 +442,7 @@ const CageInventory: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
           </div>
         )}
 
-        {state.cages.length > 0 && hasPermission && (
+        {(state.cages || []).length > 0 && hasPermission && (
           <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 flex items-center justify-between sticky top-4 z-20">
             <div className="flex items-center gap-4">
               <button 

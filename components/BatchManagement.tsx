@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { Batch, AppState, User } from '../types';
-import { Plus, Trash2, Tag, Calendar, Scale, Hash, Edit, X, BookOpen, Eye, TrendingUp, Fish, AlertCircle, ShoppingCart, CheckCircle2, Package } from 'lucide-react';
+import { Plus, Trash2, Tag, Calendar, Scale, Hash, Edit, X, BookOpen, Eye, TrendingUp, Fish, AlertCircle, ShoppingCart, CheckCircle2, Package, Utensils, Info, CheckSquare, Box } from 'lucide-react';
 import { format, differenceInDays, parseISO, startOfDay } from 'date-fns';
 import HarvestManagement from './HarvestManagement';
 
@@ -10,6 +10,14 @@ interface Props {
   onUpdate: (newState: AppState) => void;
   currentUser: User;
 }
+
+const generateId = () => {
+  try {
+    return crypto.randomUUID();
+  } catch (e) {
+    return Date.now().toString(36) + Math.random().toString(36).substring(2);
+  }
+};
 
 const BatchManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
   const [activeSubTab, setActiveSubTab] = useState<'inventory' | 'harvest'>('inventory');
@@ -35,7 +43,7 @@ const BatchManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     if (!formData.name || !formData.initialQuantity) return;
 
     if (editingId) {
-      const updatedBatches = state.batches.map(b => 
+      const updatedBatches = (state.batches || []).map(b => 
         b.id === editingId ? {
           ...b,
           name: formData.name,
@@ -51,7 +59,7 @@ const BatchManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       setEditingId(null);
     } else {
       const newBatch: Batch = {
-        id: crypto.randomUUID(),
+        id: generateId(),
         name: formData.name,
         settlementDate: formData.settlementDate,
         initialQuantity: Number(formData.initialQuantity),
@@ -60,7 +68,7 @@ const BatchManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
         expectedHarvestDate: formData.expectedHarvestDate || undefined,
         updatedAt: Date.now()
       };
-      onUpdate({ ...state, batches: [...state.batches, newBatch] });
+      onUpdate({ ...state, batches: [...(state.batches || []), newBatch] });
     }
 
     setFormData({
@@ -91,7 +99,7 @@ const BatchManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     if (!confirm('Excluir este lote? Isso removerá o vínculo com todas as gaiolas.')) return;
     onUpdate({
       ...state,
-      batches: state.batches.filter(b => b.id !== id)
+      batches: (state.batches || []).filter(b => b.id !== id)
     });
   };
 
@@ -290,7 +298,7 @@ const BatchManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     if (!batch) return [];
 
     return batch.batchCages.map(cage => {
-      const mortality = state.mortalityLogs
+      const mortality = (state.mortalityLogs || [])
         .filter(m => m.cageId === cage.id)
         .reduce((acc, curr) => acc + curr.count, 0);
       
