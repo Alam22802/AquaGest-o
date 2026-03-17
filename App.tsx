@@ -204,7 +204,7 @@ const App: React.FC = () => {
         if (oldList === newList) return oldList;
         
         const oldMap = new Map((oldList || []).map(i => [i.id, i]));
-        let listChanged = false;
+        let listChanged = (oldList || []).length !== (newList || []).length;
         
         const updatedList = (newList || []).map(item => {
           const oldItem = oldMap.get(item.id);

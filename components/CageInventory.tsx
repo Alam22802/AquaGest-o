@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { AppState, Cage, User, CageStatus } from '../types';
-import { Plus, Trash2, Box, Edit, X, Ruler, Users, Info, Layers, Filter, CheckCircle2, Settings, Eraser } from 'lucide-react';
+import { Plus, Trash2, Box, Edit, X, Ruler, Users, Info, Layers, Filter, CheckCircle2, Settings, Eraser, LayoutDashboard } from 'lucide-react';
 
 interface Props {
   state: AppState;
@@ -79,6 +79,16 @@ const CageInventory: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     const rangeRegex = /^(.+?)(\d+)\s*-\s*(.+?)(\d+)$/;
     const match = formData.name.match(rangeRegex);
 
+    // Inferred model based on dimensions
+    const getInferredModel = (l: number, w: number): Cage['model'] => {
+      const dimKey = `${l}x${w}`;
+      if (dimKey === '4x4') return '4x4';
+      if (dimKey === '6x6') return '6x6';
+      if (dimKey === '8x8') return '8x8';
+      if (dimKey === '12x12') return '12x12';
+      return '6x6'; // Default
+    };
+
     if (!editingId && match) {
       const prefix1 = match[1];
       const startNumStr = match[2];
@@ -99,7 +109,7 @@ const CageInventory: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
           newCages.push({
             id: generateId(),
             name: sequentialName,
-            model: formData.model,
+            model: getInferredModel(Number(formData.length), Number(formData.width)),
             dimensions: {
               length: Number(formData.length),
               width: Number(formData.width),
@@ -124,7 +134,7 @@ const CageInventory: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
         c.id === editingId ? {
           ...c,
           name: formData.name,
-          model: formData.model,
+          model: getInferredModel(Number(formData.length), Number(formData.width)),
           dimensions: {
             length: Number(formData.length),
             width: Number(formData.width),
@@ -141,7 +151,7 @@ const CageInventory: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       const newCage: Cage = {
         id: generateId(),
         name: formData.name,
-        model: formData.model,
+        model: getInferredModel(Number(formData.length), Number(formData.width)),
         dimensions: {
           length: Number(formData.length),
           width: Number(formData.width),
@@ -231,9 +241,13 @@ const CageInventory: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
 
   const filterSummary = useMemo(() => {
     const totalCapacity = filteredCages.reduce((acc, c) => acc + c.stockingCapacity, 0);
-    const models = filteredCages.reduce((acc: Record<string, number>, c) => {
-      const modelKey = c.model || 'Não definido';
-      acc[modelKey] = (acc[modelKey] || 0) + 1;
+    const models = filteredCages.reduce((acc: Record<string, { count: number, capacity: number }>, c) => {
+      const modelKey = `${c.dimensions.length}x${c.dimensions.width}x${c.dimensions.depth}m`;
+      if (!acc[modelKey]) {
+        acc[modelKey] = { count: 0, capacity: 0 };
+      }
+      acc[modelKey].count += 1;
+      acc[modelKey].capacity += c.stockingCapacity;
       return acc;
     }, {});
 
@@ -290,21 +304,6 @@ const CageInventory: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
             )}
 
             <form onSubmit={handleSave} className="space-y-4">
-              <div>
-                <label className="block text-[10px] font-black text-slate-400 uppercase mb-1 tracking-widest">Modelo da Gaiola</label>
-                <select 
-                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-indigo-500 font-bold text-sm"
-                  value={formData.model}
-                  onChange={(e) => setFormData({...formData, model: e.target.value as Cage['model']})}
-                >
-                  <option value="4x4">4x4</option>
-                  <option value="6x6">6x6</option>
-                  <option value="8x8">8x8</option>
-                  <option value="12x12">12x12</option>
-                  <option value="Circular">Circular</option>
-                </select>
-              </div>
-
               <div>
                 <label className="block text-[10px] font-black text-slate-400 uppercase mb-1 tracking-widest">Identificação</label>
                 <input 
@@ -419,7 +418,9 @@ const CageInventory: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
               <div className="h-12 w-px bg-slate-100 hidden md:block" />
 
               <div>
-                <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Capacidade Total</h4>
+                <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">
+                  {filterStatus === 'Todos' ? 'Capacidade Total' : `Saldo ${filterStatus}`}
+                </h4>
                 <div className="text-xl font-black text-indigo-600 tracking-tight">
                   {filterSummary.totalCapacity.toLocaleString()} <span className="text-xs">unidades</span>
                 </div>
@@ -428,12 +429,18 @@ const CageInventory: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
               <div className="h-12 w-px bg-slate-100 hidden md:block" />
 
               <div className="flex-1">
-                <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Distribuição por Modelo</h4>
+                <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Distribuição por Medidas (Modelo)</h4>
                 <div className="flex flex-wrap gap-2">
-                  {Object.entries(filterSummary.models).map(([model, count]) => (
-                    <div key={model} className="px-3 py-1.5 bg-slate-50 border border-slate-100 rounded-xl text-[10px] font-black text-slate-600 uppercase flex items-center gap-2">
-                      <span className="w-1.5 h-1.5 rounded-full bg-indigo-400" />
-                      {model}: <span className="text-indigo-600">{count}</span>
+                  {Object.entries(filterSummary.models).map(([model, data]) => (
+                    <div key={model} className="px-3 py-2 bg-slate-50 border border-slate-100 rounded-xl flex flex-col gap-1">
+                      <div className="flex items-center gap-2">
+                        <span className="w-1.5 h-1.5 rounded-full bg-indigo-400" />
+                        <span className="text-[10px] font-black text-slate-600 uppercase">{model}:</span>
+                        <span className="text-[10px] font-black text-indigo-600">{data.count}</span>
+                      </div>
+                      <div className="text-[9px] font-bold text-slate-400 uppercase pl-3.5">
+                        Cap: <span className="text-slate-600">{data.capacity.toLocaleString()} un</span>
+                      </div>
                     </div>
                   ))}
                 </div>

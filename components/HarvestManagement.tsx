@@ -163,6 +163,9 @@ const HarvestManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
     if (val && unitWeight && Number(unitWeight) > 0) {
       const count = Math.round((Number(val) * 1000) / Number(unitWeight));
       setFishCount(count.toString());
+    } else if (val && fishCount && Number(fishCount) > 0) {
+      const uw = (Number(val) * 1000) / Number(fishCount);
+      setUnitWeight(uw.toFixed(1));
     }
   };
 
@@ -176,7 +179,7 @@ const HarvestManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
 
   const handleFishCountChange = (val: string) => {
     setFishCount(val);
-    if (val && weight && Number(val) > 0) {
+    if (val && weight && Number(weight) > 0 && Number(val) > 0) {
       const uw = (Number(weight) * 1000) / Number(val);
       setUnitWeight(uw.toFixed(1));
     }

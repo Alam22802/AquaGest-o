@@ -4,6 +4,14 @@ import { Cage, AppState, User } from '../types';
 import { Trash2, Box, Edit, X, Ruler, Users, Tag, Calendar, LayoutDashboard, Info, Layers, Eye } from 'lucide-react';
 import { format } from 'date-fns';
 
+const generateId = () => {
+  try {
+    return crypto.randomUUID();
+  } catch (e) {
+    return Date.now().toString(36) + Math.random().toString(36).substring(2);
+  }
+};
+
 interface Props {
   state: AppState;
   onUpdate: (newState: AppState) => void;
@@ -24,16 +32,16 @@ const CageManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
   const hasPermission = currentUser.isMaster || currentUser.canEdit;
 
   const availableCages = useMemo(() => {
-    return state.cages.filter(c => c.status === 'Disponível' || (editingId && c.id === editingId));
+    return (state.cages || []).filter(c => c.status === 'Disponível' || (editingId && c.id === editingId));
   }, [state.cages, editingId]);
 
   const selectedCageDef = useMemo(() => {
-    return state.cages.find(c => c.id === formData.cageId);
+    return (state.cages || []).find(c => c.id === formData.cageId);
   }, [state.cages, formData.cageId]);
 
-  const selectedBatch = state.batches.find(b => b.id === formData.batchId);
+  const selectedBatch = (state.batches || []).find(b => b.id === formData.batchId);
   
-  const batchUsedFish = state.cages
+  const batchUsedFish = (state.cages || [])
     .filter(c => c.batchId === formData.batchId && c.id !== editingId)
     .reduce((a, b) => a + (b.initialFishCount || 0), 0);
     
@@ -52,7 +60,7 @@ const CageManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       return;
     }
 
-    const updatedCages = state.cages.map(c => {
+    const updatedCages = (state.cages || []).map(c => {
       if (c.id === formData.cageId) {
         return {
           ...c,
@@ -110,7 +118,7 @@ const CageManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     if (!confirm('Deseja desocupar esta gaiola? Ela retornará para o inventário como "Disponível".')) return;
     onUpdate({
       ...state,
-      cages: state.cages.map(c => c.id === id ? {
+      cages: (state.cages || []).map(c => c.id === id ? {
         ...c,
         batchId: undefined,
         initialFishCount: undefined,
@@ -121,7 +129,7 @@ const CageManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     });
   };
 
-  const occupiedCages = state.cages.filter(c => c.status === 'Ocupada');
+  const occupiedCages = (state.cages || []).filter(c => c.status === 'Ocupada');
 
   return (
     <div className="space-y-8 pb-20">
@@ -154,7 +162,7 @@ const CageManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
               <label className="block text-xs font-black text-slate-400 uppercase mb-1">Linha de Localização</label>
               <select required className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 font-bold" value={formData.lineId} onChange={(e) => setFormData({...formData, lineId: e.target.value})}>
                 <option value="">Selecione a linha...</option>
-                {state.lines.map(line => (
+                {(state.lines || []).map(line => (
                   <option key={line.id} value={line.id}>{line.name}</option>
                 ))}
               </select>
@@ -164,8 +172,8 @@ const CageManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
               <label className="block text-xs font-black text-slate-400 uppercase mb-1">Vincular ao Lote</label>
               <select required className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 font-bold" value={formData.batchId} onChange={(e) => setFormData({...formData, batchId: e.target.value})}>
                 <option value="">Selecione o lote...</option>
-                {state.batches.map(b => {
-                  const used = state.cages.filter(c => c.batchId === b.id && c.id !== editingId).reduce((x, y) => x + (y.initialFishCount || 0), 0);
+                {(state.batches || []).map(b => {
+                  const used = (state.cages || []).filter(c => c.batchId === b.id && c.id !== editingId).reduce((x, y) => x + (y.initialFishCount || 0), 0);
                   return <option key={b.id} value={b.id}>{b.name} (Saldo: {b.initialQuantity - used})</option>;
                 })}
               </select>
@@ -226,9 +234,9 @@ const CageManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {occupiedCages.map(cage => {
-          const batch = state.batches.find(b => b.id === cage.batchId);
-          const line = state.lines.find(l => l.id === cage.lineId);
-          const mortalities = state.mortalityLogs.filter(m => m.cageId === cage.id).reduce((a, b) => a + b.count, 0);
+          const batch = (state.batches || []).find(b => b.id === cage.batchId);
+          const line = (state.lines || []).find(l => l.id === cage.lineId);
+          const mortalities = (state.mortalityLogs || []).filter(m => m.cageId === cage.id).reduce((a, b) => a + b.count, 0);
           const currentCount = (cage.initialFishCount || 0) - mortalities;
           
           return (
