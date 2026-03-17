@@ -87,21 +87,21 @@ const SlaughterSummary = React.memo(({ stats, startDate, endDate, onStartDateCha
 
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-8 mt-8 pt-8 border-t border-white/5">
              <div className="space-y-2 border-l-2 border-white/10 pl-6">
-                <div className="text-[9px] font-black opacity-40 uppercase tracking-widest">Água / kg Embalado</div>
+                <div className="text-[9px] font-black opacity-40 uppercase tracking-widest">Consumo Água/Ton Peixe Abatido</div>
                 <div className="text-xl font-black flex items-baseline gap-1">
-                   {stats.waterPerKg.toFixed(2)}
-                   <span className="text-[10px] opacity-40">L/kg</span>
+                   {stats.waterPerTon.toFixed(2)}
+                   <span className="text-[10px] opacity-40">L/Ton</span>
                 </div>
              </div>
              <div className="space-y-2 border-l-2 border-white/10 pl-6">
-                <div className="text-[9px] font-black opacity-40 uppercase tracking-widest">Energia / Tonelada</div>
+                <div className="text-[9px] font-black opacity-40 uppercase tracking-widest">Consumo Kw/Ton Peixe Abatido</div>
                 <div className="text-xl font-black flex items-baseline gap-1">
-                   <span className="text-[10px] opacity-40">R$</span>
-                   {stats.energyPerTon.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                   {stats.energyKwPerTon.toFixed(2)}
+                   <span className="text-[10px] opacity-40">kWh/Ton</span>
                 </div>
              </div>
              <div className="space-y-2 border-l-2 border-white/10 pl-6">
-                <div className="text-[9px] font-black opacity-40 uppercase tracking-widest">Mão de Obra / Ton</div>
+                <div className="text-[9px] font-black opacity-40 uppercase tracking-widest">Mão De Obra/Ton Peixe Abatido</div>
                 <div className="text-xl font-black flex items-baseline gap-1">
                    <span className="text-[10px] opacity-40">R$</span>
                    {stats.laborPerTon.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
@@ -421,13 +421,13 @@ const SlaughterOverview: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
     const yieldPercentage = totalRecep > 0 ? (totalPacked / totalRecep) * 100 : 0;
 
     const totalWaterLiters = filteredExpenses.filter(e => e.category === 'Água').reduce((acc, e) => acc + (e.quantity || 0), 0);
-    const waterPerKg = totalPacked > 0 ? totalWaterLiters / totalPacked : 0;
+    const waterPerTon = totalRecep > 0 ? totalWaterLiters / (totalRecep / 1000) : 0;
 
-    const totalEnergyValue = filteredExpenses.filter(e => e.category === 'Energia').reduce((acc, e) => acc + e.value, 0);
-    const energyPerTon = totalPacked > 0 ? (totalEnergyValue / (totalPacked / 1000)) : 0;
+    const totalEnergyKw = filteredExpenses.filter(e => e.category === 'Energia').reduce((acc, e) => acc + (e.quantity || 0), 0);
+    const energyKwPerTon = totalRecep > 0 ? totalEnergyKw / (totalRecep / 1000) : 0;
 
     const totalSalaryValue = filteredExpenses.filter(e => e.category === 'Salário').reduce((acc, e) => acc + e.value, 0);
-    const laborPerTon = totalPacked > 0 ? (totalSalaryValue / (totalPacked / 1000)) : 0;
+    const laborPerTon = totalRecep > 0 ? (totalSalaryValue / (totalRecep / 1000)) : 0;
 
     const totalFreightValue = filteredLogs.reduce((acc, l) => acc + (l.freightValue || 0), 0);
     const freightPerKgLive = totalRecep > 0 ? totalFreightValue / totalRecep : 0;
@@ -444,8 +444,8 @@ const SlaughterOverview: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
       totalPacked, 
       yieldPercentage, 
       count: filteredLogs.length,
-      waterPerKg,
-      energyPerTon,
+      waterPerTon,
+      energyKwPerTon,
       laborPerTon,
       freightPerKgLive,
       totalFieldCondemnation,
