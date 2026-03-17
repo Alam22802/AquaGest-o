@@ -39,8 +39,8 @@ const HarvestManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
   );
 
   const cagesInBatch = useMemo(() => 
-    state.cages.filter(c => c.batchId === selectedBatchId),
-    [state.cages, selectedBatchId]
+    state.cages.filter(c => c.batchId === selectedBatchId || c.id === selectedCageId),
+    [state.cages, selectedBatchId, selectedCageId]
   );
 
   const selectedCage = useMemo(() => 
@@ -48,9 +48,9 @@ const HarvestManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
     [state.cages, selectedCageId]
   );
 
-  // Pre-fill fish count when cage is selected
+  // Pre-fill fish count when cage is selected (only for new harvests)
   React.useEffect(() => {
-    if (selectedCage) {
+    if (selectedCage && !editingId) {
       // Calculate current fish count in cage (initial - mortality)
       const cageMortality = (state.mortalityLogs || [])
         .filter(m => m.cageId === selectedCage.id)
@@ -58,10 +58,10 @@ const HarvestManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
       
       const currentCount = (selectedCage.initialFishCount || 0) - cageMortality;
       setFishCount(currentCount.toString());
-    } else {
+    } else if (!selectedCage && !editingId) {
       setFishCount('');
     }
-  }, [selectedCage, state.mortalityLogs]);
+  }, [selectedCage, state.mortalityLogs, editingId]);
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
