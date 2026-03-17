@@ -512,8 +512,16 @@ const BatchManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                         <div className="bg-white p-4 rounded-2xl border border-slate-100">
                           <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">Modelos Selecionados</span>
                           <div className="flex flex-wrap gap-1 mt-1">
-                            {Array.from(new Set(selectedPlanningCagesData.map(c => `${c.dimensions.length}x${c.dimensions.width}x${c.dimensions.depth}m`))).map(m => (
-                              <span key={m} className="px-2 py-0.5 bg-blue-50 text-[8px] font-black text-blue-600 rounded-md uppercase border border-blue-100">{m}</span>
+                            {Object.entries(
+                              selectedPlanningCagesData.reduce((acc, c) => {
+                                const key = `${c.dimensions.length}x${c.dimensions.width}x${c.dimensions.depth}m`;
+                                acc[key] = (acc[key] || 0) + 1;
+                                return acc;
+                              }, {} as Record<string, number>)
+                            ).map(([m, count]) => (
+                              <span key={m} className="px-2 py-0.5 bg-blue-50 text-[8px] font-black text-blue-600 rounded-md uppercase border border-blue-100">
+                                {m} = {count}und
+                              </span>
                             ))}
                           </div>
                         </div>
