@@ -15,6 +15,14 @@ interface Props {
   currentUser: User;
 }
 
+const generateId = () => {
+  try {
+    return crypto.randomUUID();
+  } catch (e) {
+    return Date.now().toString(36) + Math.random().toString(36).substring(2);
+  }
+};
+
 const CapexManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
   const [activeSubTab, setActiveSubTab] = useState<'overview' | 'planning' | 'execution'>('overview');
   const [selectedPortfolioId, setSelectedPortfolioId] = useState<string>('');
@@ -110,7 +118,7 @@ const CapexManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     if (!hasPermission) return;
 
     const newPortfolio: InvestmentPortfolio = {
-      id: editingPortfolioId || crypto.randomUUID(),
+      id: editingPortfolioId || generateId(),
       name: portfolioForm.name,
       totalValue: Number(portfolioForm.totalValue),
       startDate: portfolioForm.startDate,
@@ -150,7 +158,7 @@ const CapexManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     }
 
     const newProject: CapexProject = {
-      id: editingProjectId || crypto.randomUUID(),
+      id: editingProjectId || generateId(),
       portfolioId: projectForm.portfolioId,
       name: projectForm.name,
       costCenter: projectForm.costCenter,
@@ -193,7 +201,7 @@ const CapexManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     }
 
     const newInvoice: CapexInvoice = {
-      id: editingInvoiceId || crypto.randomUUID(),
+      id: editingInvoiceId || generateId(),
       portfolioId: invoiceForm.portfolioId,
       projectId: invoiceForm.projectId,
       invoiceNumber: invoiceForm.invoiceNumber,
@@ -848,14 +856,14 @@ const CapexManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                 <label className="block text-[10px] font-black text-slate-400 uppercase mb-1">Carteira de Investimento</label>
                 <select required className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none focus:ring-2 focus:ring-amber-500" value={invoiceForm.portfolioId} onChange={e => setInvoiceForm({...invoiceForm, portfolioId: e.target.value, projectId: ''})}>
                   <option value="">Selecionar Carteira...</option>
-                  {state.portfolios?.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                  {(state.portfolios || []).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                 </select>
               </div>
               <div className="md:col-span-1">
                 <label className="block text-[10px] font-black text-slate-400 uppercase mb-1">Projeto Vinculado</label>
                 <select required disabled={!invoiceForm.portfolioId} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none focus:ring-2 focus:ring-amber-500 disabled:opacity-50" value={invoiceForm.projectId} onChange={e => setInvoiceForm({...invoiceForm, projectId: e.target.value})}>
                   <option value="">Selecionar Projeto...</option>
-                  {state.capexProjects?.filter(p => p.portfolioId === invoiceForm.portfolioId).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                  {(state.capexProjects || []).filter(p => p.portfolioId === invoiceForm.portfolioId).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                 </select>
               </div>
               <div className="md:col-span-1">

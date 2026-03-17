@@ -10,6 +10,14 @@ interface Props {
   currentUser: User;
 }
 
+const generateId = () => {
+  try {
+    return crypto.randomUUID();
+  } catch (e) {
+    return Date.now().toString(36) + Math.random().toString(36).substring(2);
+  }
+};
+
 const BiometryLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
   const [selectedLineId, setSelectedLineId] = useState('');
   const [formBatchId, setFormBatchId] = useState('');
@@ -37,13 +45,13 @@ const BiometryLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
 
   const filteredLines = useMemo(() => {
     if (!formBatchId) return [];
-    const lineIdsInBatch = new Set(state.cages.filter(c => c.batchId === formBatchId).map(c => c.lineId));
-    return state.lines.filter(l => lineIdsInBatch.has(l.id));
+    const lineIdsInBatch = new Set((state.cages || []).filter(c => c.batchId === formBatchId).map(c => c.lineId));
+    return (state.lines || []).filter(l => lineIdsInBatch.has(l.id));
   }, [formBatchId, state.cages, state.lines]);
 
   const filteredCages = useMemo(() => {
     if (!formBatchId || !selectedLineId) return [];
-    return state.cages.filter(c => c.batchId === formBatchId && c.lineId === selectedLineId);
+    return (state.cages || []).filter(c => c.batchId === formBatchId && c.lineId === selectedLineId);
   }, [formBatchId, selectedLineId, state.cages]);
 
   const sortedLogs = useMemo(() => {
@@ -63,7 +71,7 @@ const BiometryLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     if (editingId) {
       onUpdate({
         ...state,
-        biometryLogs: state.biometryLogs.map(log => 
+        biometryLogs: (state.biometryLogs || []).map(log => 
           log.id === editingId ? { 
             ...log, 
             cageId: formData.cageId, 
@@ -76,9 +84,9 @@ const BiometryLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       });
       setEditingId(null);
     } else {
-      const cage = state.cages.find(c => c.id === formData.cageId);
+      const cage = (state.cages || []).find(c => c.id === formData.cageId);
       const newLog: IBiometryLog = {
-        id: crypto.randomUUID(),
+        id: generateId(),
         cageId: formData.cageId,
         batchId: cage?.batchId,
         averageWeight: Number(formData.averageWeight),
@@ -86,7 +94,7 @@ const BiometryLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
         userId: currentUser.id,
         updatedAt: Date.now()
       };
-      onUpdate({ ...state, biometryLogs: [newLog, ...state.biometryLogs] });
+      onUpdate({ ...state, biometryLogs: [newLog, ...(state.biometryLogs || [])] });
     }
     resetForm();
   };
@@ -100,7 +108,7 @@ const BiometryLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
 
   const startEdit = (log: IBiometryLog) => {
     if (!hasPermission) return;
-    const cage = state.cages.find(c => c.id === log.cageId);
+    const cage = (state.cages || []).find(c => c.id === log.cageId);
     if (cage) {
       setFormBatchId(cage.batchId || '');
       setSelectedLineId(cage.lineId || '');
@@ -112,7 +120,7 @@ const BiometryLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
   const removeLog = (id: string) => {
     if (!hasPermission) return;
     if (!confirm('Excluir esta pesagem?')) return;
-    onUpdate({ ...state, biometryLogs: state.biometryLogs.filter(b => b.id !== id) });
+    onUpdate({ ...state, biometryLogs: (state.biometryLogs || []).filter(b => b.id !== id) });
   };
 
   return (
@@ -130,7 +138,7 @@ const BiometryLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
             <form onSubmit={handleSave} className="space-y-4">
               <select required className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none" value={formBatchId} onChange={e => setFormBatchId(e.target.value)}>
                 <option value="">Lote...</option>
-                {state.batches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                {(state.batches || []).map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
               </select>
               <select required disabled={!formBatchId} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none" value={selectedLineId} onChange={e => setSelectedLineId(e.target.value)}>
                 <option value="">Linha...</option>
@@ -176,8 +184,8 @@ const BiometryLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
             </thead>
             <tbody className="divide-y divide-slate-100">
               {sortedLogs.map(log => {
-                const cage = state.cages.find(c => c.id === log.cageId);
-                const user = state.users.find(u => u.id === log.userId);
+                const cage = (state.cages || []).find(c => c.id === log.cageId);
+                const user = (state.users || []).find(u => u.id === log.userId);
                 return (
                   <tr key={log.id} className="hover:bg-slate-50 transition-colors">
                     <td className="px-6 py-4 font-black text-slate-800 uppercase">{cage?.name}</td>

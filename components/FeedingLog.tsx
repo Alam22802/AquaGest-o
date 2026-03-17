@@ -10,6 +10,14 @@ interface Props {
   currentUser: User;
 }
 
+const generateId = () => {
+  try {
+    return crypto.randomUUID();
+  } catch (e) {
+    return Date.now().toString(36) + Math.random().toString(36).substring(2);
+  }
+};
+
 const FeedingLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
   const [selectedLineId, setSelectedLineId] = useState('');
   const [formBatchId, setFormBatchId] = useState('');
@@ -45,19 +53,19 @@ const FeedingLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
 
   const filteredLines = useMemo(() => {
     if (!formBatchId) return [];
-    const lineIdsInBatch = new Set(state.cages.filter(c => c.batchId === formBatchId).map(c => c.lineId));
-    return state.lines.filter(l => lineIdsInBatch.has(l.id));
+    const lineIdsInBatch = new Set((state.cages || []).filter(c => c.batchId === formBatchId).map(c => c.lineId));
+    return (state.lines || []).filter(l => lineIdsInBatch.has(l.id));
   }, [formBatchId, state.cages, state.lines]);
 
   const filteredCages = useMemo(() => {
     if (!formBatchId || !selectedLineId) return [];
-    return state.cages.filter(c => c.batchId === formBatchId && c.lineId === selectedLineId);
+    return (state.cages || []).filter(c => c.batchId === formBatchId && c.lineId === selectedLineId);
   }, [formBatchId, selectedLineId, state.cages]);
 
   const { cageMap, feedMap, userMap } = useMemo(() => {
-    const cages = new Map(state.cages.map(c => [c.id, c]));
-    const feeds = new Map(state.feedTypes.map(f => [f.id, f]));
-    const users = new Map(state.users.map(u => [u.id, u]));
+    const cages = new Map((state.cages || []).map(c => [c.id, c]));
+    const feeds = new Map((state.feedTypes || []).map(f => [f.id, f]));
+    const users = new Map((state.users || []).map(u => [u.id, u]));
     return { cageMap: cages, feedMap: feeds, userMap: users };
   }, [state.cages, state.feedTypes, state.users]);
 
@@ -113,7 +121,7 @@ const FeedingLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     if (!hasPermission || selectedLogIds.size === 0) return;
     if (!confirm(`Deseja excluir ${selectedLogIds.size} tratos selecionados? O estoque será devolvido.`)) return;
 
-    const logsToRemove = state.feedingLogs.filter(l => selectedLogIds.has(l.id));
+    const logsToRemove = (state.feedingLogs || []).filter(l => selectedLogIds.has(l.id));
     
     // Group by feed type to update stock
     const feedUpdates = new Map<string, number>();
@@ -122,7 +130,7 @@ const FeedingLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       feedUpdates.set(log.feedTypeId, current + log.amount);
     });
 
-    const updatedFeeds = state.feedTypes.map(f => {
+    const updatedFeeds = (state.feedTypes || []).map(f => {
       const refund = feedUpdates.get(f.id);
       if (refund) return { ...f, totalStock: f.totalStock + refund };
       return f;
@@ -130,7 +138,7 @@ const FeedingLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
 
     onUpdate({
       ...state,
-      feedingLogs: state.feedingLogs.filter(l => !selectedLogIds.has(l.id)),
+      feedingLogs: (state.feedingLogs || []).filter(l => !selectedLogIds.has(l.id)),
       feedTypes: updatedFeeds
     });
     setSelectedLogIds(new Set());
@@ -149,9 +157,9 @@ const FeedingLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     if (!selectedFeed) return;
 
     if (editingId) {
-      const oldLog = state.feedingLogs.find(l => l.id === editingId);
+      const oldLog = (state.feedingLogs || []).find(l => l.id === editingId);
       const cage = cageMap.get(formData.cageId);
-      const updatedLogs = state.feedingLogs.map(l => 
+      const updatedLogs = (state.feedingLogs || []).map(l => 
         l.id === editingId ? {
           ...l,
           cageId: formData.cageId,
@@ -163,7 +171,7 @@ const FeedingLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
         } : l
       );
 
-      const updatedFeeds = state.feedTypes.map(f => {
+      const updatedFeeds = (state.feedTypes || []).map(f => {
         let newStock = f.totalStock;
         // Refund old amount if this was the old feed type
         if (oldLog && f.id === oldLog.feedTypeId) {
@@ -181,7 +189,7 @@ const FeedingLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     } else {
       const cage = cageMap.get(formData.cageId);
       const newLog: IFeedingLog = {
-        id: crypto.randomUUID(),
+        id: generateId(),
         cageId: formData.cageId,
         batchId: cage?.batchId,
         feedTypeId: formData.feedTypeId,
@@ -191,7 +199,7 @@ const FeedingLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
         updatedAt: Date.now()
       };
       
-      const updatedFeeds = state.feedTypes.map(f => {
+      const updatedFeeds = (state.feedTypes || []).map(f => {
         if (f.id === formData.feedTypeId) return { ...f, totalStock: f.totalStock - amountNum, updatedAt: Date.now() };
         return f;
       });
@@ -234,16 +242,16 @@ const FeedingLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
   const removeLog = (logId: string) => {
     if (!hasPermission) return;
     if (!confirm('Deseja excluir este trato? O estoque será devolvido.')) return;
-    const log = state.feedingLogs.find(l => l.id === logId);
+    const log = (state.feedingLogs || []).find(l => l.id === logId);
     if (!log) return;
     
-    const updatedFeeds = state.feedTypes.map(f => 
+    const updatedFeeds = (state.feedTypes || []).map(f => 
       f.id === log.feedTypeId ? { ...f, totalStock: f.totalStock + log.amount } : f
     );
     
     onUpdate({ 
       ...state, 
-      feedingLogs: state.feedingLogs.filter(l => l.id !== logId), 
+      feedingLogs: (state.feedingLogs || []).filter(l => l.id !== logId), 
       feedTypes: updatedFeeds 
     });
   };
@@ -263,7 +271,7 @@ const FeedingLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
             <form onSubmit={handleSave} className="space-y-4">
               <select required className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none" value={formBatchId} onChange={e => setFormBatchId(e.target.value)}>
                 <option value="">Escolher Lote...</option>
-                {state.batches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                {(state.batches || []).map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
               </select>
               <select required disabled={!formBatchId} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none" value={selectedLineId} onChange={e => setSelectedLineId(e.target.value)}>
                 <option value="">Escolher Linha...</option>
@@ -275,7 +283,7 @@ const FeedingLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
               </select>
               <select required className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none" value={formData.feedTypeId} onChange={e => setFormData({...formData, feedTypeId: e.target.value})}>
                 <option value="">Tipo de Ração...</option>
-                {state.feedTypes.map(ft => <option key={ft.id} value={ft.id}>{ft.name} (Saldo: {(ft.totalStock/1000).toFixed(1)}kg)</option>)}
+                {(state.feedTypes || []).map(ft => <option key={ft.id} value={ft.id}>{ft.name} (Saldo: {(ft.totalStock/1000).toFixed(1)}kg)</option>)}
               </select>
               <div className="relative">
                 <input type="number" required placeholder="Quantidade (gramas)" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none" value={formData.amount} onChange={e => setFormData({...formData, amount: e.target.value})} />
@@ -328,7 +336,7 @@ const FeedingLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
               }}
             >
               <option value="">Todos os Lotes</option>
-              {state.batches.map(b => (
+              {(state.batches || []).map(b => (
                 <option key={b.id} value={b.id}>{b.name}</option>
               ))}
             </select>

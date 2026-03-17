@@ -10,6 +10,14 @@ interface Props {
   currentUser: User;
 }
 
+const generateId = () => {
+  try {
+    return crypto.randomUUID();
+  } catch (e) {
+    return Date.now().toString(36) + Math.random().toString(36).substring(2);
+  }
+};
+
 const MortalityLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
   const [selectedLineId, setSelectedLineId] = useState('');
   const [formBatchId, setFormBatchId] = useState('');
@@ -43,18 +51,18 @@ const MortalityLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
 
   const filteredLines = useMemo(() => {
     if (!formBatchId) return [];
-    const lineIdsInBatch = new Set(state.cages.filter(c => c.batchId === formBatchId).map(c => c.lineId));
-    return state.lines.filter(l => lineIdsInBatch.has(l.id));
+    const lineIdsInBatch = new Set((state.cages || []).filter(c => c.batchId === formBatchId).map(c => c.lineId));
+    return (state.lines || []).filter(l => lineIdsInBatch.has(l.id));
   }, [formBatchId, state.cages, state.lines]);
 
   const filteredCages = useMemo(() => {
     if (!formBatchId || !selectedLineId) return [];
-    return state.cages.filter(c => c.batchId === formBatchId && c.lineId === selectedLineId);
+    return (state.cages || []).filter(c => c.batchId === formBatchId && c.lineId === selectedLineId);
   }, [formBatchId, selectedLineId, state.cages]);
 
   const { cageMap, userMap } = useMemo(() => {
-    const cages = new Map(state.cages.map(c => [c.id, c]));
-    const users = new Map(state.users.map(u => [u.id, u]));
+    const cages = new Map((state.cages || []).map(c => [c.id, c]));
+    const users = new Map((state.users || []).map(u => [u.id, u]));
     return { cageMap: cages, userMap: users };
   }, [state.cages, state.users]);
 
@@ -112,7 +120,7 @@ const MortalityLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
 
     onUpdate({
       ...state,
-      mortalityLogs: state.mortalityLogs.filter(l => !selectedLogIds.has(l.id))
+      mortalityLogs: (state.mortalityLogs || []).filter(l => !selectedLogIds.has(l.id))
     });
     setSelectedLogIds(new Set());
   };
@@ -125,12 +133,12 @@ const MortalityLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     if (editingId) {
       onUpdate({
         ...state,
-        mortalityLogs: state.mortalityLogs.map(m => m.id === editingId ? { ...m, cageId: formData.cageId, batchId: formBatchId, count: Number(formData.count), date: formData.date, updatedAt: Date.now() } : m)
+        mortalityLogs: (state.mortalityLogs || []).map(m => m.id === editingId ? { ...m, cageId: formData.cageId, batchId: formBatchId, count: Number(formData.count), date: formData.date, updatedAt: Date.now() } : m)
       });
       setEditingId(null);
     } else {
       const newLog: IMortalityLog = {
-        id: crypto.randomUUID(),
+        id: generateId(),
         cageId: formData.cageId,
         batchId: formBatchId,
         count: Number(formData.count),
@@ -138,7 +146,7 @@ const MortalityLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
         userId: currentUser.id,
         updatedAt: Date.now()
       };
-      onUpdate({ ...state, mortalityLogs: [newLog, ...state.mortalityLogs] });
+      onUpdate({ ...state, mortalityLogs: [newLog, ...(state.mortalityLogs || [])] });
     }
     resetForm();
   };
@@ -164,7 +172,7 @@ const MortalityLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
   const removeLog = (id: string) => {
     if (!hasPermission) return;
     if (!confirm('Deseja excluir este registro de perda?')) return;
-    onUpdate({ ...state, mortalityLogs: state.mortalityLogs.filter(m => m.id !== id) });
+    onUpdate({ ...state, mortalityLogs: (state.mortalityLogs || []).filter(m => m.id !== id) });
   };
 
   return (
@@ -182,7 +190,7 @@ const MortalityLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
             <form onSubmit={handleSave} className="space-y-4">
               <select required className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none" value={formBatchId} onChange={e => setFormBatchId(e.target.value)}>
                 <option value="">Escolher Lote...</option>
-                {state.batches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                {(state.batches || []).map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
               </select>
               <select required disabled={!formBatchId} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none" value={selectedLineId} onChange={e => setSelectedLineId(e.target.value)}>
                 <option value="">Escolher Linha...</option>
@@ -230,7 +238,7 @@ const MortalityLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
               }}
             >
               <option value="">Todos os Lotes</option>
-              {state.batches.map(b => (
+              {(state.batches || []).map(b => (
                 <option key={b.id} value={b.id}>{b.name}</option>
               ))}
             </select>

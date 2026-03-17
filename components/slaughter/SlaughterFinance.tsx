@@ -10,6 +10,14 @@ interface Props {
   currentUser: User;
 }
 
+const generateId = () => {
+  try {
+    return crypto.randomUUID();
+  } catch (e) {
+    return Date.now().toString(36) + Math.random().toString(36).substring(2);
+  }
+};
+
 const SlaughterFinance: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [filterCategory, setFilterCategory] = useState<string>('all');
@@ -42,7 +50,7 @@ const SlaughterFinance: React.FC<Props> = ({ state, onUpdate, currentUser }) => 
     if (!formData.description || !formData.value) return;
 
     const newExpense: SlaughterExpense = {
-      id: editingId || crypto.randomUUID(),
+      id: editingId || generateId(),
       description: formData.description,
       category: formData.category,
       value: Number(formData.value),

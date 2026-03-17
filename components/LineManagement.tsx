@@ -9,6 +9,14 @@ interface Props {
   currentUser: User;
 }
 
+const generateId = () => {
+  try {
+    return crypto.randomUUID();
+  } catch (e) {
+    return Date.now().toString(36) + Math.random().toString(36).substring(2);
+  }
+};
+
 const LineManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
   const [name, setName] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -23,18 +31,18 @@ const LineManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     if (editingId) {
       onUpdate({
         ...state,
-        lines: state.lines.map(l => l.id === editingId ? { ...l, name: name.trim(), updatedAt: Date.now() } : l)
+        lines: (state.lines || []).map(l => l.id === editingId ? { ...l, name: name.trim(), updatedAt: Date.now() } : l)
       });
       setEditingId(null);
     } else {
       const newLine: Line = {
-        id: crypto.randomUUID(),
+        id: generateId(),
         name: name.trim(),
         updatedAt: Date.now()
       };
       onUpdate({
         ...state,
-        lines: [...state.lines, newLine]
+        lines: [...(state.lines || []), newLine]
       });
     }
     setName('');
@@ -51,8 +59,8 @@ const LineManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     if (!confirm('Tem certeza? Isso pode afetar as gaiolas vinculadas.')) return;
     onUpdate({
       ...state,
-      lines: state.lines.filter(l => l.id !== id),
-      cages: state.cages.filter(c => c.lineId !== id)
+      lines: (state.lines || []).filter(l => l.id !== id),
+      cages: (state.cages || []).filter(c => c.lineId !== id)
     });
   };
 
@@ -95,7 +103,7 @@ const LineManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {state.lines.map(line => (
+        {(state.lines || []).map(line => (
           <div key={line.id} className="bg-white p-5 rounded-xl shadow-sm border border-slate-200 flex justify-between items-center group">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-blue-50 text-blue-600 rounded-lg">
@@ -104,7 +112,7 @@ const LineManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
               <div>
                 <div className="font-semibold text-slate-800">{line.name}</div>
                 <div className="text-xs text-slate-400">
-                  {state.cages.filter(c => c.lineId === line.id).length} gaiolas
+                  {(state.cages || []).filter(c => c.lineId === line.id).length} gaiolas
                 </div>
               </div>
             </div>

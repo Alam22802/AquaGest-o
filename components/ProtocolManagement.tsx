@@ -8,6 +8,14 @@ interface Props {
   onUpdate: (newState: AppState) => void;
 }
 
+const generateId = () => {
+  try {
+    return crypto.randomUUID();
+  } catch (e) {
+    return Date.now().toString(36) + Math.random().toString(36).substring(2);
+  }
+};
+
 const ProtocolManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formData, setFormData] = useState({
@@ -28,7 +36,7 @@ const ProtocolManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) =
     if (editingId) {
       onUpdate({
         ...state,
-        protocols: state.protocols.map(p => p.id === editingId ? {
+        protocols: (state.protocols || []).map(p => p.id === editingId ? {
           ...p,
           name: formData.name,
           species: formData.species,
@@ -41,7 +49,7 @@ const ProtocolManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) =
       setEditingId(null);
     } else {
       const newProtocol: ProductionProtocol = {
-        id: crypto.randomUUID(),
+        id: generateId(),
         name: formData.name,
         species: formData.species,
         targetWeight: Number(formData.targetWeight),

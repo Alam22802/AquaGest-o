@@ -11,6 +11,14 @@ interface Props {
   currentUser: User;
 }
 
+const generateId = () => {
+  try {
+    return crypto.randomUUID();
+  } catch (e) {
+    return Date.now().toString(36) + Math.random().toString(36).substring(2);
+  }
+};
+
 const SlaughterHR: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
   const [activeSubTab, setActiveSubTab] = useState<'employees' | 'indicators'>('employees');
   const [filterMonth, setFilterMonth] = useState(new Date().getMonth() + 1);
@@ -75,7 +83,7 @@ const SlaughterHR: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     if (!employeeForm.name || !employeeForm.role) return;
 
     const newEmployee: SlaughterEmployee = {
-      id: editingEmployeeId || crypto.randomUUID(),
+      id: editingEmployeeId || generateId(),
       registrationNumber: employeeForm.registrationNumber,
       name: employeeForm.name,
       role: employeeForm.role,
@@ -114,7 +122,7 @@ const SlaughterHR: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     }
 
     const newEntry: SlaughterHREntry = {
-      id: editingEntryId || crypto.randomUUID(),
+      id: editingEntryId || generateId(),
       employeeIds: entryForm.employeeIds,
       type: entryForm.type,
       date: entryForm.date,
@@ -157,7 +165,7 @@ const SlaughterHR: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
   const handleSaveIndicator = (e: React.FormEvent) => {
     e.preventDefault();
     const newIndicator: SlaughterHRIndicator = {
-      id: editingIndicatorId || crypto.randomUUID(),
+      id: editingIndicatorId || generateId(),
       month: Number(indicatorForm.month),
       year: Number(indicatorForm.year),
       turnover: Number(indicatorForm.turnover),

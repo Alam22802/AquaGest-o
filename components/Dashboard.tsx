@@ -130,7 +130,7 @@ const Dashboard: React.FC<Props> = ({ state }) => {
       const batchBiometries = (state.biometryLogs || []).filter(b => {
         if (b.batchId) return b.batchId === batch.id;
         // Fallback: check if cage is currently in this batch and date is after settlement
-        const cage = state.cages.find(c => c.id === b.cageId);
+        const cage = (state.cages || []).find(c => c.id === b.cageId);
         if (cage?.batchId === batch.id && b.date >= batch.settlementDate) return true;
         
         // Fallback for harvested cages

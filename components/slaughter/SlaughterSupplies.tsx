@@ -10,6 +10,14 @@ interface Props {
   currentUser: User;
 }
 
+const generateId = () => {
+  try {
+    return crypto.randomUUID();
+  } catch (e) {
+    return Date.now().toString(36) + Math.random().toString(36).substring(2);
+  }
+};
+
 const SlaughterSupplies: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
   const [activeSubTab, setActiveSubTab] = useState<'inventory' | 'requests' | 'suppliers'>('inventory');
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
@@ -53,7 +61,7 @@ const SlaughterSupplies: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
     const code = existingItem?.code || generateCode('I', items);
 
     const newItem: SlaughterSupplyItem = {
-      id: editingItemId || crypto.randomUUID(),
+      id: editingItemId || generateId(),
       code,
       name: itemForm.name,
       category: itemForm.category,
@@ -86,7 +94,7 @@ const SlaughterSupplies: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
     const code = existingSupplier?.code || generateCode('F', suppliers);
 
     const newSupplier: SlaughterSupplier = {
-      id: editingSupplierId || crypto.randomUUID(),
+      id: editingSupplierId || generateId(),
       code,
       name: supplierForm.name,
       cnpj: supplierForm.cnpj,
@@ -127,7 +135,7 @@ const SlaughterSupplies: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
     if (!requestForm.itemId || !requestForm.quantity) return;
 
     const newRequest: SlaughterSupplyRequest = {
-      id: crypto.randomUUID(),
+      id: generateId(),
       itemId: requestForm.itemId,
       supplierId: requestForm.supplierId || undefined,
       quantity: Number(requestForm.quantity),

@@ -354,6 +354,14 @@ const SlaughterTable = React.memo(({ logs, users, hasPermission, onEdit, onDelet
   );
 });
 
+const generateId = () => {
+  try {
+    return crypto.randomUUID();
+  } catch (e) {
+    return Date.now().toString(36) + Math.random().toString(36).substring(2);
+  }
+};
+
 const SlaughterOverview: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [filterStartDate, setFilterStartDate] = useState('');
@@ -528,7 +536,7 @@ const SlaughterOverview: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
       setEditingId(null);
     } else {
       const newLog: SlaughterLog = {
-        id: crypto.randomUUID(),
+        id: generateId(),
         producer: formData.producer,
         date: formData.date,
         gtaWeight: Number(formData.gtaWeight) || 0,

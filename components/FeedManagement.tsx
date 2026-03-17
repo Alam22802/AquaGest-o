@@ -10,6 +10,14 @@ interface Props {
   currentUser: User;
 }
 
+const generateId = () => {
+  try {
+    return crypto.randomUUID();
+  } catch (e) {
+    return Date.now().toString(36) + Math.random().toString(36).substring(2);
+  }
+};
+
 const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formData, setFormData] = useState({ 
@@ -37,8 +45,8 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
   });
 
   const { userMap, feedMap } = useMemo(() => {
-    const users = new Map(state.users.map(u => [u.id, u]));
-    const feeds = new Map(state.feedTypes.map(f => [f.id, f]));
+    const users = new Map((state.users || []).map(u => [u.id, u]));
+    const feeds = new Map((state.feedTypes || []).map(f => [f.id, f]));
     return { userMap: users, feedMap: feeds };
   }, [state.users, state.feedTypes]);
 
@@ -50,10 +58,10 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     const newStockGrams = Number(formData.currentStockKg) * 1000;
 
     if (editingId) {
-      const oldFeed = state.feedTypes.find(f => f.id === editingId);
+      const oldFeed = (state.feedTypes || []).find(f => f.id === editingId);
       const diff = newStockGrams - (oldFeed?.totalStock || 0);
 
-      const updatedFeeds = state.feedTypes.map(f => {
+      const updatedFeeds = (state.feedTypes || []).map(f => {
         if (f.id === editingId) {
           return {
             ...f,
@@ -69,7 +77,7 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       const newLogs = [...(state.feedStockLogs || [])];
       if (diff !== 0) {
         newLogs.unshift({
-          id: crypto.randomUUID(),
+          id: generateId(),
           feedTypeId: editingId,
           amount: diff,
           type: 'Ajuste',
@@ -81,7 +89,7 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       onUpdate({ ...state, feedTypes: updatedFeeds, feedStockLogs: newLogs });
       setEditingId(null);
     } else {
-      const newId = crypto.randomUUID();
+      const newId = generateId();
       const newFeed: FeedType = {
         id: newId,
         name: formData.name,
@@ -93,7 +101,7 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       const newLogs = [...(state.feedStockLogs || [])];
       if (newStockGrams > 0) {
         newLogs.unshift({
-          id: crypto.randomUUID(),
+          id: generateId(),
           feedTypeId: newId,
           amount: newStockGrams,
           type: 'Entrada',
@@ -104,7 +112,7 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
 
       onUpdate({
         ...state,
-        feedTypes: [...state.feedTypes, newFeed],
+        feedTypes: [...(state.feedTypes || []), newFeed],
         feedStockLogs: newLogs
       });
     }
@@ -128,7 +136,7 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     if (!confirm('Tem certeza que deseja excluir este modelo de ração?')) return;
     onUpdate({
       ...state,
-      feedTypes: state.feedTypes.filter(f => f.id !== id),
+      feedTypes: (state.feedTypes || []).filter(f => f.id !== id),
       feedStockLogs: (state.feedStockLogs || []).filter(l => l.feedTypeId !== id)
     });
   };
@@ -140,7 +148,7 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
 
     const amountGrams = Number(entryData.amount) * 1000;
 
-    const updatedFeeds = state.feedTypes.map(f => {
+    const updatedFeeds = (state.feedTypes || []).map(f => {
       if (f.id === entryData.feedId) {
         return { ...f, totalStock: f.totalStock + amountGrams, updatedAt: Date.now() };
       }
@@ -148,7 +156,7 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     });
 
     const newLog: FeedStockLog = {
-      id: crypto.randomUUID(),
+      id: generateId(),
       feedTypeId: entryData.feedId,
       amount: amountGrams,
       type: 'Entrada',
@@ -167,8 +175,8 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
 
   const feedStats = useMemo(() => {
     const last7Days = subDays(new Date(), 7);
-    return state.feedTypes.map(feed => {
-      const consumptionLast7Days = state.feedingLogs
+    return (state.feedTypes || []).map(feed => {
+      const consumptionLast7Days = (state.feedingLogs || [])
         .filter(log => log.feedTypeId === feed.id && new Date(log.timestamp) > last7Days)
         .reduce((acc, log) => acc + log.amount, 0);
       const avgDailyConsumption = consumptionLast7Days / 7;
@@ -245,7 +253,11 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     onUpdate({
       ...state,
       feedStockLogs: (state.feedStockLogs || []).filter(l => !selectedLogIds.has(l.id)),
-      feedTypes: updatedFeeds
+      feedTypes: (state.feedTypes || []).map(f => {
+        const adjustment = feedUpdates.get(f.id);
+        if (adjustment) return { ...f, totalStock: f.totalStock - adjustment };
+        return f;
+      })
     });
     setSelectedLogIds(new Set());
   };
@@ -301,7 +313,7 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                 <label className="block text-[10px] font-black text-slate-400 uppercase mb-1 tracking-widest">Modelo de Ração</label>
                 <select required className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none focus:ring-2 focus:ring-emerald-500/20" value={entryData.feedId} onChange={(e) => setEntryData({...entryData, feedId: e.target.value})}>
                   <option value="">Selecione...</option>
-                  {state.feedTypes.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
+                  {(state.feedTypes || []).map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
                 </select>
               </div>
               <div className="grid grid-cols-2 gap-4">
@@ -410,7 +422,7 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
               }}
             >
               <option value="">Todos os Modelos</option>
-              {state.feedTypes.map(f => (
+              {(state.feedTypes || []).map(f => (
                 <option key={f.id} value={f.id}>{f.name}</option>
               ))}
             </select>
