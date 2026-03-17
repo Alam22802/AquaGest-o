@@ -359,22 +359,29 @@ const BatchManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     const batch = batchStats.find(b => b.id === selectedPlanningBatchId);
     if (!batch) return [];
 
-    return batch.batchCages.map(cage => {
-      const mortality = (state.mortalityLogs || [])
-        .filter(m => m.cageId === cage.id)
-        .reduce((acc, curr) => acc + curr.count, 0);
-      
-      const currentCount = (cage.initialFishCount || 0) - mortality;
-      const biomass = (currentCount * batch.currentAvgWeight) / 1000;
+    // Get all cage IDs already scheduled, excluding the one being edited
+    const scheduledCageIds = (state.harvestSchedules || [])
+      .filter(s => s.id !== editingScheduleId)
+      .flatMap(s => s.cageIds);
 
-      return {
-        ...cage,
-        mortality,
-        currentCount,
-        biomass
-      };
-    }).sort((a, b) => b.mortality - a.mortality);
-  }, [selectedPlanningBatchId, batchStats, state.mortalityLogs]);
+    return batch.batchCages
+      .filter(cage => !scheduledCageIds.includes(cage.id))
+      .map(cage => {
+        const mortality = (state.mortalityLogs || [])
+          .filter(m => m.cageId === cage.id)
+          .reduce((acc, curr) => acc + curr.count, 0);
+        
+        const currentCount = (cage.initialFishCount || 0) - mortality;
+        const biomass = (currentCount * batch.currentAvgWeight) / 1000;
+
+        return {
+          ...cage,
+          mortality,
+          currentCount,
+          biomass
+        };
+      }).sort((a, b) => b.mortality - a.mortality);
+  }, [selectedPlanningBatchId, batchStats, state.mortalityLogs, state.harvestSchedules, editingScheduleId]);
 
   const selectedPlanningCagesData = useMemo(() => {
     return planningCages.filter(c => selectedPlanningCageIds.includes(c.id));
