@@ -527,19 +527,22 @@ const BatchManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                         </div>
                       </div>
 
-                      <div className="space-y-4 pt-4">
-                        <div className="space-y-2">
-                          <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-widest flex items-center gap-2">
-                            <Utensils className="w-3 h-3" /> Data/Hora Última Alimentação
-                          </label>
-                          <input 
-                            type="datetime-local"
-                            className="w-full px-4 py-3 bg-white border border-slate-200 rounded-2xl font-bold outline-none focus:ring-2 focus:ring-blue-500/10 text-xs"
-                            value={lastFeeding}
-                            onChange={e => setLastFeeding(e.target.value)}
-                          />
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="bg-white p-4 rounded-2xl border border-slate-100">
+                          <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">Última Alimentação (Jejum 30h)</span>
+                          <span className="text-xs font-black text-amber-600 italic">
+                            {lastFeeding ? format(new Date(lastFeeding), 'dd/MM/yyyy HH:mm') : '---'}
+                          </span>
                         </div>
+                        <div className="bg-white p-4 rounded-2xl border border-slate-100">
+                          <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">Dia da Despesca (03:00 AM)</span>
+                          <span className="text-xs font-black text-emerald-600 italic">
+                            {plannedHarvestDate ? format(parseISO(plannedHarvestDate), 'dd/MM/yyyy') : '---'}
+                          </span>
+                        </div>
+                      </div>
 
+                      <div className="space-y-4 pt-4">
                         <div className="space-y-2">
                           <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-widest flex items-center gap-2">
                             <Calendar className="w-3 h-3" /> Data da Despesca
@@ -548,7 +551,19 @@ const BatchManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                             type="date"
                             className="w-full px-4 py-3 bg-white border border-slate-200 rounded-2xl font-bold outline-none focus:ring-2 focus:ring-blue-500/10 text-xs"
                             value={plannedHarvestDate}
-                            onChange={e => setPlannedHarvestDate(e.target.value)}
+                            onChange={e => {
+                              const date = e.target.value;
+                              setPlannedHarvestDate(date);
+                              if (date) {
+                                // Considera despesca às 03:00 AM do dia selecionado
+                                // Jejum de 30 horas: 03:00 - 30h = 21:00 de 2 dias atrás
+                                const harvestDateTime = new Date(`${date}T03:00:00`);
+                                const lastFeedingDateTime = new Date(harvestDateTime.getTime() - (30 * 60 * 60 * 1000));
+                                setLastFeeding(format(lastFeedingDateTime, "yyyy-MM-dd'T'HH:mm"));
+                              } else {
+                                setLastFeeding('');
+                              }
+                            }}
                           />
                         </div>
                       </div>
