@@ -383,13 +383,23 @@ const BatchManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
   const stratification = useMemo(() => {
     const counts: Record<string, number> = {};
     selectedPlanningCagesData.forEach(cage => {
-      const dim = cage.model === 'Circular' 
-        ? `Circular (${cage.dimensions.depth}m prof.)`
-        : `${cage.model} (${cage.dimensions.width}x${cage.dimensions.length}x${cage.dimensions.depth})`;
+      const model = cage.model || 'Gaiola';
+      const d = cage.dimensions || { width: 0, length: 0, depth: 0 };
+      const dim = model === 'Circular' 
+        ? `Circular (${d.depth || 0}m prof.)`
+        : `${model} (${d.width || 0}x${d.length || 0}x${d.depth || 0})`;
       counts[dim] = (counts[dim] || 0) + 1;
     });
     return Object.entries(counts).map(([dim, count]) => `${dim} ${count}uni`).join(', ');
   }, [selectedPlanningCagesData]);
+
+  const fastingHours = useMemo(() => {
+    if (!plannedHarvestDate || !lastFeeding) return 0;
+    const harvestDate = parseISO(plannedHarvestDate);
+    harvestDate.setHours(3, 0, 0, 0); // Despesca às 03:00 AM
+    const feedingDate = parseISO(lastFeeding);
+    return Math.floor((harvestDate.getTime() - feedingDate.getTime()) / (1000 * 60 * 60));
+  }, [plannedHarvestDate, lastFeeding]);
 
   const totalPlanningBiomass = useMemo(() => {
     return selectedPlanningCagesData.reduce((acc, curr) => acc + curr.biomass, 0);
@@ -642,7 +652,7 @@ const BatchManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                       <div className="bg-white p-4 rounded-2xl border border-slate-100">
                         <div className="flex items-center justify-between mb-2">
                           <div>
-                            <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block">Último Trato (30h Jejum)</span>
+                            <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block">Último Trato (Jejum Est. {fastingHours}h)</span>
                             {plannedHarvestDate && (
                               <span className="text-[10px] font-black text-blue-600 uppercase">
                                 Sugestão: {format(new Date(parseISO(plannedHarvestDate).getTime() - (2 * 24 * 60 * 60 * 1000)), 'dd/MM/yyyy')}
@@ -757,9 +767,11 @@ const BatchManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                                   const counts: Record<string, number> = {};
                                   scheduleCages.forEach(cage => {
                                     if (!cage) return;
-                                    const dim = cage.model === 'Circular'
-                                      ? `Circular (${cage.dimensions.depth}m prof.)`
-                                      : `${cage.model} (${cage.dimensions.width}x${cage.dimensions.length}x${cage.dimensions.depth})`;
+                                    const model = cage.model || 'Gaiola';
+                                    const d = cage.dimensions || { width: 0, length: 0, depth: 0 };
+                                    const dim = model === 'Circular'
+                                      ? `Circular (${d.depth || 0}m prof.)`
+                                      : `${model} (${d.width || 0}x${d.length || 0}x${d.depth || 0})`;
                                     counts[dim] = (counts[dim] || 0) + 1;
                                   });
                                   const strat = Object.entries(counts).map(([dim, count]) => `${dim} ${count}uni`).join(', ');
