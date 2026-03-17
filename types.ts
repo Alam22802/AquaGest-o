@@ -296,6 +296,7 @@ export interface CapexInvoice {
 export interface HarvestSchedule {
   id: string;
   date: string;
+  lastFeedingDate?: string;
   cageIds: string[];
   batchId: string;
   notes?: string;

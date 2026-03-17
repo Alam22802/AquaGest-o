@@ -24,6 +24,7 @@ const BatchManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
   const [selectedPlanningBatchId, setSelectedPlanningBatchId] = useState('');
   const [selectedPlanningCageIds, setSelectedPlanningCageIds] = useState<string[]>([]);
   const [lastFeeding, setLastFeeding] = useState('');
+  const [lastFeedingHour, setLastFeedingHour] = useState('16:00');
   const [plannedHarvestDate, setPlannedHarvestDate] = useState('');
   const [selectedScheduleDate, setSelectedScheduleDate] = useState('');
   const [editingScheduleId, setEditingScheduleId] = useState<string | null>(null);
@@ -117,6 +118,7 @@ const BatchManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       batchId: selectedPlanningBatchId,
       cageIds: selectedPlanningCageIds,
       date: plannedHarvestDate,
+      lastFeedingDate: lastFeeding,
       userId: currentUser.id,
       updatedAt: Date.now()
     };
@@ -156,11 +158,11 @@ const BatchManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     setSelectedPlanningBatchId(schedule.batchId);
     setSelectedPlanningCageIds(schedule.cageIds);
     setPlannedHarvestDate(schedule.date);
-    
-    const harvestDateObj = parseISO(schedule.date);
-    const lastFeedingDate = new Date(harvestDateObj.getTime() - (2 * 24 * 60 * 60 * 1000));
-    lastFeedingDate.setHours(16, 0, 0, 0);
-    setLastFeeding(format(lastFeedingDate, "yyyy-MM-dd'T'HH:mm"));
+    setLastFeeding(schedule.lastFeedingDate || '');
+    if (schedule.lastFeedingDate) {
+      const time = schedule.lastFeedingDate.split('T')[1];
+      setLastFeedingHour(time);
+    }
   };
 
   const batchStats = useMemo(() => {
@@ -381,7 +383,9 @@ const BatchManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
   const stratification = useMemo(() => {
     const counts: Record<string, number> = {};
     selectedPlanningCagesData.forEach(cage => {
-      const dim = `${cage.width}x${cage.length}x${cage.depth}`;
+      const dim = cage.model === 'Circular' 
+        ? `Circular (${cage.dimensions.depth}m prof.)`
+        : `${cage.model} (${cage.dimensions.width}x${cage.dimensions.length}x${cage.dimensions.depth})`;
       counts[dim] = (counts[dim] || 0) + 1;
     });
     return Object.entries(counts).map(([dim, count]) => `${dim} ${count}uni`).join(', ');
@@ -622,15 +626,55 @@ const BatchManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                               const date = e.target.value;
                               setPlannedHarvestDate(date);
                               if (date) {
+                                const [h, m] = lastFeedingHour.split(':').map(Number);
                                 const harvestDateObj = parseISO(date);
                                 const lastFeedingDate = new Date(harvestDateObj.getTime() - (2 * 24 * 60 * 60 * 1000));
-                                lastFeedingDate.setHours(16, 0, 0, 0);
+                                lastFeedingDate.setHours(h, m, 0, 0);
                                 setLastFeeding(format(lastFeedingDate, "yyyy-MM-dd'T'HH:mm"));
                               } else {
                                 setLastFeeding('');
                               }
                             }}
                           />
+                        </div>
+                      </div>
+
+                      <div className="bg-white p-4 rounded-2xl border border-slate-100">
+                        <div className="flex items-center justify-between mb-2">
+                          <div>
+                            <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block">Último Trato (30h Jejum)</span>
+                            {plannedHarvestDate && (
+                              <span className="text-[10px] font-black text-blue-600 uppercase">
+                                Sugestão: {format(new Date(parseISO(plannedHarvestDate).getTime() - (2 * 24 * 60 * 60 * 1000)), 'dd/MM/yyyy')}
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex gap-1">
+                            {['07:00', '11:00', '13:00', '16:00'].map(h => (
+                              <button
+                                key={h}
+                                onClick={() => {
+                                  setLastFeedingHour(h);
+                                  if (plannedHarvestDate) {
+                                    const [hour, min] = h.split(':').map(Number);
+                                    const harvestDateObj = parseISO(plannedHarvestDate);
+                                    const lastFeedingDate = new Date(harvestDateObj.getTime() - (2 * 24 * 60 * 60 * 1000));
+                                    lastFeedingDate.setHours(hour, min, 0, 0);
+                                    setLastFeeding(format(lastFeedingDate, "yyyy-MM-dd'T'HH:mm"));
+                                  }
+                                }}
+                                className={`px-1.5 py-0.5 rounded text-[8px] font-black transition-all ${lastFeedingHour === h ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-400 hover:bg-slate-200'}`}
+                              >
+                                {h}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Utensils className="w-4 h-4 text-amber-500" />
+                          <span className="text-sm font-black text-slate-700">
+                            {lastFeeding ? format(parseISO(lastFeeding), "dd/MM/yyyy 'às' HH:mm") : '---'}
+                          </span>
                         </div>
                       </div>
 
@@ -695,12 +739,27 @@ const BatchManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                                     <span className="text-xs font-bold text-blue-600">{schedule.cageIds.length} unidades</span>
                                   </div>
                                 </div>
+
+                                {schedule.lastFeedingDate && (
+                                  <div className="mb-2 px-2 py-1 bg-amber-50 rounded-lg border border-amber-100 flex items-center gap-2">
+                                    <Utensils className="w-3 h-3 text-amber-600" />
+                                    <div className="flex flex-col">
+                                      <span className="text-[8px] font-black text-amber-400 uppercase tracking-widest">Último Trato</span>
+                                      <span className="text-[9px] font-bold text-amber-700 uppercase">
+                                        {format(parseISO(schedule.lastFeedingDate), "dd/MM/yyyy 'às' HH:mm")}
+                                      </span>
+                                    </div>
+                                  </div>
+                                )}
                                 
                                 {(() => {
                                   const scheduleCages = schedule.cageIds.map(cid => state.cages.find(c => c.id === cid)).filter(Boolean);
                                   const counts: Record<string, number> = {};
                                   scheduleCages.forEach(cage => {
-                                    const dim = `${cage?.width}x${cage?.length}x${cage?.depth}`;
+                                    if (!cage) return;
+                                    const dim = cage.model === 'Circular'
+                                      ? `Circular (${cage.dimensions.depth}m prof.)`
+                                      : `${cage.model} (${cage.dimensions.width}x${cage.dimensions.length}x${cage.dimensions.depth})`;
                                     counts[dim] = (counts[dim] || 0) + 1;
                                   });
                                   const strat = Object.entries(counts).map(([dim, count]) => `${dim} ${count}uni`).join(', ');
