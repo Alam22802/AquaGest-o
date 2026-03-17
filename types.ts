@@ -55,7 +55,7 @@ export interface Batch {
   updatedAt?: number;
 }
 
-export type CageStatus = 'Disponível' | 'Ocupada' | 'Manutenção' | 'Limpeza';
+export type CageStatus = 'Disponível' | 'Ocupada' | 'Manutenção' | 'Limpeza' | 'Avaliação';
 
 export interface Cage {
   id: string;

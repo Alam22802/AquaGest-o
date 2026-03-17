@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { AppState, CageStatus } from '../types';
-import { Settings, CheckCircle2, AlertTriangle, Eraser, Calendar, Clock, ArrowRight, Box } from 'lucide-react';
+import { Settings, CheckCircle2, AlertTriangle, Eraser, Calendar, Clock, ArrowRight, Box, Eye } from 'lucide-react';
 import { format } from 'date-fns';
 
 interface Props {
@@ -29,8 +29,8 @@ const Maintenance: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
         return {
           ...c,
           status: formData.status,
-          maintenanceStartDate: formData.status === 'Manutenção' || formData.status === 'Limpeza' ? formData.startDate : undefined,
-          maintenanceEndDate: formData.status === 'Manutenção' || formData.status === 'Limpeza' ? formData.endDate : undefined
+          maintenanceStartDate: ['Manutenção', 'Limpeza', 'Avaliação'].includes(formData.status) ? formData.startDate : undefined,
+          maintenanceEndDate: ['Manutenção', 'Limpeza', 'Avaliação'].includes(formData.status) ? formData.endDate : undefined
         };
       }
       return c;
@@ -47,6 +47,7 @@ const Maintenance: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       case 'Ocupada': return 'bg-blue-100 text-blue-700 border-blue-200';
       case 'Manutenção': return 'bg-red-100 text-red-700 border-red-200';
       case 'Limpeza': return 'bg-amber-100 text-amber-700 border-amber-200';
+      case 'Avaliação': return 'bg-purple-100 text-purple-700 border-purple-200';
       default: return 'bg-slate-100 text-slate-700';
     }
   };
@@ -57,6 +58,7 @@ const Maintenance: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       case 'Ocupada': return <Box className="w-3 h-3" />;
       case 'Manutenção': return <Settings className="w-3 h-3" />;
       case 'Limpeza': return <Eraser className="w-3 h-3" />;
+      case 'Avaliação': return <Eye className="w-3 h-3" />;
     }
   };
 
@@ -84,7 +86,7 @@ const Maintenance: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
             <div>
               <label className="block text-xs font-black text-slate-400 uppercase mb-1">Novo Momento/Status</label>
               <div className="grid grid-cols-2 gap-2">
-                {['Disponível', 'Manutenção', 'Limpeza'].map((s) => (
+                {['Disponível', 'Manutenção', 'Limpeza', 'Avaliação'].map((s) => (
                   <button
                     key={s}
                     type="button"
@@ -135,7 +137,7 @@ const Maintenance: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
               </div>
             </div>
             <div className="p-5">
-              {(cage.status === 'Manutenção' || cage.status === 'Limpeza') && cage.maintenanceStartDate ? (
+              {['Manutenção', 'Limpeza', 'Avaliação'].includes(cage.status) && cage.maintenanceStartDate ? (
                 <div className="space-y-3">
                   <div className="flex items-center gap-2 text-slate-500">
                     <Calendar className="w-3 h-3" />
