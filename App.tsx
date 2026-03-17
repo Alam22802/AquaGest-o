@@ -17,6 +17,7 @@ import ProtocolManagement from './components/ProtocolManagement.tsx';
 import CapexManagement from './components/CapexManagement.tsx';
 import SlaughterHouse from './components/SlaughterHouse.tsx';
 import Login from './components/Login.tsx';
+import ErrorBoundary from './components/ErrorBoundary.tsx';
 import { loadState, saveState, getSession, saveSession, ensureStateIntegrity, fetchRemoteState, subscribeToRemoteChanges } from './store.ts';
 import { AppState, User } from './types.ts';
 import { Loader2, RefreshCw, AlertTriangle, X, Cloud, CheckCircle2 } from 'lucide-react';
@@ -375,7 +376,9 @@ const App: React.FC = () => {
         <Login state={state!} onLogin={handleLogin} onRegister={handleRegister} onUpdateState={handleStateUpdate} />
       ) : (
         <Layout activeTab={activeTab} setActiveTab={setActiveTab} currentUser={currentUser} onLogout={handleLogout} state={state!}>
-          {renderContent()}
+          <ErrorBoundary>
+            {renderContent()}
+          </ErrorBoundary>
         </Layout>
       )}
     </>

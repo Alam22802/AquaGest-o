@@ -230,6 +230,7 @@ export interface HarvestLog {
   unitWeight?: number;
   initialFishCount?: number; // Qtd inicial na gaiola no momento da despesca
   date: string;
+  status: 'Planejado' | 'Concluído';
   userId: string;
   timestamp: string;
   updatedAt?: number;
@@ -292,6 +293,16 @@ export interface CapexInvoice {
   updatedAt?: number;
 }
 
+export interface HarvestSchedule {
+  id: string;
+  date: string;
+  cageIds: string[];
+  batchId: string;
+  notes?: string;
+  userId: string;
+  updatedAt: number;
+}
+
 export interface AppState {
   users: User[];
   lines: Line[];
@@ -311,6 +322,7 @@ export interface AppState {
   slaughterSuppliers?: SlaughterSupplier[];
   slaughterSupplyRequests?: SlaughterSupplyRequest[];
   harvestLogs?: HarvestLog[];
+  harvestSchedules?: HarvestSchedule[];
   protocols: ProductionProtocol[];
   portfolios: InvestmentPortfolio[];
   capexProjects: CapexProject[];
