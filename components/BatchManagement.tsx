@@ -527,9 +527,20 @@ const BatchManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                         </div>
                       </div>
 
+                      <div className="bg-white p-4 rounded-2xl border border-slate-100">
+                        <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-2">Gaiolas Selecionadas</span>
+                        <div className="flex flex-wrap gap-1.5">
+                          {selectedPlanningCagesData.map(c => (
+                            <span key={c.id} className="px-2 py-1 bg-slate-100 text-[10px] font-black text-slate-600 rounded-lg uppercase border border-slate-200">
+                              {c.name}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+
                       <div className="grid grid-cols-2 gap-4">
                         <div className="bg-white p-4 rounded-2xl border border-slate-100">
-                          <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">Última Alimentação (Jejum 30h)</span>
+                          <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">Última Alimentação (16:00h)</span>
                           <span className="text-xs font-black text-amber-600 italic">
                             {lastFeeding ? format(new Date(lastFeeding), 'dd/MM/yyyy HH:mm') : '---'}
                           </span>
@@ -556,10 +567,12 @@ const BatchManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                               setPlannedHarvestDate(date);
                               if (date) {
                                 // Considera despesca às 03:00 AM do dia selecionado
-                                // Jejum de 30 horas: 03:00 - 30h = 21:00 de 2 dias atrás
-                                const harvestDateTime = new Date(`${date}T03:00:00`);
-                                const lastFeedingDateTime = new Date(harvestDateTime.getTime() - (30 * 60 * 60 * 1000));
-                                setLastFeeding(format(lastFeedingDateTime, "yyyy-MM-dd'T'HH:mm"));
+                                // Jejum de pelo menos 30 horas.
+                                // Se despesca é às 03:00 AM do Dia X, o último trato às 16:00 do Dia X-2 dá 35h de jejum.
+                                const harvestDateObj = parseISO(date);
+                                const lastFeedingDate = new Date(harvestDateObj.getTime() - (2 * 24 * 60 * 60 * 1000));
+                                lastFeedingDate.setHours(16, 0, 0, 0);
+                                setLastFeeding(format(lastFeedingDate, "yyyy-MM-dd'T'HH:mm"));
                               } else {
                                 setLastFeeding('');
                               }
