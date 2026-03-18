@@ -102,7 +102,7 @@ const Dashboard: React.FC<Props> = ({ state }) => {
 
     const nurseryMortalityByBatch = new Map<string, number>();
     (state.mortalityLogs || []).forEach(m => {
-      if (m.batchId) {
+      if (m.batchId && !m.cageId) {
         nurseryMortalityByBatch.set(m.batchId, (nurseryMortalityByBatch.get(m.batchId) || 0) + m.count);
       }
     });
@@ -110,10 +110,20 @@ const Dashboard: React.FC<Props> = ({ state }) => {
     const harvestsByBatch = new Map<string, { fishCount: number, weight: number, initialFishCount: number }>();
     (state.harvestLogs || []).forEach(h => {
       const current = harvestsByBatch.get(h.batchId) || { fishCount: 0, weight: 0, initialFishCount: 0 };
+      
+      // Fallback for old logs missing initialFishCount
+      let initial = h.initialFishCount;
+      if (!initial) {
+        const cageMortality = (state.mortalityLogs || [])
+          .filter(m => m.cageId === h.cageId && m.date <= h.date)
+          .reduce((acc, curr) => acc + curr.count, 0);
+        initial = h.fishCount + cageMortality;
+      }
+
       harvestsByBatch.set(h.batchId, {
         fishCount: current.fishCount + h.fishCount,
         weight: current.weight + h.totalWeight,
-        initialFishCount: current.initialFishCount + (h.initialFishCount || 0)
+        initialFishCount: current.initialFishCount + (initial || 0)
       });
     });
 
@@ -195,7 +205,8 @@ const Dashboard: React.FC<Props> = ({ state }) => {
   }, [state.batches, state.cages, state.mortalityLogs, state.biometryLogs, state.feedingLogs, state.feedTypes, state.harvestLogs]);
 
   const filteredBatchStats = useMemo(() => {
-    return batchStats.filter(b => b.settlementBalance === 0);
+    // Show batches that are fully settled OR have fish in cages OR have been harvested
+    return batchStats.filter(b => b.settlementBalance === 0 || b.stock > 0 || b.harvested > 0);
   }, [batchStats]);
 
   useEffect(() => {
