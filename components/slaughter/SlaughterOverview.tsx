@@ -118,13 +118,6 @@ const SlaughterSummary = React.memo(({ stats, startDate, endDate, onStartDateCha
 
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-8 mt-8">
              <div className="space-y-2 border-l-2 border-red-500/30 pl-6">
-                <div className="text-[9px] font-black opacity-40 uppercase tracking-widest">Condenações Campo</div>
-                <div className="text-xl font-black text-red-400 flex items-baseline gap-1">
-                   {stats.totalFieldCondemnation.toLocaleString('pt-BR')}
-                   <span className="text-[10px] opacity-40">kg</span>
-                </div>
-             </div>
-             <div className="space-y-2 border-l-2 border-red-500/30 pl-6">
                 <div className="text-[9px] font-black opacity-40 uppercase tracking-widest">Condenações Frig.</div>
                 <div className="text-xl font-black text-red-400 flex items-baseline gap-1">
                    {stats.totalSlaughterCondemnation.toLocaleString('pt-BR')}
@@ -315,7 +308,6 @@ const SlaughterTable = React.memo(({ logs, users, hasPermission, onEdit, onDelet
                   </div>
                 </td>
                 <td className="px-8 py-6">
-                  <div className="text-[10px] font-black text-red-500 uppercase">Campo: {(log.fieldCondemnation || 0).toLocaleString('pt-BR')}kg</div>
                   <div className="text-[10px] font-black text-red-500 uppercase">Frig: {(log.slaughterCondemnation || 0).toLocaleString('pt-BR')}kg</div>
                 </td>
                 <td className="px-8 py-6">
@@ -387,7 +379,6 @@ const SlaughterOverview: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
     packedQuantity: '',
     packagingBatch: '',
     freightValue: '',
-    fieldCondemnation: '',
     slaughterCondemnation: '',
     invoiceValue: ''
   });
@@ -432,7 +423,6 @@ const SlaughterOverview: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
     const totalFreightValue = filteredLogs.reduce((acc, l) => acc + (l.freightValue || 0), 0);
     const freightPerKgLive = totalRecep > 0 ? totalFreightValue / totalRecep : 0;
 
-    const totalFieldCondemnation = filteredLogs.reduce((acc, l) => acc + (l.fieldCondemnation || 0), 0);
     const totalSlaughterCondemnation = filteredLogs.reduce((acc, l) => acc + (l.slaughterCondemnation || 0), 0);
 
     const totalInvoiceValue = filteredLogs.reduce((acc, l) => acc + (l.invoiceValue || 0), 0);
@@ -448,7 +438,6 @@ const SlaughterOverview: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
       energyKwPerTon,
       laborPerTon,
       freightPerKgLive,
-      totalFieldCondemnation,
       totalSlaughterCondemnation,
       totalInvoiceValue,
       avgLiveKgValue
@@ -519,7 +508,6 @@ const SlaughterOverview: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
           packingList: Number(formData.packingList) || 0,
           packedQuantity: Number(formData.packedQuantity) || 0,
           freightValue: Number(formData.freightValue) || 0,
-          fieldCondemnation: Number(formData.fieldCondemnation) || 0,
           slaughterCondemnation: Number(formData.slaughterCondemnation) || 0,
           invoiceValue: Number(formData.invoiceValue) || 0
         } : log
@@ -544,7 +532,6 @@ const SlaughterOverview: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
         packedQuantity: Number(formData.packedQuantity) || 0,
         packagingBatch: formData.packagingBatch,
         freightValue: Number(formData.freightValue) || 0,
-        fieldCondemnation: Number(formData.fieldCondemnation) || 0,
         slaughterCondemnation: Number(formData.slaughterCondemnation) || 0,
         invoiceValue: Number(formData.invoiceValue) || 0,
         userId: currentUser.id,
@@ -577,7 +564,6 @@ const SlaughterOverview: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
       packedQuantity: '',
       packagingBatch: '',
       freightValue: '',
-      fieldCondemnation: '',
       slaughterCondemnation: '',
       invoiceValue: ''
     });
@@ -598,7 +584,6 @@ const SlaughterOverview: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
       packedQuantity: (log.packedQuantity || 0).toString(),
       packagingBatch: log.packagingBatch || '',
       freightValue: (log.freightValue || 0).toString(),
-      fieldCondemnation: (log.fieldCondemnation || 0).toString(),
       slaughterCondemnation: (log.slaughterCondemnation || 0).toString(),
       invoiceValue: (log.invoiceValue || 0).toString()
     });
@@ -742,11 +727,7 @@ const SlaughterOverview: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-widest">Cond. Campo (kg)</label>
-                    <input type="number" step="0.01" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none text-xs" value={formData.fieldCondemnation} onChange={e => setFormData({...formData, fieldCondemnation: e.target.value})} />
-                  </div>
+                <div className="grid grid-cols-1 gap-4">
                   <div className="space-y-1">
                     <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-widest">Cond. Frig. (kg)</label>
                     <input type="number" step="0.01" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none text-xs" value={formData.slaughterCondemnation} onChange={e => setFormData({...formData, slaughterCondemnation: e.target.value})} />
