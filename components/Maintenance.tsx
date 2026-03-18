@@ -1,8 +1,9 @@
 
 import React, { useState } from 'react';
 import { AppState, CageStatus, User } from '../types';
-import { Settings, CheckCircle2, AlertTriangle, Eraser, Calendar, Clock, ArrowRight, Box, Eye } from 'lucide-react';
+import { Settings, CheckCircle2, AlertTriangle, Eraser, Calendar, Clock, ArrowRight, Box, Eye, Warehouse } from 'lucide-react';
 import { format } from 'date-fns';
+import SlaughterhouseMaintenance from './SlaughterhouseMaintenance';
 
 interface Props {
   state: AppState;
@@ -11,6 +12,7 @@ interface Props {
 }
 
 const Maintenance: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
+  const [activeTab, setActiveTab] = useState<'cages' | 'slaughterhouse'>('cages');
   const hasPermission = currentUser.isMaster || currentUser.canEdit;
 
   const [formData, setFormData] = useState({
@@ -64,104 +66,128 @@ const Maintenance: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
   };
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start pb-20">
-      <div className="lg:col-span-1 lg:sticky lg:top-4">
-        {hasPermission ? (
-          <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200">
-            <h3 className="text-lg font-black text-slate-800 mb-6 flex items-center gap-2 uppercase tracking-tighter">
-            <Settings className="w-5 h-5 text-red-500" />
-            Gerenciar Status da Gaiola
-          </h3>
-          
-          <form onSubmit={handleUpdateStatus} className="space-y-4">
-            <div>
-              <label className="block text-xs font-black text-slate-400 uppercase mb-1">Escolher Gaiola</label>
-              <select required className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-red-500 font-bold" value={formData.cageId} onChange={(e) => setFormData({...formData, cageId: e.target.value})}>
-                <option value="">Selecione...</option>
-                {state.cages.map(c => (
-                  <option key={c.id} value={c.id}>{c.name} ({c.status})</option>
-                ))}
-              </select>
-            </div>
+    <div className="space-y-8">
+      {/* Tab Switcher */}
+      <div className="flex items-center gap-2 bg-slate-100 p-1.5 rounded-2xl w-fit">
+        <button 
+          onClick={() => setActiveTab('cages')}
+          className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${activeTab === 'cages' ? 'bg-white text-red-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+        >
+          <Settings className="w-4 h-4" />
+          Manutenção de Gaiolas
+        </button>
+        <button 
+          onClick={() => setActiveTab('slaughterhouse')}
+          className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${activeTab === 'slaughterhouse' ? 'bg-white text-red-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+        >
+          <Warehouse className="w-4 h-4" />
+          Frigorífico
+        </button>
+      </div>
 
-            <div>
-              <label className="block text-xs font-black text-slate-400 uppercase mb-1">Novo Momento/Status</label>
-              <div className="grid grid-cols-2 gap-2">
-                {['Disponível', 'Manutenção', 'Limpeza', 'Avaliação'].map((s) => (
-                  <button
-                    key={s}
-                    type="button"
-                    onClick={() => setFormData({...formData, status: s as CageStatus})}
-                    className={`px-4 py-3 rounded-xl border text-xs font-black uppercase tracking-widest transition-all ${formData.status === s ? 'bg-red-600 text-white border-red-600 shadow-lg shadow-red-500/20' : 'bg-white text-slate-400 border-slate-200 hover:border-red-200'}`}
-                  >
-                    {s}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {(formData.status === 'Manutenção' || formData.status === 'Limpeza') && (
-              <div className="grid grid-cols-2 gap-3 animate-in fade-in slide-in-from-top-2 duration-300">
-                <div>
-                  <label className="block text-xs font-black text-slate-400 uppercase mb-1">Data de Entrada</label>
-                  <input type="date" required className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none font-bold" value={formData.startDate} onChange={(e) => setFormData({...formData, startDate: e.target.value})} />
-                </div>
-                <div>
-                  <label className="block text-xs font-black text-slate-400 uppercase mb-1">Previsão de Retorno</label>
-                  <input type="date" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none font-bold" value={formData.endDate} onChange={(e) => setFormData({...formData, endDate: e.target.value})} />
-                </div>
-              </div>
-            )}
-
-            <button type="submit" className="w-full py-4 bg-slate-900 text-white rounded-2xl font-black uppercase tracking-widest text-xs shadow-xl active:scale-95 transition-all mt-4">
-              Atualizar Status da Gaiola
-            </button>
-          </form>
-        </div>
+      {activeTab === 'slaughterhouse' ? (
+        <SlaughterhouseMaintenance state={state} onUpdate={onUpdate} currentUser={currentUser} />
       ) : (
-        <div className="bg-slate-100 p-12 rounded-3xl border border-dashed border-slate-300 flex flex-col items-center gap-4 text-center">
-          <Settings className="w-12 h-12 text-slate-300" />
-          <h4 className="text-sm font-black uppercase tracking-widest text-slate-400">Modo Leitura Ativo</h4>
-          <p className="text-xs font-bold text-slate-400 uppercase">Você não possui permissão para gerenciar o status das gaiolas.</p>
-        </div>
-      )}
-    </div>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start pb-20">
+          <div className="lg:col-span-1 lg:sticky lg:top-4">
+            {hasPermission ? (
+              <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200">
+                <h3 className="text-lg font-black text-slate-800 mb-6 flex items-center gap-2 uppercase tracking-tighter">
+                <Settings className="w-5 h-5 text-red-500" />
+                Gerenciar Status da Gaiola
+              </h3>
+              
+              <form onSubmit={handleUpdateStatus} className="space-y-4">
+                <div>
+                  <label className="block text-xs font-black text-slate-400 uppercase mb-1">Escolher Gaiola</label>
+                  <select required className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-red-500 font-bold" value={formData.cageId} onChange={(e) => setFormData({...formData, cageId: e.target.value})}>
+                    <option value="">Selecione...</option>
+                    {state.cages.map(c => (
+                      <option key={c.id} value={c.id}>{c.name} ({c.status})</option>
+                    ))}
+                  </select>
+                </div>
 
-      <div className="lg:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-6">
-        {state.cages.map(cage => (
-          <div key={cage.id} className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden hover:shadow-md transition-all">
-            <div className="p-4 bg-slate-50 border-b border-slate-100 flex justify-between items-center">
-              <span className="font-black text-slate-800 uppercase tracking-tighter">{cage.name}</span>
-              <div className={`p-1.5 rounded-lg border flex items-center gap-1.5 text-[9px] font-black uppercase tracking-widest ${getStatusColor(cage.status)}`}>
-                {getStatusIcon(cage.status)}
-                {cage.status}
-              </div>
-            </div>
-            <div className="p-5">
-              {['Manutenção', 'Limpeza', 'Avaliação'].includes(cage.status) && cage.maintenanceStartDate ? (
-                <div className="space-y-3">
-                  <div className="flex items-center gap-2 text-slate-500">
-                    <Calendar className="w-3 h-3" />
-                    <span className="text-[10px] font-bold uppercase">Entrada:</span>
-                    <span className="text-xs font-black text-slate-700">{format(new Date(cage.maintenanceStartDate + 'T12:00:00'), 'dd/MM/yyyy')}</span>
+                <div>
+                  <label className="block text-xs font-black text-slate-400 uppercase mb-1">Novo Momento/Status</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {['Disponível', 'Manutenção', 'Limpeza', 'Avaliação'].map((s) => (
+                      <button
+                        key={s}
+                        type="button"
+                        onClick={() => setFormData({...formData, status: s as CageStatus})}
+                        className={`px-4 py-3 rounded-xl border text-xs font-black uppercase tracking-widest transition-all ${formData.status === s ? 'bg-red-600 text-white border-red-600 shadow-lg shadow-red-500/20' : 'bg-white text-slate-400 border-slate-200 hover:border-red-200'}`}
+                      >
+                        {s}
+                      </button>
+                    ))}
                   </div>
-                  {cage.maintenanceEndDate && (
-                    <div className="flex items-center gap-2 text-amber-600">
-                      <Clock className="w-3 h-3" />
-                      <span className="text-[10px] font-bold uppercase">Previsão:</span>
-                      <span className="text-xs font-black">{format(new Date(cage.maintenanceEndDate + 'T12:00:00'), 'dd/MM/yyyy')}</span>
+                </div>
+
+                {(formData.status === 'Manutenção' || formData.status === 'Limpeza') && (
+                  <div className="grid grid-cols-2 gap-3 animate-in fade-in slide-in-from-top-2 duration-300">
+                    <div>
+                      <label className="block text-xs font-black text-slate-400 uppercase mb-1">Data de Entrada</label>
+                      <input type="date" required className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none font-bold" value={formData.startDate} onChange={(e) => setFormData({...formData, startDate: e.target.value})} />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-black text-slate-400 uppercase mb-1">Previsão de Retorno</label>
+                      <input type="date" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none font-bold" value={formData.endDate} onChange={(e) => setFormData({...formData, endDate: e.target.value})} />
+                    </div>
+                  </div>
+                )}
+
+                <button type="submit" className="w-full py-4 bg-slate-900 text-white rounded-2xl font-black uppercase tracking-widest text-xs shadow-xl active:scale-95 transition-all mt-4">
+                  Atualizar Status da Gaiola
+                </button>
+              </form>
+            </div>
+          ) : (
+            <div className="bg-slate-100 p-12 rounded-3xl border border-dashed border-slate-300 flex flex-col items-center gap-4 text-center">
+              <Settings className="w-12 h-12 text-slate-300" />
+              <h4 className="text-sm font-black uppercase tracking-widest text-slate-400">Modo Leitura Ativo</h4>
+              <p className="text-xs font-bold text-slate-400 uppercase">Você não possui permissão para gerenciar o status das gaiolas.</p>
+            </div>
+          )}
+        </div>
+
+          <div className="lg:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-6">
+            {state.cages.map(cage => (
+              <div key={cage.id} className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden hover:shadow-md transition-all">
+                <div className="p-4 bg-slate-50 border-b border-slate-100 flex justify-between items-center">
+                  <span className="font-black text-slate-800 uppercase tracking-tighter">{cage.name}</span>
+                  <div className={`p-1.5 rounded-lg border flex items-center gap-1.5 text-[9px] font-black uppercase tracking-widest ${getStatusColor(cage.status)}`}>
+                    {getStatusIcon(cage.status)}
+                    {cage.status}
+                  </div>
+                </div>
+                <div className="p-5">
+                  {['Manutenção', 'Limpeza', 'Avaliação'].includes(cage.status) && cage.maintenanceStartDate ? (
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-2 text-slate-500">
+                        <Calendar className="w-3 h-3" />
+                        <span className="text-[10px] font-bold uppercase">Entrada:</span>
+                        <span className="text-xs font-black text-slate-700">{format(new Date(cage.maintenanceStartDate + 'T12:00:00'), 'dd/MM/yyyy')}</span>
+                      </div>
+                      {cage.maintenanceEndDate && (
+                        <div className="flex items-center gap-2 text-amber-600">
+                          <Clock className="w-3 h-3" />
+                          <span className="text-[10px] font-bold uppercase">Previsão:</span>
+                          <span className="text-xs font-black">{format(new Date(cage.maintenanceEndDate + 'T12:00:00'), 'dd/MM/yyyy')}</span>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest italic">
+                      Gaiola operacional ou em alojamento.
                     </div>
                   )}
                 </div>
-              ) : (
-                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest italic">
-                  Gaiola operacional ou em alojamento.
-                </div>
-              )}
-            </div>
+              </div>
+            ))}
           </div>
-        ))}
-      </div>
+        </div>
+      )}
     </div>
   );
 };

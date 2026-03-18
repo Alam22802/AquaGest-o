@@ -29,12 +29,6 @@ const Dashboard: React.FC<Props> = ({ state }) => {
   const [reportStartDate, setReportStartDate] = useState<string>(format(subDays(new Date(), 30), 'yyyy-MM-dd'));
   const [reportEndDate, setReportEndDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'));
 
-  useEffect(() => {
-    if (state.batches && state.batches.length > 0) {
-      if (!selectedBatchId) setSelectedBatchId(state.batches[0].id);
-    }
-  }, [state.batches]);
-
   const lowStockFeeds = useMemo(() => {
     return (state.feedTypes || []).filter(feed => {
       const stockKg = feed.totalStock / 1000;
@@ -106,6 +100,13 @@ const Dashboard: React.FC<Props> = ({ state }) => {
       }
     });
 
+    const nurseryMortalityByBatch = new Map<string, number>();
+    (state.mortalityLogs || []).forEach(m => {
+      if (m.batchId) {
+        nurseryMortalityByBatch.set(m.batchId, (nurseryMortalityByBatch.get(m.batchId) || 0) + m.count);
+      }
+    });
+
     const harvestsByBatch = new Map<string, { fishCount: number, weight: number }>();
     (state.harvestLogs || []).forEach(h => {
       const current = harvestsByBatch.get(h.batchId) || { fishCount: 0, weight: 0 };
@@ -123,6 +124,10 @@ const Dashboard: React.FC<Props> = ({ state }) => {
       const totalHarvested = harvestData.fishCount;
       const totalHarvestedWeight = harvestData.weight;
       const totalMortality = mortalityByBatch.get(batch.id) || 0;
+      const nurseryMortality = nurseryMortalityByBatch.get(batch.id) || 0;
+
+      const usedFish = batchCages.reduce((acc, curr) => acc + (curr.initialFishCount || 0), 0);
+      const settlementBalance = Math.max(0, totalInitial - usedFish - totalHarvested - nurseryMortality);
 
       const currentTotalStock = Math.max(0, totalInitial - totalMortality - totalHarvested);
 
@@ -181,12 +186,68 @@ const Dashboard: React.FC<Props> = ({ state }) => {
         feedBreakdown,
         fca: fcaValue,
         avgWeight: currentAvgWeight,
-        samplingInfo
+        samplingInfo,
+        settlementBalance
       };
     });
   }, [state.batches, state.cages, state.mortalityLogs, state.biometryLogs, state.feedingLogs, state.feedTypes, state.harvestLogs]);
 
+  const filteredBatchStats = useMemo(() => {
+    return batchStats.filter(b => b.settlementBalance === 0);
+  }, [batchStats]);
+
+  useEffect(() => {
+    if (filteredBatchStats && filteredBatchStats.length > 0) {
+      if (!selectedBatchId || !filteredBatchStats.some(b => b.id === selectedBatchId)) {
+        setSelectedBatchId('all');
+      }
+    } else if (state.batches && state.batches.length > 0) {
+      if (!selectedBatchId) setSelectedBatchId(state.batches[0].id);
+    }
+  }, [filteredBatchStats, state.batches]);
+
   const selectedBatchData = useMemo(() => {
+    if (selectedBatchId === 'all') {
+      const stats = filteredBatchStats.reduce((acc, curr) => {
+        acc.stock += curr.stock;
+        acc.harvested += curr.harvested;
+        acc.harvestedWeight += curr.harvestedWeight;
+        acc.mortality += curr.mortality;
+        acc.biomass += curr.biomass;
+        acc.feed += curr.feed;
+        
+        curr.feedBreakdown.forEach(fb => {
+          const existing = acc.feedBreakdown.find(f => f.name === fb.name);
+          if (existing) {
+            existing.amountKg += fb.amountKg;
+          } else {
+            acc.feedBreakdown.push({ ...fb });
+          }
+        });
+        
+        return acc;
+      }, { 
+        stock: 0, 
+        harvested: 0, 
+        harvestedWeight: 0,
+        mortality: 0, 
+        biomass: 0, 
+        feed: 0, 
+        feedBreakdown: [] as { name: string, amountKg: number }[] 
+      });
+
+      const totalProducedWeightKg = stats.biomass + stats.harvestedWeight;
+      const fcaValue = totalProducedWeightKg > 0 ? (stats.feed / totalProducedWeightKg).toFixed(2) : '0.00';
+      const avgWeight = stats.stock > 0 ? (stats.biomass * 1000) / stats.stock : 0;
+
+      return {
+        ...stats,
+        fca: fcaValue,
+        avgWeight,
+        samplingInfo: `Total de ${filteredBatchStats.length} lotes`
+      };
+    }
+
     return batchStats.find(b => b.id === selectedBatchId) || { 
       stock: 0, 
       harvested: 0, 
@@ -199,25 +260,53 @@ const Dashboard: React.FC<Props> = ({ state }) => {
       avgWeight: 0, 
       samplingInfo: 'Sem dados' 
     };
-  }, [batchStats, selectedBatchId]);
+  }, [batchStats, filteredBatchStats, selectedBatchId]);
 
   const biometryEvolutionData = useMemo(() => {
     if (!selectedBatchId) return [];
-    const batch = (state.batches || []).find(b => b.id === selectedBatchId);
-    if (!batch) return [];
     
-    const logs = (state.biometryLogs || []).filter(l => {
-      if (l.batchId === selectedBatchId) return true;
-      if (!l.batchId && l.cageId) {
-        const cage = state.cages.find(c => c.id === l.cageId);
-        if (cage?.batchId === selectedBatchId && l.date >= batch.settlementDate) return true;
+    let logs: any[] = [];
+    let initialWeights: number[] = [];
+
+    if (selectedBatchId === 'all') {
+      const filteredBatches = (state.batches || []).filter(b => {
+        const stats = batchStats.find(s => s.id === b.id);
+        return stats?.settlementBalance === 0;
+      });
+      
+      initialWeights = filteredBatches.map(b => b.initialUnitWeight);
+      
+      logs = (state.biometryLogs || []).filter(l => {
+        const batch = filteredBatches.find(b => b.id === l.batchId);
+        if (batch) return true;
         
-        // Fallback for harvested cages
-        const harvest = (state.harvestLogs || []).find(h => h.cageId === l.cageId && h.date >= l.date);
-        return harvest?.batchId === selectedBatchId;
-      }
-      return false;
-    }).sort((a, b) => a.date.localeCompare(b.date));
+        if (!l.batchId && l.cageId) {
+          const cage = state.cages.find(c => c.id === l.cageId);
+          const cageBatch = filteredBatches.find(b => b.id === cage?.batchId);
+          if (cageBatch && l.date >= cageBatch.settlementDate) return true;
+          
+          const harvest = (state.harvestLogs || []).find(h => h.cageId === l.cageId && h.date >= l.date);
+          return filteredBatches.some(b => b.id === harvest?.batchId);
+        }
+        return false;
+      });
+    } else {
+      const batch = (state.batches || []).find(b => b.id === selectedBatchId);
+      if (!batch) return [];
+      initialWeights = [batch.initialUnitWeight];
+      
+      logs = (state.biometryLogs || []).filter(l => {
+        if (l.batchId === selectedBatchId) return true;
+        if (!l.batchId && l.cageId) {
+          const cage = state.cages.find(c => c.id === l.cageId);
+          if (cage?.batchId === selectedBatchId && l.date >= batch.settlementDate) return true;
+          
+          const harvest = (state.harvestLogs || []).find(h => h.cageId === l.cageId && h.date >= l.date);
+          return harvest?.batchId === selectedBatchId;
+        }
+        return false;
+      });
+    }
     
     const uniqueDates = Array.from(new Set(logs.map(l => l.date))).sort();
     
@@ -237,26 +326,51 @@ const Dashboard: React.FC<Props> = ({ state }) => {
       };
     });
     
-    return [{ date: 'Início', weight: batch.initialUnitWeight }, ...data];
-  }, [state.biometryLogs, state.batches, state.cages, state.harvestLogs, selectedBatchId]);
+    const avgInitial = initialWeights.length > 0 ? initialWeights.reduce((a, b) => a + b, 0) / initialWeights.length : 0;
+    return [{ date: 'Início', weight: Math.round(avgInitial) }, ...data];
+  }, [state.biometryLogs, state.batches, state.cages, state.harvestLogs, selectedBatchId, batchStats]);
 
   const mortalityEvolutionData = useMemo(() => {
     if (!selectedBatchId) return [];
-    const batch = (state.batches || []).find(b => b.id === selectedBatchId);
-    if (!batch) return [];
+    
+    let logs: any[] = [];
 
-    const logs = (state.mortalityLogs || []).filter(m => {
-      if (m.batchId === selectedBatchId) return true;
-      if (!m.batchId && m.cageId) {
-        const cage = state.cages.find(c => c.id === m.cageId);
-        if (cage?.batchId === selectedBatchId && m.date >= batch.settlementDate) return true;
-        
-        // Fallback for harvested cages
-        const harvest = (state.harvestLogs || []).find(h => h.cageId === m.cageId && h.date >= m.date);
-        return harvest?.batchId === selectedBatchId;
-      }
-      return false;
-    });
+    if (selectedBatchId === 'all') {
+      const filteredBatches = (state.batches || []).filter(b => {
+        const stats = batchStats.find(s => s.id === b.id);
+        return stats?.settlementBalance === 0;
+      });
+
+      logs = (state.mortalityLogs || []).filter(m => {
+        const batch = filteredBatches.find(b => b.id === m.batchId);
+        if (batch) return true;
+
+        if (!m.batchId && m.cageId) {
+          const cage = state.cages.find(c => c.id === m.cageId);
+          const cageBatch = filteredBatches.find(b => b.id === cage?.batchId);
+          if (cageBatch && m.date >= cageBatch.settlementDate) return true;
+          
+          const harvest = (state.harvestLogs || []).find(h => h.cageId === m.cageId && h.date >= m.date);
+          return filteredBatches.some(b => b.id === harvest?.batchId);
+        }
+        return false;
+      });
+    } else {
+      const batch = (state.batches || []).find(b => b.id === selectedBatchId);
+      if (!batch) return [];
+
+      logs = (state.mortalityLogs || []).filter(m => {
+        if (m.batchId === selectedBatchId) return true;
+        if (!m.batchId && m.cageId) {
+          const cage = state.cages.find(c => c.id === m.cageId);
+          if (cage?.batchId === selectedBatchId && m.date >= batch.settlementDate) return true;
+          
+          const harvest = (state.harvestLogs || []).find(h => h.cageId === m.cageId && h.date >= m.date);
+          return harvest?.batchId === selectedBatchId;
+        }
+        return false;
+      });
+    }
 
     const grouped = logs.reduce((acc: any, log) => {
       if (!acc[log.date]) acc[log.date] = 0;
@@ -274,7 +388,7 @@ const Dashboard: React.FC<Props> = ({ state }) => {
         count: grouped[date] 
       };
     }).sort((a, b) => a.fullDate.localeCompare(b.fullDate));
-  }, [state.mortalityLogs, state.cages, state.batches, state.harvestLogs, selectedBatchId]);
+  }, [state.mortalityLogs, state.cages, state.batches, state.harvestLogs, selectedBatchId, batchStats]);
 
   const totalMortalityInChart = useMemo(() => {
     return mortalityEvolutionData.reduce((acc, curr) => acc + curr.count, 0);
@@ -445,8 +559,11 @@ const Dashboard: React.FC<Props> = ({ state }) => {
                 onChange={e => setSelectedBatchId(e.target.value)}
                 className="text-lg font-black text-slate-800 bg-transparent border-none outline-none focus:ring-0 p-0 cursor-pointer"
               >
-                {state.batches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
-                {state.batches.length === 0 && <option value="">Nenhum lote criado</option>}
+                {filteredBatchStats.length > 0 && (
+                  <option value="all">Todos os Lotes (Povoados)</option>
+                )}
+                {filteredBatchStats.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                {filteredBatchStats.length === 0 && <option value="">Nenhum lote povoado</option>}
               </select>
             </div>
           </div>

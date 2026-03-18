@@ -303,6 +303,26 @@ export interface HarvestSchedule {
   updatedAt: number;
 }
 
+export interface ColdStorageLog {
+  id: string;
+  date: string;
+  chamberName: string;
+  temperature: number;
+  userId: string;
+  timestamp: string;
+  updatedAt: number;
+}
+
+export interface UtilityLog {
+  id: string;
+  date: string;
+  type: 'water' | 'energy';
+  reading: number;
+  userId: string;
+  timestamp: string;
+  updatedAt: number;
+}
+
 export interface AppState {
   users: User[];
   lines: Line[];
@@ -323,6 +343,8 @@ export interface AppState {
   slaughterSupplyRequests?: SlaughterSupplyRequest[];
   harvestLogs?: HarvestLog[];
   harvestSchedules?: HarvestSchedule[];
+  coldStorageLogs?: ColdStorageLog[];
+  utilityLogs?: UtilityLog[];
   protocols: ProductionProtocol[];
   portfolios: InvestmentPortfolio[];
   capexProjects: CapexProject[];

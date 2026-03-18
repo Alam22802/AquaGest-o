@@ -44,6 +44,8 @@ const initialState: AppState = {
   slaughterSupplyItems: [],
   slaughterSupplyRequests: [],
   harvestLogs: [],
+  coldStorageLogs: [],
+  utilityLogs: [],
   protocols: [],
   portfolios: [],
   capexProjects: [],
@@ -122,6 +124,8 @@ export const ensureStateIntegrity = (state: any, mergeWith?: AppState, priority:
     capexProjects: filterByTombstone(base.capexProjects || []),
     capexInvoices: filterByTombstone(base.capexInvoices || []),
     harvestLogs: filterByTombstone(base.harvestLogs || []),
+    coldStorageLogs: filterByTombstone(base.coldStorageLogs || []),
+    utilityLogs: filterByTombstone(base.utilityLogs || []),
   };
 
   if (mergeWith) {
@@ -147,6 +151,8 @@ export const ensureStateIntegrity = (state: any, mergeWith?: AppState, priority:
       capexProjects: mergeArraysById(result.capexProjects || [], mergeWith.capexProjects || [], combinedDeletedIds, priority),
       capexInvoices: mergeArraysById(result.capexInvoices || [], mergeWith.capexInvoices || [], combinedDeletedIds, priority),
       harvestLogs: mergeArraysById(result.harvestLogs || [], mergeWith.harvestLogs || [], combinedDeletedIds, priority),
+      coldStorageLogs: mergeArraysById(result.coldStorageLogs || [], mergeWith.coldStorageLogs || [], combinedDeletedIds, priority),
+      utilityLogs: mergeArraysById(result.utilityLogs || [], mergeWith.utilityLogs || [], combinedDeletedIds, priority),
     };
   }
   return result;
