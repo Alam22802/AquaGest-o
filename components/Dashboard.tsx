@@ -205,8 +205,8 @@ const Dashboard: React.FC<Props> = ({ state }) => {
   }, [state.batches, state.cages, state.mortalityLogs, state.biometryLogs, state.feedingLogs, state.feedTypes, state.harvestLogs]);
 
   const filteredBatchStats = useMemo(() => {
-    // Show batches that are fully settled OR have fish in cages OR have been harvested
-    return batchStats.filter(b => b.settlementBalance === 0 || b.stock > 0 || b.harvested > 0);
+    // Show only batches that are fully settled (balance 0)
+    return batchStats.filter(b => b.settlementBalance === 0);
   }, [batchStats]);
 
   useEffect(() => {
@@ -573,7 +573,7 @@ const Dashboard: React.FC<Props> = ({ state }) => {
                 className="text-lg font-black text-slate-800 bg-transparent border-none outline-none focus:ring-0 p-0 cursor-pointer"
               >
                 {filteredBatchStats.length > 0 && (
-                  <option value="all">Todos os Lotes (Povoados)</option>
+                  <option value="all">Todos os Lotes</option>
                 )}
                 {filteredBatchStats.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
                 {filteredBatchStats.length === 0 && <option value="">Nenhum lote povoado</option>}
