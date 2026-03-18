@@ -403,6 +403,84 @@ const Dashboard: React.FC<Props> = ({ state }) => {
     }).sort((a, b) => a.fullDate.localeCompare(b.fullDate));
   }, [state.mortalityLogs, state.cages, state.batches, state.harvestLogs, selectedBatchId, batchStats]);
 
+  const biomassEvolutionData = useMemo(() => {
+    if (!selectedBatchId) return [];
+    
+    let relevantBatches: any[] = [];
+    if (selectedBatchId === 'all') {
+      relevantBatches = (state.batches || []).filter(b => {
+        const stats = batchStats.find(s => s.id === b.id);
+        return stats?.settlementBalance === 0;
+      });
+    } else {
+      const batch = (state.batches || []).find(b => b.id === selectedBatchId);
+      if (batch) relevantBatches = [batch];
+    }
+
+    if (relevantBatches.length === 0) return [];
+
+    const batchIds = relevantBatches.map(b => b.id);
+    const initialPop = relevantBatches.reduce((acc, b) => acc + b.initialQuantity, 0);
+    const initialWeight = relevantBatches.length > 0 ? relevantBatches.reduce((acc, b) => acc + b.initialUnitWeight, 0) / relevantBatches.length : 0;
+
+    const biometries = (state.biometryLogs || []).filter(l => {
+      if (l.batchId) return batchIds.includes(l.batchId);
+      const cage = state.cages.find(c => c.id === l.cageId);
+      return batchIds.includes(cage?.batchId || '');
+    });
+
+    const mortalities = (state.mortalityLogs || []).filter(l => {
+      if (l.batchId) return batchIds.includes(l.batchId);
+      const cage = state.cages.find(c => c.id === l.cageId);
+      return batchIds.includes(cage?.batchId || '');
+    });
+
+    const harvests = (state.harvestLogs || []).filter(l => batchIds.includes(l.batchId));
+
+    const allDates = Array.from(new Set([
+      ...biometries.map(l => l.date),
+      ...harvests.map(l => l.date)
+    ])).sort();
+
+    let lastWeight = initialWeight;
+    
+    const data = allDates.map(date => {
+      const cumMortality = mortalities.filter(m => m.date <= date).reduce((acc, m) => acc + m.count, 0);
+      const cumHarvest = harvests.filter(h => h.date <= date).reduce((acc, h) => acc + h.fishCount, 0);
+      const currentPop = Math.max(0, initialPop - cumMortality - cumHarvest);
+      
+      const dayBiometries = biometries.filter(b => b.date === date);
+      if (dayBiometries.length > 0) {
+        lastWeight = dayBiometries.reduce((acc, b) => acc + b.averageWeight, 0) / dayBiometries.length;
+      }
+      
+      const biomassKg = (currentPop * lastWeight) / 1000;
+
+      let dateLabel = date;
+      try {
+        dateLabel = format(parseISO(date), 'dd/MM');
+      } catch {}
+
+      return {
+        date: dateLabel,
+        fullDate: date,
+        biomass: Math.round(biomassKg),
+        weight: Math.round(lastWeight),
+        pop: currentPop
+      };
+    });
+
+    return [
+      { 
+        date: 'Início', 
+        biomass: Math.round((initialPop * initialWeight) / 1000), 
+        weight: Math.round(initialWeight), 
+        pop: initialPop 
+      }, 
+      ...data
+    ];
+  }, [state, selectedBatchId, batchStats]);
+
   const totalMortalityInChart = useMemo(() => {
     return mortalityEvolutionData.reduce((acc, curr) => acc + curr.count, 0);
   }, [mortalityEvolutionData]);
@@ -671,6 +749,34 @@ const Dashboard: React.FC<Props> = ({ state }) => {
                 <Tooltip cursor={{fill: 'transparent'}} />
                 <Bar dataKey="count" fill="#ef4444" radius={[4, 4, 0, 0]}>{mortalityEvolutionData.map((entry, index) => (<Cell key={`cell-${index}`} fill={entry.count > 50 ? '#b91c1c' : '#ef4444'} />))}</Bar>
               </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm lg:col-span-2">
+          <div className="flex justify-between items-center mb-6">
+            <h3 className="text-sm font-black text-slate-400 uppercase tracking-widest flex items-center gap-2 italic"><Scale className="w-4 h-4" /> Evolução da Biomassa Estimada (kg)</h3>
+            <div className="text-[10px] font-bold text-slate-400 uppercase">Considera despescas e mortalidade</div>
+          </div>
+          <div className="h-[300px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={biomassEvolutionData}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{fontSize: 9, fontWeight: 700, fill: '#94a3b8'}} />
+                <YAxis axisLine={false} tickLine={false} tick={{fontSize: 9, fontWeight: 700, fill: '#94a3b8'}} />
+                <Tooltip 
+                  contentStyle={{ borderRadius: '1rem', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
+                  formatter={(value: number) => [`${value.toLocaleString()} kg`, 'Biomassa']}
+                />
+                <Line 
+                  type="monotone" 
+                  dataKey="biomass" 
+                  stroke="#10b981" 
+                  strokeWidth={4} 
+                  dot={{r: 4, fill: '#10b981', strokeWidth: 0}}
+                  activeDot={{r: 6, strokeWidth: 0}}
+                />
+              </LineChart>
             </ResponsiveContainer>
           </div>
         </div>

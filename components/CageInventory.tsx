@@ -241,6 +241,10 @@ const CageInventory: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
 
   const filterSummary = useMemo(() => {
     const totalCapacity = filteredCages.reduce((acc, c) => acc + c.stockingCapacity, 0);
+    const totalVolume = filteredCages.reduce((acc, c) => {
+      const d = c.dimensions || { length: 0, width: 0, depth: 0 };
+      return acc + (d.length * d.width * d.depth);
+    }, 0);
     const models = filteredCages.reduce((acc: Record<string, { count: number, capacity: number }>, c) => {
       const d = c.dimensions || { length: 0, width: 0, depth: 0 };
       const modelKey = `${d.length}x${d.width}x${d.depth}m`;
@@ -254,6 +258,7 @@ const CageInventory: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
 
     return {
       totalCapacity,
+      totalVolume,
       models,
       count: filteredCages.length
     };
@@ -426,6 +431,9 @@ const CageInventory: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                 </h4>
                 <div className="text-xl font-black text-indigo-600 tracking-tight">
                   {filterSummary.totalCapacity.toLocaleString()} <span className="text-xs">unidades</span>
+                </div>
+                <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">
+                  {filterSummary.totalVolume.toFixed(2)} m³ Total
                 </div>
               </div>
 
