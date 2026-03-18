@@ -13,6 +13,7 @@ interface Props {
 
 const Maintenance: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
   const [activeTab, setActiveTab] = useState<'cages' | 'slaughterhouse'>('cages');
+  const [selectedCageIds, setSelectedCageIds] = useState<string[]>([]);
   const hasPermission = currentUser.isMaster || currentUser.canEdit;
 
   const [formData, setFormData] = useState({
@@ -22,13 +23,32 @@ const Maintenance: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     endDate: ''
   });
 
+  const toggleCageSelection = (id: string) => {
+    setSelectedCageIds(prev => 
+      prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+    );
+  };
+
+  const selectAllCages = () => {
+    if (selectedCageIds.length === state.cages.length) {
+      setSelectedCageIds([]);
+    } else {
+      setSelectedCageIds(state.cages.map(c => c.id));
+    }
+  };
+
   const handleUpdateStatus = (e: React.FormEvent) => {
     e.preventDefault();
     if (!hasPermission) return;
-    if (!formData.cageId) return;
+    
+    const targetIds = selectedCageIds.length > 0 ? selectedCageIds : (formData.cageId ? [formData.cageId] : []);
+    if (targetIds.length === 0) {
+      alert('Selecione ao menos uma gaiola.');
+      return;
+    }
 
     const updatedCages = state.cages.map(c => {
-      if (c.id === formData.cageId) {
+      if (targetIds.includes(c.id)) {
         return {
           ...c,
           status: formData.status,
@@ -41,7 +61,8 @@ const Maintenance: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
 
     onUpdate({ ...state, cages: updatedCages });
     setFormData({ ...formData, cageId: '', endDate: '' });
-    alert('Status da gaiola atualizado com sucesso!');
+    setSelectedCageIds([]);
+    alert(`${targetIds.length} status de gaiola(s) atualizado(s) com sucesso!`);
   };
 
   const getStatusColor = (status: CageStatus) => {
@@ -51,6 +72,7 @@ const Maintenance: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       case 'Manutenção': return 'bg-red-100 text-red-700 border-red-200';
       case 'Limpeza': return 'bg-amber-100 text-amber-700 border-amber-200';
       case 'Avaliação': return 'bg-purple-100 text-purple-700 border-purple-200';
+      case 'Sucata': return 'bg-slate-200 text-slate-700 border-slate-300';
       default: return 'bg-slate-100 text-slate-700';
     }
   };
@@ -62,6 +84,7 @@ const Maintenance: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       case 'Manutenção': return <Settings className="w-3 h-3" />;
       case 'Limpeza': return <Eraser className="w-3 h-3" />;
       case 'Avaliação': return <Eye className="w-3 h-3" />;
+      case 'Sucata': return <Trash2 className="w-3 h-3" />;
     }
   };
 
@@ -96,22 +119,36 @@ const Maintenance: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                 <Settings className="w-5 h-5 text-red-500" />
                 Gerenciar Status da Gaiola
               </h3>
-              
-              <form onSubmit={handleUpdateStatus} className="space-y-4">
-                <div>
-                  <label className="block text-xs font-black text-slate-400 uppercase mb-1">Escolher Gaiola</label>
-                  <select required className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-red-500 font-bold" value={formData.cageId} onChange={(e) => setFormData({...formData, cageId: e.target.value})}>
-                    <option value="">Selecione...</option>
-                    {state.cages.map(c => (
-                      <option key={c.id} value={c.id}>{c.name} ({c.status})</option>
-                    ))}
-                  </select>
-                </div>
+                             <form onSubmit={handleUpdateStatus} className="space-y-4">
+                {selectedCageIds.length > 0 ? (
+                  <div className="p-4 bg-amber-50 border border-amber-200 rounded-2xl mb-4">
+                    <p className="text-xs font-black text-amber-700 uppercase tracking-widest">
+                      Editando {selectedCageIds.length} gaiola(s) em massa
+                    </p>
+                    <button 
+                      type="button"
+                      onClick={() => setSelectedCageIds([])}
+                      className="text-[10px] font-bold text-amber-600 underline uppercase mt-1"
+                    >
+                      Cancelar seleção em massa
+                    </button>
+                  </div>
+                ) : (
+                  <div>
+                    <label className="block text-xs font-black text-slate-400 uppercase mb-1">Escolher Gaiola</label>
+                    <select required={selectedCageIds.length === 0} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-red-500 font-bold" value={formData.cageId} onChange={(e) => setFormData({...formData, cageId: e.target.value})}>
+                      <option value="">Selecione...</option>
+                      {state.cages.map(c => (
+                        <option key={c.id} value={c.id}>{c.name} ({c.status})</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
 
                 <div>
                   <label className="block text-xs font-black text-slate-400 uppercase mb-1">Novo Momento/Status</label>
                   <div className="grid grid-cols-2 gap-2">
-                    {['Disponível', 'Manutenção', 'Limpeza', 'Avaliação'].map((s) => (
+                    {['Disponível', 'Manutenção', 'Limpeza', 'Avaliação', 'Sucata'].map((s) => (
                       <button
                         key={s}
                         type="button"
@@ -151,40 +188,61 @@ const Maintenance: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
           )}
         </div>
 
-          <div className="lg:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-6">
-            {state.cages.map(cage => (
-              <div key={cage.id} className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden hover:shadow-md transition-all">
-                <div className="p-4 bg-slate-50 border-b border-slate-100 flex justify-between items-center">
-                  <span className="font-black text-slate-800 uppercase tracking-tighter">{cage.name}</span>
-                  <div className={`p-1.5 rounded-lg border flex items-center gap-1.5 text-[9px] font-black uppercase tracking-widest ${getStatusColor(cage.status)}`}>
-                    {getStatusIcon(cage.status)}
-                    {cage.status}
-                  </div>
-                </div>
-                <div className="p-5">
-                  {['Manutenção', 'Limpeza', 'Avaliação'].includes(cage.status) && cage.maintenanceStartDate ? (
-                    <div className="space-y-3">
-                      <div className="flex items-center gap-2 text-slate-500">
-                        <Calendar className="w-3 h-3" />
-                        <span className="text-[10px] font-bold uppercase">Entrada:</span>
-                        <span className="text-xs font-black text-slate-700">{format(new Date(cage.maintenanceStartDate + 'T12:00:00'), 'dd/MM/yyyy')}</span>
-                      </div>
-                      {cage.maintenanceEndDate && (
-                        <div className="flex items-center gap-2 text-amber-600">
-                          <Clock className="w-3 h-3" />
-                          <span className="text-[10px] font-bold uppercase">Previsão:</span>
-                          <span className="text-xs font-black">{format(new Date(cage.maintenanceEndDate + 'T12:00:00'), 'dd/MM/yyyy')}</span>
+          <div className="lg:col-span-2 space-y-6">
+            <div className="flex justify-end">
+              <button 
+                onClick={selectAllCages}
+                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all"
+              >
+                {selectedCageIds.length === state.cages.length ? 'Desmarcar Tudo' : 'Selecionar Tudo'}
+              </button>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {state.cages.map(cage => (
+                <div 
+                  key={cage.id} 
+                  onClick={() => hasPermission && toggleCageSelection(cage.id)}
+                  className={`bg-white rounded-3xl shadow-sm border transition-all cursor-pointer overflow-hidden hover:shadow-md ${selectedCageIds.includes(cage.id) ? 'border-red-500 ring-2 ring-red-500/20' : 'border-slate-200'}`}
+                >
+                  <div className="p-4 bg-slate-50 border-b border-slate-100 flex justify-between items-center">
+                    <div className="flex items-center gap-3">
+                      {hasPermission && (
+                        <div className={`w-4 h-4 rounded border flex items-center justify-center transition-all ${selectedCageIds.includes(cage.id) ? 'bg-red-500 border-red-500' : 'bg-white border-slate-300'}`}>
+                          {selectedCageIds.includes(cage.id) && <CheckCircle2 className="w-3 h-3 text-white" />}
                         </div>
                       )}
+                      <span className="font-black text-slate-800 uppercase tracking-tighter">{cage.name}</span>
                     </div>
-                  ) : (
-                    <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest italic">
-                      Gaiola operacional ou em alojamento.
+                    <div className={`p-1.5 rounded-lg border flex items-center gap-1.5 text-[9px] font-black uppercase tracking-widest ${getStatusColor(cage.status)}`}>
+                      {getStatusIcon(cage.status)}
+                      {cage.status}
                     </div>
-                  )}
+                  </div>
+                  <div className="p-5">
+                    {['Manutenção', 'Limpeza', 'Avaliação'].includes(cage.status) && cage.maintenanceStartDate ? (
+                      <div className="space-y-3">
+                        <div className="flex items-center gap-2 text-slate-500">
+                          <Calendar className="w-3 h-3" />
+                          <span className="text-[10px] font-bold uppercase">Entrada:</span>
+                          <span className="text-xs font-black text-slate-700">{format(new Date(cage.maintenanceStartDate + 'T12:00:00'), 'dd/MM/yyyy')}</span>
+                        </div>
+                        {cage.maintenanceEndDate && (
+                          <div className="flex items-center gap-2 text-amber-600">
+                            <Clock className="w-3 h-3" />
+                            <span className="text-[10px] font-bold uppercase">Previsão:</span>
+                            <span className="text-xs font-black">{format(new Date(cage.maintenanceEndDate + 'T12:00:00'), 'dd/MM/yyyy')}</span>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest italic">
+                        {cage.status === 'Sucata' ? 'Gaiola descartada/sucata.' : 'Gaiola operacional ou em alojamento.'}
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
         </div>
       )}

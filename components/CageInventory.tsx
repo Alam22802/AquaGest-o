@@ -271,6 +271,7 @@ const CageInventory: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       case 'Manutenção': return <Settings className="w-3 h-3" />;
       case 'Limpeza': return <Eraser className="w-3 h-3" />;
       case 'Avaliação': return <Eye className="w-3 h-3" />;
+      case 'Sucata': return <Trash2 className="w-3 h-3" />;
     }
   };
 
@@ -281,6 +282,7 @@ const CageInventory: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       case 'Manutenção': return 'bg-red-100 text-red-700 border-red-200';
       case 'Limpeza': return 'bg-amber-100 text-amber-700 border-amber-200';
       case 'Avaliação': return 'bg-purple-100 text-purple-700 border-purple-200';
+      case 'Sucata': return 'bg-slate-200 text-slate-700 border-slate-300';
       default: return 'bg-slate-100 text-slate-700';
     }
   };
@@ -395,7 +397,7 @@ const CageInventory: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
           >
             Todos
           </button>
-          {(['Disponível', 'Ocupada', 'Manutenção', 'Limpeza', 'Avaliação'] as CageStatus[]).map(status => (
+          {(['Disponível', 'Ocupada', 'Manutenção', 'Limpeza', 'Avaliação', 'Sucata'] as CageStatus[]).map(status => (
             <button 
               key={status}
               onClick={() => setFilterStatus(status)}
