@@ -54,7 +54,8 @@ const SlaughterSummary = React.memo(({ stats, startDate, endDate, onStartDateCha
              </div>
           </div>
 
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-8">
+          {/* Linha 1: Produção */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-8 mb-8 pb-8 border-b border-white/5">
              <div className="space-y-2 border-l-2 border-white/10 pl-6">
                 <div className="text-[9px] font-black opacity-40 uppercase tracking-widest">Total Recepção</div>
                 <div className="text-2xl font-black flex items-baseline gap-1">
@@ -76,47 +77,17 @@ const SlaughterSummary = React.memo(({ stats, startDate, endDate, onStartDateCha
                    <span className="text-[10px] opacity-40">%</span>
                 </div>
              </div>
-             <div className="space-y-2 border-l-2 border-amber-500/30 pl-6">
-                <div className="text-[9px] font-black opacity-40 uppercase tracking-widest">Valor Total Notas</div>
-                <div className="text-2xl font-black text-amber-300 flex items-baseline gap-1">
-                   <span className="text-[10px] opacity-40">R$</span>
-                   {stats.totalInvoiceValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+             <div className="space-y-2 border-l-2 border-white/10 pl-6">
+                <div className="text-[9px] font-black opacity-40 uppercase tracking-widest">Filé Congelado</div>
+                <div className="text-2xl font-black flex items-baseline gap-1">
+                   {stats.totalGta.toLocaleString('pt-BR', { minimumFractionDigits: 0 })}
+                   <span className="text-[10px] opacity-40">kg</span>
                 </div>
              </div>
           </div>
 
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-8 mt-8 pt-8 border-t border-white/5">
-             <div className="space-y-2 border-l-2 border-white/10 pl-6">
-                <div className="text-[9px] font-black opacity-40 uppercase tracking-widest">Consumo Água/Ton Peixe Abatido</div>
-                <div className="text-xl font-black flex items-baseline gap-1">
-                   {stats.waterPerTon.toFixed(2)}
-                   <span className="text-[10px] opacity-40">L/Ton</span>
-                </div>
-             </div>
-             <div className="space-y-2 border-l-2 border-white/10 pl-6">
-                <div className="text-[9px] font-black opacity-40 uppercase tracking-widest">Consumo Kw/Ton Peixe Abatido</div>
-                <div className="text-xl font-black flex items-baseline gap-1">
-                   {stats.energyKwPerTon.toFixed(2)}
-                   <span className="text-[10px] opacity-40">kWh/Ton</span>
-                </div>
-             </div>
-             <div className="space-y-2 border-l-2 border-white/10 pl-6">
-                <div className="text-[9px] font-black opacity-40 uppercase tracking-widest">Mão De Obra/Ton Peixe Abatido</div>
-                <div className="text-xl font-black flex items-baseline gap-1">
-                   <span className="text-[10px] opacity-40">R$</span>
-                   {stats.laborPerTon.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                </div>
-             </div>
-             <div className="space-y-2 border-l-2 border-white/10 pl-6">
-                <div className="text-[9px] font-black opacity-40 uppercase tracking-widest">Frete / kg Vivo</div>
-                <div className="text-xl font-black flex items-baseline gap-1">
-                   <span className="text-[10px] opacity-40">R$</span>
-                   {stats.freightPerKgLive.toFixed(2)}
-                </div>
-             </div>
-          </div>
-
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-8 mt-8">
+          {/* Linha 2: Condenações */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-8 mb-8 pb-8 border-b border-white/5">
              <div className="space-y-2 border-l-2 border-red-500/30 pl-6">
                 <div className="text-[9px] font-black opacity-40 uppercase tracking-widest">Condenações Frig.</div>
                 <div className="text-xl font-black text-red-400 flex items-baseline gap-1">
@@ -131,6 +102,17 @@ const SlaughterSummary = React.memo(({ stats, startDate, endDate, onStartDateCha
                    <span className="text-[10px] opacity-40">kg</span>
                 </div>
              </div>
+          </div>
+
+          {/* Linha 3: Financeiro */}
+          <div className="grid grid-cols-2 lg:grid-cols-6 gap-8">
+             <div className="space-y-2 border-l-2 border-amber-500/30 pl-6">
+                <div className="text-[9px] font-black opacity-40 uppercase tracking-widest">Valor Total Notas</div>
+                <div className="text-xl font-black text-amber-300 flex items-baseline gap-1">
+                   <span className="text-[10px] opacity-40">R$</span>
+                   {stats.totalInvoiceValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                </div>
+             </div>
              <div className="space-y-2 border-l-2 border-white/10 pl-6">
                 <div className="text-[9px] font-black opacity-40 uppercase tracking-widest">Valor KG Peixe Vivo</div>
                 <div className="text-xl font-black flex items-baseline gap-1">
@@ -139,10 +121,31 @@ const SlaughterSummary = React.memo(({ stats, startDate, endDate, onStartDateCha
                 </div>
              </div>
              <div className="space-y-2 border-l-2 border-white/10 pl-6">
-                <div className="text-[9px] font-black opacity-40 uppercase tracking-widest">Total Filé Congelado</div>
+                <div className="text-[9px] font-black opacity-40 uppercase tracking-widest">Frete / kg Vivo</div>
                 <div className="text-xl font-black flex items-baseline gap-1">
-                   {stats.totalGta.toLocaleString('pt-BR', { minimumFractionDigits: 0 })}
-                   <span className="text-[10px] opacity-40">kg</span>
+                   <span className="text-[10px] opacity-40">R$</span>
+                   {stats.freightPerKgLive.toFixed(2)}
+                </div>
+             </div>
+             <div className="space-y-2 border-l-2 border-white/10 pl-6">
+                <div className="text-[9px] font-black opacity-40 uppercase tracking-widest">Mão De Obra/Ton</div>
+                <div className="text-xl font-black flex items-baseline gap-1">
+                   <span className="text-[10px] opacity-40">R$</span>
+                   {stats.laborPerTon.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                </div>
+             </div>
+             <div className="space-y-2 border-l-2 border-white/10 pl-6">
+                <div className="text-[9px] font-black opacity-40 uppercase tracking-widest">Consumo Água/Ton</div>
+                <div className="text-xl font-black flex items-baseline gap-1">
+                   {stats.waterPerTon.toFixed(2)}
+                   <span className="text-[10px] opacity-40">L/Ton</span>
+                </div>
+             </div>
+             <div className="space-y-2 border-l-2 border-white/10 pl-6">
+                <div className="text-[9px] font-black opacity-40 uppercase tracking-widest">Consumo Kw/Ton</div>
+                <div className="text-xl font-black flex items-baseline gap-1">
+                   {stats.energyKwPerTon.toFixed(2)}
+                   <span className="text-[10px] opacity-40">kWh/Ton</span>
                 </div>
              </div>
           </div>
@@ -161,25 +164,29 @@ const SlaughterSummary = React.memo(({ stats, startDate, endDate, onStartDateCha
   );
 });
 
-const SlaughterChart = React.memo(({ data, month, year, onMonthChange, onYearChange, months, years }: {
+const SlaughterChart = React.memo(({ data, month, year, onMonthChange, onYearChange, months, years, title, dataKey, color, unit }: {
   data: any[],
   month: number,
   year: number,
   onMonthChange: (val: number) => void,
   onYearChange: (val: number) => void,
   months: string[],
-  years: number[]
+  years: number[],
+  title: string,
+  dataKey: string,
+  color: string,
+  unit: string
 }) => {
   return (
     <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-200">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
          <div className="flex items-center gap-3">
-            <div className="p-3 bg-blue-50 text-blue-600 rounded-2xl shadow-sm">
+            <div className={`p-3 rounded-2xl shadow-sm ${color === '#344434' ? 'bg-slate-50 text-slate-600' : 'bg-blue-50 text-blue-600'}`}>
                <TrendingUp className="w-6 h-6" />
             </div>
             <div>
-              <h3 className="text-sm font-black text-slate-800 uppercase tracking-tighter italic leading-none">Rendimento Diário (%)</h3>
-              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">Eficiência de Produção por Dia</p>
+              <h3 className="text-sm font-black text-slate-800 uppercase tracking-tighter italic leading-none">{title}</h3>
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">Evolução Diária</p>
             </div>
          </div>
 
@@ -217,8 +224,7 @@ const SlaughterChart = React.memo(({ data, month, year, onMonthChange, onYearCha
                  axisLine={false} 
                  tickLine={false} 
                  tick={{fontSize: 9, fontWeight: 900, fill: '#94a3b8'}}
-                 domain={[0, 100]}
-                 tickFormatter={(val) => `${val}%`}
+                 tickFormatter={(val) => `${val}${unit}`}
                />
                <Tooltip 
                  cursor={{fill: '#f8fafc'}}
@@ -241,9 +247,9 @@ const SlaughterChart = React.memo(({ data, month, year, onMonthChange, onYearCha
                    marginBottom: '4px'
                  }}
                />
-               <Bar dataKey="yield" name="Rendimento" radius={[6, 6, 0, 0]}>
+               <Bar dataKey={dataKey} name={title} radius={[6, 6, 0, 0]}>
                  {data.map((entry, index) => (
-                   <Cell key={`cell-${index}`} fill="#344434" />
+                   <Cell key={`cell-${index}`} fill={color} />
                  ))}
                </Bar>
             </BarChart>
@@ -485,7 +491,7 @@ const SlaughterOverview: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
         recep: dayRecep,
         packed: dayPacked
       };
-    }).filter(d => d.recep > 0); 
+    }); 
   }, [state.slaughterLogs, chartMonth, chartYear]);
 
   const hasPermission = currentUser.isMaster || currentUser.canEdit;
@@ -654,15 +660,35 @@ const SlaughterOverview: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
         onEndDateChange={setSummaryEndDate} 
       />
 
-      <SlaughterChart 
-        data={dailyYieldData} 
-        month={chartMonth} 
-        year={chartYear} 
-        onMonthChange={setChartMonth} 
-        onYearChange={setChartYear} 
-        months={months} 
-        years={years} 
-      />
+      <div className="grid grid-cols-1 gap-8">
+        <SlaughterChart 
+          data={dailyYieldData} 
+          month={chartMonth} 
+          year={chartYear} 
+          onMonthChange={setChartMonth} 
+          onYearChange={setChartYear} 
+          months={months} 
+          years={years}
+          title="Rendimento Diário (%)"
+          dataKey="yield"
+          color="#344434"
+          unit="%"
+        />
+
+        <SlaughterChart 
+          data={dailyYieldData} 
+          month={chartMonth} 
+          year={chartYear} 
+          onMonthChange={setChartMonth} 
+          onYearChange={setChartYear} 
+          months={months} 
+          years={years}
+          title="Peso Recebido Diário (kg)"
+          dataKey="recep"
+          color="#3b82f6"
+          unit="kg"
+        />
+      </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
         <div className="lg:col-span-1 lg:sticky lg:top-8">
