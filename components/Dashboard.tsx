@@ -423,49 +423,50 @@ const Dashboard: React.FC<Props> = ({ state }) => {
     const initialPop = relevantBatches.reduce((acc, b) => acc + b.initialQuantity, 0);
     const initialWeight = relevantBatches.length > 0 ? relevantBatches.reduce((acc, b) => acc + b.initialUnitWeight, 0) / relevantBatches.length : 0;
 
-    const biometries = (state.biometryLogs || []).filter(l => {
-      if (l.batchId) return batchIds.includes(l.batchId);
-      const cage = state.cages.find(c => c.id === l.cageId);
-      return batchIds.includes(cage?.batchId || '');
-    });
+    // Helper to check if a log belongs to the relevant batches
+    const isLogRelevant = (log: any) => {
+      if (log.batchId && batchIds.includes(log.batchId)) return true;
+      if (!log.batchId && log.cageId) {
+        const cage = state.cages.find(c => c.id === log.cageId);
+        if (cage?.batchId && batchIds.includes(cage.batchId)) {
+          const batch = relevantBatches.find(b => b.id === cage.batchId);
+          if (batch && log.date >= batch.settlementDate) return true;
+        }
+        const harvest = (state.harvestLogs || []).find(h => h.cageId === log.cageId && h.date >= log.date);
+        if (harvest && batchIds.includes(harvest.batchId)) return true;
+      }
+      return false;
+    };
 
-    const mortalities = (state.mortalityLogs || []).filter(l => {
-      if (l.batchId) return batchIds.includes(l.batchId);
-      const cage = state.cages.find(c => c.id === l.cageId);
-      return batchIds.includes(cage?.batchId || '');
-    });
-
+    const biometries = (state.biometryLogs || []).filter(isLogRelevant);
+    const mortalities = (state.mortalityLogs || []).filter(isLogRelevant);
     const harvests = (state.harvestLogs || []).filter(l => batchIds.includes(l.batchId));
 
-    const allDates = Array.from(new Set([
-      ...biometries.map(l => l.date),
-      ...harvests.map(l => l.date)
-    ])).sort();
-
-    let lastWeight = initialWeight;
+    // Use ONLY biometry dates as requested
+    const biometryDates = Array.from(new Set(biometries.map(l => l.date))).sort();
     
-    const data = allDates.map(date => {
+    const data = biometryDates.map(date => {
+      // "Estoque Vivo" at this specific date
       const cumMortality = mortalities.filter(m => m.date <= date).reduce((acc, m) => acc + m.count, 0);
       const cumHarvest = harvests.filter(h => h.date <= date).reduce((acc, h) => acc + h.fishCount, 0);
       const currentPop = Math.max(0, initialPop - cumMortality - cumHarvest);
       
       const dayBiometries = biometries.filter(b => b.date === date);
-      if (dayBiometries.length > 0) {
-        lastWeight = dayBiometries.reduce((acc, b) => acc + b.averageWeight, 0) / dayBiometries.length;
-      }
+      const avgWeight = dayBiometries.reduce((acc, b) => acc + b.averageWeight, 0) / dayBiometries.length;
       
-      const biomassKg = (currentPop * lastWeight) / 1000;
+      // Biomassa = Estoque Vivo * Média de Peso da Biometria
+      const biomassKg = (currentPop * avgWeight) / 1000;
 
       let dateLabel = date;
       try {
-        dateLabel = format(parseISO(date), 'dd/MM');
+        dateLabel = format(new Date(date + 'T12:00:00'), 'dd/MM');
       } catch {}
 
       return {
         date: dateLabel,
         fullDate: date,
-        biomass: Math.round(biomassKg),
-        weight: Math.round(lastWeight),
+        biomass: Number(biomassKg.toFixed(1)),
+        weight: Math.round(avgWeight),
         pop: currentPop
       };
     });
@@ -473,7 +474,7 @@ const Dashboard: React.FC<Props> = ({ state }) => {
     return [
       { 
         date: 'Início', 
-        biomass: Math.round((initialPop * initialWeight) / 1000), 
+        biomass: Number(((initialPop * initialWeight) / 1000).toFixed(1)), 
         weight: Math.round(initialWeight), 
         pop: initialPop 
       }, 
