@@ -193,7 +193,7 @@ export interface SlaughterSupplyItem {
   id: string;
   code: string;
   name: string;
-  category: 'Embalagem' | 'Químicos' | 'EPI' | 'Outros';
+  category: string;
   currentStock: number;
   minStock: number;
   unit: string;
@@ -219,6 +219,31 @@ export interface SlaughterSupplyRequest {
   requesterId: string;
   status: 'Pendente' | 'Aprovado' | 'Rejeitado';
   date: string;
+  updatedAt?: number;
+}
+
+export interface SlaughterPurchaseOrder {
+  id: string;
+  code: string;
+  itemId: string;
+  supplierId?: string;
+  quantity: number;
+  requesterId: string;
+  status: 'Pendente' | 'Aprovado' | 'Cancelado' | 'Recebido';
+  date: string;
+  updatedAt?: number;
+}
+
+export interface SlaughterSupplyInvoice {
+  id: string;
+  itemId: string;
+  supplierId: string;
+  quantity: number;
+  unitValue: number;
+  totalValue: number;
+  invoiceNumber: string;
+  date: string;
+  userId: string;
   updatedAt?: number;
 }
 
@@ -342,6 +367,9 @@ export interface AppState {
   slaughterSupplyItems?: SlaughterSupplyItem[];
   slaughterSuppliers?: SlaughterSupplier[];
   slaughterSupplyRequests?: SlaughterSupplyRequest[];
+  slaughterPurchaseOrders?: SlaughterPurchaseOrder[];
+  slaughterSupplyInvoices?: SlaughterSupplyInvoice[];
+  slaughterSupplyCategories?: string[];
   harvestLogs?: HarvestLog[];
   harvestSchedules?: HarvestSchedule[];
   coldStorageLogs?: ColdStorageLog[];

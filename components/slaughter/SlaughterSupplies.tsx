@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo } from 'react';
-import { AppState, SlaughterSupplyItem, SlaughterSupplyRequest, User, SlaughterSupplier } from '../../types';
-import { Package, Plus, Trash2, Edit3, X, Search, ShoppingCart, ClipboardList, AlertTriangle, CheckCircle2, Clock, Truck } from 'lucide-react';
+import { AppState, SlaughterSupplyItem, SlaughterSupplyRequest, User, SlaughterSupplier, SlaughterPurchaseOrder } from '../../types';
+import { Package, Plus, Trash2, Edit3, X, Search, ShoppingCart, ClipboardList, AlertTriangle, CheckCircle2, Clock, Truck, FileText, Receipt, TrendingDown } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 
 interface Props {
@@ -25,11 +25,14 @@ const SlaughterSupplies: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
   
   const [itemForm, setItemForm] = useState({
     name: '',
-    category: 'Embalagem' as SlaughterSupplyItem['category'],
+    category: '',
     currentStock: '',
     minStock: '',
     unit: 'un'
   });
+
+  const [newCategory, setNewCategory] = useState('');
+  const [showCategoryForm, setShowCategoryForm] = useState(false);
 
   const [supplierForm, setSupplierForm] = useState({
     name: '',
@@ -41,12 +44,22 @@ const SlaughterSupplies: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
   const items = useMemo(() => state.slaughterSupplyItems || [], [state.slaughterSupplyItems]);
   const suppliers = useMemo(() => state.slaughterSuppliers || [], [state.slaughterSuppliers]);
   const requests = useMemo(() => state.slaughterSupplyRequests || [], [state.slaughterSupplyRequests]);
+  const purchaseOrders = useMemo(() => state.slaughterPurchaseOrders || [], [state.slaughterPurchaseOrders]);
+  const categories = useMemo(() => state.slaughterSupplyCategories || ['Embalagem', 'Químicos', 'EPI', 'Outros'], [state.slaughterSupplyCategories]);
 
-  const generateCode = (prefix: 'I' | 'F', list: { code: string }[]) => {
+  const handleAddCategory = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newCategory || categories.includes(newCategory)) return;
+    onUpdate({ ...state, slaughterSupplyCategories: [...categories, newCategory] });
+    setNewCategory('');
+    setShowCategoryForm(false);
+  };
+
+  const generateCode = (prefix: 'I' | 'F' | 'PC', list: { code: string }[]) => {
     const codes = list
       .map(i => i.code)
       .filter(c => c.startsWith(prefix))
-      .map(c => parseInt(c.substring(1)))
+      .map(c => parseInt(c.substring(prefix.length)))
       .filter(n => !isNaN(n));
     
     const nextNum = codes.length > 0 ? Math.max(...codes) + 1 : 1;
@@ -79,7 +92,7 @@ const SlaughterSupplies: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
     setEditingItemId(null);
     setItemForm({
       name: '',
-      category: 'Embalagem',
+      category: categories[0] || '',
       currentStock: '',
       minStock: '',
       unit: 'un'
@@ -124,29 +137,109 @@ const SlaughterSupplies: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
   };
 
   const [requestForm, setRequestForm] = useState({
+    category: '',
+    searchTerm: '',
     itemId: '',
     supplierId: '',
     quantity: '',
     date: new Date().toISOString().split('T')[0]
   });
 
+  const filteredItemsForRequest = useMemo(() => {
+    if (!requestForm.category) return [];
+    return items.filter(item => 
+      item.category === requestForm.category && 
+      (item.name.toLowerCase().includes(requestForm.searchTerm.toLowerCase()) || 
+       item.code.toLowerCase().includes(requestForm.searchTerm.toLowerCase()))
+    );
+  }, [items, requestForm.category, requestForm.searchTerm]);
+
   const handleSaveRequest = (e: React.FormEvent) => {
     e.preventDefault();
     if (!requestForm.itemId || !requestForm.quantity) return;
+
+    const qty = Number(requestForm.quantity);
+    const item = items.find(i => i.id === requestForm.itemId);
+    
+    if (item && item.currentStock < qty) {
+      alert('Estoque insuficiente para esta requisição!');
+      return;
+    }
 
     const newRequest: SlaughterSupplyRequest = {
       id: generateId(),
       itemId: requestForm.itemId,
       supplierId: requestForm.supplierId || undefined,
-      quantity: Number(requestForm.quantity),
+      quantity: qty,
       requesterId: currentUser.id,
-      status: 'Pendente',
+      status: 'Aprovado', // Internal requests are usually auto-approved or handled as "laçamentos"
       date: requestForm.date,
       updatedAt: Date.now()
     };
 
-    onUpdate({ ...state, slaughterSupplyRequests: [...requests, newRequest] });
+    // Update stock immediately
+    const updatedItems = items.map(i => 
+      i.id === requestForm.itemId ? { ...i, currentStock: i.currentStock - qty } : i
+    );
+
+    onUpdate({ 
+      ...state, 
+      slaughterSupplyItems: updatedItems,
+      slaughterSupplyRequests: [...requests, newRequest] 
+    });
+
     setRequestForm({
+      category: '',
+      searchTerm: '',
+      itemId: '',
+      supplierId: '',
+      quantity: '',
+      date: new Date().toISOString().split('T')[0]
+    });
+  };
+
+  const [poForm, setPoForm] = useState({
+    category: '',
+    searchTerm: '',
+    itemId: '',
+    supplierId: '',
+    quantity: '',
+    date: new Date().toISOString().split('T')[0]
+  });
+
+  const filteredItemsForPO = useMemo(() => {
+    if (!poForm.category) return [];
+    return items.filter(item => 
+      item.category === poForm.category && 
+      (item.name.toLowerCase().includes(poForm.searchTerm.toLowerCase()) || 
+       item.code.toLowerCase().includes(poForm.searchTerm.toLowerCase()))
+    );
+  }, [items, poForm.category, poForm.searchTerm]);
+
+  const handleSavePO = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!poForm.itemId || !poForm.quantity) return;
+
+    const newPO: SlaughterPurchaseOrder = {
+      id: generateId(),
+      code: generateCode('PC', purchaseOrders),
+      itemId: poForm.itemId,
+      supplierId: poForm.supplierId || undefined,
+      quantity: Number(poForm.quantity),
+      requesterId: currentUser.id,
+      status: 'Pendente',
+      date: poForm.date,
+      updatedAt: Date.now()
+    };
+
+    onUpdate({ 
+      ...state, 
+      slaughterPurchaseOrders: [...purchaseOrders, newPO] 
+    });
+
+    setPoForm({
+      category: '',
+      searchTerm: '',
       itemId: '',
       supplierId: '',
       quantity: '',
@@ -209,10 +302,41 @@ const SlaughterSupplies: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div className="lg:col-span-1">
             <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-200">
-              <h3 className="text-xl font-black text-slate-800 mb-8 uppercase tracking-tighter italic flex items-center gap-3">
-                <Package className="w-6 h-6" />
-                {editingItemId ? 'Editar Item' : 'Novo Item'}
-              </h3>
+              <div className="flex items-center justify-between mb-8">
+                <h3 className="text-xl font-black text-slate-800 uppercase tracking-tighter italic flex items-center gap-3">
+                  <Package className="w-6 h-6" />
+                  {editingItemId ? 'Editar Item' : 'Novo Item'}
+                </h3>
+                <button 
+                  onClick={() => setShowCategoryForm(!showCategoryForm)}
+                  className="p-2 text-slate-400 hover:text-[#344434] hover:bg-slate-100 rounded-xl transition-all"
+                  title="Gerenciar Categorias"
+                >
+                  <Plus className="w-4 h-4" />
+                </button>
+              </div>
+
+              {showCategoryForm && (
+                <div className="mb-6 p-4 bg-slate-50 rounded-2xl border border-slate-200 animate-in fade-in slide-in-from-top-2">
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Nova Categoria</span>
+                    <button onClick={() => setShowCategoryForm(false)} className="text-slate-400 hover:text-red-500"><X className="w-3 h-3" /></button>
+                  </div>
+                  <form onSubmit={handleAddCategory} className="flex gap-2">
+                    <input 
+                      type="text" 
+                      className="flex-1 px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold outline-none"
+                      placeholder="Nome da categoria..."
+                      value={newCategory}
+                      onChange={e => setNewCategory(e.target.value)}
+                    />
+                    <button type="submit" className="px-3 py-2 bg-[#344434] text-white rounded-xl text-[10px] font-black uppercase tracking-widest">
+                      Add
+                    </button>
+                  </form>
+                </div>
+              )}
+
               <form onSubmit={handleSaveItem} className="space-y-4">
                 <div className="space-y-1">
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Nome do Item</label>
@@ -228,12 +352,13 @@ const SlaughterSupplies: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
                   <select 
                     className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none text-xs"
                     value={itemForm.category}
-                    onChange={e => setItemForm({...itemForm, category: e.target.value as any})}
+                    onChange={e => setItemForm({...itemForm, category: e.target.value})}
+                    required
                   >
-                    <option value="Embalagem">Embalagem</option>
-                    <option value="Químicos">Químicos</option>
-                    <option value="EPI">EPI</option>
-                    <option value="Outros">Outros</option>
+                    <option value="">Selecione uma categoria</option>
+                    {categories.map(cat => (
+                      <option key={cat} value={cat}>{cat}</option>
+                    ))}
                   </select>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
@@ -466,34 +591,154 @@ const SlaughterSupplies: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
       )}
 
       {activeSubTab === 'requests' && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          <div className="lg:col-span-1">
+        <div className="space-y-8">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            {/* Requisição Interna */}
             <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-200">
               <h3 className="text-xl font-black text-slate-800 mb-8 uppercase tracking-tighter italic flex items-center gap-3">
-                <ShoppingCart className="w-6 h-6" />
-                Nova Solicitação
+                <ClipboardList className="w-6 h-6" />
+                Nova Requisição (Saída)
               </h3>
               <form onSubmit={handleSaveRequest} className="space-y-4">
                 <div className="space-y-1">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Item</label>
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Filtrar por Categoria</label>
                   <select 
                     className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none text-xs"
+                    value={requestForm.category}
+                    onChange={e => setRequestForm({...requestForm, category: e.target.value, itemId: '', searchTerm: ''})}
+                    required
+                  >
+                    <option value="">Selecione uma categoria</option>
+                    {categories.map(cat => (
+                      <option key={cat} value={cat}>{cat}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {requestForm.category && (
+                  <div className="space-y-1 animate-in fade-in slide-in-from-top-2">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Pesquisar Item</label>
+                    <div className="relative">
+                      <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                      <input 
+                        type="text"
+                        placeholder="Digite o nome ou código..."
+                        className="w-full pl-11 pr-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none text-xs"
+                        value={requestForm.searchTerm}
+                        onChange={e => setRequestForm({...requestForm, searchTerm: e.target.value, itemId: ''})}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Selecionar Item</label>
+                  <select 
+                    className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none text-xs disabled:opacity-50 disabled:cursor-not-allowed"
                     value={requestForm.itemId}
                     onChange={e => setRequestForm({...requestForm, itemId: e.target.value})}
                     required
+                    disabled={!requestForm.category}
                   >
-                    <option value="">Selecione um item</option>
-                    {items.map(item => (
+                    <option value="">
+                      {!requestForm.category ? 'Selecione uma categoria primeiro' : 
+                       filteredItemsForRequest.length === 0 ? 'Nenhum item encontrado' : 'Selecione um item'}
+                    </option>
+                    {filteredItemsForRequest.map(item => (
                       <option key={item.id} value={item.id}>[{item.code}] {item.name} ({item.currentStock} {item.unit})</option>
                     ))}
                   </select>
                 </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Quantidade</label>
+                    <input 
+                      type="number" required 
+                      className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none text-xs"
+                      value={requestForm.quantity}
+                      onChange={e => setRequestForm({...requestForm, quantity: e.target.value})}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Data</label>
+                    <input 
+                      type="date" required 
+                      className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none text-xs"
+                      value={requestForm.date}
+                      onChange={e => setRequestForm({...requestForm, date: e.target.value})}
+                    />
+                  </div>
+                </div>
+                <button type="submit" className="w-full py-4 bg-red-600 text-white rounded-2xl font-black uppercase tracking-widest text-xs shadow-lg hover:bg-red-700 transition-all flex items-center justify-center gap-2">
+                  <TrendingDown className="w-4 h-4" /> Lançar Saída de Estoque
+                </button>
+              </form>
+            </div>
+
+            {/* Pedido de Compra */}
+            <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-200">
+              <h3 className="text-xl font-black text-slate-800 mb-8 uppercase tracking-tighter italic flex items-center gap-3">
+                <ShoppingCart className="w-6 h-6" />
+                Novo Pedido de Compra
+              </h3>
+              <form onSubmit={handleSavePO} className="space-y-4">
                 <div className="space-y-1">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Fornecedor (Opcional)</label>
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Filtrar por Categoria</label>
                   <select 
                     className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none text-xs"
-                    value={requestForm.supplierId}
-                    onChange={e => setRequestForm({...requestForm, supplierId: e.target.value})}
+                    value={poForm.category}
+                    onChange={e => setPoForm({...poForm, category: e.target.value, itemId: '', searchTerm: ''})}
+                    required
+                  >
+                    <option value="">Selecione uma categoria</option>
+                    {categories.map(cat => (
+                      <option key={cat} value={cat}>{cat}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {poForm.category && (
+                  <div className="space-y-1 animate-in fade-in slide-in-from-top-2">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Pesquisar Item</label>
+                    <div className="relative">
+                      <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                      <input 
+                        type="text"
+                        placeholder="Digite o nome ou código..."
+                        className="w-full pl-11 pr-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none text-xs"
+                        value={poForm.searchTerm}
+                        onChange={e => setPoForm({...poForm, searchTerm: e.target.value, itemId: ''})}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Selecionar Item</label>
+                  <select 
+                    className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+                    value={poForm.itemId}
+                    onChange={e => setPoForm({...poForm, itemId: e.target.value})}
+                    required
+                    disabled={!poForm.category}
+                  >
+                    <option value="">
+                      {!poForm.category ? 'Selecione uma categoria primeiro' : 
+                       filteredItemsForPO.length === 0 ? 'Nenhum item encontrado' : 'Selecione um item'}
+                    </option>
+                    {filteredItemsForPO.map(item => (
+                      <option key={item.id} value={item.id}>[{item.code}] {item.name} ({item.currentStock} {item.unit})</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Fornecedor Sugerido</label>
+                  <select 
+                    className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none text-xs"
+                    value={poForm.supplierId}
+                    onChange={e => setPoForm({...poForm, supplierId: e.target.value})}
                   >
                     <option value="">Selecione um fornecedor</option>
                     {suppliers.map(s => (
@@ -501,81 +746,64 @@ const SlaughterSupplies: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
                     ))}
                   </select>
                 </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Quantidade</label>
-                  <input 
-                    type="number" required 
-                    className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none text-xs"
-                    value={requestForm.quantity}
-                    onChange={e => setRequestForm({...requestForm, quantity: e.target.value})}
-                  />
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Quantidade</label>
+                    <input 
+                      type="number" required 
+                      className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none text-xs"
+                      value={poForm.quantity}
+                      onChange={e => setPoForm({...poForm, quantity: e.target.value})}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Data</label>
+                    <input 
+                      type="date" required 
+                      className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none text-xs"
+                      value={poForm.date}
+                      onChange={e => setPoForm({...poForm, date: e.target.value})}
+                    />
+                  </div>
                 </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Data</label>
-                  <input 
-                    type="date" required 
-                    className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none text-xs"
-                    value={requestForm.date}
-                    onChange={e => setRequestForm({...requestForm, date: e.target.value})}
-                  />
-                </div>
-                <button type="submit" className="w-full py-4 bg-[#344434] text-white rounded-2xl font-black uppercase tracking-widest text-xs shadow-lg hover:bg-[#2a382a] transition-all">
-                  Enviar Solicitação
+                <button type="submit" className="w-full py-4 bg-blue-600 text-white rounded-2xl font-black uppercase tracking-widest text-xs shadow-lg hover:bg-blue-700 transition-all flex items-center justify-center gap-2">
+                  <FileText className="w-4 h-4" /> Gerar Pedido de Compra
                 </button>
               </form>
             </div>
           </div>
 
-          <div className="lg:col-span-2">
+          {/* Tabelas de Gestão */}
+          <div className="space-y-8">
             <div className="bg-white border border-slate-200 rounded-[2.5rem] overflow-hidden shadow-sm">
+              <div className="px-8 py-5 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
+                <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Histórico de Requisições (Saídas)</h4>
+              </div>
               <table className="w-full text-left border-collapse">
-                <thead className="bg-slate-50 text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                <thead className="bg-slate-50/50 text-[9px] font-black text-slate-400 uppercase tracking-widest">
                   <tr>
-                    <th className="px-8 py-5">Item Solicitado</th>
-                    <th className="px-8 py-5">Fornecedor</th>
-                    <th className="px-8 py-5">Quantidade</th>
-                    <th className="px-8 py-5">Data</th>
-                    <th className="px-8 py-5">Status</th>
-                    <th className="px-8 py-5 text-center">Ações</th>
+                    <th className="px-8 py-4">Item</th>
+                    <th className="px-8 py-4">Quantidade</th>
+                    <th className="px-8 py-4">Data</th>
+                    <th className="px-8 py-4 text-center">Ações</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {requests.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0)).map(req => {
                     const item = items.find(i => i.id === req.itemId);
-                    const supplier = suppliers.find(s => s.id === req.supplierId);
                     return (
                       <tr key={req.id} className="hover:bg-slate-50/50 transition-colors">
-                        <td className="px-8 py-6">
-                          <div className="font-bold text-slate-700">{item?.name || 'Item Desconhecido'}</div>
-                          {item && <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{item.code}</div>}
+                        <td className="px-8 py-4">
+                          <div className="font-bold text-slate-700 text-xs">{item?.name || 'Item Desconhecido'}</div>
+                          {item && <div className="text-[8px] font-black text-slate-400 uppercase tracking-widest">{item.code}</div>}
                         </td>
-                        <td className="px-8 py-6">
-                          <div className="text-xs font-bold text-slate-600">{supplier?.name || '-'}</div>
-                          {supplier && <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{supplier.code}</div>}
-                        </td>
-                        <td className="px-8 py-6 text-xs font-black text-slate-600">{req.quantity} {item?.unit}</td>
-                        <td className="px-8 py-6 text-xs text-slate-500">{format(parseISO(req.date), 'dd/MM/yyyy')}</td>
-                        <td className="px-8 py-6">
-                          <span className={`text-[9px] font-black uppercase tracking-widest px-3 py-1 rounded-full flex items-center gap-1 w-fit ${
-                            req.status === 'Aprovado' ? 'bg-emerald-50 text-emerald-600' : 
-                            req.status === 'Rejeitado' ? 'bg-red-50 text-red-600' : 'bg-blue-50 text-blue-600'
-                          }`}>
-                            {req.status === 'Pendente' && <Clock className="w-3 h-3" />}
-                            {req.status === 'Aprovado' && <CheckCircle2 className="w-3 h-3" />}
-                            {req.status === 'Rejeitado' && <X className="w-3 h-3" />}
-                            {req.status}
-                          </span>
-                        </td>
-                        <td className="px-8 py-6">
-                          <div className="flex justify-center gap-2">
-                            {req.status === 'Pendente' && (
-                              <>
-                                <button onClick={() => handleRequestStatus(req.id, 'Aprovado')} className="p-2 text-emerald-500 hover:bg-emerald-50 rounded-lg transition-colors"><CheckCircle2 className="w-4 h-4" /></button>
-                                <button onClick={() => handleRequestStatus(req.id, 'Rejeitado')} className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors"><X className="w-4 h-4" /></button>
-                              </>
-                            )}
+                        <td className="px-8 py-4 text-xs font-black text-red-600">-{req.quantity} {item?.unit}</td>
+                        <td className="px-8 py-4 text-xs text-slate-500">{format(parseISO(req.date), 'dd/MM/yyyy')}</td>
+                        <td className="px-8 py-4">
+                          <div className="flex justify-center">
                             <button onClick={() => {
-                              if (confirm('Deseja excluir esta solicitação?')) {
+                              if (confirm('Deseja excluir esta requisição? O estoque não será restaurado automaticamente.')) {
                                 onUpdate({ ...state, slaughterSupplyRequests: requests.filter(r => r.id !== req.id) });
                               }
                             }} className="p-2 text-slate-300 hover:text-red-500 transition-colors"><Trash2 className="w-4 h-4" /></button>
@@ -584,13 +812,67 @@ const SlaughterSupplies: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
                       </tr>
                     );
                   })}
-                  {requests.length === 0 && (
-                    <tr>
-                      <td colSpan={6} className="px-8 py-12 text-center text-slate-400 text-xs font-bold uppercase tracking-widest">
-                        Nenhuma solicitação pendente.
-                      </td>
-                    </tr>
-                  )}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="bg-white border border-slate-200 rounded-[2.5rem] overflow-hidden shadow-sm">
+              <div className="px-8 py-5 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
+                <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Pedidos de Compra</h4>
+              </div>
+              <table className="w-full text-left border-collapse">
+                <thead className="bg-slate-50/50 text-[9px] font-black text-slate-400 uppercase tracking-widest">
+                  <tr>
+                    <th className="px-8 py-4">Código</th>
+                    <th className="px-8 py-4">Item</th>
+                    <th className="px-8 py-4">Fornecedor</th>
+                    <th className="px-8 py-4">Qtd</th>
+                    <th className="px-8 py-4">Status</th>
+                    <th className="px-8 py-4 text-center">Ações</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {purchaseOrders.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0)).map(po => {
+                    const item = items.find(i => i.id === po.itemId);
+                    const supplier = suppliers.find(s => s.id === po.supplierId);
+                    return (
+                      <tr key={po.id} className="hover:bg-slate-50/50 transition-colors">
+                        <td className="px-8 py-4">
+                          <span className="text-[9px] font-black text-blue-600 bg-blue-50 px-2 py-1 rounded border border-blue-100">
+                            {po.code}
+                          </span>
+                        </td>
+                        <td className="px-8 py-4">
+                          <div className="font-bold text-slate-700 text-xs">{item?.name || 'Item Desconhecido'}</div>
+                        </td>
+                        <td className="px-8 py-4 text-xs text-slate-500">{supplier?.name || '-'}</td>
+                        <td className="px-8 py-4 text-xs font-black text-slate-600">{po.quantity} {item?.unit}</td>
+                        <td className="px-8 py-4">
+                          <span className={`text-[8px] font-black uppercase tracking-widest px-2 py-1 rounded-full ${
+                            po.status === 'Recebido' ? 'bg-emerald-50 text-emerald-600' : 
+                            po.status === 'Cancelado' ? 'bg-red-50 text-red-600' : 'bg-blue-50 text-blue-600'
+                          }`}>
+                            {po.status}
+                          </span>
+                        </td>
+                        <td className="px-8 py-4">
+                          <div className="flex justify-center gap-2">
+                            {po.status === 'Pendente' && (
+                              <button onClick={() => {
+                                const updated = purchaseOrders.map(p => p.id === po.id ? { ...p, status: 'Recebido' as const, updatedAt: Date.now() } : p);
+                                onUpdate({ ...state, slaughterPurchaseOrders: updated });
+                              }} className="p-2 text-emerald-500 hover:bg-emerald-50 rounded-lg transition-colors" title="Marcar como Recebido"><CheckCircle2 className="w-4 h-4" /></button>
+                            )}
+                            <button onClick={() => {
+                              if (confirm('Deseja excluir este pedido?')) {
+                                onUpdate({ ...state, slaughterPurchaseOrders: purchaseOrders.filter(p => p.id !== po.id) });
+                              }
+                            }} className="p-2 text-slate-300 hover:text-red-500 transition-colors"><Trash2 className="w-4 h-4" /></button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
