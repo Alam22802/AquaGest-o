@@ -51,6 +51,7 @@ export interface Batch {
   initialUnitWeight: number;
   protocolId?: string;
   expectedHarvestDate?: string;
+  isSettlementComplete?: boolean;
   userId?: string;
   updatedAt?: number;
 }

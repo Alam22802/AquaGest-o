@@ -106,6 +106,14 @@ const BatchManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     });
   };
 
+  const toggleSettlementComplete = (batchId: string) => {
+    if (!hasPermission) return;
+    const updatedBatches = (state.batches || []).map(b => 
+      b.id === batchId ? { ...b, isSettlementComplete: !b.isSettlementComplete, updatedAt: Date.now() } : b
+    );
+    onUpdate({ ...state, batches: updatedBatches });
+  };
+
   const handleSaveSchedule = () => {
     if (!hasPermission) return;
     if (!selectedPlanningBatchId || selectedPlanningCageIds.length === 0 || !plannedHarvestDate) {
@@ -282,7 +290,7 @@ const BatchManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       const nurseryMortality = nurseryMortalityByBatch.get(batch.id) || 0;
       
       // Saldo Alojamento: O que ainda não saiu do berçário
-      const balance = Math.max(0, batch.initialQuantity - usedFish - settledAndHarvested - nurseryMortality);
+      const balance = batch.isSettlementComplete ? 0 : Math.max(0, batch.initialQuantity - usedFish - settledAndHarvested - nurseryMortality);
       
       const mortality = totalMortality;
       const liveFish = Math.max(0, batch.initialQuantity - mortality - harvestedFish);
@@ -919,7 +927,18 @@ const BatchManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                         <span className="text-lg font-black text-slate-700 leading-none mt-1">{batch.liveFish} un</span>
                       </div>
                       <div className="flex flex-col items-end">
-                        <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Saldo Aloj.</span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Saldo Aloj.</span>
+                          {hasPermission && (
+                            <button 
+                              onClick={() => toggleSettlementComplete(batch.id)}
+                              title={batch.isSettlementComplete ? "Reativar Saldo" : "Zerar Saldo Manualmente"}
+                              className={`p-1 rounded-md transition-all ${batch.isSettlementComplete ? 'bg-blue-100 text-blue-600' : 'bg-slate-100 text-slate-400 hover:bg-blue-50 hover:text-blue-500'}`}
+                            >
+                              <CheckSquare className="w-3 h-3" />
+                            </button>
+                          )}
+                        </div>
                         <span className={`text-lg font-black mt-1 leading-none ${batch.balance > 0 ? 'text-blue-600' : 'text-slate-400'}`}>{batch.balance} un</span>
                       </div>
                     </div>

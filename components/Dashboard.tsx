@@ -107,12 +107,13 @@ const Dashboard: React.FC<Props> = ({ state }) => {
       }
     });
 
-    const harvestsByBatch = new Map<string, { fishCount: number, weight: number }>();
+    const harvestsByBatch = new Map<string, { fishCount: number, weight: number, initialFishCount: number }>();
     (state.harvestLogs || []).forEach(h => {
-      const current = harvestsByBatch.get(h.batchId) || { fishCount: 0, weight: 0 };
+      const current = harvestsByBatch.get(h.batchId) || { fishCount: 0, weight: 0, initialFishCount: 0 };
       harvestsByBatch.set(h.batchId, {
         fishCount: current.fishCount + h.fishCount,
-        weight: current.weight + h.totalWeight
+        weight: current.weight + h.totalWeight,
+        initialFishCount: current.initialFishCount + (h.initialFishCount || 0)
       });
     });
 
@@ -120,14 +121,15 @@ const Dashboard: React.FC<Props> = ({ state }) => {
       const batchCages = cagesByBatch.get(batch.id) || [];
       
       const totalInitial = batch.initialQuantity;
-      const harvestData = harvestsByBatch.get(batch.id) || { fishCount: 0, weight: 0 };
+      const harvestData = harvestsByBatch.get(batch.id) || { fishCount: 0, weight: 0, initialFishCount: 0 };
       const totalHarvested = harvestData.fishCount;
       const totalHarvestedWeight = harvestData.weight;
+      const totalInitialInHarvested = harvestData.initialFishCount;
       const totalMortality = mortalityByBatch.get(batch.id) || 0;
       const nurseryMortality = nurseryMortalityByBatch.get(batch.id) || 0;
 
       const usedFish = batchCages.reduce((acc, curr) => acc + (curr.initialFishCount || 0), 0);
-      const settlementBalance = Math.max(0, totalInitial - usedFish - totalHarvested - nurseryMortality);
+      const settlementBalance = batch.isSettlementComplete ? 0 : Math.max(0, totalInitial - usedFish - totalInitialInHarvested - nurseryMortality);
 
       const currentTotalStock = Math.max(0, totalInitial - totalMortality - totalHarvested);
 
