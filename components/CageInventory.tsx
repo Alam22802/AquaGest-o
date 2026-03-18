@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { AppState, Cage, User, CageStatus } from '../types';
-import { Plus, Trash2, Box, Edit, X, Ruler, Users, Info, Layers, Filter, CheckCircle2, Settings, Eraser, LayoutDashboard } from 'lucide-react';
+import { Plus, Trash2, Box, Edit, X, Ruler, Users, Info, Layers, Filter, CheckCircle2, Settings, Eraser, LayoutDashboard, Eye } from 'lucide-react';
 
 interface Props {
   state: AppState;
@@ -242,7 +242,8 @@ const CageInventory: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
   const filterSummary = useMemo(() => {
     const totalCapacity = filteredCages.reduce((acc, c) => acc + c.stockingCapacity, 0);
     const models = filteredCages.reduce((acc: Record<string, { count: number, capacity: number }>, c) => {
-      const modelKey = `${c.dimensions.length}x${c.dimensions.width}x${c.dimensions.depth}m`;
+      const d = c.dimensions || { length: 0, width: 0, depth: 0 };
+      const modelKey = `${d.length}x${d.width}x${d.depth}m`;
       if (!acc[modelKey]) {
         acc[modelKey] = { count: 0, capacity: 0 };
       }
@@ -494,7 +495,9 @@ const CageInventory: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                   <Box className={`w-4 h-4 ${cage.status === 'Ocupada' ? 'text-blue-500' : 'text-slate-400'}`} />
                   <div>
                     <span className="font-black text-slate-800 uppercase tracking-tighter block leading-none">{cage.name}</span>
-                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{`${cage.dimensions.length}x${cage.dimensions.width}x${cage.dimensions.depth}m`}</span>
+                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
+                      {cage.dimensions ? `${cage.dimensions.length}x${cage.dimensions.width}x${cage.dimensions.depth}m` : 'Dimensões não definidas'}
+                    </span>
                   </div>
                 </div>
                 {hasPermission && (

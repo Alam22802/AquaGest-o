@@ -227,10 +227,9 @@ export interface HarvestLog {
   cageId: string;
   fishCount: number;
   totalWeight: number;
-  unitWeight?: number;
+  averageWeight?: number;
   initialFishCount?: number; // Qtd inicial na gaiola no momento da despesca
   date: string;
-  status: 'Planejado' | 'Concluído';
   userId: string;
   timestamp: string;
   updatedAt?: number;

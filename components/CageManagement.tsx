@@ -153,7 +153,9 @@ const CageManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
               <select required className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 font-bold" value={formData.cageId} onChange={(e) => setFormData({...formData, cageId: e.target.value})}>
                 <option value="">Escolha a gaiola...</option>
                 {availableCages.map(c => (
-                  <option key={c.id} value={c.id}>{c.name} ({c.dimensions.length}x{c.dimensions.width}x{c.dimensions.depth}m - Cap: {c.stockingCapacity})</option>
+                  <option key={c.id} value={c.id}>
+                    {c.name} {c.dimensions ? `(${c.dimensions.length}x${c.dimensions.width}x${c.dimensions.depth}m - Cap: ${c.stockingCapacity})` : `(Cap: ${c.stockingCapacity})`}
+                  </option>
                 ))}
               </select>
             </div>

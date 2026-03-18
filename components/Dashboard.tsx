@@ -111,7 +111,7 @@ const Dashboard: React.FC<Props> = ({ state }) => {
       const current = harvestsByBatch.get(h.batchId) || { fishCount: 0, weight: 0 };
       harvestsByBatch.set(h.batchId, {
         fishCount: current.fishCount + h.fishCount,
-        weight: current.weight + h.weight
+        weight: current.weight + h.totalWeight
       });
     });
 

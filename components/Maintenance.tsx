@@ -1,12 +1,13 @@
 
 import React, { useState } from 'react';
-import { AppState, CageStatus } from '../types';
+import { AppState, CageStatus, User } from '../types';
 import { Settings, CheckCircle2, AlertTriangle, Eraser, Calendar, Clock, ArrowRight, Box, Eye } from 'lucide-react';
 import { format } from 'date-fns';
 
 interface Props {
   state: AppState;
   onUpdate: (newState: AppState) => void;
+  currentUser: User;
 }
 
 const Maintenance: React.FC<Props> = ({ state, onUpdate, currentUser }) => {

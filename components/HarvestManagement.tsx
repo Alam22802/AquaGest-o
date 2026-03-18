@@ -22,14 +22,12 @@ const HarvestManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
   const [selectedBatchId, setSelectedBatchId] = useState('');
   const [selectedCageId, setSelectedCageId] = useState('');
   const [totalWeight, setTotalWeight] = useState('');
-  const [unitWeight, setUnitWeight] = useState('');
+  const [averageWeight, setAverageWeight] = useState('');
   const [fishCount, setFishCount] = useState('');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
-  const [status, setStatus] = useState<'Planejado' | 'Concluído'>('Concluído');
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [selectedLogIds, setSelectedLogIds] = useState<Set<string>>(new Set());
-  const [selectedBulkCageIds, setSelectedBulkCageIds] = useState<Set<string>>(new Set());
 
   const hasPermission = currentUser.isMaster || currentUser.canEdit;
 
@@ -81,34 +79,14 @@ const HarvestManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
           cageId: selectedCageId,
           fishCount: Number(fishCount),
           totalWeight: Number(totalWeight),
-          unitWeight: unitWeight ? Number(unitWeight) : undefined,
+          averageWeight: averageWeight ? Number(averageWeight) : undefined,
           date,
-          status,
           updatedAt: Date.now()
         } : l
       );
 
-      // If status changed to Concluído, clear the cage
-      let updatedCages = state.cages;
-      const oldLog = state.harvestLogs?.find(l => l.id === editingId);
-      if (status === 'Concluído' && oldLog?.status === 'Planejado') {
-        updatedCages = state.cages.map(c => 
-          c.id === selectedCageId ? { 
-            ...c, 
-            batchId: undefined, 
-            initialFishCount: undefined, 
-            status: 'Disponível' as const,
-            harvestDate: date,
-            maintenanceStartDate: undefined,
-            maintenanceEndDate: undefined,
-            updatedAt: Date.now()
-          } : c
-        );
-      }
-
       onUpdate({
         ...state,
-        cages: updatedCages,
         harvestLogs: updatedLogs
       });
       setEditingId(null);
@@ -119,31 +97,27 @@ const HarvestManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
         cageId: selectedCageId,
         fishCount: Number(fishCount),
         totalWeight: Number(totalWeight),
-        unitWeight: unitWeight ? Number(unitWeight) : undefined,
+        averageWeight: averageWeight ? Number(averageWeight) : undefined,
         initialFishCount: selectedCage?.initialFishCount,
         date,
-        status,
         userId: currentUser.id,
         timestamp: new Date().toISOString(),
         updatedAt: Date.now()
       };
 
-      // Update state: add harvest log and clear cage ONLY if status is Concluído
-      let updatedCages = state.cages;
-      if (status === 'Concluído') {
-        updatedCages = state.cages.map(c => 
-          c.id === selectedCageId ? { 
-            ...c, 
-            batchId: undefined, 
-            initialFishCount: undefined, 
-            status: 'Disponível' as const,
-            harvestDate: date,
-            maintenanceStartDate: undefined,
-            maintenanceEndDate: undefined,
-            updatedAt: Date.now()
-          } : c
-        );
-      }
+      // Update state: add harvest log and clear cage
+      const updatedCages = state.cages.map(c => 
+        c.id === selectedCageId ? { 
+          ...c, 
+          batchId: undefined, 
+          initialFishCount: undefined, 
+          status: 'Disponível' as const,
+          harvestDate: date,
+          maintenanceStartDate: undefined,
+          maintenanceEndDate: undefined,
+          updatedAt: Date.now()
+        } : c
+      );
 
       const updatedHarvestLogs = [newLog, ...(state.harvestLogs || [])];
 
@@ -166,10 +140,9 @@ const HarvestManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
     setSelectedBatchId('');
     setSelectedCageId('');
     setTotalWeight('');
-    setUnitWeight('');
+    setAverageWeight('');
     setFishCount('');
     setDate(new Date().toISOString().split('T')[0]);
-    setStatus('Concluído');
   };
 
   const startEdit = (log: HarvestLog) => {
@@ -177,10 +150,9 @@ const HarvestManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
     setSelectedBatchId(log.batchId);
     setSelectedCageId(log.cageId);
     setTotalWeight(log.totalWeight.toString());
-    setUnitWeight(log.unitWeight?.toString() || '');
+    setAverageWeight(log.averageWeight?.toString() || '');
     setFishCount(log.fishCount.toString());
     setDate(log.date);
-    setStatus(log.status);
     
     // Scroll to form
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -189,14 +161,18 @@ const HarvestManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
   // Auto-calculate logic
   const handleWeightChange = (val: string) => {
     setTotalWeight(val);
-    if (val && unitWeight && Number(unitWeight) > 0) {
-      const count = Math.round((Number(val) * 1000) / Number(unitWeight));
-      setFishCount(count.toString());
+    if (val && averageWeight && Number(averageWeight) > 0) {
+      const count = Math.round((Number(val) * 1000) / Number(averageWeight));
+      const currentFishCount = Number(fishCount);
+      // Only update if the difference is significant to avoid jitter
+      if (Math.abs(count - currentFishCount) > 0) {
+        setFishCount(count.toString());
+      }
     }
   };
 
-  const handleUnitWeightChange = (val: string) => {
-    setUnitWeight(val);
+  const handleAverageWeightChange = (val: string) => {
+    setAverageWeight(val);
     if (val && totalWeight && Number(totalWeight) > 0 && Number(val) > 0) {
       const count = Math.round((Number(totalWeight) * 1000) / Number(val));
       setFishCount(count.toString());
@@ -206,91 +182,10 @@ const HarvestManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
   const handleFishCountChange = (val: string) => {
     setFishCount(val);
     if (val && totalWeight && Number(totalWeight) > 0 && Number(val) > 0) {
-      const uw = (Number(totalWeight) * 1000) / Number(val);
-      setUnitWeight(uw.toFixed(1));
+      const aw = (Number(totalWeight) * 1000) / Number(val);
+      setAverageWeight(aw.toFixed(1));
     }
   };
-
-  const toggleBulkCage = (id: string) => {
-    const newSelected = new Set(selectedBulkCageIds);
-    if (newSelected.has(id)) {
-      newSelected.delete(id);
-    } else {
-      newSelected.add(id);
-    }
-    setSelectedBulkCageIds(newSelected);
-  };
-
-  const handleBulkSchedule = () => {
-    if (selectedBulkCageIds.size === 0) return;
-    
-    const newLogs: HarvestLog[] = [];
-    selectedBulkCageIds.forEach(cageId => {
-      const cage = state.cages.find(c => c.id === cageId);
-      if (cage && cage.batchId) {
-        // Calculate current fish count
-        const cageMortality = (state.mortalityLogs || [])
-          .filter(m => m.cageId === cage.id)
-          .reduce((acc, curr) => acc + curr.count, 0);
-        const currentCount = (cage.initialFishCount || 0) - cageMortality;
-
-        newLogs.push({
-          id: generateId(),
-          batchId: cage.batchId,
-          cageId: cage.id,
-          fishCount: currentCount,
-          totalWeight: 0,
-          unitWeight: 0,
-          date: date,
-          status: 'Planejado',
-          userId: currentUser.id,
-          timestamp: new Date().toISOString(),
-          updatedAt: Date.now()
-        });
-      }
-    });
-
-    onUpdate({
-      ...state,
-      harvestLogs: [...newLogs, ...(state.harvestLogs || [])]
-    });
-    setSelectedBulkCageIds(new Set());
-    alert(`${newLogs.length} despescas programadas com sucesso!`);
-  };
-
-  const confirmPlannedHarvest = (log: HarvestLog) => {
-    if (!hasPermission) return;
-    
-    // Update log status to Concluído
-    const updatedLogs = (state.harvestLogs || []).map(l => 
-      l.id === log.id ? { ...l, status: 'Concluído' as const, updatedAt: Date.now() } : l
-    );
-
-    // Clear the cage
-    const updatedCages = state.cages.map(c => 
-      c.id === log.cageId ? { 
-        ...c, 
-        batchId: undefined, 
-        initialFishCount: undefined, 
-        status: 'Disponível' as const,
-        harvestDate: log.date,
-        maintenanceStartDate: undefined,
-        maintenanceEndDate: undefined,
-        updatedAt: Date.now()
-      } : c
-    );
-
-    onUpdate({
-      ...state,
-      cages: updatedCages,
-      harvestLogs: updatedLogs
-    });
-  };
-
-  const occupiedCages = useMemo(() => 
-    state.cages.filter(c => c.status === 'Ocupada'),
-    [state.cages]
-  );
 
   const finalizedBatches = useMemo(() => {
     return batches.filter(batch => {
@@ -432,15 +327,15 @@ const HarvestManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1">
-                <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-widest">Peso Unitário (g) *</label>
+                <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-widest">Peso Médio (g) *</label>
                 <input 
                   type="number" 
                   step="0.1"
                   required
                   placeholder="0.0"
                   className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none focus:ring-2 focus:ring-blue-500/10 text-xs"
-                  value={unitWeight}
-                  onChange={e => handleUnitWeightChange(e.target.value)}
+                  value={averageWeight}
+                  onChange={e => handleAverageWeightChange(e.target.value)}
                 />
               </div>
               <div className="space-y-1">
@@ -480,34 +375,6 @@ const HarvestManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
                   value={date}
                   onChange={e => setDate(e.target.value)}
                 />
-              </div>
-            </div>
-
-            <div className="space-y-1">
-              <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-widest">Status</label>
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  onClick={() => setStatus('Concluído')}
-                  className={`py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
-                    status === 'Concluído' 
-                      ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/20' 
-                      : 'bg-slate-100 text-slate-400 hover:bg-slate-200'
-                  }`}
-                >
-                  Concluído
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setStatus('Planejado')}
-                  className={`py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
-                    status === 'Planejado' 
-                      ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' 
-                      : 'bg-slate-100 text-slate-400 hover:bg-slate-200'
-                  }`}
-                >
-                  Planejado
-                </button>
               </div>
             </div>
 
@@ -614,7 +481,6 @@ const HarvestManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
                   <th className="px-6 py-4 text-right">Peso Médio</th>
                   <th className="px-6 py-4 text-right">Peso Total</th>
                   <th className="px-6 py-4 text-right">Qtd Peixes</th>
-                  <th className="px-6 py-4 text-center">Status</th>
                   <th className="px-6 py-4 text-center">Ações</th>
                 </tr>
               </thead>
@@ -625,8 +491,8 @@ const HarvestManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
                   const isSelected = selectedLogIds.has(log.id);
                   
                   // Logic to calculate fish count based on total weight and unit weight
-                  const calculatedFishCount = log.unitWeight && log.unitWeight > 0 
-                    ? Math.round((log.totalWeight * 1000) / log.unitWeight) 
+                  const calculatedFishCount = log.averageWeight && log.averageWeight > 0 
+                    ? Math.round((log.totalWeight * 1000) / log.averageWeight) 
                     : log.fishCount;
 
                   return (
@@ -653,7 +519,7 @@ const HarvestManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
                         </div>
                       </td>
                       <td className="px-6 py-4 text-right text-xs font-black text-indigo-600">
-                        {log.unitWeight ? `${log.unitWeight.toLocaleString()} g` : '-'}
+                        {log.averageWeight ? `${log.averageWeight.toLocaleString()} g` : '-'}
                       </td>
                       <td className="px-6 py-4 text-right text-xs font-black text-emerald-600">
                         {log.totalWeight?.toLocaleString()} kg
@@ -662,26 +528,8 @@ const HarvestManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
                         {calculatedFishCount?.toLocaleString()} un
                       </td>
                       <td className="px-6 py-4 text-center">
-                        <span className={`px-2 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest ${
-                          log.status === 'Concluído' 
-                            ? 'bg-emerald-100 text-emerald-700' 
-                            : 'bg-blue-100 text-blue-700'
-                        }`}>
-                          {log.status}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 text-center">
                         {hasPermission && (
                           <div className="flex items-center justify-center gap-1">
-                            {log.status === 'Planejado' && (
-                              <button
-                                onClick={() => confirmPlannedHarvest(log)}
-                                className="p-2 text-emerald-500 hover:text-emerald-700 transition-colors"
-                                title="Confirmar Despesca"
-                              >
-                                <CheckCircle2 className="w-4 h-4" />
-                              </button>
-                            )}
                             <button 
                               onClick={() => startEdit(log)}
                               className="p-2 text-slate-300 hover:text-blue-500 transition-colors"

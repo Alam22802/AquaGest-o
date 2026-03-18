@@ -264,7 +264,7 @@ const BatchManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       harvestsByBatch.set(h.batchId, {
         fishCount: current.fishCount + h.fishCount,
         initialFishCount: current.initialFishCount + initial,
-        weight: current.weight + h.weight
+        weight: current.weight + h.totalWeight
       });
     });
 
