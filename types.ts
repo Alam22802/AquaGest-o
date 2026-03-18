@@ -136,6 +136,7 @@ export interface SlaughterLog {
   packagingBatch: string;
   freightValue?: number;
   fieldCondemnation?: number;
+  transportCondemnation?: number;
   slaughterCondemnation?: number;
   invoiceValue?: number;
   revenuePerKg?: number;
