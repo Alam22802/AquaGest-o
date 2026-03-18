@@ -81,7 +81,7 @@ const Maintenance: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
           className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${activeTab === 'slaughterhouse' ? 'bg-white text-red-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
         >
           <Warehouse className="w-4 h-4" />
-          Frigorífico
+          Utilidades
         </button>
       </div>
 

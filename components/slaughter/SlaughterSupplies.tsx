@@ -51,6 +51,7 @@ const SlaughterSupplies: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
     e.preventDefault();
     if (!newCategory || categories.includes(newCategory)) return;
     onUpdate({ ...state, slaughterSupplyCategories: [...categories, newCategory] });
+    setItemForm(prev => ({ ...prev, category: newCategory }));
     setNewCategory('');
     setShowCategoryForm(false);
   };
@@ -352,13 +353,21 @@ const SlaughterSupplies: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
                   <select 
                     className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none text-xs"
                     value={itemForm.category}
-                    onChange={e => setItemForm({...itemForm, category: e.target.value})}
+                    onChange={e => {
+                      if (e.target.value === 'ADD_NEW') {
+                        setShowCategoryForm(true);
+                        setItemForm({...itemForm, category: ''});
+                      } else {
+                        setItemForm({...itemForm, category: e.target.value});
+                      }
+                    }}
                     required
                   >
                     <option value="">Selecione uma categoria</option>
                     {categories.map(cat => (
                       <option key={cat} value={cat}>{cat}</option>
                     ))}
+                    <option value="ADD_NEW" className="text-blue-600 font-black">+ Cadastrar Nova...</option>
                   </select>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
