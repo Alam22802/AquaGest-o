@@ -5,6 +5,7 @@ import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   BarChart, Bar, Cell
 } from 'recharts';
+import { formatNumber } from '../utils/formatters';
 import { Fish, Utensils, Scale, TrendingUp, FishOff, Calendar, Layers, Download, Info, AlertTriangle, PackageSearch } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { format, isWithinInterval, parseISO, startOfDay, endOfDay, subDays } from 'date-fns';
@@ -184,7 +185,7 @@ const Dashboard: React.FC<Props> = ({ state }) => {
       })).sort((a, b) => a.name.localeCompare(b.name));
 
       const totalProducedWeightKg = totalBiomassKg + totalHarvestedWeight;
-      const fcaValue = totalProducedWeightKg > 0 ? (totalFeedKg / totalProducedWeightKg).toFixed(2) : '0.00';
+      const fcaValue = totalProducedWeightKg > 0 ? formatNumber(totalFeedKg / totalProducedWeightKg, 2) : '0,00';
 
       return { 
         id: batch.id, 
@@ -250,7 +251,7 @@ const Dashboard: React.FC<Props> = ({ state }) => {
       });
 
       const totalProducedWeightKg = stats.biomass + stats.harvestedWeight;
-      const fcaValue = totalProducedWeightKg > 0 ? (stats.feed / totalProducedWeightKg).toFixed(2) : '0.00';
+      const fcaValue = totalProducedWeightKg > 0 ? formatNumber(stats.feed / totalProducedWeightKg, 2) : '0,00';
       const avgWeight = stats.stock > 0 ? (stats.biomass * 1000) / stats.stock : 0;
 
       return {
@@ -524,11 +525,11 @@ const Dashboard: React.FC<Props> = ({ state }) => {
     ];
     const summaryData = batchStats.map(bs => [
       bs.name,
-      `Estoque: ${bs.stock} un`,
-      `Biomassa: ${bs.biomass.toFixed(2)} kg`,
-      `Consumo Total: ${bs.feed.toFixed(2)} kg`,
+      `Estoque: ${formatNumber(bs.stock)} un`,
+      `Biomassa: ${formatNumber(bs.biomass, 2)} kg`,
+      `Consumo Total: ${formatNumber(bs.feed, 2)} kg`,
       `FCA: ${bs.fca}`,
-      `Peso Médio: ${bs.avgWeight.toFixed(1)} g`
+      `Peso Médio: ${formatNumber(bs.avgWeight, 1)} g`
     ]);
     const wsSummary = XLSX.utils.aoa_to_sheet([...summaryHeader, ...summaryData]);
     XLSX.utils.book_append_sheet(wb, wsSummary, "Resumo Geral");
@@ -605,7 +606,7 @@ const Dashboard: React.FC<Props> = ({ state }) => {
       "Peso Filé Congelado (kg)": s.gtaWeight,
       "Recepção (kg)": s.receptionWeight,
       "Embalado (kg)": s.packedQuantity,
-      "Rendimento (%)": s.receptionWeight > 0 ? ((s.packedQuantity / s.receptionWeight) * 100).toFixed(1) : 0,
+      "Rendimento (%)": s.receptionWeight > 0 ? formatNumber((s.packedQuantity / s.receptionWeight) * 100, 1) : 0,
       "Lote Embalagem": s.packagingBatch,
       "Lançado por": userMap.get(s.userId) || s.userId
     })));
@@ -619,7 +620,7 @@ const Dashboard: React.FC<Props> = ({ state }) => {
       "Gaiola": cageMap.get(h.cageId) || h.cageId,
       "Peixes Retirados": h.fishCount,
       "Peso Total (kg)": h.totalWeight,
-      "Peso Médio (g)": h.averageWeight || (h.fishCount > 0 ? (h.totalWeight * 1000 / h.fishCount).toFixed(1) : 0),
+      "Peso Médio (g)": h.averageWeight || (h.fishCount > 0 ? formatNumber(h.totalWeight * 1000 / h.fishCount, 1) : 0),
       "Lançado por": userMap.get(h.userId) || h.userId
     })));
     XLSX.utils.book_append_sheet(wb, wsHarvest, "Despescas");
@@ -719,7 +720,7 @@ const Dashboard: React.FC<Props> = ({ state }) => {
             <div className="mt-2 flex flex-wrap gap-2 justify-center md:justify-start">
               {lowStockFeeds.map(feed => (
                 <span key={feed.id} className="px-3 py-1 bg-white border border-red-100 rounded-xl text-[11px] font-black text-red-600 uppercase flex items-center gap-2">
-                  <PackageSearch className="w-3 h-3" /> {feed.name}: {(feed.totalStock/1000).toFixed(0)}kg restantes
+                  <PackageSearch className="w-3 h-3" /> {feed.name}: {formatNumber(feed.totalStock/1000, 0)}kg restantes
                 </span>
               ))}
             </div>
@@ -780,7 +781,7 @@ const Dashboard: React.FC<Props> = ({ state }) => {
           value={
             <div className="flex flex-col">
               <span className="text-xl font-black text-indigo-600 leading-none">{selectedBatchData.harvested} un</span>
-              <span className="text-[10px] font-black text-slate-400 uppercase mt-1">Biomassa: {selectedBatchData.harvestedWeight.toFixed(1)}kg</span>
+              <span className="text-[10px] font-black text-slate-400 uppercase mt-1">Biomassa: {formatNumber(selectedBatchData.harvestedWeight, 1)}kg</span>
             </div>
           } 
           icon={<Download className="w-5 h-5" />} 
@@ -788,17 +789,17 @@ const Dashboard: React.FC<Props> = ({ state }) => {
           subtext="Peixes retirados para abate" 
         />
         <MiniStat label="Mortalidade Total" value={<span className="text-xl font-black">{selectedBatchData.mortality} un</span>} icon={<FishOff className="w-5 h-5" />} color="text-red-600" subtext="Perdas registradas no lote" />
-        <MiniStat label="Biomassa Est. Atual" value={<span className="text-xl font-black">{selectedBatchData.biomass.toFixed(1)}kg</span>} icon={<Scale className="w-5 h-5" />} color="text-emerald-600" subtext={selectedBatchData.samplingInfo} />
+        <MiniStat label="Biomassa Est. Atual" value={<span className="text-xl font-black">{formatNumber(selectedBatchData.biomass, 1)}kg</span>} icon={<Scale className="w-5 h-5" />} color="text-emerald-600" subtext={selectedBatchData.samplingInfo} />
         <MiniStat 
           label="Ração Consumida" 
           value={
             <div className="flex flex-col">
-              <div className="text-xl font-black text-slate-800 leading-none mb-2">{selectedBatchData.feed.toFixed(1)}kg</div>
+              <div className="text-xl font-black text-slate-800 leading-none mb-2">{formatNumber(selectedBatchData.feed, 1)}kg</div>
               <div className="space-y-1 pt-2 border-t border-slate-100">
                 {selectedBatchData.feedBreakdown.length > 0 ? selectedBatchData.feedBreakdown.map((item: any) => (
                   <div key={item.name} className="flex justify-between items-center text-[9px]">
                     <span className="font-bold text-slate-400 uppercase truncate">{item.name}</span>
-                    <span className="font-black text-slate-600 ml-1">{item.amountKg.toFixed(1)}k</span>
+                    <span className="font-black text-slate-600 ml-1">{formatNumber(item.amountKg, 1)}k</span>
                   </div>
                 )) : <span className="text-[9px] font-bold text-slate-300 italic">Sem consumo</span>}
               </div>
@@ -858,7 +859,7 @@ const Dashboard: React.FC<Props> = ({ state }) => {
                 <YAxis axisLine={false} tickLine={false} tick={{fontSize: 9, fontWeight: 700, fill: '#94a3b8'}} />
                 <Tooltip 
                   contentStyle={{ borderRadius: '1rem', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
-                  formatter={(value: number) => [`${value.toLocaleString()} kg`, 'Biomassa']}
+                  formatter={(value: number) => [`${formatNumber(value)} kg`, 'Biomassa']}
                 />
                 <Line 
                   type="monotone" 

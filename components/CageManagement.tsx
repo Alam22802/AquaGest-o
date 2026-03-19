@@ -138,7 +138,7 @@ const CageManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
           <h3 className="text-lg font-black text-slate-800 mb-6 flex items-center justify-between uppercase tracking-tighter">
             <div className="flex items-center gap-2">
               <LayoutDashboard className="w-5 h-5 text-blue-600" />
-              {editingId ? 'Editar Alojamento' : 'Novo Alojamento'}
+              {editingId ? 'Editar Povoamento' : 'Novo Povoamento'}
             </div>
             {editingId && (
               <button onClick={resetForm} className="text-slate-400 hover:text-slate-600">
@@ -154,7 +154,7 @@ const CageManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                 <option value="">Escolha a gaiola...</option>
                 {availableCages.map(c => (
                   <option key={c.id} value={c.id}>
-                    {c.name} {c.dimensions ? `(${c.dimensions.length}x${c.dimensions.width}x${c.dimensions.depth}m - Cap: ${c.stockingCapacity})` : `(Cap: ${c.stockingCapacity})`}
+                    {c.name} {c.dimensions ? `(${c.dimensions.length}x${c.dimensions.width}x${c.dimensions.depth}m - Cap: ${c.stockingCapacity.toLocaleString('pt-BR')})` : `(Cap: ${c.stockingCapacity.toLocaleString('pt-BR')})`}
                   </option>
                 ))}
               </select>
@@ -176,7 +176,7 @@ const CageManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                 <option value="">Selecione o lote...</option>
                 {(state.batches || []).map(b => {
                   const used = (state.cages || []).filter(c => c.batchId === b.id && c.id !== editingId).reduce((x, y) => x + (y.initialFishCount || 0), 0);
-                  return <option key={b.id} value={b.id}>{b.name} (Saldo: {b.initialQuantity - used})</option>;
+                  return <option key={b.id} value={b.id}>{b.name} (Saldo: {(b.initialQuantity - used).toLocaleString('pt-BR')})</option>;
                 })}
               </select>
             </div>
@@ -190,7 +190,7 @@ const CageManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                   <div>
                     <div className="text-[9px] font-black text-slate-400 uppercase">Volume / Medidas</div>
                     <div className="text-xs font-bold text-slate-700">
-                      {(selectedCageDef.dimensions.length * selectedCageDef.dimensions.width * selectedCageDef.dimensions.depth).toFixed(2)}m³ 
+                      {(selectedCageDef.dimensions.length * selectedCageDef.dimensions.width * selectedCageDef.dimensions.depth).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}m³ 
                       <span className="text-[10px] text-slate-400 ml-1">({selectedCageDef.dimensions.length}x{selectedCageDef.dimensions.width}x{selectedCageDef.dimensions.depth}m)</span>
                     </div>
                   </div>
@@ -202,8 +202,8 @@ const CageManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                   <div>
                     <div className="text-[9px] font-black text-slate-400 uppercase">Capacidade / Densidade</div>
                     <div className="text-xs font-bold text-slate-700">
-                      {selectedCageDef.stockingCapacity} un
-                      {selectedCageDef.stockingDensity && <span className="text-[10px] text-slate-400 ml-1">({selectedCageDef.stockingDensity} p/m³)</span>}
+                      {selectedCageDef.stockingCapacity.toLocaleString('pt-BR')} un
+                      {selectedCageDef.stockingDensity && <span className="text-[10px] text-slate-400 ml-1">({selectedCageDef.stockingDensity.toLocaleString('pt-BR')} p/m³)</span>}
                     </div>
                   </div>
                 </div>
@@ -222,7 +222,7 @@ const CageManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
             </div>
 
             <button type="submit" disabled={isOverBatchBalance || !formData.cageId || !formData.lineId} className={`col-span-2 py-4 rounded-2xl font-black uppercase tracking-widest text-xs text-white shadow-xl transition-all active:scale-95 mt-2 ${isOverBatchBalance || !formData.cageId || !formData.lineId ? 'bg-slate-300' : 'bg-blue-600 shadow-blue-600/20 hover:bg-blue-700'}`}>
-              {editingId ? 'Salvar Alterações' : 'Confirmar Alojamento'}
+              {editingId ? 'Salvar Alterações' : 'Confirmar Povoamento'}
             </button>
           </form>
         </div>
@@ -230,7 +230,7 @@ const CageManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
         <div className="bg-slate-100 p-8 rounded-3xl border border-dashed border-slate-300 flex flex-col items-center gap-4 text-center max-w-2xl mx-auto">
           <Eye className="w-10 h-10 text-slate-300" />
           <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Modo Leitura Ativo</h4>
-          <p className="text-[9px] font-bold text-slate-400 uppercase leading-relaxed">Você não possui permissão para alojar novos peixes ou editar alojamentos.</p>
+          <p className="text-[9px] font-bold text-slate-400 uppercase leading-relaxed">Você não possui permissão para povoar novos peixes ou editar povoamentos.</p>
         </div>
       )}
 
@@ -266,11 +266,11 @@ const CageManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                 <div className="flex justify-between items-center border-t border-slate-50 pt-3">
                   <div className="flex flex-col">
                     <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Estoque Vivo</span>
-                    <span className="text-xl font-black text-emerald-600 leading-none mt-1">{currentCount} un</span>
+                    <span className="text-xl font-black text-emerald-600 leading-none mt-1">{currentCount.toLocaleString('pt-BR')} un</span>
                   </div>
                   <div className="flex flex-col items-end">
                     <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Inicial</span>
-                    <span className="text-xs font-bold text-slate-500">{cage.initialFishCount} un</span>
+                    <span className="text-xs font-bold text-slate-500">{cage.initialFishCount?.toLocaleString('pt-BR')} un</span>
                   </div>
                 </div>
               </div>
@@ -280,7 +280,7 @@ const CageManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
         {occupiedCages.length === 0 && (
           <div className="col-span-full py-24 text-center">
             <Info className="w-10 h-10 text-slate-200 mx-auto mb-4" />
-            <h4 className="text-slate-400 font-black uppercase tracking-widest text-xs">Nenhum alojamento ativo encontrado.</h4>
+            <h4 className="text-slate-400 font-black uppercase tracking-widest text-xs">Nenhum povoamento ativo encontrado.</h4>
           </div>
         )}
       </div>

@@ -1,5 +1,6 @@
 
 import { AppState, NotificationSettings, User } from '../../types';
+import { formatNumber } from '../../utils/formatters';
 
 export const sendEmailAlert = async (to: string, subject: string, body: string, settings?: NotificationSettings) => {
   console.log(`[ALERT] Enviando e-mail para: ${to}`);
@@ -29,7 +30,7 @@ export const checkAndTriggerAlerts = (state: AppState): {title: string, message:
       const percentage = feed.maxCapacity > 0 ? (stockKg / feed.maxCapacity) * 100 : 0;
       if (percentage <= feed.minStockPercentage) {
         const title = `ALERTA: Estoque Baixo - ${feed.name}`;
-        const message = `O estoque de ${feed.name} está em ${percentage.toFixed(1)}% (${stockKg.toFixed(1)}kg).`;
+        const message = `O estoque de ${feed.name} está em ${formatNumber(percentage, 1)}% (${formatNumber(stockKg, 1)}kg).`;
         sendEmailAlert(targetEmail, title, message, settings);
         return { title, message };
       }

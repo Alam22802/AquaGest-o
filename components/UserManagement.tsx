@@ -529,7 +529,7 @@ const UserManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                         { id: 'protocols', label: 'Modelos de Produção' },
                         { id: 'batches', label: 'Lotes (Estoque)' },
                         { id: 'lines', label: 'Linhas/Setores' },
-                        { id: 'cages', label: 'Alojamento' },
+                        { id: 'cages', label: 'Povoamento' },
                         { id: 'feed', label: 'Estoque Ração' },
                         { id: 'feeding', label: 'Trato Diário' },
                         { id: 'biometry', label: 'Biometria' },

@@ -1,6 +1,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { AppState, SlaughterLog, User } from '../../types';
+import { formatNumber } from '../../utils/formatters';
 import { Factory, Trash2, Edit3, X, ArrowUpDown, Calendar, Clock, Scale, ClipboardCheck, User as UserIcon, Search, CheckCircle, TrendingUp, ChevronDown, BarChart as BarChartIcon } from 'lucide-react';
 import { format, isWithinInterval, parseISO, startOfDay, endOfDay, subDays, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -74,28 +75,28 @@ const SlaughterSummary = React.memo(({ stats, startDate, endDate, onStartDateCha
              <div className="space-y-2 border-l-2 border-white/10 pl-6">
                 <div className="text-[9px] font-black opacity-40 uppercase tracking-widest">Total Recepção</div>
                 <div className="text-2xl font-black flex items-baseline gap-1">
-                   {stats.totalRecep.toLocaleString('pt-BR', { minimumFractionDigits: 0 })}
+                   {formatNumber(stats.totalRecep, 0)}
                    <span className="text-[10px] opacity-40">kg</span>
                 </div>
              </div>
              <div className="space-y-2 border-l-2 border-emerald-500/30 pl-6">
                 <div className="text-[9px] font-black opacity-40 uppercase tracking-widest">Total Embalado</div>
                 <div className="text-2xl font-black text-emerald-400 flex items-baseline gap-1">
-                   {stats.totalPacked.toLocaleString('pt-BR', { minimumFractionDigits: 0 })}
+                   {formatNumber(stats.totalPacked, 0)}
                    <span className="text-[10px] opacity-40">kg</span>
                 </div>
              </div>
              <div className="space-y-2 border-l-2 border-blue-500/30 pl-6">
                 <div className="text-[9px] font-black opacity-40 uppercase tracking-widest">Rendimento</div>
                 <div className="text-2xl font-black text-blue-300 flex items-baseline gap-1">
-                   {stats.yieldPercentage.toFixed(1)}
+                   {formatNumber(stats.yieldPercentage, 1)}
                    <span className="text-[10px] opacity-40">%</span>
                 </div>
              </div>
              <div className="space-y-2 border-l-2 border-white/10 pl-6">
                 <div className="text-[9px] font-black opacity-40 uppercase tracking-widest">Filé Congelado</div>
                 <div className="text-2xl font-black flex items-baseline gap-1">
-                   {stats.totalGta.toLocaleString('pt-BR', { minimumFractionDigits: 0 })}
+                   {formatNumber(stats.totalGta, 0)}
                    <span className="text-[10px] opacity-40">kg</span>
                 </div>
              </div>
@@ -106,21 +107,21 @@ const SlaughterSummary = React.memo(({ stats, startDate, endDate, onStartDateCha
              <div className="space-y-2 border-l-2 border-red-500/30 pl-6">
                 <div className="text-[9px] font-black opacity-40 uppercase tracking-widest">Condenações Frig.</div>
                 <div className="text-xl font-black text-red-400 flex items-baseline gap-1">
-                   {stats.totalSlaughterCondemnation.toLocaleString('pt-BR')}
+                   {formatNumber(stats.totalSlaughterCondemnation)}
                    <span className="text-[10px] opacity-40">kg</span>
                 </div>
              </div>
              <div className="space-y-2 border-l-2 border-orange-500/30 pl-6">
                 <div className="text-[9px] font-black opacity-40 uppercase tracking-widest">Condenações Transp.</div>
                 <div className="text-xl font-black text-orange-400 flex items-baseline gap-1">
-                   {stats.totalTransportCondemnation.toLocaleString('pt-BR')}
+                   {formatNumber(stats.totalTransportCondemnation)}
                    <span className="text-[10px] opacity-40">kg</span>
                 </div>
              </div>
              <div className="space-y-2 border-l-2 border-amber-500/30 pl-6">
                 <div className="text-[9px] font-black opacity-40 uppercase tracking-widest">Graxaria</div>
                 <div className="text-xl font-black text-amber-400 flex items-baseline gap-1">
-                   {stats.totalRendering.toLocaleString('pt-BR', { minimumFractionDigits: 0 })}
+                   {formatNumber(stats.totalRendering, 0)}
                    <span className="text-[10px] opacity-40">kg</span>
                 </div>
              </div>
@@ -132,41 +133,41 @@ const SlaughterSummary = React.memo(({ stats, startDate, endDate, onStartDateCha
                 <div className="text-[9px] font-black opacity-40 uppercase tracking-widest">Valor Total Notas</div>
                 <div className="text-xl font-black text-amber-100 flex items-baseline gap-1">
                    <span className="text-[10px] opacity-40">R$</span>
-                   {stats.totalInvoiceValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                   {formatNumber(stats.totalInvoiceValue, 2)}
                 </div>
              </div>
              <div className="space-y-2 border-l-2 border-indigo-500/50 pl-6 bg-indigo-500/5 rounded-r-xl py-2 -ml-2">
                 <div className="text-[9px] font-black text-indigo-300 uppercase tracking-widest">Custo Ton Produzida</div>
                 <div className="text-xl font-black text-indigo-200 flex items-baseline gap-1">
                    <span className="text-[10px] opacity-40">R$</span>
-                   {stats.costPerTonProduced.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                   {formatNumber(stats.costPerTonProduced, 2)}
                 </div>
              </div>
              <div className="space-y-2 border-l-2 border-white/20 pl-6">
                 <div className="text-[9px] font-black opacity-40 uppercase tracking-widest">Frete / kg Vivo</div>
                 <div className="text-xl font-black text-white/90 flex items-baseline gap-1">
                    <span className="text-[10px] opacity-40">R$</span>
-                   {stats.freightPerKgLive.toFixed(2)}
+                   {formatNumber(stats.freightPerKgLive, 2)}
                 </div>
              </div>
              <div className="space-y-2 border-l-2 border-white/20 pl-6">
                 <div className="text-[9px] font-black opacity-40 uppercase tracking-widest">Mão De Obra/Ton</div>
                 <div className="text-xl font-black text-white/90 flex items-baseline gap-1">
                    <span className="text-[10px] opacity-40">R$</span>
-                   {stats.laborPerTon.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                   {formatNumber(stats.laborPerTon, 2)}
                 </div>
              </div>
              <div className="space-y-2 border-l-2 border-white/20 pl-6">
                 <div className="text-[9px] font-black opacity-40 uppercase tracking-widest">Consumo Água/Ton</div>
                 <div className="text-xl font-black text-white/90 flex items-baseline gap-1">
-                   {stats.waterPerTon.toFixed(2)}
+                   {formatNumber(stats.waterPerTon, 2)}
                    <span className="text-[10px] opacity-40">L/Ton</span>
                 </div>
              </div>
              <div className="space-y-2 border-l-2 border-white/20 pl-6">
                 <div className="text-[9px] font-black opacity-40 uppercase tracking-widest">Consumo Kw/Ton</div>
                 <div className="text-xl font-black text-white/90 flex items-baseline gap-1">
-                   {stats.energyKwPerTon.toFixed(2)}
+                   {formatNumber(stats.energyKwPerTon, 2)}
                    <span className="text-[10px] opacity-40">kWh/Ton</span>
                 </div>
              </div>
@@ -320,38 +321,38 @@ const SlaughterTable = React.memo(({ logs, users, hasPermission, onEdit, onDelet
                   <div className="flex flex-col gap-1">
                     <div className="flex items-center gap-2">
                        <span className="text-[9px] font-black text-slate-400 uppercase w-10">FILÉ:</span>
-                       <span className="text-xs font-black text-slate-800">{(log.gtaWeight || 0).toFixed(2)}kg</span>
+                       <span className="text-xs font-black text-slate-800">{formatNumber(log.gtaWeight || 0, 2)}kg</span>
                     </div>
                     <div className="flex items-center gap-2">
                        <span className="text-[9px] font-black text-slate-400 uppercase w-10">RECEP:</span>
-                       <span className="text-xs font-black text-emerald-600">{(log.receptionWeight || 0).toFixed(2)}kg</span>
+                       <span className="text-xs font-black text-emerald-600">{formatNumber(log.receptionWeight || 0, 2)}kg</span>
                     </div>
                   </div>
                 </td>
                 <td className="px-8 py-6">
-                  <div className="font-black text-blue-600 text-xs">{log.packedQuantity ? `${log.packedQuantity} kg` : '---'}</div>
+                  <div className="font-black text-blue-600 text-xs">{log.packedQuantity ? `${formatNumber(log.packedQuantity)} kg` : '---'}</div>
                   {log.receptionWeight > 0 && (
                     <div className="text-[10px] font-black text-emerald-600 mt-1 uppercase tracking-widest">
-                      Rend: {((log.packedQuantity / log.receptionWeight) * 100).toFixed(1)}%
+                      Rend: {formatNumber((log.packedQuantity / log.receptionWeight) * 100, 1)}%
                     </div>
                   )}
                   <div className="text-[9px] font-black text-slate-400 uppercase mt-1">LOTE EMB: {log.packagingBatch || 'N/A'}</div>
                 </td>
                 <td className="px-8 py-6">
-                  <div className="font-black text-amber-600 text-xs">{log.renderingWeight ? `${log.renderingWeight} kg` : '---'}</div>
+                  <div className="font-black text-amber-600 text-xs">{log.renderingWeight ? `${formatNumber(log.renderingWeight)} kg` : '---'}</div>
                 </td>
                 <td className="px-8 py-6">
-                  <div className="text-xs font-black text-slate-700">R$ {(log.freightValue || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
+                  <div className="text-xs font-black text-slate-700">R$ {formatNumber(log.freightValue || 0, 2)}</div>
                   <div className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">
-                    R$ {log.receptionWeight && log.freightValue ? (log.freightValue / log.receptionWeight).toFixed(2) : '0.00'}/kg
+                    R$ {log.receptionWeight && log.freightValue ? formatNumber(log.freightValue / log.receptionWeight, 2) : '0.00'}/kg
                   </div>
                 </td>
                 <td className="px-8 py-6">
-                  <div className="text-[10px] font-black text-red-500 uppercase">Frig: {(log.slaughterCondemnation || 0).toLocaleString('pt-BR')}kg</div>
-                  <div className="text-[10px] font-black text-orange-500 uppercase">Transp: {(log.transportCondemnation || 0).toLocaleString('pt-BR')}kg</div>
+                  <div className="text-[10px] font-black text-red-500 uppercase">Frig: {formatNumber(log.slaughterCondemnation || 0)}kg</div>
+                  <div className="text-[10px] font-black text-orange-500 uppercase">Transp: {formatNumber(log.transportCondemnation || 0)}kg</div>
                 </td>
                 <td className="px-8 py-6">
-                  <div className="text-xs font-black text-amber-600">R$ {(log.invoiceValue || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
+                  <div className="text-xs font-black text-amber-600">R$ {formatNumber(log.invoiceValue || 0, 2)}</div>
                 </td>
                 <td className="px-8 py-6">
                   <div className="flex items-center gap-2 text-[10px] font-black text-slate-400 uppercase tracking-widest">

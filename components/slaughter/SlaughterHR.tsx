@@ -1,9 +1,10 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { AppState, SlaughterEmployee, SlaughterHRIndicator, SlaughterHREntry, User } from '../../types';
-import { Users, UserPlus, Trash2, Edit3, X, Calendar, Search, TrendingUp, Heart, AlertCircle, Briefcase, BarChart as BarChartIcon, CheckSquare, Square } from 'lucide-react';
+import { Users, UserPlus, Trash2, Edit3, X, Calendar, Search, TrendingUp, Heart, AlertCircle, Briefcase, BarChart as BarChartIcon, CheckSquare, Square, Plus } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
+import { formatNumber } from '../../utils/formatters';
 
 interface Props {
   state: AppState;
@@ -23,6 +24,7 @@ const SlaughterHR: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
   const [activeSubTab, setActiveSubTab] = useState<'employees' | 'indicators'>('employees');
   const [filterMonth, setFilterMonth] = useState(new Date().getMonth() + 1);
   const [filterYear, setFilterYear] = useState(new Date().getFullYear());
+  const [filterEmployeeId, setFilterEmployeeId] = useState<string>('all');
   const [editingEmployeeId, setEditingEmployeeId] = useState<string | null>(null);
   const [employeeForm, setEmployeeForm] = useState({
     registrationNumber: '',
@@ -63,10 +65,12 @@ const SlaughterHR: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     // Filter indicators by month/year
     const filteredIndicator = indicators.find(ind => ind.month === filterMonth && ind.year === filterYear);
 
-    // Filter entries by month/year
+    // Filter entries by month/year and employee
     const filteredEntries = entries.filter(entry => {
       const d = new Date(entry.date);
-      return (d.getMonth() + 1) === filterMonth && d.getFullYear() === filterYear;
+      const matchesDate = (d.getMonth() + 1) === filterMonth && d.getFullYear() === filterYear;
+      const matchesEmployee = filterEmployeeId === 'all' || entry.employeeIds.includes(filterEmployeeId);
+      return matchesDate && matchesEmployee;
     });
 
     // Chart data for absenteeism (last 6 months)
@@ -171,6 +175,29 @@ const SlaughterHR: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     absenteeism: '',
     accidents: ''
   });
+
+  useEffect(() => {
+    const existing = indicators.find(ind => ind.month === filterMonth && ind.year === filterYear);
+    if (existing) {
+      setEditingIndicatorId(existing.id);
+      setIndicatorForm({
+        month: existing.month,
+        year: existing.year,
+        turnover: existing.turnover.toString(),
+        absenteeism: existing.absenteeism.toString(),
+        accidents: existing.accidents.toString()
+      });
+    } else {
+      setEditingIndicatorId(null);
+      setIndicatorForm({
+        month: filterMonth,
+        year: filterYear,
+        turnover: '',
+        absenteeism: '',
+        accidents: ''
+      });
+    }
+  }, [filterMonth, filterYear, indicators]);
 
   const handleSaveIndicator = (e: React.FormEvent) => {
     e.preventDefault();
@@ -451,50 +478,71 @@ const SlaughterHR: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
               <Users className="w-4 h-4 text-blue-600" />
               <div>
                 <div className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Ativos</div>
-                <div className="text-sm font-black text-slate-800">{stats.active}</div>
+                <div className="text-sm font-black text-slate-800">{formatNumber(stats.active)}</div>
               </div>
             </div>
             <div className="bg-amber-50/50 p-4 rounded-2xl flex items-center gap-3">
               <TrendingUp className="w-4 h-4 text-amber-600" />
               <div>
                 <div className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Turnover</div>
-                <div className="text-sm font-black text-slate-800">{stats.filteredIndicator?.turnover || 0}%</div>
+                <div className="text-sm font-black text-slate-800">{formatNumber(stats.filteredIndicator?.turnover || 0, 1)}%</div>
               </div>
             </div>
             <div className="bg-red-50/50 p-4 rounded-2xl flex items-center gap-3">
               <Heart className="w-4 h-4 text-red-600" />
               <div>
                 <div className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Acidentes</div>
-                <div className="text-sm font-black text-slate-800">{stats.filteredIndicator?.accidents || 0}</div>
+                <div className="text-sm font-black text-slate-800">{formatNumber(stats.filteredIndicator?.accidents || 0)}</div>
               </div>
             </div>
           </div>
 
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-6 rounded-[2rem] border border-slate-200 shadow-sm">
-            <div className="flex items-center gap-3">
-              <div className="p-3 bg-slate-100 rounded-xl text-slate-400">
-                <Search className="w-5 h-5" />
+            <div className="flex flex-wrap items-center gap-6">
+              <div className="flex items-center gap-3">
+                <div className="p-3 bg-slate-100 rounded-xl text-slate-400">
+                  <Calendar className="w-5 h-5" />
+                </div>
+                <div>
+                  <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-400">Período</h4>
+                  <div className="flex items-center gap-2 mt-1">
+                    <select 
+                      value={filterMonth} 
+                      onChange={e => setFilterMonth(Number(e.target.value))}
+                      className="bg-transparent border-none text-xs font-black uppercase outline-none focus:ring-0 cursor-pointer text-slate-600"
+                    >
+                      {Array.from({ length: 12 }, (_, i) => i + 1).map(m => (
+                        <option key={m} value={m}>{format(new Date(2000, m - 1), 'MMMM')}</option>
+                      ))}
+                    </select>
+                    <span className="text-slate-300">/</span>
+                    <select 
+                      value={filterYear} 
+                      onChange={e => setFilterYear(Number(e.target.value))}
+                      className="bg-transparent border-none text-xs font-black uppercase outline-none focus:ring-0 cursor-pointer text-slate-600"
+                    >
+                      {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - i).map(y => (
+                        <option key={y} value={y}>{y}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
               </div>
-              <div>
-                <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-400">Filtrar Lançamentos e Indicadores</h4>
-                <div className="flex items-center gap-2 mt-1">
+
+              <div className="flex items-center gap-3">
+                <div className="p-3 bg-slate-100 rounded-xl text-slate-400">
+                  <Users className="w-5 h-5" />
+                </div>
+                <div>
+                  <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-400">Colaborador</h4>
                   <select 
-                    value={filterMonth} 
-                    onChange={e => setFilterMonth(Number(e.target.value))}
-                    className="bg-transparent border-none text-xs font-black uppercase outline-none focus:ring-0 cursor-pointer text-slate-600"
+                    value={filterEmployeeId} 
+                    onChange={e => setFilterEmployeeId(e.target.value)}
+                    className="bg-transparent border-none text-xs font-black uppercase outline-none focus:ring-0 cursor-pointer text-slate-600 mt-1"
                   >
-                    {Array.from({ length: 12 }, (_, i) => i + 1).map(m => (
-                      <option key={m} value={m}>{format(new Date(2000, m - 1), 'MMMM')}</option>
-                    ))}
-                  </select>
-                  <span className="text-slate-300">/</span>
-                  <select 
-                    value={filterYear} 
-                    onChange={e => setFilterYear(Number(e.target.value))}
-                    className="bg-transparent border-none text-xs font-black uppercase outline-none focus:ring-0 cursor-pointer text-slate-600"
-                  >
-                    {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - i).map(y => (
-                      <option key={y} value={y}>{y}</option>
+                    <option value="all">Todos os Colaboradores</option>
+                    {employees.map(emp => (
+                      <option key={emp.id} value={emp.id}>{emp.name}</option>
                     ))}
                   </select>
                 </div>
@@ -519,7 +567,11 @@ const SlaughterHR: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                     <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 9, fontWeight: 900, fill: '#94a3b8'}} />
                     <YAxis axisLine={false} tickLine={false} tick={{fontSize: 9, fontWeight: 900, fill: '#94a3b8'}} />
-                    <Tooltip cursor={{fill: '#f8fafc'}} contentStyle={{borderRadius: '20px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)'}} />
+                    <Tooltip 
+                      cursor={{fill: '#f8fafc'}} 
+                      contentStyle={{borderRadius: '20px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)'}} 
+                      formatter={(value: number) => [formatNumber(value, 1) + '%', "Absenteísmo"]}
+                    />
                     <Bar dataKey="value" name="Absenteísmo" fill="#344434" radius={[6, 6, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
@@ -542,7 +594,11 @@ const SlaughterHR: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                     <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f1f5f9" />
                     <XAxis type="number" axisLine={false} tickLine={false} tick={{fontSize: 9, fontWeight: 900, fill: '#94a3b8'}} />
                     <YAxis dataKey="name" type="category" axisLine={false} tickLine={false} tick={{fontSize: 9, fontWeight: 900, fill: '#94a3b8'}} width={100} />
-                    <Tooltip cursor={{fill: '#f8fafc'}} contentStyle={{borderRadius: '20px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)'}} />
+                    <Tooltip 
+                      cursor={{fill: '#f8fafc'}} 
+                      contentStyle={{borderRadius: '20px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)'}} 
+                      formatter={(value: number) => [formatNumber(value), "Colaboradores"]}
+                    />
                     <Bar dataKey="value" name="Colaboradores" fill="#10b981" radius={[0, 6, 6, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
@@ -696,6 +752,75 @@ const SlaughterHR: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
               </div>
             </div>
 
+            <div className="lg:col-span-1">
+              <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-200">
+                <h3 className="text-xl font-black text-slate-800 mb-8 uppercase tracking-tighter italic flex items-center gap-3">
+                  <BarChartIcon className="w-6 h-6" />
+                  Indicadores Mensais
+                </h3>
+                <form onSubmit={handleSaveIndicator} className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Mês</label>
+                      <select 
+                        className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none text-xs"
+                        value={indicatorForm.month}
+                        onChange={e => setIndicatorForm({...indicatorForm, month: Number(e.target.value)})}
+                      >
+                        {Array.from({ length: 12 }, (_, i) => i + 1).map(m => (
+                          <option key={m} value={m}>{format(new Date(2000, m - 1), 'MMMM')}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Ano</label>
+                      <select 
+                        className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none text-xs"
+                        value={indicatorForm.year}
+                        onChange={e => setIndicatorForm({...indicatorForm, year: Number(e.target.value)})}
+                      >
+                        {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - i).map(y => (
+                          <option key={y} value={y}>{y}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Turnover (%)</label>
+                      <input 
+                        type="number" step="0.1" required 
+                        className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none text-xs"
+                        value={indicatorForm.turnover}
+                        onChange={e => setIndicatorForm({...indicatorForm, turnover: e.target.value})}
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Absenteísmo (%)</label>
+                      <input 
+                        type="number" step="0.1" required 
+                        className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none text-xs"
+                        value={indicatorForm.absenteeism}
+                        onChange={e => setIndicatorForm({...indicatorForm, absenteeism: e.target.value})}
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Acidentes</label>
+                    <input 
+                      type="number" required 
+                      className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none text-xs"
+                      value={indicatorForm.accidents}
+                      onChange={e => setIndicatorForm({...indicatorForm, accidents: e.target.value})}
+                    />
+                  </div>
+                  <button type="submit" className="w-full py-4 bg-[#344434] text-white rounded-2xl font-black uppercase tracking-widest text-xs shadow-lg hover:bg-[#2a382a] transition-all">
+                    Salvar Indicadores
+                  </button>
+                </form>
+              </div>
+            </div>
+
             <div className="lg:col-span-2">
               <div className="bg-white border border-slate-200 rounded-[2.5rem] overflow-hidden shadow-sm">
                 <div className="p-6 border-b border-slate-100 flex justify-between items-center">
@@ -716,8 +841,10 @@ const SlaughterHR: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                         <td className="px-8 py-6 text-xs font-bold text-slate-500">{format(parseISO(ent.date), 'dd/MM/yyyy')}</td>
                         <td className="px-8 py-6">
                           <div className="text-xs font-bold text-slate-800">
-                            {ent.employeeIds.length === 1 
-                              ? employees.find(e => e.id === ent.employeeIds[0])?.name 
+                            {ent.employeeIds.length === 1 || filterEmployeeId !== 'all'
+                              ? (filterEmployeeId !== 'all' 
+                                  ? employees.find(e => e.id === filterEmployeeId)?.name 
+                                  : employees.find(e => e.id === ent.employeeIds[0])?.name)
                               : `${ent.employeeIds.length} Colaboradores`}
                           </div>
                           {ent.description && <div className="text-[9px] text-slate-400 italic mt-0.5">{ent.description}</div>}
@@ -729,7 +856,7 @@ const SlaughterHR: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                             ent.type === 'Turnover' ? 'bg-slate-100 text-slate-600' :
                             'bg-blue-50 text-blue-600'
                           }`}>
-                            {ent.type} {ent.days ? `(${ent.days}d)` : ''}
+                            {ent.type} {ent.days ? `(${formatNumber(ent.days)}d)` : ''}
                           </span>
                         </td>
                         <td className="px-8 py-6">
@@ -758,54 +885,6 @@ const SlaughterHR: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                     )}
                   </tbody>
                 </table>
-              </div>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-200">
-              <div className="flex items-center gap-3 mb-8">
-                <div className="p-3 bg-blue-50 text-blue-600 rounded-2xl shadow-sm">
-                  <TrendingUp className="w-6 h-6" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-black text-slate-800 uppercase tracking-tighter italic leading-none">Absenteísmo (%)</h3>
-                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">Histórico dos últimos 6 meses</p>
-                </div>
-              </div>
-              <div className="h-[250px] w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={stats.absenteeismData}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                    <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 9, fontWeight: 900, fill: '#94a3b8'}} />
-                    <YAxis axisLine={false} tickLine={false} tick={{fontSize: 9, fontWeight: 900, fill: '#94a3b8'}} />
-                    <Tooltip cursor={{fill: '#f8fafc'}} contentStyle={{borderRadius: '20px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)'}} />
-                    <Bar dataKey="value" name="Absenteísmo" fill="#344434" radius={[6, 6, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
-
-            <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-200">
-              <div className="flex items-center gap-3 mb-8">
-                <div className="p-3 bg-emerald-50 text-emerald-600 rounded-2xl shadow-sm">
-                  <Users className="w-6 h-6" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-black text-slate-800 uppercase tracking-tighter italic leading-none">Headcount por Depto</h3>
-                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">Distribuição de Colaboradores Ativos</p>
-                </div>
-              </div>
-              <div className="h-[250px] w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={stats.headcountData} layout="vertical">
-                    <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f1f5f9" />
-                    <XAxis type="number" axisLine={false} tickLine={false} tick={{fontSize: 9, fontWeight: 900, fill: '#94a3b8'}} />
-                    <YAxis dataKey="name" type="category" axisLine={false} tickLine={false} tick={{fontSize: 9, fontWeight: 900, fill: '#94a3b8'}} width={100} />
-                    <Tooltip cursor={{fill: '#f8fafc'}} contentStyle={{borderRadius: '20px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)'}} />
-                    <Bar dataKey="value" name="Colaboradores" fill="#10b981" radius={[0, 6, 6, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
               </div>
             </div>
           </div>

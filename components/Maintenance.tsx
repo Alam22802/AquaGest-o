@@ -243,7 +243,7 @@ const Maintenance: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                       </div>
                     ) : (
                       <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest italic">
-                        {cage.status === 'Sucata' ? 'Gaiola descartada/sucata.' : 'Gaiola operacional ou em alojamento.'}
+                        {cage.status === 'Sucata' ? 'Gaiola descartada/sucata.' : 'Gaiola operacional ou em povoamento.'}
                       </div>
                     )}
                   </div>

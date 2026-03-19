@@ -1,6 +1,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { AppState, SlaughterExpense, User } from '../../types';
+import { formatNumber } from '../../utils/formatters';
 import { DollarSign, Plus, Trash2, Edit3, X, Calendar, Search, Filter, TrendingUp, TrendingDown, PieChart, Receipt, Package, Truck, CheckCircle2 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 
@@ -112,7 +113,7 @@ const SlaughterFinance: React.FC<Props> = ({ state, onUpdate, currentUser }) => 
         ...prev,
         quantity: field === 'qty' ? val : prev.quantity,
         unitValue: field === 'unit' ? val : prev.unitValue,
-        value: (qty * unit).toFixed(2)
+        value: formatNumber(qty * unit, 2)
       }));
     } else {
       setFormData(prev => ({
@@ -135,7 +136,7 @@ const SlaughterFinance: React.FC<Props> = ({ state, onUpdate, currentUser }) => 
             <h3 className="text-[10px] font-black uppercase tracking-widest opacity-60">Custo Total Acumulado</h3>
           </div>
           <div className="text-4xl font-black italic tracking-tighter">
-            R$ {stats.total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+            R$ {formatNumber(stats.total, 2)}
           </div>
         </div>
 
@@ -143,7 +144,7 @@ const SlaughterFinance: React.FC<Props> = ({ state, onUpdate, currentUser }) => 
           {Object.entries(stats.byCategory).map(([cat, val]) => (
             <div key={cat} className="space-y-1 min-w-[120px]">
               <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{cat}</div>
-              <div className="text-lg font-black text-slate-800">R$ {val.toLocaleString('pt-BR')}</div>
+              <div className="text-lg font-black text-slate-800">R$ {formatNumber(val)}</div>
             </div>
           ))}
           {Object.keys(stats.byCategory).length === 0 && (
@@ -326,11 +327,11 @@ const SlaughterFinance: React.FC<Props> = ({ state, onUpdate, currentUser }) => 
                     <td className="px-8 py-6">
                       {expense.quantity && expense.unitValue ? (
                         <div className="text-[10px] font-bold text-slate-400 uppercase">
-                          {expense.quantity} {expense.category === 'Água' ? 'L' : 'KW'} x R$ {expense.unitValue.toFixed(2)}
+                          {formatNumber(expense.quantity)} {expense.category === 'Água' ? 'L' : 'KW'} x R$ {formatNumber(expense.unitValue, 2)}
                         </div>
                       ) : '-'}
                     </td>
-                    <td className="px-8 py-6 font-black text-slate-900">R$ {expense.value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
+                    <td className="px-8 py-6 font-black text-slate-900">R$ {formatNumber(expense.value, 2)}</td>
                     <td className="px-8 py-6">
                       <div className="flex justify-center gap-2">
                         <button onClick={() => startEdit(expense)} className="p-2 text-slate-300 hover:text-amber-500 transition-colors"><Edit3 className="w-4 h-4" /></button>

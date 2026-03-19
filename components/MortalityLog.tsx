@@ -3,6 +3,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { AppState, MortalityLog as IMortalityLog, User } from '../types';
 import { FishOff, Trash2, Edit3, X, ArrowUpDown, Calendar } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
+import { formatNumber } from '../utils/formatters';
 
 interface Props {
   state: AppState;
@@ -312,7 +313,7 @@ const MortalityLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                     <td className="px-6 py-4 text-xs font-bold text-slate-600">
                       <div className="flex items-center gap-1"><Calendar className="w-3 h-3 opacity-30" /> {format(new Date(log.date + 'T12:00:00'), 'dd/MM/yyyy')}</div>
                     </td>
-                    <td className="px-6 py-4 font-black text-red-600">{log.count}</td>
+                    <td className="px-6 py-4 font-black text-red-600">{formatNumber(log.count)}</td>
                     <td className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase">@{user?.username || '---'}</td>
                     {hasPermission && (
                       <td className="px-6 py-4 text-center">

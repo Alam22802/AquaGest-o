@@ -3,6 +3,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { AppState, FeedingLog as IFeedingLog, User } from '../types';
 import { Utensils, Trash2, Edit3, X, ArrowUpDown, Clock, Calendar, AlertTriangle, Eye } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
+import { formatNumber } from '../utils/formatters';
 
 interface Props {
   state: AppState;
@@ -283,7 +284,7 @@ const FeedingLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
               </select>
               <select required className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none" value={formData.feedTypeId} onChange={e => setFormData({...formData, feedTypeId: e.target.value})}>
                 <option value="">Tipo de Ração...</option>
-                {(state.feedTypes || []).map(ft => <option key={ft.id} value={ft.id}>{ft.name} (Saldo: {(ft.totalStock/1000).toFixed(1)}kg)</option>)}
+                {(state.feedTypes || []).map(ft => <option key={ft.id} value={ft.id}>{ft.name} (Saldo: {formatNumber(ft.totalStock/1000, 1)}kg)</option>)}
               </select>
               <div className="relative">
                 <input type="number" required placeholder="Quantidade (gramas)" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none" value={formData.amount} onChange={e => setFormData({...formData, amount: e.target.value})} />
@@ -415,7 +416,7 @@ const FeedingLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                       <div className="flex items-center gap-1"><Calendar className="w-3 h-3 opacity-30" /> {format(parseISO(log.timestamp), 'dd/MM/yyyy')}</div>
                       <div className="flex items-center gap-1"><Clock className="w-3 h-3 opacity-30" /> {format(parseISO(log.timestamp), 'HH:mm')}</div>
                     </td>
-                    <td className="px-6 py-4 font-black text-slate-700">{log.amount}g</td>
+                    <td className="px-6 py-4 font-black text-slate-700">{formatNumber(log.amount)}g</td>
                     <td className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase">@{user?.username || '---'}</td>
                     {hasPermission && (
                       <td className="px-6 py-4 text-center">

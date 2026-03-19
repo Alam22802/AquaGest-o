@@ -3,6 +3,7 @@ import React, { useState, useMemo } from 'react';
 import { AppState, FeedType, FeedStockLog, User } from '../types';
 import { Plus, Package, TrendingDown, AlertCircle, Calendar, Settings2, Edit, Trash2, X, ArrowUpDown, Clock, User as UserIcon, Filter, CheckSquare, Square } from 'lucide-react';
 import { subDays, format, parseISO } from 'date-fns';
+import { formatNumber } from '../utils/formatters';
 
 interface Props {
   state: AppState;
@@ -370,12 +371,12 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                           <div className={`h-full transition-all duration-500 ${isCritical ? 'bg-red-500' : 'bg-emerald-500'}`} style={{width: `${Math.min(100, percentage)}%`}} />
                         </div>
                         <span className={`text-[11px] font-black ${isCritical ? 'text-red-600' : 'text-slate-600'}`}>
-                          {stockKg.toFixed(1)}kg ({percentage.toFixed(0)}%)
+                          {formatNumber(stockKg, 1)}kg ({formatNumber(percentage, 0)}%)
                         </span>
                       </div>
                     </td>
-                    <td className="px-6 py-4 text-xs font-bold text-slate-500">{feed.maxCapacity}kg</td>
-                    <td className="px-6 py-4 text-xs font-bold text-slate-500">{feed.minStockPercentage}%</td>
+                    <td className="px-6 py-4 text-xs font-bold text-slate-500">{formatNumber(feed.maxCapacity)}kg</td>
+                    <td className="px-6 py-4 text-xs font-bold text-slate-500">{formatNumber(feed.minStockPercentage)}%</td>
                     {hasPermission && (
                       <td className="px-6 py-4 text-center">
                          <div className="flex justify-center gap-2">
@@ -500,7 +501,7 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                       <div className="flex items-center gap-1"><Clock className="w-3 h-3 opacity-30" /> {format(parseISO(log.timestamp), 'HH:mm')}</div>
                     </td>
                     <td className={`px-6 py-4 font-black ${isNegative ? 'text-red-600' : 'text-slate-700'}`}>
-                      {isNegative ? '' : '+'}{(log.amount / 1000).toFixed(1)}kg
+                      {isNegative ? '' : '+'}{formatNumber(log.amount / 1000, 1)}kg
                     </td>
                     <td className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase">
                       <div className="flex items-center gap-1"><UserIcon className="w-3 h-3 opacity-30" /> @{user?.username || '---'}</div>

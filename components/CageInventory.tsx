@@ -1,6 +1,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { AppState, Cage, User, CageStatus } from '../types';
+import { formatNumber } from '../utils/formatters';
 import { Plus, Trash2, Box, Edit, X, Ruler, Users, Info, Layers, Filter, CheckCircle2, Settings, Eraser, LayoutDashboard, Eye, Target, BarChart3 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, ReferenceLine, Legend } from 'recharts';
 
@@ -70,7 +71,7 @@ const CageInventory: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       onUpdate({ ...state, cages: updatedCages });
       setSelectedIds([]);
       resetForm();
-      alert(`${selectedIds.length} gaiolas atualizadas com sucesso!`);
+      alert(`${formatNumber(selectedIds.length, 0)} gaiolas atualizadas com sucesso!`);
       return;
     }
 
@@ -196,7 +197,7 @@ const CageInventory: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     if (!hasPermission) return;
     const cage = (state.cages || []).find(c => c.id === id);
     if (cage?.status === 'Ocupada') {
-      alert('Não é possível remover uma gaiola que está OCUPADA com peixes. Desocupe-a primeiro no menu Alojamento.');
+      alert('Não é possível remover uma gaiola que está OCUPADA com peixes. Desocupe-a primeiro no menu Povoamento.');
       return;
     }
     if (!confirm(`Tem certeza que deseja remover a gaiola "${cage?.name}" permanentemente?`)) return;
@@ -232,7 +233,7 @@ const CageInventory: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       alert(`Não é possível remover ${occupiedSelected.length} gaiolas que estão OCUPADAS. Desocupe-as primeiro.`);
       return;
     }
-    if (!confirm(`Tem certeza que deseja remover as ${selectedIds.length} gaiolas selecionadas permanentemente?`)) return;
+    if (!confirm(`Tem certeza que deseja remover as ${formatNumber(selectedIds.length, 0)} gaiolas selecionadas permanentemente?`)) return;
     onUpdate({
       ...state,
       cages: (state.cages || []).filter(c => !selectedIds.includes(c.id))
@@ -329,7 +330,7 @@ const CageInventory: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
             <h3 className="text-lg font-black text-slate-800 mb-6 flex items-center justify-between uppercase tracking-tighter italic">
               <div className="flex items-center gap-2">
                 {selectedIds.length > 0 ? <Layers className="w-5 h-5 text-indigo-500" /> : editingId ? <Edit className="w-5 h-5 text-amber-500" /> : <Plus className="w-5 h-5 text-blue-500" />}
-                {selectedIds.length > 0 ? `Editar ${selectedIds.length} Gaiolas` : editingId ? 'Editar Gaiola' : 'Cadastrar Gaiola'}
+                {selectedIds.length > 0 ? `Editar ${selectedIds.length.toLocaleString('pt-BR')} Gaiolas` : editingId ? 'Editar Gaiola' : 'Cadastrar Gaiola'}
               </div>
               {(editingId || selectedIds.length > 0) && (
                 <button onClick={resetForm} className="text-slate-400 hover:text-slate-600">
@@ -342,7 +343,7 @@ const CageInventory: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
               <div className="mb-6 p-4 bg-indigo-50 rounded-2xl border border-indigo-100 flex items-start gap-3">
                 <Info className="w-4 h-4 text-indigo-600 mt-0.5 shrink-0" />
                 <p className="text-[10px] font-bold text-indigo-700 uppercase leading-relaxed">
-                  Modo de edição em massa. Os campos preenchidos abaixo serão aplicados a todas as {selectedIds.length} gaiolas selecionadas.
+                  Modo de edição em massa. Os campos preenchidos abaixo serão aplicados a todas as {selectedIds.length.toLocaleString('pt-BR')} gaiolas selecionadas.
                 </p>
               </div>
             )}
@@ -378,7 +379,7 @@ const CageInventory: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                 <div>
                   <label className="block text-[10px] font-black text-slate-400 uppercase mb-1 tracking-widest">Capacidade</label>
                   <div className="relative">
-                    <input type="text" readOnly className="w-full px-4 py-3 bg-indigo-50 border border-indigo-100 rounded-2xl outline-none font-black text-indigo-600 text-sm" value={selectedIds.length > 0 && !editingId ? "---" : `${calculatedCapacity} un`} />
+                    <input type="text" readOnly className="w-full px-4 py-3 bg-indigo-50 border border-indigo-100 rounded-2xl outline-none font-black text-indigo-600 text-sm" value={selectedIds.length > 0 && !editingId ? "---" : `${calculatedCapacity.toLocaleString('pt-BR')} un`} />
                   </div>
                 </div>
               </div>
@@ -386,7 +387,7 @@ const CageInventory: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
               <div className="space-y-2">
                 <label className="block text-[10px] font-black text-slate-400 uppercase mb-1 flex items-center justify-between tracking-widest">
                   <span className="flex items-center gap-1"><Ruler className="w-3 h-3" /> Dimensões (metros)</span>
-                  {volume > 0 && !editingId && selectedIds.length === 0 && <span className="text-indigo-500 font-black">{volume.toFixed(2)} m³</span>}
+                  {volume > 0 && !editingId && selectedIds.length === 0 && <span className="text-indigo-500 font-black">{volume.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} m³</span>}
                 </label>
                 <div className="grid grid-cols-3 gap-3">
                   <div className="relative">
@@ -454,7 +455,7 @@ const CageInventory: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                   <div>
                     <h4 className="text-xs font-black text-slate-400 uppercase tracking-[0.2em] mb-1">Resumo do Inventário</h4>
                     <div className="flex items-baseline gap-2">
-                      <span className="text-3xl font-black text-slate-800 tracking-tighter">{filterSummary.count}</span>
+                      <span className="text-3xl font-black text-slate-800 tracking-tighter">{formatNumber(filterSummary.count, 0)}</span>
                       <span className="text-xs font-bold text-slate-400 uppercase">Gaiolas Filtradas</span>
                     </div>
                   </div>
@@ -467,17 +468,17 @@ const CageInventory: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                     {filterStatus === 'Todos' ? 'Capacidade Atual' : `Saldo ${filterStatus}`}
                   </h4>
                   <div className="text-xl font-black text-indigo-600 tracking-tight">
-                    {filterSummary.totalCapacity.toLocaleString()} <span className="text-xs">unidades</span>
+                    {formatNumber(filterSummary.totalCapacity, 0)} <span className="text-xs">unidades</span>
                   </div>
                   <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">
-                    {filterSummary.totalVolume.toFixed(2)} m³ Total
+                    {formatNumber(filterSummary.totalVolume, 2)} m³ Total
                   </div>
                   {Object.keys(filterSummary.models).length > 0 && (
                     <div className="mt-3 pt-3 border-t border-slate-100 space-y-1">
                       {Object.entries(filterSummary.models).map(([model, data]) => (
                         <div key={model} className="flex justify-between items-center gap-4">
                           <span className="text-[9px] font-black text-slate-400 uppercase">{model}</span>
-                          <span className="text-[10px] font-black text-slate-700">{data.count} un</span>
+                          <span className="text-[10px] font-black text-slate-700">{formatNumber(data.count, 0)} un</span>
                         </div>
                       ))}
                     </div>
@@ -488,7 +489,7 @@ const CageInventory: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
 
                 <div className="flex-1">
                   <div className="flex items-center justify-between mb-2">
-                    <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Capacidade de Alojamento (Meta)</h4>
+                    <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Capacidade de Povoamento (Meta)</h4>
                     <div className="flex items-center gap-2">
                       <Target className="w-3 h-3 text-indigo-400" />
                       <div className="relative flex items-center">
@@ -500,7 +501,7 @@ const CageInventory: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                           onChange={(e) => onUpdate({ ...state, farmTargetCapacity: Number(e.target.value) })}
                         />
                         <button 
-                          onClick={() => alert('Meta de alojamento salva com sucesso!')}
+                          onClick={() => alert('Meta de povoamento salva com sucesso!')}
                           className="absolute right-1 p-1 text-indigo-500 hover:text-indigo-700 transition-colors"
                           title="Salvar Meta"
                         >
@@ -517,8 +518,8 @@ const CageInventory: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                     />
                   </div>
                   <div className="flex justify-between mt-1">
-                    <span className="text-[9px] font-black text-slate-400 uppercase">Progresso: {((filterSummary.totalVolume / (state.farmTargetCapacity || 1)) * 100).toFixed(1)}%</span>
-                    <span className="text-[9px] font-black text-slate-400 uppercase">Meta: {state.farmTargetCapacity?.toLocaleString() || 0} m³</span>
+                    <span className="text-[9px] font-black text-slate-400 uppercase">Progresso: {formatNumber((filterSummary.totalVolume / (state.farmTargetCapacity || 1)) * 100, 1)}%</span>
+                    <span className="text-[9px] font-black text-slate-400 uppercase">Meta: {formatNumber(state.farmTargetCapacity || 0, 0)} m³</span>
                   </div>
                 </div>
               </div>
@@ -567,7 +568,7 @@ const CageInventory: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                       strokeWidth={2}
                       strokeDasharray="5 5"
                       label={{ 
-                        value: `META: ${state.farmTargetCapacity} m³`, 
+                        value: `META: ${formatNumber(state.farmTargetCapacity || 0, 0)} m³`, 
                         position: 'top', 
                         fill: '#ef4444', 
                         fontSize: 10, 
@@ -597,7 +598,7 @@ const CageInventory: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
               </button>
               {selectedIds.length > 0 && (
                 <span className="text-[10px] font-black text-indigo-600 uppercase tracking-widest">
-                  {selectedIds.length} selecionada(s)
+                  {formatNumber(selectedIds.length, 0)} selecionada(s)
                 </span>
               )}
             </div>
@@ -680,13 +681,13 @@ const CageInventory: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                 <div className="flex justify-between items-center border-t border-slate-50 pt-2">
                   <span className="text-[10px] font-black text-slate-400 uppercase">Capacidade</span>
                   <div className="text-right">
-                    <span className="text-sm font-black text-slate-700 block">{cage.stockingCapacity} un</span>
-                    {cage.stockingDensity && <span className="text-[9px] font-bold text-slate-400 uppercase">{cage.stockingDensity} peixes/m³</span>}
+                    <span className="text-sm font-black text-slate-700 block">{formatNumber(cage.stockingCapacity, 0)} un</span>
+                    {cage.stockingDensity && <span className="text-[9px] font-bold text-slate-400 uppercase">{formatNumber(cage.stockingDensity, 0)} peixes/m³</span>}
                   </div>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-[10px] font-black text-slate-400 uppercase">Volume</span>
-                  <span className="text-xs font-bold text-indigo-600">{(cage.dimensions.length * cage.dimensions.width * cage.dimensions.depth).toFixed(2)} m³</span>
+                  <span className="text-xs font-bold text-indigo-600">{formatNumber(cage.dimensions.length * cage.dimensions.width * cage.dimensions.depth, 2)} m³</span>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-[10px] font-black text-slate-400 uppercase">Medidas</span>

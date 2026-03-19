@@ -3,6 +3,7 @@ import React, { useState, useMemo } from 'react';
 import { Batch, AppState, User } from '../types';
 import { Plus, Trash2, Tag, Calendar, Scale, Hash, Edit, X, BookOpen, Eye, TrendingUp, Fish, AlertCircle, ShoppingCart, CheckCircle2, Package, Utensils, Info, CheckSquare, Box } from 'lucide-react';
 import { format, differenceInDays, parseISO, startOfDay } from 'date-fns';
+import { formatNumber } from '../utils/formatters';
 import HarvestManagement from './HarvestManagement';
 
 interface Props {
@@ -289,7 +290,7 @@ const BatchManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       const totalMortality = mortalityByBatch.get(batch.id) || 0;
       const nurseryMortality = nurseryMortalityByBatch.get(batch.id) || 0;
       
-      // Saldo Alojamento: O que ainda não saiu do berçário
+      // Saldo Povoamento: O que ainda não saiu do berçário
       const balance = batch.isSettlementComplete ? 0 : Math.max(0, batch.initialQuantity - usedFish - settledAndHarvested - nurseryMortality);
       
       const mortality = totalMortality;
@@ -405,7 +406,7 @@ const BatchManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
         : `${model} (${d.width || 0}x${d.length || 0}x${d.depth || 0})`;
       counts[dim] = (counts[dim] || 0) + 1;
     });
-    return Object.entries(counts).map(([dim, count]) => `${dim} ${count}uni`).join(', ');
+    return Object.entries(counts).map(([dim, count]) => `${dim} ${formatNumber(count)}uni`).join(', ');
   }, [selectedPlanningCagesData]);
 
   const fastingHours = useMemo(() => {
@@ -554,7 +555,7 @@ const BatchManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                     >
                       <option value="">Escolher Lote para Planejar</option>
                       {batchStats.filter(b => !b.isFinalized).map(b => (
-                        <option key={b.id} value={b.id}>{b.name} ({b.batchCages.length} gaiolas)</option>
+                        <option key={b.id} value={b.id}>{b.name} ({formatNumber(b.batchCages.length)} gaiolas)</option>
                       ))}
                     </select>
                   </div>
@@ -564,7 +565,7 @@ const BatchManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                       <div className="flex items-center justify-between px-1">
                         <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Gaiolas Disponíveis</label>
                         <span className="text-[10px] font-black text-blue-600 uppercase bg-blue-50 px-2 py-1 rounded-lg">
-                          {planningCages.length} Total
+                          {formatNumber(planningCages.length)} Total
                         </span>
                       </div>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[400px] overflow-y-auto pr-2 scrollbar-hide">
@@ -591,9 +592,9 @@ const BatchManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                               <div className="text-left">
                                 <span className="text-sm font-black text-slate-800 uppercase italic">{cage.name}</span>
                                 <div className="flex flex-col mt-0.5">
-                                  <span className="text-[9px] font-bold text-slate-400 uppercase">{cage.currentCount} peixes</span>
-                                  <span className="text-[9px] font-black text-red-500 uppercase">Mortalidade: {cage.mortality}</span>
-                                  <span className="text-[9px] font-black text-blue-600 uppercase">{cage.biomass.toFixed(1)}kg</span>
+                                  <span className="text-[9px] font-bold text-slate-400 uppercase">{formatNumber(cage.currentCount)} peixes</span>
+                                  <span className="text-[9px] font-black text-red-500 uppercase">Mortalidade: {formatNumber(cage.mortality)}</span>
+                                  <span className="text-[9px] font-black text-blue-600 uppercase">{formatNumber(cage.biomass, 1)}kg</span>
                                 </div>
                               </div>
                             </div>
@@ -624,7 +625,7 @@ const BatchManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                             </button>
                           )}
                           <span className="px-3 py-1 bg-blue-600 text-white text-[10px] font-black rounded-full uppercase">
-                            {selectedPlanningCageIds.length} Gaiolas
+                            {formatNumber(selectedPlanningCageIds.length)} Gaiolas
                           </span>
                         </div>
                       </div>
@@ -632,7 +633,7 @@ const BatchManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                       <div className="grid grid-cols-2 gap-4">
                         <div className="bg-white p-4 rounded-2xl border border-slate-100">
                           <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">Biomassa Total</span>
-                          <span className="text-xl font-black text-blue-600 italic">{totalPlanningBiomass.toFixed(1)}kg</span>
+                          <span className="text-xl font-black text-blue-600 italic">{formatNumber(totalPlanningBiomass, 1)}kg</span>
                         </div>
                         <div className="bg-white p-4 rounded-2xl border border-slate-100">
                           <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">Estratificação</span>
@@ -789,7 +790,7 @@ const BatchManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                                       : `${model} (${d.width || 0}x${d.length || 0}x${d.depth || 0})`;
                                     counts[dim] = (counts[dim] || 0) + 1;
                                   });
-                                  const strat = Object.entries(counts).map(([dim, count]) => `${dim} ${count}uni`).join(', ');
+                                  const strat = Object.entries(counts).map(([dim, count]) => `${dim} ${formatNumber(count)}uni`).join(', ');
                                   return strat ? (
                                     <div className="mt-2 px-2 py-1 bg-slate-50 rounded-lg border border-slate-100">
                                       <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest block">Estratificação</span>
@@ -853,12 +854,12 @@ const BatchManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                       {batch.isFinalized ? (
                         <div className="flex items-center gap-2 px-3 py-1.5 bg-indigo-900 rounded-xl border border-indigo-800 text-white">
                           <CheckCircle2 className="w-3 h-3 text-indigo-400" />
-                          <span className="text-[10px] font-black uppercase tracking-widest">Assertividade: {batch.accuracy.toFixed(1)}%</span>
+                          <span className="text-[10px] font-black uppercase tracking-widest">Assertividade: {formatNumber(batch.accuracy, 1)}%</span>
                         </div>
                       ) : (
                         <div className="flex items-center gap-2 px-3 py-1.5 bg-emerald-50 rounded-xl border border-emerald-100">
                           <TrendingUp className="w-3 h-3 text-emerald-600" />
-                          <span className="text-[10px] font-black text-emerald-700 uppercase tracking-widest">Rend: {batch.yieldPercentage.toFixed(1)}%</span>
+                          <span className="text-[10px] font-black text-emerald-700 uppercase tracking-widest">Rend: {formatNumber(batch.yieldPercentage, 1)}%</span>
                         </div>
                       )}
                     </div>
@@ -894,13 +895,13 @@ const BatchManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                         <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1">
                           <Scale className="w-2.5 h-2.5" /> Peso Médio
                         </span>
-                        <span className="text-lg font-black text-blue-600 leading-none mt-1">{batch.currentAvgWeight.toFixed(1)}g</span>
+                        <span className="text-lg font-black text-blue-600 leading-none mt-1">{formatNumber(batch.currentAvgWeight, 1)}g</span>
                       </div>
                       <div className="flex flex-col items-end">
                         <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1">
                           <TrendingUp className="w-2.5 h-2.5" /> Biomassa Est.
                         </span>
-                        <span className="text-lg font-black text-emerald-600 leading-none mt-1">{batch.totalBiomassKg.toFixed(1)}kg</span>
+                        <span className="text-lg font-black text-emerald-600 leading-none mt-1">{formatNumber(batch.totalBiomassKg, 1)}kg</span>
                       </div>
                     </div>
 
@@ -909,13 +910,13 @@ const BatchManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                         <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1">
                           <Package className="w-2.5 h-2.5" /> Ração Total
                         </span>
-                        <span className="text-lg font-black text-amber-600 leading-none mt-1">{(batch.totalFeed / 1000).toFixed(1)}kg</span>
+                        <span className="text-lg font-black text-amber-600 leading-none mt-1">{formatNumber(batch.totalFeed / 1000, 1)}kg</span>
                       </div>
                       <div className="flex flex-col items-end">
                         <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1">
                           <TrendingUp className="w-2.5 h-2.5" /> FCA
                         </span>
-                        <span className="text-lg font-black text-indigo-600 leading-none mt-1">{batch.fca.toFixed(2)}</span>
+                        <span className="text-lg font-black text-indigo-600 leading-none mt-1">{formatNumber(batch.fca, 2)}</span>
                       </div>
                     </div>
 
@@ -924,11 +925,11 @@ const BatchManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                         <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1">
                           <Fish className="w-2.5 h-2.5" /> Peixes Vivos
                         </span>
-                        <span className="text-lg font-black text-slate-700 leading-none mt-1">{batch.liveFish} un</span>
+                        <span className="text-lg font-black text-slate-700 leading-none mt-1">{formatNumber(batch.liveFish)} un</span>
                       </div>
                       <div className="flex flex-col items-end">
                         <div className="flex items-center gap-2">
-                          <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Saldo Aloj.</span>
+                          <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Saldo Povoam.</span>
                           {hasPermission && (
                             <button 
                               onClick={() => toggleSettlementComplete(batch.id)}
@@ -939,25 +940,25 @@ const BatchManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                             </button>
                           )}
                         </div>
-                        <span className={`text-lg font-black mt-1 leading-none ${batch.balance > 0 ? 'text-blue-600' : 'text-slate-400'}`}>{batch.balance} un</span>
+                        <span className={`text-lg font-black mt-1 leading-none ${batch.balance > 0 ? 'text-blue-600' : 'text-slate-400'}`}>{formatNumber(batch.balance)} un</span>
                       </div>
                     </div>
 
                     <div className="grid grid-cols-2 gap-4 pt-3 border-t border-slate-50">
                       <div className="flex flex-col">
                         <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Total Despescado</span>
-                        <span className="text-sm font-black text-blue-600">{batch.harvestedFish} un</span>
+                        <span className="text-sm font-black text-blue-600">{formatNumber(batch.harvestedFish)} un</span>
                       </div>
                       <div className="flex flex-col items-end">
                         <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Mortalidade</span>
-                        <span className="text-sm font-black text-red-500">{batch.mortality} un</span>
+                        <span className="text-sm font-black text-red-500">{formatNumber(batch.mortality)} un</span>
                       </div>
                     </div>
 
                     <div className="flex justify-between items-center pt-3 border-t border-slate-50">
                       <div className="flex flex-col">
                         <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Total Povoado</span>
-                        <span className="text-sm font-black text-slate-700">{batch.initialQuantity} un</span>
+                        <span className="text-sm font-black text-slate-700">{formatNumber(batch.initialQuantity)} un</span>
                       </div>
                     </div>
                   </div>

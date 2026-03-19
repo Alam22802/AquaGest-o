@@ -8,6 +8,7 @@ import {
   Search, Filter, ChevronRight, Truck, ClipboardList, Building2, TrendingUp
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
+import { formatNumber } from '../utils/formatters';
 
 interface Props {
   state: AppState;
@@ -153,7 +154,7 @@ const CapexManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
 
     // Verificar se há saldo na carteira
     if (newValue > availableBalance) {
-      alert(`Saldo insuficiente na carteira! Saldo disponível: R$ ${availableBalance.toLocaleString()}`);
+      alert(`Saldo insuficiente na carteira! Saldo disponível: R$ ${formatNumber(availableBalance)}`);
       return;
     }
 
@@ -196,7 +197,7 @@ const CapexManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
 
     // Verificar se há saldo no CAPEX
     if (newValue > availableBalance) {
-      alert(`Saldo insuficiente no CAPEX! Saldo disponível: R$ ${availableBalance.toLocaleString()}`);
+      alert(`Saldo insuficiente no CAPEX! Saldo disponível: R$ ${formatNumber(availableBalance)}`);
       return;
     }
 
@@ -362,21 +363,21 @@ const CapexManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                                 <DollarSign className="w-4 h-4 text-slate-400" />
                                 <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Orçamento Previsto</span>
                               </div>
-                              <div className="text-2xl font-black text-slate-800">R$ {project.plannedValue.toLocaleString()}</div>
+                              <div className="text-2xl font-black text-slate-800">R$ {formatNumber(project.plannedValue)}</div>
                             </div>
                             <div className="bg-slate-50 p-6 rounded-3xl border border-slate-100">
                               <div className="flex items-center gap-2 mb-2">
                                 <ArrowRight className="w-4 h-4 text-blue-500" />
                                 <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Total Executado</span>
                               </div>
-                              <div className="text-2xl font-black text-blue-600">R$ {project.executedValue.toLocaleString()}</div>
+                              <div className="text-2xl font-black text-blue-600">R$ {formatNumber(project.executedValue)}</div>
                             </div>
                             <div className={`p-6 rounded-3xl border ${project.balance < 0 ? 'bg-red-50 border-red-100' : 'bg-emerald-50 border-emerald-100'}`}>
                               <div className="flex items-center gap-2 mb-2">
                                 <Wallet className={`w-4 h-4 ${project.balance < 0 ? 'text-red-400' : 'text-emerald-400'}`} />
                                 <span className={`text-[10px] font-black uppercase tracking-widest ${project.balance < 0 ? 'text-red-400' : 'text-emerald-400'}`}>Saldo Disponível</span>
                               </div>
-                              <div className={`text-2xl font-black ${project.balance < 0 ? 'text-red-600' : 'text-emerald-600'}`}>R$ {project.balance.toLocaleString()}</div>
+                              <div className={`text-2xl font-black ${project.balance < 0 ? 'text-red-600' : 'text-emerald-600'}`}>R$ {formatNumber(project.balance)}</div>
                             </div>
                           </div>
 
@@ -387,7 +388,7 @@ const CapexManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                                   <TrendingDown className="w-4 h-4" /> Aderência Orçamentária
                                 </span>
                                 <span className={`text-xs font-black ${project.executionPercentage > 100 ? 'text-red-500' : 'text-emerald-500'}`}>
-                                  {project.executionPercentage.toFixed(1)}% Utilizado
+                                  {formatNumber(project.executionPercentage, 1)}% Utilizado
                                 </span>
                               </div>
                               <div className="h-4 bg-slate-100 rounded-full overflow-hidden border border-slate-200 p-0.5">
@@ -404,7 +405,7 @@ const CapexManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                                   <Calendar className="w-4 h-4" /> Aderência Cronograma
                                 </span>
                                 <span className={`text-xs font-black ${isLate ? 'text-red-500' : 'text-blue-500'}`}>
-                                  {timeProgress.toFixed(1)}% do Tempo Decorrido
+                                  {formatNumber(timeProgress, 1)}% do Tempo Decorrido
                                 </span>
                               </div>
                               <div className="h-4 bg-slate-100 rounded-full overflow-hidden border border-slate-200 p-0.5">
@@ -467,7 +468,7 @@ const CapexManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                           <div className="h-px bg-white/10" />
                           <div>
                             <div className="text-3xl font-black italic tracking-tighter mb-1">
-                              R$ {invoices.length > 0 ? (project.executedValue / invoices.length).toLocaleString(undefined, { maximumFractionDigits: 0 }) : '0'}
+                              R$ {invoices.length > 0 ? formatNumber(project.executedValue / invoices.length, 0) : '0'}
                             </div>
                             <div className="text-[9px] font-black uppercase tracking-widest opacity-50">Ticket Médio por Nota</div>
                           </div>
@@ -535,7 +536,7 @@ const CapexManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                             <div className="text-right">
                               <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Execução Global</p>
                               <div className="text-sm font-black text-blue-600 uppercase italic">
-                                {portfolio.executionPercentage.toFixed(1)}% Realizado
+                                {formatNumber(portfolio.executionPercentage, 1)}% Realizado
                               </div>
                             </div>
                           </div>
@@ -546,21 +547,21 @@ const CapexManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                                 <Wallet className="w-4 h-4 text-slate-400" />
                                 <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Orçamento Inicial</span>
                               </div>
-                              <div className="text-2xl font-black text-slate-800">R$ {portfolio.totalValue.toLocaleString()}</div>
+                              <div className="text-2xl font-black text-slate-800">R$ {formatNumber(portfolio.totalValue)}</div>
                             </div>
                             <div className="bg-slate-50 p-6 rounded-3xl border border-slate-100">
                               <div className="flex items-center gap-2 mb-2">
                                 <Briefcase className="w-4 h-4 text-emerald-500" />
                                 <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Total Alocado</span>
                               </div>
-                              <div className="text-2xl font-black text-emerald-600">R$ {portfolio.allocatedValue.toLocaleString()}</div>
+                              <div className="text-2xl font-black text-emerald-600">R$ {formatNumber(portfolio.allocatedValue)}</div>
                             </div>
                             <div className="bg-blue-50 p-6 rounded-3xl border border-blue-100">
                               <div className="flex items-center gap-2 mb-2">
                                 <DollarSign className="w-4 h-4 text-blue-400" />
                                 <span className="text-[10px] font-black text-blue-400 uppercase tracking-widest">Saldo Livre</span>
                               </div>
-                              <div className="text-2xl font-black text-blue-600">R$ {portfolio.balance.toLocaleString()}</div>
+                              <div className="text-2xl font-black text-blue-600">R$ {formatNumber(portfolio.balance)}</div>
                             </div>
                           </div>
 
@@ -570,7 +571,7 @@ const CapexManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                                 <TrendingUp className="w-4 h-4" /> Progresso Financeiro da Carteira
                               </span>
                               <span className="text-xs font-black text-blue-600">
-                                R$ {portfolio.executedValue.toLocaleString()} Executados
+                                R$ {formatNumber(portfolio.executedValue)} Executados
                               </span>
                             </div>
                             <div className="h-4 bg-slate-100 rounded-full overflow-hidden border border-slate-200 p-0.5">
@@ -605,11 +606,11 @@ const CapexManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                                 <div className="flex justify-between items-end">
                                   <div>
                                     <div className="text-[9px] font-black text-slate-400 uppercase">Alocado</div>
-                                    <div className="text-xs font-black text-slate-700">R$ {proj.plannedValue.toLocaleString()}</div>
+                                    <div className="text-xs font-black text-slate-700">R$ {formatNumber(proj.plannedValue)}</div>
                                   </div>
                                   <div className="text-right">
                                     <div className="text-[9px] font-black text-slate-400 uppercase">Execução</div>
-                                    <div className="text-xs font-black text-emerald-600">{stats?.executionPercentage.toFixed(1)}%</div>
+                                    <div className="text-xs font-black text-emerald-600">{formatNumber(stats?.executionPercentage, 1)}%</div>
                                   </div>
                                 </div>
                               </div>
@@ -629,21 +630,21 @@ const CapexManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                         <div className="space-y-8">
                           <div>
                             <div className="text-3xl font-black italic tracking-tighter mb-1">
-                              R$ {portfolio.totalValue.toLocaleString()}
+                              R$ {formatNumber(portfolio.totalValue)}
                             </div>
                             <div className="text-[9px] font-black uppercase tracking-widest opacity-50">Orçamento Total</div>
                           </div>
                           <div className="h-px bg-white/10" />
                           <div>
                             <div className="text-3xl font-black italic tracking-tighter mb-1">
-                              R$ {portfolio.allocatedValue.toLocaleString()}
+                              R$ {formatNumber(portfolio.allocatedValue)}
                             </div>
                             <div className="text-[9px] font-black uppercase tracking-widest opacity-50">Total Comprometido</div>
                           </div>
                           <div className="h-px bg-white/10" />
                           <div>
                             <div className="text-3xl font-black italic tracking-tighter mb-1">
-                              R$ {portfolio.executedValue.toLocaleString()}
+                              R$ {formatNumber(portfolio.executedValue)}
                             </div>
                             <div className="text-[9px] font-black uppercase tracking-widest opacity-50">Total Liquidado (Notas)</div>
                           </div>
@@ -654,12 +655,12 @@ const CapexManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                       <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm">
                         <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-6">Últimas Notas (Carteira)</h3>
                         <div className="space-y-3">
-                          {invoices.slice(0, 3).map(inv => (
-                            <div key={inv.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-xl border border-slate-100">
-                              <div className="text-[10px] font-black text-slate-800 uppercase truncate max-w-[100px]">{inv.supplier}</div>
-                              <div className="text-[10px] font-black text-blue-600">R$ {inv.value.toLocaleString()}</div>
-                            </div>
-                          ))}
+                              {invoices.slice(0, 3).map(inv => (
+                                <div key={inv.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-xl border border-slate-100">
+                                  <div className="text-[10px] font-black text-slate-800 uppercase truncate max-w-[100px]">{inv.supplier}</div>
+                                  <div className="text-[10px] font-black text-blue-600">R$ {formatNumber(inv.value)}</div>
+                                </div>
+                              ))}
                           {invoices.length === 0 && (
                             <div className="text-center py-4 text-slate-400 font-bold uppercase text-[8px] tracking-widest italic">Sem lançamentos.</div>
                           )}
@@ -730,22 +731,22 @@ const CapexManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                       <button onClick={() => removePortfolio(p.id)} className="p-2 text-slate-300 hover:text-red-500 transition-colors"><Trash2 className="w-4 h-4" /></button>
                     </div>
                   </div>
-                  <div className="grid grid-cols-2 gap-4 mb-4">
-                    <div className="bg-slate-50 p-3 rounded-2xl border border-slate-100">
-                      <span className="text-[9px] font-black text-slate-400 uppercase block mb-1">Orçamento Inicial</span>
-                      <span className="text-sm font-black text-slate-700">R$ {p.totalValue.toLocaleString()}</span>
+                    <div className="grid grid-cols-2 gap-4 mb-4">
+                      <div className="bg-slate-50 p-3 rounded-2xl border border-slate-100">
+                        <span className="text-[9px] font-black text-slate-400 uppercase block mb-1">Orçamento Inicial</span>
+                        <span className="text-sm font-black text-slate-700">R$ {formatNumber(p.totalValue)}</span>
+                      </div>
+                      <div className="bg-blue-50 p-3 rounded-2xl border border-blue-100">
+                        <span className="text-[9px] font-black text-blue-400 uppercase block mb-1">Saldo Disponível</span>
+                        <span className="text-sm font-black text-blue-700">R$ {formatNumber(p.balance)}</span>
+                      </div>
                     </div>
-                    <div className="bg-blue-50 p-3 rounded-2xl border border-blue-100">
-                      <span className="text-[9px] font-black text-blue-400 uppercase block mb-1">Saldo Disponível</span>
-                      <span className="text-sm font-black text-blue-700">R$ {p.balance.toLocaleString()}</span>
-                    </div>
-                  </div>
                   <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
                     <div className="h-full bg-blue-500 transition-all duration-500" style={{ width: `${Math.min(100, p.executionPercentage)}%` }} />
                   </div>
                   <div className="flex justify-between items-center mt-2">
                     <span className="text-[9px] font-black text-slate-400 uppercase">{p.projectsCount} Projetos Vinculados</span>
-                    <span className="text-[9px] font-black text-blue-600 uppercase">{p.executionPercentage.toFixed(1)}% Executado</span>
+                    <span className="text-[9px] font-black text-blue-600 uppercase">{formatNumber(p.executionPercentage, 1)}% Executado</span>
                   </div>
                 </div>
               ))}
@@ -823,11 +824,11 @@ const CapexManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                     <div className="grid grid-cols-2 gap-4 mb-4">
                       <div className="bg-slate-50 p-3 rounded-2xl border border-slate-100">
                         <span className="text-[9px] font-black text-slate-400 uppercase block mb-1">Valor Inicial CAPEX</span>
-                        <span className="text-sm font-black text-slate-700">R$ {proj.plannedValue.toLocaleString()}</span>
+                        <span className="text-sm font-black text-slate-700">R$ {formatNumber(proj.plannedValue)}</span>
                       </div>
                       <div className="bg-emerald-50 p-3 rounded-2xl border border-emerald-100">
                         <span className="text-[9px] font-black text-emerald-400 uppercase block mb-1">Saldo CAPEX</span>
-                        <span className="text-sm font-black text-emerald-700">R$ {proj.balance.toLocaleString()}</span>
+                        <span className="text-sm font-black text-emerald-700">R$ {formatNumber(proj.balance)}</span>
                       </div>
                     </div>
                     <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
@@ -835,7 +836,7 @@ const CapexManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                     </div>
                     <div className="flex justify-between items-center mt-2">
                       <span className="text-[9px] font-black text-slate-400 uppercase">Resp: {proj.responsible}</span>
-                      <span className="text-[9px] font-black text-emerald-600 uppercase">{proj.executionPercentage.toFixed(1)}% Utilizado</span>
+                      <span className="text-[9px] font-black text-emerald-600 uppercase">{formatNumber(proj.executionPercentage, 1)}% Utilizado</span>
                     </div>
                   </div>
                 );
@@ -983,7 +984,7 @@ const CapexManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                           <div className="text-[10px] font-black text-emerald-600 uppercase tracking-tight">{project?.name}</div>
                         </td>
                         <td className="px-6 py-4 font-black text-slate-800">
-                          R$ {inv.value.toLocaleString()}
+                          R$ {formatNumber(inv.value)}
                         </td>
                         <td className="px-6 py-4 text-[10px] font-bold text-slate-500">
                           {format(parseISO(inv.deliveryDate), 'dd/MM/yyyy')}

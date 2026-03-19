@@ -321,7 +321,7 @@ const SlaughterhouseMaintenance: React.FC<Props> = ({ state, onUpdate, currentUs
                         </td>
                         <td className="px-6 py-4 text-right">
                           <span className={`text-xs font-black ${log.temperature > 0 ? 'text-red-600' : 'text-blue-600'}`}>
-                            {log.temperature.toFixed(1)} °C
+                            {log.temperature.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} °C
                           </span>
                         </td>
                         <td className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase">
@@ -359,7 +359,7 @@ const SlaughterhouseMaintenance: React.FC<Props> = ({ state, onUpdate, currentUs
                         </td>
                         <td className="px-6 py-4 text-right">
                           <span className="text-xs font-black text-slate-800">
-                            {log.reading.toLocaleString()} {log.type === 'energy' ? 'kWh' : 'm³'}
+                            {log.reading.toLocaleString('pt-BR')} {log.type === 'energy' ? 'kWh' : 'm³'}
                           </span>
                         </td>
                         <td className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase">
