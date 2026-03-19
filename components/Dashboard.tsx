@@ -650,23 +650,6 @@ const Dashboard: React.FC<Props> = ({ state }) => {
     })));
     XLSX.utils.book_append_sheet(wb, wsSlaughterHR, "RH Frigorífico");
 
-    // 14. ABA: SUPRIMENTOS FRIGORÍFICO
-    const itemMap = new Map((state.slaughterSupplyItems || []).map(i => [i.id, i.name]));
-    const supplierMap = new Map((state.slaughterSuppliers || []).map(s => [s.id, s.name]));
-    
-    const filteredSupplyInvoices = (state.slaughterSupplyInvoices || []).filter(i => filterByDate(i.date));
-    const wsSupplies = XLSX.utils.json_to_sheet(filteredSupplyInvoices.map(i => ({
-      "Data": i.date,
-      "Item": itemMap.get(i.itemId) || i.itemId,
-      "Fornecedor": supplierMap.get(i.supplierId) || i.supplierId,
-      "NF": i.invoiceNumber,
-      "Quantidade": i.quantity,
-      "Valor Unitário": i.unitValue,
-      "Total": i.totalValue,
-      "Lançado por": userMap.get(i.userId) || i.userId
-    })));
-    XLSX.utils.book_append_sheet(wb, wsSupplies, "Suprimentos (Entradas)");
-
     // 15. ABA: CAPEX - FILTRADO
     const portfolioMap_capex = new Map(state.portfolios.map(p => [p.id, p.name]));
     const projectMap = new Map(state.capexProjects.map(p => [p.id, p.name]));
@@ -708,7 +691,7 @@ const Dashboard: React.FC<Props> = ({ state }) => {
     const wsUtilities = XLSX.utils.json_to_sheet(utilityData);
     XLSX.utils.book_append_sheet(wb, wsUtilities, "Utilidades e Frio");
 
-    // 17. ABA: AGENDAMENTO DESPESCA
+    // 18. ABA: AGENDAMENTO DESPESCA
     const filteredSchedules = (state.harvestSchedules || []).filter(s => filterByDate(s.date));
     const wsSchedules = XLSX.utils.json_to_sheet(filteredSchedules.map(s => ({
       "Data": s.date,
@@ -718,32 +701,6 @@ const Dashboard: React.FC<Props> = ({ state }) => {
       "Observações": s.notes || ""
     })));
     XLSX.utils.book_append_sheet(wb, wsSchedules, "Agendamento Despesca");
-
-    // 18. ABA: PEDIDOS SUPRIMENTOS
-    const filteredRequests = (state.slaughterSupplyRequests || []).filter(r => filterByDate(r.date));
-    const filteredOrders = (state.slaughterPurchaseOrders || []).filter(o => filterByDate(o.date));
-    
-    const supplyOrdersData = [
-      ...filteredRequests.map(r => ({
-        "Data": r.date,
-        "Tipo": "Requisição",
-        "Item": itemMap.get(r.itemId) || r.itemId,
-        "Qtd": r.quantity,
-        "Status": r.status,
-        "Fornecedor": r.supplierId ? supplierMap.get(r.supplierId) : "N/A"
-      })),
-      ...filteredOrders.map(o => ({
-        "Data": o.date,
-        "Tipo": "Ordem de Compra",
-        "Item": itemMap.get(o.itemId) || o.itemId,
-        "Qtd": o.quantity,
-        "Status": o.status,
-        "Fornecedor": o.supplierId ? supplierMap.get(o.supplierId) : "N/A"
-      }))
-    ].sort((a, b) => b.Data.localeCompare(a.Data));
-
-    const wsSupplyOrders = XLSX.utils.json_to_sheet(supplyOrdersData);
-    XLSX.utils.book_append_sheet(wb, wsSupplyOrders, "Pedidos Suprimentos");
 
     // FINALIZAR DOWNLOAD
     XLSX.writeFile(wb, `Relatorio_AquaGestao_${reportStartDate}_a_${reportEndDate}.xlsx`);

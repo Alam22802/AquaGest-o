@@ -149,7 +149,7 @@ export interface SlaughterLog {
 export interface SlaughterExpense {
   id: string;
   description: string;
-  category: 'Energia' | 'Água' | 'Manutenção' | 'Insumos' | 'Prestação de Serviços' | 'Salário' | 'Outros';
+  category: string;
   value: number;
   quantity?: number;
   unitValue?: number;
@@ -172,7 +172,7 @@ export interface SlaughterEmployee {
 export interface SlaughterHREntry {
   id: string;
   employeeIds: string[];
-  type: 'Falta' | 'Atestado' | 'Acidente' | 'Turnover';
+  type: string;
   date: string;
   days?: number;
   description?: string;
@@ -372,6 +372,10 @@ export interface AppState {
   slaughterPurchaseOrders?: SlaughterPurchaseOrder[];
   slaughterSupplyInvoices?: SlaughterSupplyInvoice[];
   slaughterSupplyCategories?: string[];
+  slaughterExpenseCategories?: string[];
+  slaughterHREntryTypes?: string[];
+  slaughterHRDepartments?: string[];
+  slaughterHRRoles?: string[];
   harvestLogs?: HarvestLog[];
   harvestSchedules?: HarvestSchedule[];
   coldStorageLogs?: ColdStorageLog[];
@@ -380,6 +384,7 @@ export interface AppState {
   portfolios: InvestmentPortfolio[];
   capexProjects: CapexProject[];
   capexInvoices: CapexInvoice[];
+  farmTargetCapacity?: number;
   notificationSettings?: NotificationSettings;
   supabaseConfig?: { url: string; key: string };
   lastSync?: string;

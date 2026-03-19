@@ -139,7 +139,9 @@ const Maintenance: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                     <select required={selectedCageIds.length === 0} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-red-500 font-bold" value={formData.cageId} onChange={(e) => setFormData({...formData, cageId: e.target.value})}>
                       <option value="">Selecione...</option>
                       {state.cages.map(c => (
-                        <option key={c.id} value={c.id}>{c.name} ({c.status})</option>
+                        <option key={c.id} value={c.id}>
+                          {c.name} ({c.dimensions ? `${c.dimensions.length}x${c.dimensions.width}x${c.dimensions.depth}m` : 'S/D'}) - {c.status}
+                        </option>
                       ))}
                     </select>
                   </div>
@@ -211,7 +213,12 @@ const Maintenance: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                           {selectedCageIds.includes(cage.id) && <CheckCircle2 className="w-3 h-3 text-white" />}
                         </div>
                       )}
-                      <span className="font-black text-slate-800 uppercase tracking-tighter">{cage.name}</span>
+                      <div className="flex flex-col">
+                        <span className="font-black text-slate-800 uppercase tracking-tighter leading-none">{cage.name}</span>
+                        <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest mt-1">
+                          {cage.dimensions ? `${cage.dimensions.length}x${cage.dimensions.width}x${cage.dimensions.depth}m` : 'Dimensões não definidas'}
+                        </span>
+                      </div>
                     </div>
                     <div className={`p-1.5 rounded-lg border flex items-center gap-1.5 text-[9px] font-black uppercase tracking-widest ${getStatusColor(cage.status)}`}>
                       {getStatusIcon(cage.status)}

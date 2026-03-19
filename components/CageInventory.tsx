@@ -1,7 +1,8 @@
 
 import React, { useState, useMemo } from 'react';
 import { AppState, Cage, User, CageStatus } from '../types';
-import { Plus, Trash2, Box, Edit, X, Ruler, Users, Info, Layers, Filter, CheckCircle2, Settings, Eraser, LayoutDashboard, Eye } from 'lucide-react';
+import { Plus, Trash2, Box, Edit, X, Ruler, Users, Info, Layers, Filter, CheckCircle2, Settings, Eraser, LayoutDashboard, Eye, Target, BarChart3 } from 'lucide-react';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, ReferenceLine, Legend } from 'recharts';
 
 interface Props {
   state: AppState;
@@ -287,6 +288,39 @@ const CageInventory: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     }
   };
 
+  const getStatusHexColor = (status: string) => {
+    switch (status) {
+      case 'Disponível': return '#10b981';
+      case 'Ocupada': return '#3b82f6';
+      case 'Manutenção': return '#ef4444';
+      case 'Limpeza': return '#f59e0b';
+      case 'Avaliação': return '#a855f7';
+      case 'Sucata': return '#64748b';
+      default: return '#94a3b8';
+    }
+  };
+
+  const chartData = useMemo(() => {
+    const statusVolumes: Record<string, number> = {
+      'Disponível': 0,
+      'Ocupada': 0,
+      'Manutenção': 0,
+      'Limpeza': 0,
+      'Avaliação': 0,
+      'Sucata': 0
+    };
+    (state.cages || []).forEach(c => {
+      const vol = (c.dimensions?.length || 0) * (c.dimensions?.width || 0) * (c.dimensions?.depth || 0);
+      statusVolumes[c.status] = (statusVolumes[c.status] || 0) + vol;
+    });
+    return Object.entries(statusVolumes)
+      .filter(([_, vol]) => vol > 0)
+      .map(([status, volume]) => ({
+        status,
+        volume: Number(volume.toFixed(1))
+      }));
+  }, [state.cages]);
+
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start pb-20">
       <div className="lg:col-span-1 lg:sticky lg:top-8">
@@ -410,53 +444,143 @@ const CageInventory: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
         </div>
 
         {filterSummary && (
-          <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm animate-in fade-in slide-in-from-top-2 duration-300">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-              <div className="flex items-center gap-4">
-                <div className="p-4 bg-indigo-50 rounded-2xl text-indigo-600 shadow-inner">
-                  <LayoutDashboard className="w-6 h-6" />
+          <div className="space-y-6">
+            <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm animate-in fade-in slide-in-from-top-2 duration-300">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+                <div className="flex items-center gap-4">
+                  <div className="p-4 bg-indigo-50 rounded-2xl text-indigo-600 shadow-inner">
+                    <LayoutDashboard className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-black text-slate-400 uppercase tracking-[0.2em] mb-1">Resumo do Inventário</h4>
+                    <div className="flex items-baseline gap-2">
+                      <span className="text-3xl font-black text-slate-800 tracking-tighter">{filterSummary.count}</span>
+                      <span className="text-xs font-bold text-slate-400 uppercase">Gaiolas Filtradas</span>
+                    </div>
+                  </div>
                 </div>
+
+                <div className="h-12 w-px bg-slate-100 hidden md:block" />
+
                 <div>
-                  <h4 className="text-xs font-black text-slate-400 uppercase tracking-[0.2em] mb-1">Resumo do Inventário</h4>
-                  <div className="flex items-baseline gap-2">
-                    <span className="text-3xl font-black text-slate-800 tracking-tighter">{filterSummary.count}</span>
-                    <span className="text-xs font-bold text-slate-400 uppercase">Gaiolas Filtradas</span>
+                  <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">
+                    {filterStatus === 'Todos' ? 'Capacidade Atual' : `Saldo ${filterStatus}`}
+                  </h4>
+                  <div className="text-xl font-black text-indigo-600 tracking-tight">
+                    {filterSummary.totalCapacity.toLocaleString()} <span className="text-xs">unidades</span>
+                  </div>
+                  <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">
+                    {filterSummary.totalVolume.toFixed(2)} m³ Total
+                  </div>
+                  {Object.keys(filterSummary.models).length > 0 && (
+                    <div className="mt-3 pt-3 border-t border-slate-100 space-y-1">
+                      {Object.entries(filterSummary.models).map(([model, data]) => (
+                        <div key={model} className="flex justify-between items-center gap-4">
+                          <span className="text-[9px] font-black text-slate-400 uppercase">{model}</span>
+                          <span className="text-[10px] font-black text-slate-700">{data.count} un</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div className="h-12 w-px bg-slate-100 hidden md:block" />
+
+                <div className="flex-1">
+                  <div className="flex items-center justify-between mb-2">
+                    <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Capacidade de Alojamento (Meta)</h4>
+                    <div className="flex items-center gap-2">
+                      <Target className="w-3 h-3 text-indigo-400" />
+                      <div className="relative flex items-center">
+                        <input 
+                          type="number" 
+                          placeholder="Meta m³"
+                          className="w-24 px-2 py-1 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold outline-none focus:ring-1 focus:ring-indigo-500 pr-8"
+                          value={state.farmTargetCapacity || ''}
+                          onChange={(e) => onUpdate({ ...state, farmTargetCapacity: Number(e.target.value) })}
+                        />
+                        <button 
+                          onClick={() => alert('Meta de alojamento salva com sucesso!')}
+                          className="absolute right-1 p-1 text-indigo-500 hover:text-indigo-700 transition-colors"
+                          title="Salvar Meta"
+                        >
+                          <CheckCircle2 className="w-3 h-3" />
+                        </button>
+                      </div>
+                      <span className="text-[10px] font-black text-slate-400 uppercase">m³</span>
+                    </div>
+                  </div>
+                  <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
+                    <div 
+                      className="h-full bg-indigo-600 transition-all duration-500"
+                      style={{ width: `${Math.min(100, (filterSummary.totalVolume / (state.farmTargetCapacity || 1)) * 100)}%` }}
+                    />
+                  </div>
+                  <div className="flex justify-between mt-1">
+                    <span className="text-[9px] font-black text-slate-400 uppercase">Progresso: {((filterSummary.totalVolume / (state.farmTargetCapacity || 1)) * 100).toFixed(1)}%</span>
+                    <span className="text-[9px] font-black text-slate-400 uppercase">Meta: {state.farmTargetCapacity?.toLocaleString() || 0} m³</span>
                   </div>
                 </div>
               </div>
+            </div>
 
-              <div className="h-12 w-px bg-slate-100 hidden md:block" />
-
-              <div>
-                <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">
-                  {filterStatus === 'Todos' ? 'Capacidade Total' : `Saldo ${filterStatus}`}
-                </h4>
-                <div className="text-xl font-black text-indigo-600 tracking-tight">
-                  {filterSummary.totalCapacity.toLocaleString()} <span className="text-xs">unidades</span>
-                </div>
-                <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">
-                  {filterSummary.totalVolume.toFixed(2)} m³ Total
-                </div>
+            {/* Gráfico de Status por Volume */}
+            <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm">
+              <div className="flex items-center gap-2 mb-6">
+                <BarChart3 className="w-5 h-5 text-indigo-500" />
+                <h4 className="text-xs font-black text-slate-800 uppercase tracking-widest italic">Volume por Status (m³)</h4>
               </div>
-
-              <div className="h-12 w-px bg-slate-100 hidden md:block" />
-
-              <div className="flex-1">
-                <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Distribuição por Medidas (Modelo)</h4>
-                <div className="flex flex-wrap gap-2">
-                  {Object.entries(filterSummary.models).map(([model, data]) => (
-                    <div key={model} className="px-3 py-2 bg-slate-50 border border-slate-100 rounded-xl flex flex-col gap-1">
-                      <div className="flex items-center gap-2">
-                        <span className="w-1.5 h-1.5 rounded-full bg-indigo-400" />
-                        <span className="text-[10px] font-black text-slate-600 uppercase">{model}:</span>
-                        <span className="text-[10px] font-black text-indigo-600">{data.count}</span>
-                      </div>
-                      <div className="text-[9px] font-bold text-slate-400 uppercase pl-3.5">
-                        Cap: <span className="text-slate-600">{data.capacity.toLocaleString()} un</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+              <div className="h-[200px] w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                    <XAxis 
+                      dataKey="status" 
+                      axisLine={false} 
+                      tickLine={false} 
+                      tick={{ fontSize: 9, fontWeight: 900, fill: '#94a3b8' }}
+                      textAnchor="middle"
+                    />
+                    <YAxis 
+                      axisLine={false} 
+                      tickLine={false} 
+                      tick={{ fontSize: 9, fontWeight: 900, fill: '#94a3b8' }}
+                      domain={[0, (dataMax: number) => Math.max(dataMax, (state.farmTargetCapacity || 0)) * 1.1]}
+                    />
+                    <Tooltip 
+                      cursor={{ fill: '#f8fafc' }}
+                      content={({ active, payload }) => {
+                        if (active && payload && payload.length) {
+                          return (
+                            <div className="bg-white p-3 rounded-xl shadow-xl border border-slate-100">
+                              <p className="text-[10px] font-black text-slate-400 uppercase mb-1">{payload[0].payload.status}</p>
+                              <p className="text-sm font-black text-indigo-600">{payload[0].value} m³</p>
+                            </div>
+                          );
+                        }
+                        return null;
+                      }}
+                    />
+                    <ReferenceLine 
+                      y={state.farmTargetCapacity || 0} 
+                      stroke="#ef4444" 
+                      strokeWidth={2}
+                      strokeDasharray="5 5"
+                      label={{ 
+                        value: `META: ${state.farmTargetCapacity} m³`, 
+                        position: 'top', 
+                        fill: '#ef4444', 
+                        fontSize: 10, 
+                        fontWeight: 900 
+                      }} 
+                    />
+                    <Bar dataKey="volume" radius={[4, 4, 0, 0]} barSize={40}>
+                      {chartData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={getStatusHexColor(entry.status)} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
               </div>
             </div>
           </div>

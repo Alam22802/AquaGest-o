@@ -33,10 +33,17 @@ const SlaughterHR: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     status: 'Ativo' as SlaughterEmployee['status']
   });
 
+  const [showNewRoleInput, setShowNewRoleInput] = useState(false);
+  const [newRoleName, setNewRoleName] = useState('');
+  const [showNewDeptInput, setShowNewDeptInput] = useState(false);
+  const [newDeptName, setNewDeptName] = useState('');
+  const [showNewEntryTypeInput, setShowNewEntryTypeInput] = useState(false);
+  const [newEntryTypeName, setNewEntryTypeName] = useState('');
+
   const [editingEntryId, setEditingEntryId] = useState<string | null>(null);
   const [entryForm, setEntryForm] = useState({
     employeeIds: [] as string[],
-    type: 'Falta' as SlaughterHREntry['type'],
+    type: 'Falta',
     date: new Date().toISOString().split('T')[0],
     days: '',
     description: ''
@@ -46,6 +53,9 @@ const SlaughterHR: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
   const employees = useMemo(() => state.slaughterEmployees || [], [state.slaughterEmployees]);
   const indicators = useMemo(() => state.slaughterHRIndicators || [], [state.slaughterHRIndicators]);
   const entries = useMemo(() => state.slaughterHREntries || [], [state.slaughterHREntries]);
+  const roles = useMemo(() => state.slaughterHRRoles || [], [state.slaughterHRRoles]);
+  const departments = useMemo(() => state.slaughterHRDepartments || [], [state.slaughterHRDepartments]);
+  const entryTypes = useMemo(() => state.slaughterHREntryTypes || [], [state.slaughterHREntryTypes]);
 
   const stats = useMemo(() => {
     const active = employees.filter(e => e.status === 'Ativo').length;
@@ -244,21 +254,103 @@ const SlaughterHR: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1">
                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Cargo</label>
-                    <input 
-                      type="text" required 
-                      className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none text-xs"
-                      value={employeeForm.role}
-                      onChange={e => setEmployeeForm({...employeeForm, role: e.target.value})}
-                    />
+                    <div className="flex gap-2">
+                      <select 
+                        className="flex-1 px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none text-xs"
+                        value={employeeForm.role}
+                        onChange={e => setEmployeeForm({...employeeForm, role: e.target.value})}
+                      >
+                        <option value="">Selecione...</option>
+                        {roles.map(role => (
+                          <option key={role} value={role}>{role}</option>
+                        ))}
+                      </select>
+                      <button 
+                        type="button"
+                        onClick={() => setShowNewRoleInput(!showNewRoleInput)}
+                        className="p-3.5 bg-slate-100 text-slate-600 rounded-2xl hover:bg-slate-200 transition-colors"
+                      >
+                        <Plus className="w-4 h-4" />
+                      </button>
+                    </div>
+                    {showNewRoleInput && (
+                      <div className="flex gap-2 mt-2">
+                        <input 
+                          type="text"
+                          placeholder="Novo cargo..."
+                          className="flex-1 px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl font-bold outline-none text-xs"
+                          value={newRoleName}
+                          onChange={e => setNewRoleName(e.target.value)}
+                        />
+                        <button 
+                          type="button"
+                          onClick={() => {
+                            if (newRoleName.trim() && !roles.includes(newRoleName.trim())) {
+                              onUpdate({
+                                ...state,
+                                slaughterHRRoles: [...roles, newRoleName.trim()]
+                              });
+                              setEmployeeForm({ ...employeeForm, role: newRoleName.trim() });
+                              setNewRoleName('');
+                              setShowNewRoleInput(false);
+                            }
+                          }}
+                          className="px-3 py-1 bg-[#344434] text-white rounded-xl font-black uppercase text-[9px]"
+                        >
+                          OK
+                        </button>
+                      </div>
+                    )}
                   </div>
                   <div className="space-y-1">
                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Departamento</label>
-                    <input 
-                      type="text" required 
-                      className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none text-xs"
-                      value={employeeForm.department}
-                      onChange={e => setEmployeeForm({...employeeForm, department: e.target.value})}
-                    />
+                    <div className="flex gap-2">
+                      <select 
+                        className="flex-1 px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none text-xs"
+                        value={employeeForm.department}
+                        onChange={e => setEmployeeForm({...employeeForm, department: e.target.value})}
+                      >
+                        <option value="">Selecione...</option>
+                        {departments.map(dept => (
+                          <option key={dept} value={dept}>{dept}</option>
+                        ))}
+                      </select>
+                      <button 
+                        type="button"
+                        onClick={() => setShowNewDeptInput(!showNewDeptInput)}
+                        className="p-3.5 bg-slate-100 text-slate-600 rounded-2xl hover:bg-slate-200 transition-colors"
+                      >
+                        <Plus className="w-4 h-4" />
+                      </button>
+                    </div>
+                    {showNewDeptInput && (
+                      <div className="flex gap-2 mt-2">
+                        <input 
+                          type="text"
+                          placeholder="Novo depto..."
+                          className="flex-1 px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl font-bold outline-none text-xs"
+                          value={newDeptName}
+                          onChange={e => setNewDeptName(e.target.value)}
+                        />
+                        <button 
+                          type="button"
+                          onClick={() => {
+                            if (newDeptName.trim() && !departments.includes(newDeptName.trim())) {
+                              onUpdate({
+                                ...state,
+                                slaughterHRDepartments: [...departments, newDeptName.trim()]
+                              });
+                              setEmployeeForm({ ...employeeForm, department: newDeptName.trim() });
+                              setNewDeptName('');
+                              setShowNewDeptInput(false);
+                            }
+                          }}
+                          className="px-3 py-1 bg-[#344434] text-white rounded-xl font-black uppercase text-[9px]"
+                        >
+                          OK
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
@@ -518,16 +610,52 @@ const SlaughterHR: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-1">
                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Tipo</label>
-                      <select 
-                        className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none text-xs"
-                        value={entryForm.type}
-                        onChange={e => setEntryForm({...entryForm, type: e.target.value as any})}
-                      >
-                        <option value="Falta">Falta</option>
-                        <option value="Atestado">Atestado</option>
-                        <option value="Acidente">Acidente</option>
-                        <option value="Turnover">Turnover (Desligamento)</option>
-                      </select>
+                      <div className="flex gap-2">
+                        <select 
+                          className="flex-1 px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none text-xs"
+                          value={entryForm.type}
+                          onChange={e => setEntryForm({...entryForm, type: e.target.value})}
+                        >
+                          {entryTypes.map(type => (
+                            <option key={type} value={type}>{type}</option>
+                          ))}
+                        </select>
+                        <button 
+                          type="button"
+                          onClick={() => setShowNewEntryTypeInput(!showNewEntryTypeInput)}
+                          className="p-3.5 bg-slate-100 text-slate-600 rounded-2xl hover:bg-slate-200 transition-colors"
+                        >
+                          <Plus className="w-4 h-4" />
+                        </button>
+                      </div>
+                      {showNewEntryTypeInput && (
+                        <div className="flex gap-2 mt-2">
+                          <input 
+                            type="text"
+                            placeholder="Novo tipo..."
+                            className="flex-1 px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl font-bold outline-none text-xs"
+                            value={newEntryTypeName}
+                            onChange={e => setNewEntryTypeName(e.target.value)}
+                          />
+                          <button 
+                            type="button"
+                            onClick={() => {
+                              if (newEntryTypeName.trim() && !entryTypes.includes(newEntryTypeName.trim())) {
+                                onUpdate({
+                                  ...state,
+                                  slaughterHREntryTypes: [...entryTypes, newEntryTypeName.trim()]
+                                });
+                                setEntryForm({ ...entryForm, type: newEntryTypeName.trim() });
+                                setNewEntryTypeName('');
+                                setShowNewEntryTypeInput(false);
+                              }
+                            }}
+                            className="px-3 py-1 bg-[#344434] text-white rounded-xl font-black uppercase text-[9px]"
+                          >
+                            OK
+                          </button>
+                        </div>
+                      )}
                     </div>
                     <div className="space-y-1">
                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Data</label>

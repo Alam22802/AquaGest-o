@@ -457,7 +457,7 @@ const SlaughterOverview: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
     const totalEnergyKw = filteredExpenses.filter(e => e.category === 'Energia').reduce((acc, e) => acc + (e.quantity || 0), 0);
     const energyKwPerTon = totalRecep > 0 ? totalEnergyKw / (totalRecep / 1000) : 0;
 
-    const totalSalaryValue = filteredExpenses.filter(e => e.category === 'Salário').reduce((acc, e) => acc + e.value, 0);
+    const totalSalaryValue = filteredExpenses.filter(e => e.category === 'Folha de Pagamento').reduce((acc, e) => acc + e.value, 0);
     const laborPerTon = totalRecep > 0 ? (totalSalaryValue / (totalRecep / 1000)) : 0;
 
     const totalFreightValue = filteredLogs.reduce((acc, l) => acc + (l.freightValue || 0), 0);

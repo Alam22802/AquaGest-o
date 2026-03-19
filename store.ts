@@ -41,6 +41,11 @@ const initialState: AppState = {
   slaughterExpenses: [],
   slaughterEmployees: [],
   slaughterHRIndicators: [],
+  slaughterHREntries: [],
+  slaughterExpenseCategories: ['Folha de Pagamento', 'Manutenção', 'Energia', 'Água', 'Insumos', 'Prestação de Serviços', 'Outros'],
+  slaughterHREntryTypes: ['Falta', 'Atestado Médico', 'Acidente', 'Turnover', 'Outros'],
+  slaughterHRDepartments: ['Abate', 'Desossa', 'Expedição', 'Administrativo', 'Limpeza', 'Manutenção'],
+  slaughterHRRoles: ['Operador', 'Supervisor', 'Gerente', 'Auxiliar', 'Técnico'],
   slaughterSupplyItems: [],
   slaughterSupplyRequests: [],
   harvestLogs: [],
@@ -50,6 +55,7 @@ const initialState: AppState = {
   portfolios: [],
   capexProjects: [],
   capexInvoices: [],
+  farmTargetCapacity: 0,
   notificationSettings: defaultNotificationSettings,
   deletedIds: []
 };
@@ -117,6 +123,11 @@ export const ensureStateIntegrity = (state: any, mergeWith?: AppState, priority:
     slaughterExpenses: filterByTombstone(base.slaughterExpenses || []),
     slaughterEmployees: filterByTombstone(base.slaughterEmployees || []),
     slaughterHRIndicators: filterByTombstone(base.slaughterHRIndicators || []),
+    slaughterHREntries: filterByTombstone(base.slaughterHREntries || []),
+    slaughterExpenseCategories: base.slaughterExpenseCategories || initialState.slaughterExpenseCategories,
+    slaughterHREntryTypes: base.slaughterHREntryTypes || initialState.slaughterHREntryTypes,
+    slaughterHRDepartments: base.slaughterHRDepartments || initialState.slaughterHRDepartments,
+    slaughterHRRoles: base.slaughterHRRoles || initialState.slaughterHRRoles,
     slaughterSupplyItems: filterByTombstone(base.slaughterSupplyItems || []),
     slaughterSupplyRequests: filterByTombstone(base.slaughterSupplyRequests || []),
     protocols: filterByTombstone(base.protocols),
@@ -126,6 +137,7 @@ export const ensureStateIntegrity = (state: any, mergeWith?: AppState, priority:
     harvestLogs: filterByTombstone(base.harvestLogs || []),
     coldStorageLogs: filterByTombstone(base.coldStorageLogs || []),
     utilityLogs: filterByTombstone(base.utilityLogs || []),
+    farmTargetCapacity: base.farmTargetCapacity || 0,
   };
 
   if (mergeWith) {
@@ -146,6 +158,10 @@ export const ensureStateIntegrity = (state: any, mergeWith?: AppState, priority:
       slaughterHRIndicators: mergeArraysById(result.slaughterHRIndicators || [], mergeWith.slaughterHRIndicators || [], combinedDeletedIds, priority),
       slaughterSupplyItems: mergeArraysById(result.slaughterSupplyItems || [], mergeWith.slaughterSupplyItems || [], combinedDeletedIds, priority),
       slaughterSupplyRequests: mergeArraysById(result.slaughterSupplyRequests || [], mergeWith.slaughterSupplyRequests || [], combinedDeletedIds, priority),
+      slaughterExpenseCategories: Array.from(new Set([...(result.slaughterExpenseCategories || []), ...(mergeWith.slaughterExpenseCategories || [])])),
+      slaughterHREntryTypes: Array.from(new Set([...(result.slaughterHREntryTypes || []), ...(mergeWith.slaughterHREntryTypes || [])])),
+      slaughterHRDepartments: Array.from(new Set([...(result.slaughterHRDepartments || []), ...(mergeWith.slaughterHRDepartments || [])])),
+      slaughterHRRoles: Array.from(new Set([...(result.slaughterHRRoles || []), ...(mergeWith.slaughterHRRoles || [])])),
       protocols: mergeArraysById(result.protocols, mergeWith.protocols, combinedDeletedIds, priority),
       portfolios: mergeArraysById(result.portfolios || [], mergeWith.portfolios || [], combinedDeletedIds, priority),
       capexProjects: mergeArraysById(result.capexProjects || [], mergeWith.capexProjects || [], combinedDeletedIds, priority),
@@ -153,6 +169,7 @@ export const ensureStateIntegrity = (state: any, mergeWith?: AppState, priority:
       harvestLogs: mergeArraysById(result.harvestLogs || [], mergeWith.harvestLogs || [], combinedDeletedIds, priority),
       coldStorageLogs: mergeArraysById(result.coldStorageLogs || [], mergeWith.coldStorageLogs || [], combinedDeletedIds, priority),
       utilityLogs: mergeArraysById(result.utilityLogs || [], mergeWith.utilityLogs || [], combinedDeletedIds, priority),
+      farmTargetCapacity: mergeWith.farmTargetCapacity !== undefined ? mergeWith.farmTargetCapacity : result.farmTargetCapacity,
     };
   }
   return result;
