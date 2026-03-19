@@ -140,6 +140,7 @@ export interface SlaughterLog {
   slaughterCondemnation?: number;
   invoiceValue?: number;
   revenuePerKg?: number;
+  renderingWeight?: number;
   userId: string;
   timestamp: string;
   updatedAt?: number;

@@ -16,7 +16,22 @@ interface Props {
 
 // Sub-component for the summary board to prevent re-renders on form input
 const SlaughterSummary = React.memo(({ stats, startDate, endDate, onStartDateChange, onEndDateChange }: { 
-  stats: any, 
+  stats: {
+    totalGta: number;
+    totalRecep: number;
+    totalPacked: number;
+    totalRendering: number;
+    yieldPercentage: number;
+    count: number;
+    waterPerTon: number;
+    energyKwPerTon: number;
+    laborPerTon: number;
+    freightPerKgLive: number;
+    totalSlaughterCondemnation: number;
+    totalInvoiceValue: number;
+    costPerTonProduced: number;
+    totalTransportCondemnation: number;
+  }, 
   startDate: string, 
   endDate: string, 
   onStartDateChange: (val: string) => void, 
@@ -102,48 +117,55 @@ const SlaughterSummary = React.memo(({ stats, startDate, endDate, onStartDateCha
                    <span className="text-[10px] opacity-40">kg</span>
                 </div>
              </div>
+             <div className="space-y-2 border-l-2 border-amber-500/30 pl-6">
+                <div className="text-[9px] font-black opacity-40 uppercase tracking-widest">Graxaria</div>
+                <div className="text-xl font-black text-amber-400 flex items-baseline gap-1">
+                   {stats.totalRendering.toLocaleString('pt-BR', { minimumFractionDigits: 0 })}
+                   <span className="text-[10px] opacity-40">kg</span>
+                </div>
+             </div>
           </div>
 
           {/* Linha 3: Financeiro */}
           <div className="grid grid-cols-2 lg:grid-cols-6 gap-8">
              <div className="space-y-2 border-l-2 border-amber-500/30 pl-6">
                 <div className="text-[9px] font-black opacity-40 uppercase tracking-widest">Valor Total Notas</div>
-                <div className="text-xl font-black text-amber-300 flex items-baseline gap-1">
+                <div className="text-xl font-black text-amber-100 flex items-baseline gap-1">
                    <span className="text-[10px] opacity-40">R$</span>
                    {stats.totalInvoiceValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                 </div>
              </div>
-             <div className="space-y-2 border-l-2 border-white/10 pl-6">
-                <div className="text-[9px] font-black opacity-40 uppercase tracking-widest">Valor KG Peixe Vivo</div>
-                <div className="text-xl font-black flex items-baseline gap-1">
+             <div className="space-y-2 border-l-2 border-indigo-500/50 pl-6 bg-indigo-500/5 rounded-r-xl py-2 -ml-2">
+                <div className="text-[9px] font-black text-indigo-300 uppercase tracking-widest">Custo Ton Produzida</div>
+                <div className="text-xl font-black text-indigo-200 flex items-baseline gap-1">
                    <span className="text-[10px] opacity-40">R$</span>
-                   {stats.avgLiveKgValue.toFixed(2)}
+                   {stats.costPerTonProduced.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                 </div>
              </div>
-             <div className="space-y-2 border-l-2 border-white/10 pl-6">
+             <div className="space-y-2 border-l-2 border-white/20 pl-6">
                 <div className="text-[9px] font-black opacity-40 uppercase tracking-widest">Frete / kg Vivo</div>
-                <div className="text-xl font-black flex items-baseline gap-1">
+                <div className="text-xl font-black text-white/90 flex items-baseline gap-1">
                    <span className="text-[10px] opacity-40">R$</span>
                    {stats.freightPerKgLive.toFixed(2)}
                 </div>
              </div>
-             <div className="space-y-2 border-l-2 border-white/10 pl-6">
+             <div className="space-y-2 border-l-2 border-white/20 pl-6">
                 <div className="text-[9px] font-black opacity-40 uppercase tracking-widest">Mão De Obra/Ton</div>
-                <div className="text-xl font-black flex items-baseline gap-1">
+                <div className="text-xl font-black text-white/90 flex items-baseline gap-1">
                    <span className="text-[10px] opacity-40">R$</span>
                    {stats.laborPerTon.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                 </div>
              </div>
-             <div className="space-y-2 border-l-2 border-white/10 pl-6">
+             <div className="space-y-2 border-l-2 border-white/20 pl-6">
                 <div className="text-[9px] font-black opacity-40 uppercase tracking-widest">Consumo Água/Ton</div>
-                <div className="text-xl font-black flex items-baseline gap-1">
+                <div className="text-xl font-black text-white/90 flex items-baseline gap-1">
                    {stats.waterPerTon.toFixed(2)}
                    <span className="text-[10px] opacity-40">L/Ton</span>
                 </div>
              </div>
-             <div className="space-y-2 border-l-2 border-white/10 pl-6">
+             <div className="space-y-2 border-l-2 border-white/20 pl-6">
                 <div className="text-[9px] font-black opacity-40 uppercase tracking-widest">Consumo Kw/Ton</div>
-                <div className="text-xl font-black flex items-baseline gap-1">
+                <div className="text-xl font-black text-white/90 flex items-baseline gap-1">
                    {stats.energyKwPerTon.toFixed(2)}
                    <span className="text-[10px] opacity-40">kWh/Ton</span>
                 </div>
@@ -274,9 +296,10 @@ const SlaughterTable = React.memo(({ logs, users, hasPermission, onEdit, onDelet
             <th className="px-8 py-5">Lote / Produtor</th>
             <th className="px-8 py-5">Pesos (Filé/Recep)</th>
             <th className="px-8 py-5">Embalado (kg)</th>
+            <th className="px-8 py-5">Graxaria (kg)</th>
             <th className="px-8 py-5">Frete / kg</th>
             <th className="px-8 py-5">Condenações</th>
-            <th className="px-8 py-5">Valor Nota / KG Vivo</th>
+            <th className="px-8 py-5">Valor Nota</th>
             <th className="px-8 py-5">Registrado por</th>
             {hasPermission && <th className="px-8 py-5 text-center">Ações</th>}
           </tr>
@@ -315,6 +338,9 @@ const SlaughterTable = React.memo(({ logs, users, hasPermission, onEdit, onDelet
                   <div className="text-[9px] font-black text-slate-400 uppercase mt-1">LOTE EMB: {log.packagingBatch || 'N/A'}</div>
                 </td>
                 <td className="px-8 py-6">
+                  <div className="font-black text-amber-600 text-xs">{log.renderingWeight ? `${log.renderingWeight} kg` : '---'}</div>
+                </td>
+                <td className="px-8 py-6">
                   <div className="text-xs font-black text-slate-700">R$ {(log.freightValue || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
                   <div className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">
                     R$ {log.receptionWeight && log.freightValue ? (log.freightValue / log.receptionWeight).toFixed(2) : '0.00'}/kg
@@ -326,9 +352,6 @@ const SlaughterTable = React.memo(({ logs, users, hasPermission, onEdit, onDelet
                 </td>
                 <td className="px-8 py-6">
                   <div className="text-xs font-black text-amber-600">R$ {(log.invoiceValue || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
-                  <div className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">
-                    KG Vivo: R$ {log.receptionWeight && log.invoiceValue ? (log.invoiceValue / log.receptionWeight).toFixed(2) : '0.00'}/kg
-                  </div>
                 </td>
                 <td className="px-8 py-6">
                   <div className="flex items-center gap-2 text-[10px] font-black text-slate-400 uppercase tracking-widest">
@@ -391,6 +414,7 @@ const SlaughterOverview: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
     slaughterBatch: '',
     endTime: '',
     packedQuantity: '',
+    renderingWeight: '',
     packagingBatch: '',
     freightValue: '',
     transportCondemnation: '',
@@ -424,6 +448,7 @@ const SlaughterOverview: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
     const totalGta = filteredLogs.reduce((acc, l) => acc + (l.gtaWeight || 0), 0);
     const totalRecep = filteredLogs.reduce((acc, l) => acc + (l.receptionWeight || 0), 0);
     const totalPacked = filteredLogs.reduce((acc, l) => acc + (l.packedQuantity || 0), 0);
+    const totalRendering = filteredLogs.reduce((acc, l) => acc + (l.renderingWeight || 0), 0);
     const yieldPercentage = totalRecep > 0 ? (totalPacked / totalRecep) * 100 : 0;
 
     const totalWaterLiters = filteredExpenses.filter(e => e.category === 'Água').reduce((acc, e) => acc + (e.quantity || 0), 0);
@@ -442,12 +467,19 @@ const SlaughterOverview: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
     const totalTransportCondemnation = filteredLogs.reduce((acc, l) => acc + (l.transportCondemnation || 0), 0);
 
     const totalInvoiceValue = filteredLogs.reduce((acc, l) => acc + (l.invoiceValue || 0), 0);
-    const avgLiveKgValue = totalRecep > 0 ? totalInvoiceValue / totalRecep : 0;
+    
+    // Calculate total cost for the period (Invoices + Freight + All other expenses)
+    const totalOtherExpenses = filteredExpenses.reduce((acc, e) => acc + e.value, 0);
+    const totalCost = totalInvoiceValue + totalFreightValue + totalOtherExpenses;
+    
+    // Custo Ton Produzida = Total Cost / (Total Packed in tons)
+    const costPerTonProduced = totalPacked > 0 ? totalCost / (totalPacked / 1000) : 0;
 
     return { 
       totalGta, 
       totalRecep, 
       totalPacked, 
+      totalRendering,
       yieldPercentage, 
       count: filteredLogs.length,
       waterPerTon,
@@ -456,7 +488,7 @@ const SlaughterOverview: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
       freightPerKgLive,
       totalSlaughterCondemnation,
       totalInvoiceValue,
-      avgLiveKgValue,
+      costPerTonProduced,
       totalTransportCondemnation
     };
   }, [state.slaughterLogs, state.slaughterExpenses, summaryStartDate, summaryEndDate]);
@@ -524,6 +556,7 @@ const SlaughterOverview: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
           receptionWeight: Number(formData.receptionWeight) || 0,
           packingList: Number(formData.packingList) || 0,
           packedQuantity: Number(formData.packedQuantity) || 0,
+          renderingWeight: Number(formData.renderingWeight) || 0,
           freightValue: Number(formData.freightValue) || 0,
           transportCondemnation: Number(formData.transportCondemnation) || 0,
           slaughterCondemnation: Number(formData.slaughterCondemnation) || 0,
@@ -548,6 +581,7 @@ const SlaughterOverview: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
         slaughterBatch: formData.slaughterBatch,
         endTime: formData.endTime,
         packedQuantity: Number(formData.packedQuantity) || 0,
+        renderingWeight: Number(formData.renderingWeight) || 0,
         packagingBatch: formData.packagingBatch,
         freightValue: Number(formData.freightValue) || 0,
         transportCondemnation: Number(formData.transportCondemnation) || 0,
@@ -581,6 +615,7 @@ const SlaughterOverview: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
       slaughterBatch: '',
       endTime: '',
       packedQuantity: '',
+      renderingWeight: '',
       packagingBatch: '',
       freightValue: '',
       transportCondemnation: '',
@@ -602,6 +637,7 @@ const SlaughterOverview: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
       slaughterBatch: log.slaughterBatch || '',
       endTime: log.endTime || '',
       packedQuantity: (log.packedQuantity || 0).toString(),
+      renderingWeight: (log.renderingWeight || 0).toString(),
       packagingBatch: log.packagingBatch || '',
       freightValue: (log.freightValue || 0).toString(),
       transportCondemnation: (log.transportCondemnation || 0).toString(),
@@ -727,6 +763,10 @@ const SlaughterOverview: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
                   <div className="space-y-1">
                     <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-widest">Embalado (kg)</label>
                     <input type="number" step="0.01" placeholder="0.00" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none text-xs" value={formData.packedQuantity} onChange={e => setFormData({...formData, packedQuantity: e.target.value})} />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-widest">Graxaria (kg)</label>
+                    <input type="number" step="0.01" placeholder="0.00" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none text-xs" value={formData.renderingWeight} onChange={e => setFormData({...formData, renderingWeight: e.target.value})} />
                   </div>
                 </div>
 
