@@ -1,10 +1,11 @@
 
 import React, { useState, useMemo } from 'react';
 import { Batch, AppState, User } from '../types';
-import { Plus, Trash2, Tag, Calendar, Scale, Hash, Edit, X, BookOpen, Eye, TrendingUp, Fish, AlertCircle, ShoppingCart, CheckCircle2, Package, Utensils, Info, CheckSquare, Box } from 'lucide-react';
+import { Plus, Trash2, Tag, Calendar, Scale, Hash, Edit, X, BookOpen, Eye, TrendingUp, Fish, AlertCircle, ShoppingCart, CheckCircle2, Package, Utensils, Info, CheckSquare, Box, FileText } from 'lucide-react';
 import { format, differenceInDays, parseISO, startOfDay } from 'date-fns';
 import { formatNumber } from '../utils/formatters';
 import HarvestManagement from './HarvestManagement';
+import BatchClosing from './BatchClosing';
 
 interface Props {
   state: AppState;
@@ -21,7 +22,7 @@ const generateId = () => {
 };
 
 const BatchManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
-  const [activeSubTab, setActiveSubTab] = useState<'inventory' | 'harvest'>('inventory');
+  const [activeSubTab, setActiveSubTab] = useState<'inventory' | 'harvest' | 'closing'>('inventory');
   const [selectedPlanningBatchId, setSelectedPlanningBatchId] = useState('');
   const [selectedPlanningCageIds, setSelectedPlanningCageIds] = useState<string[]>([]);
   const [lastFeeding, setLastFeeding] = useState('');
@@ -439,10 +440,19 @@ const BatchManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
           <ShoppingCart className="w-4 h-4" />
           Despesca
         </button>
+        <button 
+          onClick={() => setActiveSubTab('closing')}
+          className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${activeSubTab === 'closing' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+        >
+          <FileText className="w-4 h-4" />
+          Fechamento
+        </button>
       </div>
 
       {activeSubTab === 'harvest' ? (
         <HarvestManagement state={state} onUpdate={onUpdate} currentUser={currentUser} />
+      ) : activeSubTab === 'closing' ? (
+        <BatchClosing state={state} onUpdate={onUpdate} currentUser={currentUser} />
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
           <div className="lg:col-span-1 lg:sticky lg:top-8">

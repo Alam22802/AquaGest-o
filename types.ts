@@ -52,6 +52,8 @@ export interface Batch {
   protocolId?: string;
   expectedHarvestDate?: string;
   isSettlementComplete?: boolean;
+  isClosed?: boolean;
+  closedAt?: string;
   userId?: string;
   updatedAt?: number;
 }
@@ -351,6 +353,17 @@ export interface UtilityLog {
   updatedAt: number;
 }
 
+export interface BatchExpense {
+  id: string;
+  batchId: string;
+  description: string;
+  category: string;
+  value: number;
+  date: string;
+  userId: string;
+  updatedAt?: number;
+}
+
 export interface AppState {
   users: User[];
   lines: Line[];
@@ -378,6 +391,7 @@ export interface AppState {
   slaughterHRRoles?: string[];
   harvestLogs?: HarvestLog[];
   harvestSchedules?: HarvestSchedule[];
+  batchExpenses?: BatchExpense[];
   coldStorageLogs?: ColdStorageLog[];
   utilityLogs?: UtilityLog[];
   protocols: ProductionProtocol[];

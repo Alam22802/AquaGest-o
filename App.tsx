@@ -196,7 +196,7 @@ const App: React.FC = () => {
     }
   }, [activeTab, currentUser]);
 
-  const handleStateUpdate = (newState: AppState) => {
+  const handleStateUpdate = useCallback((newState: AppState) => {
     setState(prev => {
       if (!prev) return newState;
 
@@ -253,6 +253,7 @@ const App: React.FC = () => {
         slaughterSuppliers: injectTimestamps(prev.slaughterSuppliers || [], newState.slaughterSuppliers || []),
         slaughterSupplyRequests: injectTimestamps(prev.slaughterSupplyRequests || [], newState.slaughterSupplyRequests || []),
         harvestLogs: injectTimestamps(prev.harvestLogs || [], newState.harvestLogs || []),
+        batchExpenses: injectTimestamps(prev.batchExpenses || [], newState.batchExpenses || []),
         protocols: injectTimestamps(prev.protocols, newState.protocols),
         portfolios: injectTimestamps(prev.portfolios, newState.portfolios),
         capexProjects: injectTimestamps(prev.capexProjects, newState.capexProjects),
@@ -283,6 +284,7 @@ const App: React.FC = () => {
         ...findDeleted(prev.slaughterSuppliers || [], stateWithTimestamps.slaughterSuppliers || []),
         ...findDeleted(prev.slaughterSupplyRequests || [], stateWithTimestamps.slaughterSupplyRequests || []),
         ...findDeleted(prev.harvestLogs || [], stateWithTimestamps.harvestLogs || []),
+        ...findDeleted(prev.batchExpenses || [], stateWithTimestamps.batchExpenses || []),
         ...findDeleted(prev.protocols, stateWithTimestamps.protocols),
         ...findDeleted(prev.portfolios, stateWithTimestamps.portfolios),
         ...findDeleted(prev.capexProjects, stateWithTimestamps.capexProjects),
@@ -295,7 +297,7 @@ const App: React.FC = () => {
       }
       return stateWithTimestamps;
     });
-  };
+  }, []);
 
   const handleLogin = (user: User) => {
     setCurrentUser(user);
@@ -313,6 +315,36 @@ const App: React.FC = () => {
     const newState = { ...state, users: [...state.users, u] };
     handleStateUpdate(newState);
   };
+
+  useEffect(() => {
+    if (state && currentUser?.isMaster) {
+      const ninetyDaysAgo = new Date();
+      ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
+      
+      const batchesToCleanup = (state.batches || []).filter(b => 
+        b.isClosed && b.closedAt && new Date(b.closedAt) < ninetyDaysAgo
+      );
+
+      if (batchesToCleanup.length > 0) {
+        const batchIdsToRemove = new Set(batchesToCleanup.map(b => b.id));
+        
+        const newState: AppState = {
+          ...state,
+          batches: (state.batches || []).filter(b => !batchIdsToRemove.has(b.id)),
+          feedingLogs: (state.feedingLogs || []).filter(l => !batchIdsToRemove.has(l.batchId || '')),
+          mortalityLogs: (state.mortalityLogs || []).filter(l => !batchIdsToRemove.has(l.batchId || '')),
+          biometryLogs: (state.biometryLogs || []).filter(l => !batchIdsToRemove.has(l.batchId || '')),
+          harvestLogs: (state.harvestLogs || []).filter(l => !batchIdsToRemove.has(l.batchId)),
+          batchExpenses: (state.batchExpenses || []).filter(l => !batchIdsToRemove.has(l.batchId)),
+          // Also cleanup logs that might be linked via cage but the batch is gone
+          // (Though usually batchId is the primary link for these logs in the cleanup context)
+        };
+
+        handleStateUpdate(newState);
+        console.log(`Sistema: Limpeza automática realizada para ${batchesToCleanup.length} lotes arquivados há mais de 90 dias.`);
+      }
+    }
+  }, [state, currentUser, handleStateUpdate]);
 
   const renderContent = () => {
     if (!state || !currentUser) return null;
