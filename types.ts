@@ -193,6 +193,15 @@ export interface SlaughterHRIndicator {
   updatedAt?: number;
 }
 
+export interface SlaughterHRVacancy {
+  id: string;
+  department: string;
+  role: string;
+  totalVacancies: number;
+  userId: string;
+  updatedAt?: number;
+}
+
 export interface SlaughterSupplyItem {
   id: string;
   code: string;
@@ -379,6 +388,7 @@ export interface AppState {
   slaughterEmployees?: SlaughterEmployee[];
   slaughterHRIndicators?: SlaughterHRIndicator[];
   slaughterHREntries?: SlaughterHREntry[];
+  slaughterHRVacancies?: SlaughterHRVacancy[];
   slaughterSupplyItems?: SlaughterSupplyItem[];
   slaughterSuppliers?: SlaughterSupplier[];
   slaughterSupplyRequests?: SlaughterSupplyRequest[];

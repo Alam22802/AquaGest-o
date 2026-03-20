@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
-import { AppState, SlaughterEmployee, SlaughterHRIndicator, SlaughterHREntry, User } from '../../types';
-import { Users, UserPlus, Trash2, Edit3, X, Calendar, Search, TrendingUp, Heart, AlertCircle, Briefcase, BarChart as BarChartIcon, CheckSquare, Square, Plus } from 'lucide-react';
+import { AppState, SlaughterEmployee, SlaughterHRIndicator, SlaughterHREntry, SlaughterHRVacancy, User } from '../../types';
+import { Users, UserPlus, Trash2, Edit3, X, Calendar, Search, TrendingUp, Heart, AlertCircle, Briefcase, BarChart as BarChartIcon, CheckSquare, Square, Plus, Layout } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { formatNumber } from '../../utils/formatters';
@@ -21,7 +21,7 @@ const generateId = () => {
 };
 
 const SlaughterHR: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
-  const [activeSubTab, setActiveSubTab] = useState<'employees' | 'indicators'>('employees');
+  const [activeSubTab, setActiveSubTab] = useState<'registration' | 'entries' | 'indicators'>('registration');
   const [filterMonth, setFilterMonth] = useState(new Date().getMonth() + 1);
   const [filterYear, setFilterYear] = useState(new Date().getFullYear());
   const [filterEmployeeId, setFilterEmployeeId] = useState<string>('all');
@@ -55,13 +55,25 @@ const SlaughterHR: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
   const employees = useMemo(() => state.slaughterEmployees || [], [state.slaughterEmployees]);
   const indicators = useMemo(() => state.slaughterHRIndicators || [], [state.slaughterHRIndicators]);
   const entries = useMemo(() => state.slaughterHREntries || [], [state.slaughterHREntries]);
+  const vacancies = useMemo(() => state.slaughterHRVacancies || [], [state.slaughterHRVacancies]);
   const roles = useMemo(() => state.slaughterHRRoles || [], [state.slaughterHRRoles]);
   const departments = useMemo(() => state.slaughterHRDepartments || [], [state.slaughterHRDepartments]);
   const entryTypes = useMemo(() => state.slaughterHREntryTypes || [], [state.slaughterHREntryTypes]);
 
+  const [vacancyForm, setVacancyForm] = useState({
+    department: '',
+    role: '',
+    totalVacancies: ''
+  });
+  const [editingVacancyId, setEditingVacancyId] = useState<string | null>(null);
+
   const stats = useMemo(() => {
-    const active = employees.filter(e => e.status === 'Ativo').length;
+    const activeEmployees = employees.filter(e => e.status === 'Ativo');
+    const activeCount = activeEmployees.length;
     
+    const totalVacanciesCount = vacancies.reduce((acc, v) => acc + v.totalVacancies, 0);
+    const occupancyRate = totalVacanciesCount > 0 ? (activeCount / totalVacanciesCount) * 100 : 0;
+
     // Filter indicators by month/year
     const filteredIndicator = indicators.find(ind => ind.month === filterMonth && ind.year === filterYear);
 
@@ -73,24 +85,96 @@ const SlaughterHR: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       return matchesDate && matchesEmployee;
     });
 
-    // Chart data for absenteeism (last 6 months)
-    const sortedIndicators = [...indicators].sort((a, b) => (b.year * 12 + b.month) - (a.year * 12 + a.month));
-    const absenteeismData = sortedIndicators.slice(0, 6).reverse().map(ind => ({
-      name: `${format(new Date(2000, ind.month - 1), 'MMM')}/${ind.year}`,
-      value: ind.absenteeism
-    }));
+    // Calculate metrics from entries for the current filtered month/year
+    const monthEntries = entries.filter(entry => {
+      const d = new Date(entry.date);
+      return (d.getMonth() + 1) === filterMonth && d.getFullYear() === filterYear;
+    });
 
-    // Headcount data (active employees per department)
-    const deptHeadcount = employees.filter(e => e.status === 'Ativo').reduce((acc, emp) => {
-      const dept = emp.department || 'Outros';
-      acc[dept] = (acc[dept] || 0) + 1;
-      return acc;
-    }, {} as Record<string, number>);
+    const accidentsCount = monthEntries.filter(e => e.type === 'Acidente').length;
+    const turnoverCount = monthEntries.filter(e => e.type === 'Turnover').length;
+    const turnoverRate = activeCount > 0 ? (turnoverCount / activeCount) * 100 : 0;
 
-    const headcountData = Object.entries(deptHeadcount).map(([name, value]) => ({ name, value }));
+    const absentDays = monthEntries
+      .filter(e => e.type === 'Atestado' || e.type === 'Falta')
+      .reduce((acc, e) => acc + (e.days || 1), 0);
+    const totalWorkDays = activeCount * 22;
+    const absenteeismRate = totalWorkDays > 0 ? (absentDays / totalWorkDays) * 100 : 0;
 
-    return { active, filteredIndicator, filteredEntries, absenteeismData, headcountData };
-  }, [employees, indicators, entries, filterMonth, filterYear]);
+    // Chart data for absenteeism (last 6 months) - derived from entries
+    const last6Months = Array.from({ length: 6 }, (_, i) => {
+      const d = new Date();
+      d.setMonth(d.getMonth() - i);
+      return { month: d.getMonth() + 1, year: d.getFullYear() };
+    }).reverse();
+
+    const absenteeismData = last6Months.map(m => {
+      const mEntries = entries.filter(e => {
+        const d = new Date(e.date);
+        return (d.getMonth() + 1) === m.month && d.getFullYear() === m.year;
+      });
+      const mAbsentDays = mEntries
+        .filter(e => e.type === 'Atestado' || e.type === 'Falta')
+        .reduce((acc, e) => acc + (e.days || 1), 0);
+      const mRate = (activeCount * 22) > 0 ? (mAbsentDays / (activeCount * 22)) * 100 : 0;
+      return {
+        name: `${format(new Date(2000, m.month - 1), 'MMM')}/${m.year}`,
+        value: mRate
+      };
+    });
+
+    // Headcount data (active employees per sector vs vacancies)
+    const headcountData = departments.map(dept => {
+      const occupied = activeEmployees.filter(e => e.department === dept).length;
+      const total = vacancies.filter(v => v.department === dept).reduce((acc, v) => acc + v.totalVacancies, 0);
+      return {
+        name: dept,
+        ocupadas: occupied,
+        vagas: total
+      };
+    });
+
+    return { 
+      active: activeCount, 
+      totalVacanciesCount, 
+      occupancyRate, 
+      filteredIndicator: {
+        turnover: turnoverRate,
+        accidents: accidentsCount,
+        absenteeism: absenteeismRate
+      }, 
+      filteredEntries, 
+      absenteeismData, 
+      headcountData 
+    };
+  }, [employees, entries, vacancies, filterMonth, filterYear, departments]);
+
+  const handleSaveVacancy = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!vacancyForm.department || !vacancyForm.role || !vacancyForm.totalVacancies) return;
+
+    const newVacancy: SlaughterHRVacancy = {
+      id: editingVacancyId || generateId(),
+      department: vacancyForm.department,
+      role: vacancyForm.role,
+      totalVacancies: Number(vacancyForm.totalVacancies),
+      userId: currentUser.id,
+      updatedAt: Date.now()
+    };
+
+    const updatedVacancies = editingVacancyId
+      ? vacancies.map(v => v.id === editingVacancyId ? newVacancy : v)
+      : [...vacancies, newVacancy];
+
+    onUpdate({ ...state, slaughterHRVacancies: updatedVacancies });
+    setEditingVacancyId(null);
+    setVacancyForm({ department: '', role: '', totalVacancies: '' });
+  };
+
+  const removeVacancy = (id: string) => {
+    if (!confirm('Deseja excluir este quadro de vagas?')) return;
+    onUpdate({ ...state, slaughterHRVacancies: vacancies.filter(v => v.id !== id) });
+  };
 
   const handleSaveEmployee = (e: React.FormEvent) => {
     e.preventDefault();
@@ -234,23 +318,31 @@ const SlaughterHR: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
 
   return (
     <div className="space-y-8">
-      <div className="flex gap-4 border-b border-slate-200">
+      <div className="flex gap-4 border-b border-slate-200 overflow-x-auto">
         <button 
-          onClick={() => setActiveSubTab('employees')}
-          className={`pb-4 px-4 text-[10px] font-black uppercase tracking-widest transition-all ${activeSubTab === 'employees' ? 'border-b-2 border-[#344434] text-[#344434]' : 'text-slate-400'}`}
+          onClick={() => setActiveSubTab('registration')}
+          className={`pb-4 px-4 text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap ${activeSubTab === 'registration' ? 'border-b-2 border-[#344434] text-[#344434]' : 'text-slate-400'}`}
         >
-          Colaboradores
+          Cadastro
+        </button>
+        <button 
+          onClick={() => setActiveSubTab('entries')}
+          className={`pb-4 px-4 text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap ${activeSubTab === 'entries' ? 'border-b-2 border-[#344434] text-[#344434]' : 'text-slate-400'}`}
+        >
+          Lançamentos
         </button>
         <button 
           onClick={() => setActiveSubTab('indicators')}
-          className={`pb-4 px-4 text-[10px] font-black uppercase tracking-widest transition-all ${activeSubTab === 'indicators' ? 'border-b-2 border-[#344434] text-[#344434]' : 'text-slate-400'}`}
+          className={`pb-4 px-4 text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap ${activeSubTab === 'indicators' ? 'border-b-2 border-[#344434] text-[#344434]' : 'text-slate-400'}`}
         >
-          Lançamentos e Indicadores
+          Indicadores
         </button>
       </div>
 
-      {activeSubTab === 'employees' ? (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      {activeSubTab === 'registration' && (
+        <div className="space-y-12">
+          {/* Employees Section */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div className="lg:col-span-1">
             <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-200">
               <h3 className="text-xl font-black text-slate-800 mb-8 uppercase tracking-tighter italic flex items-center gap-3">
@@ -330,7 +422,7 @@ const SlaughterHR: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                     )}
                   </div>
                   <div className="space-y-1">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Departamento</label>
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Setor</label>
                     <div className="flex gap-2">
                       <select 
                         className="flex-1 px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none text-xs"
@@ -354,7 +446,7 @@ const SlaughterHR: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                       <div className="flex gap-2 mt-2">
                         <input 
                           type="text"
-                          placeholder="Novo depto..."
+                          placeholder="Novo setor..."
                           className="flex-1 px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl font-bold outline-none text-xs"
                           value={newDeptName}
                           onChange={e => setNewDeptName(e.target.value)}
@@ -416,7 +508,7 @@ const SlaughterHR: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                   <tr>
                     <th className="px-8 py-5">Matrícula</th>
                     <th className="px-8 py-5">Colaborador</th>
-                    <th className="px-8 py-5">Cargo / Depto</th>
+                    <th className="px-8 py-5">Cargo / Setor</th>
                     <th className="px-8 py-5">Admissão</th>
                     <th className="px-8 py-5">Status</th>
                     <th className="px-8 py-5 text-center">Ações</th>
@@ -471,32 +563,122 @@ const SlaughterHR: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
             </div>
           </div>
         </div>
-      ) : (
-        <div className="space-y-8">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-white p-6 rounded-[2rem] border border-slate-200 shadow-sm">
-            <div className="bg-blue-50/50 p-4 rounded-2xl flex items-center gap-3">
-              <Users className="w-4 h-4 text-blue-600" />
-              <div>
-                <div className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Ativos</div>
-                <div className="text-sm font-black text-slate-800">{formatNumber(stats.active)}</div>
+
+        {/* Vacancy Board Section */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div className="lg:col-span-1">
+              <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-200">
+                <h3 className="text-xl font-black text-slate-800 mb-8 uppercase tracking-tighter italic flex items-center gap-3">
+                  <Layout className="w-6 h-6" />
+                  {editingVacancyId ? 'Editar Quadro' : 'Novo Quadro de Vagas'}
+                </h3>
+                <form onSubmit={handleSaveVacancy} className="space-y-4">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Setor</label>
+                    <select 
+                      className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none text-xs"
+                      value={vacancyForm.department}
+                      onChange={e => setVacancyForm({...vacancyForm, department: e.target.value})}
+                      required
+                    >
+                      <option value="">Selecione...</option>
+                      {departments.map(dept => (
+                        <option key={dept} value={dept}>{dept}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Cargo</label>
+                    <select 
+                      className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none text-xs"
+                      value={vacancyForm.role}
+                      onChange={e => setVacancyForm({...vacancyForm, role: e.target.value})}
+                      required
+                    >
+                      <option value="">Selecione...</option>
+                      {roles.map(role => (
+                        <option key={role} value={role}>{role}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Total de Vagas</label>
+                    <input 
+                      type="number" required 
+                      className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none text-xs"
+                      value={vacancyForm.totalVacancies}
+                      onChange={e => setVacancyForm({...vacancyForm, totalVacancies: e.target.value})}
+                    />
+                  </div>
+                  <button type="submit" className="w-full py-4 bg-[#344434] text-white rounded-2xl font-black uppercase tracking-widest text-xs shadow-lg hover:bg-[#2a382a] transition-all">
+                    {editingVacancyId ? 'Salvar Alterações' : 'Cadastrar Vagas'}
+                  </button>
+                </form>
               </div>
             </div>
-            <div className="bg-amber-50/50 p-4 rounded-2xl flex items-center gap-3">
-              <TrendingUp className="w-4 h-4 text-amber-600" />
-              <div>
-                <div className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Turnover</div>
-                <div className="text-sm font-black text-slate-800">{formatNumber(stats.filteredIndicator?.turnover || 0, 1)}%</div>
-              </div>
-            </div>
-            <div className="bg-red-50/50 p-4 rounded-2xl flex items-center gap-3">
-              <Heart className="w-4 h-4 text-red-600" />
-              <div>
-                <div className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Acidentes</div>
-                <div className="text-sm font-black text-slate-800">{formatNumber(stats.filteredIndicator?.accidents || 0)}</div>
+
+            <div className="lg:col-span-2">
+              <div className="bg-white border border-slate-200 rounded-[2.5rem] overflow-hidden shadow-sm">
+                <div className="p-6 border-b border-slate-100">
+                  <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest">Distribuição de Vagas</h3>
+                </div>
+                <table className="w-full text-left border-collapse">
+                  <thead className="bg-slate-50 text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                    <tr>
+                      <th className="px-8 py-5">Setor</th>
+                      <th className="px-8 py-5">Cargo</th>
+                      <th className="px-8 py-5">Vagas</th>
+                      <th className="px-8 py-5">Preenchidas</th>
+                      <th className="px-8 py-5 text-center">Ações</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {vacancies.map(v => {
+                      const filled = employees.filter(e => e.department === v.department && e.role === v.role && e.status === 'Ativo').length;
+                      return (
+                        <tr key={v.id} className="hover:bg-slate-50/50 transition-colors">
+                          <td className="px-8 py-6 text-xs font-bold text-slate-800">{v.department}</td>
+                          <td className="px-8 py-6 text-xs text-slate-600">{v.role}</td>
+                          <td className="px-8 py-6 text-xs font-black text-slate-400">{v.totalVacancies}</td>
+                          <td className="px-8 py-6">
+                            <div className="flex items-center gap-2">
+                              <div className="text-xs font-bold text-slate-800">{filled}</div>
+                              <div className="text-[10px] font-black text-slate-400">({formatNumber((filled / v.totalVacancies) * 100, 0)}%)</div>
+                            </div>
+                          </td>
+                          <td className="px-8 py-6">
+                            <div className="flex justify-center gap-2">
+                              <button onClick={() => {
+                                setEditingVacancyId(v.id);
+                                setVacancyForm({
+                                  department: v.department,
+                                  role: v.role,
+                                  totalVacancies: v.totalVacancies.toString()
+                                });
+                              }} className="p-2 text-slate-300 hover:text-amber-500 transition-colors"><Edit3 className="w-4 h-4" /></button>
+                              <button onClick={() => removeVacancy(v.id)} className="p-2 text-slate-300 hover:text-red-500 transition-colors"><Trash2 className="w-4 h-4" /></button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                    {vacancies.length === 0 && (
+                      <tr>
+                        <td colSpan={5} className="px-8 py-12 text-center text-slate-400 text-xs font-bold uppercase tracking-widest">
+                          Nenhum quadro de vagas cadastrado.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
               </div>
             </div>
           </div>
+        </div>
+      )}
 
+      {activeSubTab === 'entries' && (
+        <div className="space-y-8">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-6 rounded-[2rem] border border-slate-200 shadow-sm">
             <div className="flex flex-wrap items-center gap-6">
               <div className="flex items-center gap-3">
@@ -546,62 +728,6 @@ const SlaughterHR: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                     ))}
                   </select>
                 </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-200">
-              <div className="flex items-center gap-3 mb-8">
-                <div className="p-3 bg-blue-50 text-blue-600 rounded-2xl shadow-sm">
-                  <TrendingUp className="w-6 h-6" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-black text-slate-800 uppercase tracking-tighter italic leading-none">Absenteísmo (%)</h3>
-                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">Histórico dos últimos 6 meses</p>
-                </div>
-              </div>
-              <div className="h-[250px] w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={stats.absenteeismData}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                    <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 9, fontWeight: 900, fill: '#94a3b8'}} />
-                    <YAxis axisLine={false} tickLine={false} tick={{fontSize: 9, fontWeight: 900, fill: '#94a3b8'}} />
-                    <Tooltip 
-                      cursor={{fill: '#f8fafc'}} 
-                      contentStyle={{borderRadius: '20px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)'}} 
-                      formatter={(value: number) => [formatNumber(value, 1) + '%', "Absenteísmo"]}
-                    />
-                    <Bar dataKey="value" name="Absenteísmo" fill="#344434" radius={[6, 6, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
-
-            <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-200">
-              <div className="flex items-center gap-3 mb-8">
-                <div className="p-3 bg-emerald-50 text-emerald-600 rounded-2xl shadow-sm">
-                  <Users className="w-6 h-6" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-black text-slate-800 uppercase tracking-tighter italic leading-none">Headcount por Depto</h3>
-                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">Distribuição de Colaboradores Ativos</p>
-                </div>
-              </div>
-              <div className="h-[250px] w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={stats.headcountData} layout="vertical">
-                    <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f1f5f9" />
-                    <XAxis type="number" axisLine={false} tickLine={false} tick={{fontSize: 9, fontWeight: 900, fill: '#94a3b8'}} />
-                    <YAxis dataKey="name" type="category" axisLine={false} tickLine={false} tick={{fontSize: 9, fontWeight: 900, fill: '#94a3b8'}} width={100} />
-                    <Tooltip 
-                      cursor={{fill: '#f8fafc'}} 
-                      contentStyle={{borderRadius: '20px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)'}} 
-                      formatter={(value: number) => [formatNumber(value), "Colaboradores"]}
-                    />
-                    <Bar dataKey="value" name="Colaboradores" fill="#10b981" radius={[0, 6, 6, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
               </div>
             </div>
           </div>
@@ -752,75 +878,6 @@ const SlaughterHR: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
               </div>
             </div>
 
-            <div className="lg:col-span-1">
-              <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-200">
-                <h3 className="text-xl font-black text-slate-800 mb-8 uppercase tracking-tighter italic flex items-center gap-3">
-                  <BarChartIcon className="w-6 h-6" />
-                  Indicadores Mensais
-                </h3>
-                <form onSubmit={handleSaveIndicator} className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Mês</label>
-                      <select 
-                        className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none text-xs"
-                        value={indicatorForm.month}
-                        onChange={e => setIndicatorForm({...indicatorForm, month: Number(e.target.value)})}
-                      >
-                        {Array.from({ length: 12 }, (_, i) => i + 1).map(m => (
-                          <option key={m} value={m}>{format(new Date(2000, m - 1), 'MMMM')}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Ano</label>
-                      <select 
-                        className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none text-xs"
-                        value={indicatorForm.year}
-                        onChange={e => setIndicatorForm({...indicatorForm, year: Number(e.target.value)})}
-                      >
-                        {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - i).map(y => (
-                          <option key={y} value={y}>{y}</option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Turnover (%)</label>
-                      <input 
-                        type="number" step="0.1" required 
-                        className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none text-xs"
-                        value={indicatorForm.turnover}
-                        onChange={e => setIndicatorForm({...indicatorForm, turnover: e.target.value})}
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Absenteísmo (%)</label>
-                      <input 
-                        type="number" step="0.1" required 
-                        className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none text-xs"
-                        value={indicatorForm.absenteeism}
-                        onChange={e => setIndicatorForm({...indicatorForm, absenteeism: e.target.value})}
-                      />
-                    </div>
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Acidentes</label>
-                    <input 
-                      type="number" required 
-                      className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none text-xs"
-                      value={indicatorForm.accidents}
-                      onChange={e => setIndicatorForm({...indicatorForm, accidents: e.target.value})}
-                    />
-                  </div>
-                  <button type="submit" className="w-full py-4 bg-[#344434] text-white rounded-2xl font-black uppercase tracking-widest text-xs shadow-lg hover:bg-[#2a382a] transition-all">
-                    Salvar Indicadores
-                  </button>
-                </form>
-              </div>
-            </div>
-
             <div className="lg:col-span-2">
               <div className="bg-white border border-slate-200 rounded-[2.5rem] overflow-hidden shadow-sm">
                 <div className="p-6 border-b border-slate-100 flex justify-between items-center">
@@ -885,6 +942,121 @@ const SlaughterHR: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                     )}
                   </tbody>
                 </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {activeSubTab === 'indicators' && (
+        <div className="space-y-8">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-white p-6 rounded-[2rem] border border-slate-200 shadow-sm">
+            <div className="bg-blue-50/50 p-4 rounded-2xl flex items-center gap-3">
+              <Users className="w-4 h-4 text-blue-600" />
+              <div>
+                <div className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Quadro de Vagas</div>
+                <div className="flex items-baseline gap-2">
+                  <div className="text-sm font-black text-slate-800">{formatNumber(stats.active)} / {formatNumber(stats.totalVacanciesCount)}</div>
+                  <div className="text-[10px] font-bold text-blue-600">{formatNumber(stats.occupancyRate, 1)}%</div>
+                </div>
+              </div>
+            </div>
+            <div className="bg-amber-50/50 p-4 rounded-2xl flex items-center gap-3">
+              <TrendingUp className="w-4 h-4 text-amber-600" />
+              <div>
+                <div className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Turnover</div>
+                <div className="text-sm font-black text-slate-800">{formatNumber(stats.filteredIndicator?.turnover || 0, 1)}%</div>
+              </div>
+            </div>
+            <div className="bg-red-50/50 p-4 rounded-2xl flex items-center gap-3">
+              <Heart className="w-4 h-4 text-red-600" />
+              <div>
+                <div className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Acidentes</div>
+                <div className="text-sm font-black text-slate-800">{formatNumber(stats.filteredIndicator?.accidents || 0)}</div>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-200">
+              <div className="flex items-center gap-3 mb-8">
+                <div className="p-3 bg-blue-50 text-blue-600 rounded-2xl shadow-sm">
+                  <TrendingUp className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-black text-slate-800 uppercase tracking-tighter italic leading-none">Absenteísmo (%)</h3>
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">Histórico dos últimos 6 meses</p>
+                </div>
+              </div>
+              <div className="h-[250px] w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={stats.absenteeismData}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                    <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 9, fontWeight: 900, fill: '#94a3b8'}} />
+                    <YAxis axisLine={false} tickLine={false} tick={{fontSize: 9, fontWeight: 900, fill: '#94a3b8'}} />
+                    <Tooltip 
+                      cursor={{fill: '#f8fafc'}} 
+                      contentStyle={{borderRadius: '20px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)'}} 
+                      formatter={(value: number) => [formatNumber(value, 1) + '%', "Absenteísmo"]}
+                    />
+                    <Bar dataKey="value" name="Absenteísmo" fill="#344434" radius={[6, 6, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+
+            <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-200">
+              <div className="flex items-center gap-3 mb-8">
+                <div className="p-3 bg-emerald-50 text-emerald-600 rounded-2xl shadow-sm">
+                  <Users className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-black text-slate-800 uppercase tracking-tighter italic leading-none">HEADCOUNT</h3>
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">Vagas vs Ocupadas por Setor</p>
+                </div>
+              </div>
+              <div className="h-[250px] w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={stats.headcountData} layout="vertical">
+                    <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f1f5f9" />
+                    <XAxis type="number" axisLine={false} tickLine={false} tick={{fontSize: 9, fontWeight: 900, fill: '#94a3b8'}} />
+                    <YAxis dataKey="name" type="category" axisLine={false} tickLine={false} tick={{fontSize: 9, fontWeight: 900, fill: '#94a3b8'}} width={100} />
+                    <Tooltip 
+                      cursor={{fill: '#f8fafc'}} 
+                      contentStyle={{borderRadius: '20px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)'}} 
+                    />
+                    <Bar dataKey="vagas" name="Vagas Totais" fill="#e2e8f0" radius={[0, 6, 6, 0]} />
+                    <Bar dataKey="ocupadas" name="Vagas Ocupadas" fill="#10b981" radius={[0, 6, 6, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div className="lg:col-span-3">
+              <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-200">
+                <h3 className="text-xl font-black text-slate-800 mb-8 uppercase tracking-tighter italic flex items-center gap-3">
+                  <BarChartIcon className="w-6 h-6" />
+                  Resumo de Indicadores (Calculado dos Lançamentos)
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div className="bg-slate-50 p-6 rounded-3xl border border-slate-100">
+                    <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Absenteísmo</div>
+                    <div className="text-2xl font-black text-slate-800">{formatNumber(stats.filteredIndicator.absenteeism, 1)}%</div>
+                    <div className="text-[10px] text-slate-400 mt-1">Baseado em faltas e atestados do mês</div>
+                  </div>
+                  <div className="bg-slate-50 p-6 rounded-3xl border border-slate-100">
+                    <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Turnover</div>
+                    <div className="text-2xl font-black text-slate-800">{formatNumber(stats.filteredIndicator.turnover, 1)}%</div>
+                    <div className="text-[10px] text-slate-400 mt-1">Baseado em desligamentos do mês</div>
+                  </div>
+                  <div className="bg-slate-50 p-6 rounded-3xl border border-slate-100">
+                    <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Acidentes</div>
+                    <div className="text-2xl font-black text-slate-800">{formatNumber(stats.filteredIndicator.accidents)}</div>
+                    <div className="text-[10px] text-slate-400 mt-1">Total de acidentes no mês</div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
