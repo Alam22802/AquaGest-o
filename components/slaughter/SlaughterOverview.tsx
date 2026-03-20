@@ -3,7 +3,7 @@ import React, { useState, useMemo } from 'react';
 import { AppState, SlaughterLog, User } from '../../types';
 import { formatNumber } from '../../utils/formatters';
 import { Factory, Trash2, Edit3, X, ArrowUpDown, Calendar, Clock, Scale, ClipboardCheck, User as UserIcon, Search, CheckCircle, TrendingUp, ChevronDown, BarChart as BarChartIcon } from 'lucide-react';
-import { format, isWithinInterval, parseISO, startOfDay, endOfDay, subDays, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay } from 'date-fns';
+import { format, isWithinInterval, parseISO, startOfDay, endOfDay, subDays, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, differenceInDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell
@@ -32,6 +32,8 @@ const SlaughterSummary = React.memo(({ stats, startDate, endDate, onStartDateCha
     totalInvoiceValue: number;
     costPerTonProduced: number;
     totalTransportCondemnation: number;
+    avgSlaughterPerDay: number;
+    avgFinishedProductPerDay: number;
   }, 
   startDate: string, 
   endDate: string, 
@@ -71,7 +73,7 @@ const SlaughterSummary = React.memo(({ stats, startDate, endDate, onStartDateCha
           </div>
 
           {/* Linha 1: Produção */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-8 mb-8 pb-8 border-b border-white/5">
+          <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-8 mb-8 pb-8 border-b border-white/5">
              <div className="space-y-2 border-l-2 border-white/10 pl-6">
                 <div className="text-[9px] font-black opacity-40 uppercase tracking-widest">Total Recepção</div>
                 <div className="text-2xl font-black flex items-baseline gap-1">
@@ -98,6 +100,20 @@ const SlaughterSummary = React.memo(({ stats, startDate, endDate, onStartDateCha
                 <div className="text-2xl font-black flex items-baseline gap-1">
                    {formatNumber(stats.totalGta, 0)}
                    <span className="text-[10px] opacity-40">kg</span>
+                </div>
+             </div>
+             <div className="space-y-2 border-l-2 border-white/10 pl-6">
+                <div className="text-[9px] font-black opacity-40 uppercase tracking-widest">Média Abate Dia</div>
+                <div className="text-2xl font-black flex items-baseline gap-1">
+                   {formatNumber(stats.avgSlaughterPerDay, 0)}
+                   <span className="text-[10px] opacity-40">kg/dia</span>
+                </div>
+             </div>
+             <div className="space-y-2 border-l-2 border-emerald-500/30 pl-6">
+                <div className="text-[9px] font-black opacity-40 uppercase tracking-widest">Média Prod. Acabado Dia</div>
+                <div className="text-2xl font-black text-emerald-400 flex items-baseline gap-1">
+                   {formatNumber(stats.avgFinishedProductPerDay, 0)}
+                   <span className="text-[10px] opacity-40">kg/dia</span>
                 </div>
              </div>
           </div>
@@ -476,6 +492,10 @@ const SlaughterOverview: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
     // Custo Ton Produzida = Total Cost / (Total Packed in tons)
     const costPerTonProduced = totalPacked > 0 ? totalCost / (totalPacked / 1000) : 0;
 
+    const daysInPeriod = Math.max(1, differenceInDays(end, start) + 1);
+    const avgSlaughterPerDay = totalRecep / daysInPeriod;
+    const avgFinishedProductPerDay = totalPacked / daysInPeriod;
+
     return { 
       totalGta, 
       totalRecep, 
@@ -490,7 +510,9 @@ const SlaughterOverview: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
       totalSlaughterCondemnation,
       totalInvoiceValue,
       costPerTonProduced,
-      totalTransportCondemnation
+      totalTransportCondemnation,
+      avgSlaughterPerDay,
+      avgFinishedProductPerDay
     };
   }, [state.slaughterLogs, state.slaughterExpenses, summaryStartDate, summaryEndDate]);
 

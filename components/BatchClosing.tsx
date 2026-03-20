@@ -13,6 +13,7 @@ import {
   DollarSign, 
   Plus, 
   Trash2, 
+  Edit2,
   AlertCircle,
   CheckCircle2,
   Target,
@@ -51,9 +52,15 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
   const [selectedBatchId, setSelectedBatchId] = useState<string>('');
   const [expenseForm, setExpenseForm] = useState({
     category: '',
+    item: '',
     date: new Date().toISOString().split('T')[0],
     amount: ''
   });
+  const [isAddingCategory, setIsAddingCategory] = useState(false);
+  const [isAddingItem, setIsAddingItem] = useState(false);
+  const [editingExpenseId, setEditingExpenseId] = useState<string | null>(null);
+  const [filterCategory, setFilterCategory] = useState('');
+  const [filterItem, setFilterItem] = useState('');
 
   const hasPermission = currentUser.isMaster || currentUser.canEdit;
 
@@ -206,6 +213,15 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     
     const totalExpenses = expenses.reduce((acc, curr) => acc + curr.value, 0);
 
+    const categories = Array.from(new Set((state.batchExpenses || []).map(e => e.category))).sort();
+    const items = Array.from(new Set((state.batchExpenses || []).map(e => e.description))).sort();
+
+    const filteredExpenses = expenses.filter(e => {
+      const matchCategory = !filterCategory || e.category === filterCategory;
+      const matchItem = !filterItem || e.description.toLowerCase().includes(filterItem.toLowerCase());
+      return matchCategory && matchItem;
+    }).sort((a, b) => b.date.localeCompare(a.date));
+
     const protocol = (state.protocols || []).find(p => p.id === batch.protocolId);
     
     // Calculate total days
@@ -300,35 +316,78 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       liveFish,
       currentBiomassKg,
       biomassBeforeHarvest,
-      logsByCage
+      logsByCage,
+      categories,
+      items,
+      filteredExpenses
     };
-  }, [selectedBatchId, state.batches, state.mortalityLogs, state.feedingLogs, state.harvestLogs, state.slaughterLogs, state.batchExpenses, state.protocols, state.biometryLogs, state.cages, state.feedTypes]);
+  }, [selectedBatchId, state.batches, state.mortalityLogs, state.feedingLogs, state.harvestLogs, state.slaughterLogs, state.batchExpenses, state.protocols, state.biometryLogs, state.cages, state.feedTypes, filterCategory, filterItem]);
 
   const handleAddExpense = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedBatchId || !expenseForm.category || !expenseForm.amount) return;
+    if (!selectedBatchId || !expenseForm.category || !expenseForm.item || !expenseForm.amount) return;
 
-    const newExpense: BatchExpense = {
-      id: generateId(),
+    const expenseData = {
       batchId: selectedBatchId,
       category: expenseForm.category,
-      description: expenseForm.category, // Using category as description for now
+      description: expenseForm.item,
       date: expenseForm.date,
       value: Number(expenseForm.amount),
       userId: currentUser.id,
       updatedAt: Date.now()
     };
 
+    let updatedExpenses;
+    if (editingExpenseId) {
+      updatedExpenses = (state.batchExpenses || []).map(e => 
+        e.id === editingExpenseId ? { ...e, ...expenseData } : e
+      );
+    } else {
+      const newExpense: BatchExpense = {
+        id: generateId(),
+        ...expenseData
+      };
+      updatedExpenses = [...(state.batchExpenses || []), newExpense];
+    }
+
     onUpdate({
       ...state,
-      batchExpenses: [...(state.batchExpenses || []), newExpense]
+      batchExpenses: updatedExpenses
     });
 
     setExpenseForm({
       category: '',
+      item: '',
       date: new Date().toISOString().split('T')[0],
       amount: ''
     });
+    setIsAddingCategory(false);
+    setIsAddingItem(false);
+    setEditingExpenseId(null);
+  };
+
+  const startEditExpense = (expense: BatchExpense) => {
+    setEditingExpenseId(expense.id);
+    setExpenseForm({
+      category: expense.category,
+      item: expense.description,
+      date: expense.date,
+      amount: expense.value.toString()
+    });
+    setIsAddingCategory(false);
+    setIsAddingItem(false);
+  };
+
+  const cancelEdit = () => {
+    setEditingExpenseId(null);
+    setExpenseForm({
+      category: '',
+      item: '',
+      date: new Date().toISOString().split('T')[0],
+      amount: ''
+    });
+    setIsAddingCategory(false);
+    setIsAddingItem(false);
   };
 
   const removeExpense = (id: string) => {
@@ -534,7 +593,7 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                       <span className="text-lg font-black italic">{formatNumber(batchData.harvestedFish)} un</span>
                     </div>
                     <div className="space-y-1">
-                      <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest block">Peso Despescado</span>
+                      <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest block">Peso Total</span>
                       <span className="text-lg font-black italic">{formatNumber(batchData.harvestedWeight, 1)}kg</span>
                     </div>
                     <div className="space-y-1">
@@ -560,134 +619,145 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                 </div>
               </div>
             </div>
-
-            {/* Expenses List */}
-            <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-200">
-              <div className="flex items-center justify-between mb-8">
-                <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest flex items-center gap-2 italic">
-                  <DollarSign className="w-4 h-4 text-emerald-600" />
-                  Custos e Despesas do Lote
-                </h3>
-                <div className="px-4 py-2 bg-emerald-50 text-emerald-700 rounded-xl border border-emerald-100">
-                  <span className="text-[10px] font-black uppercase tracking-widest">Total: {formatCurrency(batchData.totalExpenses)}</span>
-                </div>
-              </div>
-
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b border-slate-100">
-                      <th className="text-left py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Data</th>
-                      <th className="text-left py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Categoria/Modelo</th>
-                      <th className="text-right py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Valor</th>
-                      <th className="w-10"></th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-50">
-                    {batchData.expenses.sort((a, b) => b.date.localeCompare(a.date)).map(expense => (
-                      <tr key={expense.id} className="group hover:bg-slate-50 transition-colors">
-                        <td className="py-4 text-xs font-bold text-slate-600">{safeDateFormat(expense.date, 'dd/MM/yyyy')}</td>
-                        <td className="py-4 text-xs font-black text-slate-800 uppercase italic">{expense.category}</td>
-                        <td className="py-4 text-right text-xs font-black text-emerald-600">{formatCurrency(expense.value)}</td>
-                        <td className="py-4 text-right">
-                          <button 
-                            onClick={() => removeExpense(expense.id)}
-                            className="p-2 text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                    {batchData.expenses.length === 0 && (
-                      <tr>
-                        <td colSpan={4} className="py-12 text-center">
-                          <DollarSign className="w-8 h-8 text-slate-200 mx-auto mb-2" />
-                          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Nenhuma despesa lançada.</p>
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
           </div>
 
-            {/* Sidebar: Cost Analysis & Expense Form */}
-            <div className="space-y-8 print:hidden">
+          {/* Sidebar (Right Column) */}
+          <div className="space-y-8">
               {/* Cost Analysis Card */}
-              <div className="bg-emerald-600 p-8 rounded-[2.5rem] shadow-xl shadow-emerald-200 text-white space-y-6">
-                <h3 className="text-sm font-black uppercase tracking-widest flex items-center gap-2 italic">
-                  <Scale className="w-4 h-4" />
-                  Análise de Custo
+              <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-200 space-y-6">
+                <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest flex items-center gap-2 italic">
+                  <DollarSign className="w-4 h-4 text-emerald-600" />
+                  Análise de Custos
                 </h3>
-                
+
                 <div className="space-y-4">
-                  <div className="p-6 bg-white/10 rounded-3xl border border-white/10 text-center">
-                    <span className="text-[10px] font-black text-emerald-100 uppercase tracking-widest block mb-2">Custo por KG Produzido</span>
-                    <span className="text-4xl font-black italic">{formatCurrency(batchData.costPerKg)}</span>
-                    <p className="text-[9px] font-bold text-emerald-100 uppercase mt-2">Baseado no peso líquido de abate</p>
+                  <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">Custo Total Acumulado</span>
+                    <span className="text-2xl font-black text-slate-800 italic">{formatCurrency(batchData.totalExpenses)}</span>
                   </div>
 
-                  <div className="grid grid-cols-1 gap-4">
-                    <div className="flex justify-between items-center px-2">
-                      <span className="text-[10px] font-black text-emerald-100 uppercase tracking-widest">Total Investido</span>
-                      <span className="text-sm font-black">{formatCurrency(batchData.totalExpenses)}</span>
-                    </div>
-                    <div className="flex justify-between items-center px-2">
-                      <span className="text-[10px] font-black text-emerald-100 uppercase tracking-widest">Peso Total (Abate)</span>
-                      <span className="text-sm font-black">{formatNumber(batchData.slaughteredWeight || batchData.harvestedWeight, 1)}kg</span>
-                    </div>
+                  <div className="p-4 bg-emerald-50 rounded-2xl border border-emerald-100">
+                    <span className="text-[10px] font-black text-emerald-600 uppercase tracking-widest block mb-1">Custo por KG</span>
+                    <span className="text-2xl font-black text-emerald-700 italic">{formatCurrency(batchData.costPerKg)}</span>
                   </div>
                 </div>
-              </div>
 
-              {/* Close Batch Button (Admin Only) */}
-              {currentUser.isMaster && !batchData.batch.isClosed && (
-                <div className="bg-amber-50 p-8 rounded-[2.5rem] border border-amber-200 space-y-6">
-                  <div className="flex items-center gap-3">
-                    <div className="p-3 bg-amber-100 rounded-2xl">
-                      <Lock className="w-6 h-6 text-amber-600" />
-                    </div>
-                    <div>
-                      <h4 className="text-sm font-black text-amber-800 uppercase tracking-tighter italic">Finalizar Lote</h4>
-                      <p className="text-[10px] font-bold text-amber-600 uppercase tracking-widest">Ação de Auditoria</p>
-                    </div>
-                  </div>
-                  <p className="text-[10px] font-bold text-amber-700 uppercase leading-relaxed">
-                    Ao fechar o lote, todos os dados financeiros e produtivos serão congelados para arquivamento. Certifique-se de que todos os lançamentos foram conferidos.
-                  </p>
+                {!batchData.batch.isClosed && currentUser.isMaster && (
                   <button 
                     onClick={handleCloseBatch}
-                    className="w-full py-4 bg-amber-600 text-white rounded-2xl font-black uppercase tracking-widest text-xs shadow-xl shadow-amber-200 hover:bg-amber-700 transition-all active:scale-95"
+                    className="w-full py-4 bg-emerald-600 text-white rounded-2xl font-black uppercase tracking-widest text-xs shadow-xl shadow-emerald-100 hover:bg-emerald-700 transition-all active:scale-95 flex items-center justify-center gap-2"
                   >
-                    Fechar Lote Agora
+                    <Lock className="w-4 h-4" />
+                    Fechar Lote Definitivamente
                   </button>
-                </div>
-              )}
+                )}
+
+                {batchData.batch.isClosed && (
+                  <div className="p-4 bg-slate-100 rounded-2xl border border-slate-200 text-center">
+                    <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Lote Encerrado</p>
+                    <p className="text-[9px] font-bold text-slate-400 uppercase mt-1">Nenhuma alteração permitida</p>
+                  </div>
+                )}
+              </div>
 
               {/* Add Expense Form */}
               {!batchData.batch.isClosed && (
                 <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-200">
                   <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest flex items-center gap-2 italic mb-6">
                     <Plus className="w-4 h-4 text-blue-600" />
-                    Lançar Despesa
+                    {editingExpenseId ? 'Editar Despesa' : 'Lançar Despesa'}
                   </h3>
                   
                   <form onSubmit={handleAddExpense} className="space-y-4">
                     <div>
-                      <label className="block text-[10px] font-black text-slate-400 uppercase mb-1 tracking-widest ml-1">Modelo/Categoria</label>
-                      <input 
-                        type="text" 
-                        required 
-                        placeholder="Ex: Ração, Alevinos, Energia..."
-                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 font-bold text-sm"
-                        value={expenseForm.category}
-                        onChange={e => setExpenseForm({...expenseForm, category: e.target.value})}
-                      />
+                      <label className="block text-[10px] font-black text-slate-400 uppercase mb-1 tracking-widest ml-1">Categoria</label>
+                      {!isAddingCategory ? (
+                        <select 
+                          className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 font-bold text-sm"
+                          value={expenseForm.category}
+                          onChange={e => {
+                            if (e.target.value === 'new') {
+                              setIsAddingCategory(true);
+                              setExpenseForm({ ...expenseForm, category: '' });
+                            } else {
+                              setExpenseForm({ ...expenseForm, category: e.target.value });
+                            }
+                          }}
+                          required
+                        >
+                          <option value="">Selecione...</option>
+                          {batchData.categories.map(cat => (
+                            <option key={cat} value={cat}>{cat}</option>
+                          ))}
+                          <option value="new" className="text-blue-600 font-black">+ Cadastrar Nova Categoria</option>
+                        </select>
+                      ) : (
+                        <div className="flex gap-2">
+                          <input 
+                            type="text" 
+                            autoFocus
+                            placeholder="Nova Categoria"
+                            className="flex-1 px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 font-bold text-sm"
+                            value={expenseForm.category}
+                            onChange={e => setExpenseForm({ ...expenseForm, category: e.target.value })}
+                            required
+                          />
+                          <button 
+                            type="button"
+                            onClick={() => setIsAddingCategory(false)}
+                            className="px-4 py-3 bg-slate-100 text-slate-500 rounded-2xl font-black text-[10px] uppercase"
+                          >
+                            Voltar
+                          </button>
+                        </div>
+                      )}
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-[10px] font-black text-slate-400 uppercase mb-1 tracking-widest ml-1">Item (Lançamento)</label>
+                      {!isAddingItem ? (
+                        <select 
+                          className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 font-bold text-sm"
+                          value={expenseForm.item}
+                          onChange={e => {
+                            if (e.target.value === 'new') {
+                              setIsAddingItem(true);
+                              setExpenseForm({ ...expenseForm, item: '' });
+                            } else {
+                              setExpenseForm({ ...expenseForm, item: e.target.value });
+                            }
+                          }}
+                          required
+                        >
+                          <option value="">Selecione...</option>
+                          {batchData.items.map(item => (
+                            <option key={item} value={item}>{item}</option>
+                          ))}
+                          <option value="new" className="text-blue-600 font-black">+ Cadastrar Novo Item</option>
+                        </select>
+                      ) : (
+                        <div className="flex gap-2">
+                          <input 
+                            type="text" 
+                            autoFocus
+                            placeholder="Novo Item"
+                            className="flex-1 px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 font-bold text-sm"
+                            value={expenseForm.item}
+                            onChange={e => setExpenseForm({ ...expenseForm, item: e.target.value })}
+                            required
+                          />
+                          <button 
+                            type="button"
+                            onClick={() => setIsAddingItem(false)}
+                            className="px-4 py-3 bg-slate-100 text-slate-500 rounded-2xl font-black text-[10px] uppercase"
+                          >
+                            Voltar
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-4">
                       <div>
                         <label className="block text-[10px] font-black text-slate-400 uppercase mb-1 tracking-widest ml-1">Data</label>
                         <input 
@@ -712,18 +782,120 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                       </div>
                     </div>
 
-                    <button 
-                      type="submit"
-                      disabled={!hasPermission}
-                      className="w-full py-4 bg-slate-900 text-white rounded-2xl font-black uppercase tracking-widest text-xs shadow-xl shadow-slate-200 hover:bg-black transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      Confirmar Lançamento
-                    </button>
+                    <div className="flex gap-3">
+                      {editingExpenseId && (
+                        <button 
+                          type="button"
+                          onClick={cancelEdit}
+                          className="flex-1 py-4 bg-slate-100 text-slate-600 rounded-2xl font-black uppercase tracking-widest text-xs hover:bg-slate-200 transition-all"
+                        >
+                          Cancelar
+                        </button>
+                      )}
+                      <button 
+                        type="submit"
+                        disabled={!hasPermission}
+                        className="flex-[2] py-4 bg-slate-900 text-white rounded-2xl font-black uppercase tracking-widest text-xs shadow-xl shadow-slate-200 hover:bg-black transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {editingExpenseId ? 'Salvar Alterações' : 'Confirmar Lançamento'}
+                      </button>
+                    </div>
                   </form>
                 </div>
               )}
             </div>
           </div>
+
+          {/* Expenses List */}
+          <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-200">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+                <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest flex items-center gap-2 italic">
+                  <DollarSign className="w-4 h-4 text-emerald-600" />
+                  Quadro de Lançamentos
+                </h3>
+                
+                <div className="flex flex-wrap items-center gap-3">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-black text-slate-400 uppercase">Filtrar:</span>
+                    <select 
+                      className="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-[10px] font-black uppercase outline-none focus:ring-2 focus:ring-blue-500/20"
+                      value={filterCategory}
+                      onChange={e => setFilterCategory(e.target.value)}
+                    >
+                      <option value="">Todas Categorias</option>
+                      {batchData.categories.map(cat => (
+                        <option key={cat} value={cat}>{cat}</option>
+                      ))}
+                    </select>
+                    <input 
+                      type="text"
+                      placeholder="Buscar Item..."
+                      className="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-[10px] font-black uppercase outline-none focus:ring-2 focus:ring-blue-500/20"
+                      value={filterItem}
+                      onChange={e => setFilterItem(e.target.value)}
+                    />
+                  </div>
+                  <div className="px-4 py-2 bg-emerald-50 text-emerald-700 rounded-xl border border-emerald-100">
+                    <span className="text-[10px] font-black uppercase tracking-widest">Total: {formatCurrency(batchData.totalExpenses)}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b border-slate-100">
+                      <th className="text-left py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Data</th>
+                      <th className="text-left py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Categoria</th>
+                      <th className="text-left py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Lançamento (Item)</th>
+                      <th className="text-left py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Usuário</th>
+                      <th className="text-right py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Valor</th>
+                      <th className="w-20"></th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-50">
+                    {batchData.filteredExpenses.map(expense => {
+                      const user = state.users.find(u => u.id === expense.userId);
+                      return (
+                        <tr key={expense.id} className="group hover:bg-slate-50 transition-colors">
+                          <td className="py-4 text-xs font-bold text-slate-600">{safeDateFormat(expense.date, 'dd/MM/yyyy')}</td>
+                          <td className="py-4 text-xs font-black text-slate-400 uppercase italic">{expense.category}</td>
+                          <td className="py-4 text-xs font-black text-slate-800 uppercase italic">{expense.description}</td>
+                          <td className="py-4 text-xs font-bold text-slate-500 italic">{user?.name || '---'}</td>
+                          <td className="py-4 text-right text-xs font-black text-emerald-600">{formatCurrency(expense.value)}</td>
+                          <td className="py-4 text-right">
+                            <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-all">
+                              <button 
+                                onClick={() => startEditExpense(expense)}
+                                className="p-2 text-slate-300 hover:text-blue-500 transition-colors"
+                                title="Editar"
+                              >
+                                <Edit2 className="w-4 h-4" />
+                              </button>
+                              <button 
+                                onClick={() => removeExpense(expense.id)}
+                                className="p-2 text-slate-300 hover:text-red-500 transition-colors"
+                                title="Excluir"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                    {batchData.filteredExpenses.length === 0 && (
+                      <tr>
+                        <td colSpan={6} className="py-12 text-center">
+                          <DollarSign className="w-8 h-8 text-slate-200 mx-auto mb-2" />
+                          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Nenhum lançamento encontrado.</p>
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
 
           {/* Detailed Logs Section (Only visible after closing or for audit) */}
           {batchData.batch.isClosed && (

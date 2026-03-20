@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { AppState, CageStatus, User } from '../types';
 import { Settings, CheckCircle2, AlertTriangle, Eraser, Calendar, Clock, ArrowRight, Box, Eye, Warehouse } from 'lucide-react';
 import { format } from 'date-fns';
@@ -14,6 +14,7 @@ interface Props {
 const Maintenance: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
   const [activeTab, setActiveTab] = useState<'cages' | 'slaughterhouse'>('cages');
   const [selectedCageIds, setSelectedCageIds] = useState<string[]>([]);
+  const [filterBatchId, setFilterBatchId] = useState('');
   const hasPermission = currentUser.isMaster || currentUser.canEdit;
 
   const [formData, setFormData] = useState({
@@ -53,7 +54,8 @@ const Maintenance: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
           ...c,
           status: formData.status,
           maintenanceStartDate: ['Manutenção', 'Limpeza', 'Avaliação'].includes(formData.status) ? formData.startDate : undefined,
-          maintenanceEndDate: ['Manutenção', 'Limpeza', 'Avaliação'].includes(formData.status) ? formData.endDate : undefined
+          maintenanceEndDate: ['Manutenção', 'Limpeza', 'Avaliação'].includes(formData.status) ? formData.endDate : undefined,
+          harvestDate: undefined // Clear harvest date after status update
         };
       }
       return c;
@@ -62,6 +64,7 @@ const Maintenance: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     onUpdate({ ...state, cages: updatedCages });
     setFormData({ ...formData, cageId: '', endDate: '' });
     setSelectedCageIds([]);
+    setFilterBatchId(''); // Reset filter after update
     alert(`${targetIds.length} status de gaiola(s) atualizado(s) com sucesso!`);
   };
 
@@ -87,6 +90,44 @@ const Maintenance: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       case 'Sucata': return <Trash2 className="w-3 h-3" />;
     }
   };
+
+  const filteredCages = useMemo(() => {
+    if (filterBatchId === 'none') {
+      return state.cages.filter(c => !c.batchId);
+    }
+    if (filterBatchId) {
+      // Show cages currently in the batch
+      const activeInBatch = state.cages.filter(c => c.batchId === filterBatchId);
+      
+      // Also show cages recently harvested from this batch (so they can be moved to maintenance)
+      const harvestedFromBatchIds = new Set(
+        (state.harvestLogs || [])
+          .filter(h => h.batchId === filterBatchId)
+          .map(h => h.cageId)
+      );
+      
+      const recentlyHarvested = state.cages.filter(c => 
+        !c.batchId && harvestedFromBatchIds.has(c.id) && c.status === 'Disponível'
+      );
+      
+      // Combine and remove duplicates just in case
+      const combined = [...activeInBatch, ...recentlyHarvested];
+      const uniqueIds = new Set();
+      return combined.filter(c => {
+        if (uniqueIds.has(c.id)) return false;
+        uniqueIds.add(c.id);
+        return true;
+      });
+    }
+    return state.cages;
+  }, [state.cages, state.harvestLogs, filterBatchId]);
+
+  const batchesWithCages = useMemo(() => {
+    const activeBatchIds = new Set(state.cages.filter(c => c.batchId).map(c => c.batchId!));
+    const harvestedBatchIds = new Set((state.harvestLogs || []).map(h => h.batchId));
+    
+    return state.batches.filter(b => activeBatchIds.has(b.id) || harvestedBatchIds.has(b.id));
+  }, [state.batches, state.cages, state.harvestLogs]);
 
   return (
     <div className="space-y-8">
@@ -134,16 +175,41 @@ const Maintenance: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                     </button>
                   </div>
                 ) : (
-                  <div>
-                    <label className="block text-xs font-black text-slate-400 uppercase mb-1">Escolher Gaiola</label>
-                    <select required={selectedCageIds.length === 0} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-red-500 font-bold" value={formData.cageId} onChange={(e) => setFormData({...formData, cageId: e.target.value})}>
-                      <option value="">Selecione...</option>
-                      {state.cages.map(c => (
-                        <option key={c.id} value={c.id}>
-                          {c.name} ({c.dimensions ? `${c.dimensions.length}x${c.dimensions.width}x${c.dimensions.depth}m` : 'S/D'}) - {c.status}
-                        </option>
-                      ))}
-                    </select>
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-xs font-black text-slate-400 uppercase mb-1">Filtrar por Lote</label>
+                      <select 
+                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-red-500 font-bold"
+                        value={filterBatchId}
+                        onChange={(e) => {
+                          setFilterBatchId(e.target.value);
+                          setFormData({ ...formData, cageId: '' });
+                        }}
+                      >
+                        <option value="">Todas as Gaiolas</option>
+                        <option value="none">Gaiolas sem Lote</option>
+                        {batchesWithCages.map(b => (
+                          <option key={b.id} value={b.id}>{b.name}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-black text-slate-400 uppercase mb-1">Escolher Gaiola</label>
+                      <select 
+                        required={selectedCageIds.length === 0} 
+                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-red-500 font-bold" 
+                        value={formData.cageId} 
+                        onChange={(e) => setFormData({...formData, cageId: e.target.value})}
+                      >
+                        <option value="">Selecione...</option>
+                        {filteredCages.map(c => (
+                          <option key={c.id} value={c.id}>
+                            {c.name} - {c.model} - {c.status}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
                   </div>
                 )}
 
