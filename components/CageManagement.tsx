@@ -238,7 +238,12 @@ const CageManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
         {occupiedCages.map(cage => {
           const batch = (state.batches || []).find(b => b.id === cage.batchId);
           const line = (state.lines || []).find(l => l.id === cage.lineId);
-          const mortalities = (state.mortalityLogs || []).filter(m => m.cageId === cage.id).reduce((a, b) => a + b.count, 0);
+          const mortalities = (state.mortalityLogs || []).filter(m => {
+            if (m.cageId !== cage.id) return false;
+            if (m.batchId) return m.batchId === cage.batchId;
+            // Fallback for old logs
+            return batch && m.date >= batch.settlementDate;
+          }).reduce((a, b) => a + b.count, 0);
           const currentCount = (cage.initialFishCount || 0) - mortalities;
           
           return (

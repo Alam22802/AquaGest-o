@@ -612,7 +612,12 @@ const BatchManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       .filter((cage) => !scheduledCageIds.includes(cage.id))
       .map((cage) => {
         const mortality = (state.mortalityLogs || [])
-          .filter((m) => m.cageId === cage.id)
+          .filter((m) => {
+            if (m.cageId !== cage.id) return false;
+            if (m.batchId) return m.batchId === batch.id;
+            // Fallback for old logs
+            return m.date >= batch.settlementDate;
+          })
           .reduce((acc, curr) => acc + curr.count, 0);
 
         const currentCount = (cage.initialFishCount || 0) - mortality;
