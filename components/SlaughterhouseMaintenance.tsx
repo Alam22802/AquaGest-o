@@ -34,7 +34,15 @@ const SlaughterhouseMaintenance: React.FC<Props> = ({ state, onUpdate, currentUs
   const [utilityData, setUtilityData] = useState({
     date: new Date().toISOString().split('T')[0],
     type: 'energy' as 'water' | 'energy',
-    reading: ''
+    reading: '',
+    horimetro: ''
+  });
+
+  // Utility Filter State
+  const [utilityFilter, setUtilityFilter] = useState({
+    type: 'all' as 'all' | 'energy' | 'water',
+    startDate: '',
+    endDate: ''
   });
 
   const hasPermission = currentUser.isMaster || currentUser.canEdit;
@@ -74,6 +82,7 @@ const SlaughterhouseMaintenance: React.FC<Props> = ({ state, onUpdate, currentUs
       date: utilityData.date,
       type: utilityData.type,
       reading: Number(utilityData.reading),
+      horimetro: utilityData.type === 'water' ? Number(utilityData.horimetro) : undefined,
       userId: currentUser.id,
       timestamp: new Date().toISOString(),
       updatedAt: Date.now()
@@ -84,7 +93,7 @@ const SlaughterhouseMaintenance: React.FC<Props> = ({ state, onUpdate, currentUs
       utilityLogs: [newLog, ...(state.utilityLogs || [])]
     });
 
-    setUtilityData({ ...utilityData, reading: '' });
+    setUtilityData({ ...utilityData, reading: '', horimetro: '' });
     setSaveSuccess(true);
     setTimeout(() => setSaveSuccess(false), 3000);
   };
@@ -115,9 +124,35 @@ const SlaughterhouseMaintenance: React.FC<Props> = ({ state, onUpdate, currentUs
   }, [state.coldStorageLogs, searchTerm]);
 
   const filteredUtilityLogs = useMemo(() => {
-    const logs = [...(state.utilityLogs || [])];
+    let logs = [...(state.utilityLogs || [])];
+    
+    if (utilityFilter.type !== 'all') {
+      logs = logs.filter(l => l.type === utilityFilter.type);
+    }
+    
+    if (utilityFilter.startDate) {
+      logs = logs.filter(l => l.date >= utilityFilter.startDate);
+    }
+    
+    if (utilityFilter.endDate) {
+      logs = logs.filter(l => l.date <= utilityFilter.endDate);
+    }
+
     return logs.sort((a, b) => b.date.localeCompare(a.date) || b.timestamp.localeCompare(a.timestamp));
-  }, [state.utilityLogs]);
+  }, [state.utilityLogs, utilityFilter]);
+
+  const getConsumption = (currentLog: UtilityLog) => {
+    const allLogs = state.utilityLogs || [];
+    const sameTypeLogs = allLogs
+      .filter(l => l.type === currentLog.type)
+      .sort((a, b) => b.date.localeCompare(a.date) || b.timestamp.localeCompare(a.timestamp));
+    
+    const currentIndex = sameTypeLogs.findIndex(l => l.id === currentLog.id);
+    if (currentIndex === -1 || currentIndex === sameTypeLogs.length - 1) return null;
+    
+    const previousLog = sameTypeLogs[currentIndex + 1];
+    return currentLog.reading - previousLog.reading;
+  };
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
@@ -234,6 +269,20 @@ const SlaughterhouseMaintenance: React.FC<Props> = ({ state, onUpdate, currentUs
                   />
                 </div>
 
+                {utilityData.type === 'water' && (
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-widest">Horímetro (h)</label>
+                    <input 
+                      type="number" 
+                      step="0.1"
+                      placeholder="0.0"
+                      className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none focus:ring-2 focus:ring-blue-500/10 text-sm"
+                      value={utilityData.horimetro}
+                      onChange={e => setUtilityData({ ...utilityData, horimetro: e.target.value })}
+                    />
+                  </div>
+                )}
+
                 <div className="space-y-1">
                   <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-widest">Data</label>
                   <input 
@@ -275,7 +324,7 @@ const SlaughterhouseMaintenance: React.FC<Props> = ({ state, onUpdate, currentUs
                 </h3>
               </div>
               
-              {activeSubTab === 'temperature' && (
+              {activeSubTab === 'temperature' ? (
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
                   <input 
@@ -285,6 +334,33 @@ const SlaughterhouseMaintenance: React.FC<Props> = ({ state, onUpdate, currentUs
                     value={searchTerm}
                     onChange={e => setSearchTerm(e.target.value)}
                   />
+                </div>
+              ) : (
+                <div className="flex flex-wrap items-center gap-2">
+                  <select
+                    className="px-3 py-2 bg-white border border-slate-200 rounded-xl text-[10px] font-bold outline-none focus:ring-2 focus:ring-blue-500/10"
+                    value={utilityFilter.type}
+                    onChange={e => setUtilityFilter({ ...utilityFilter, type: e.target.value as any })}
+                  >
+                    <option value="all">Todos Tipos</option>
+                    <option value="energy">Energia</option>
+                    <option value="water">Água</option>
+                  </select>
+                  <div className="flex items-center gap-1">
+                    <input 
+                      type="date"
+                      className="px-3 py-2 bg-white border border-slate-200 rounded-xl text-[10px] font-bold outline-none focus:ring-2 focus:ring-blue-500/10"
+                      value={utilityFilter.startDate}
+                      onChange={e => setUtilityFilter({ ...utilityFilter, startDate: e.target.value })}
+                    />
+                    <span className="text-[10px] font-black text-slate-400">A</span>
+                    <input 
+                      type="date"
+                      className="px-3 py-2 bg-white border border-slate-200 rounded-xl text-[10px] font-bold outline-none focus:ring-2 focus:ring-blue-500/10"
+                      value={utilityFilter.endDate}
+                      onChange={e => setUtilityFilter({ ...utilityFilter, endDate: e.target.value })}
+                    />
+                  </div>
                 </div>
               )}
             </div>
@@ -303,6 +379,8 @@ const SlaughterhouseMaintenance: React.FC<Props> = ({ state, onUpdate, currentUs
                       <>
                         <th className="px-6 py-4">Tipo</th>
                         <th className="px-6 py-4 text-right">Leitura</th>
+                        <th className="px-6 py-4 text-right">Consumo</th>
+                        <th className="px-6 py-4 text-right">Horímetro</th>
                       </>
                     )}
                     <th className="px-6 py-4">Lançado por</th>
@@ -360,6 +438,16 @@ const SlaughterhouseMaintenance: React.FC<Props> = ({ state, onUpdate, currentUs
                         <td className="px-6 py-4 text-right">
                           <span className="text-xs font-black text-slate-800">
                             {log.reading.toLocaleString('pt-BR')} {log.type === 'energy' ? 'kWh' : 'm³'}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                          <span className="text-xs font-black text-emerald-600">
+                            {getConsumption(log) !== null ? `+${getConsumption(log)?.toLocaleString('pt-BR')}` : '---'} {log.type === 'energy' ? 'kWh' : 'm³'}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                          <span className="text-xs font-black text-slate-800">
+                            {log.horimetro ? `${log.horimetro.toLocaleString('pt-BR')} h` : '---'}
                           </span>
                         </td>
                         <td className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase">

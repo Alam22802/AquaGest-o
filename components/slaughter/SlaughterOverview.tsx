@@ -492,9 +492,10 @@ const SlaughterOverview: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
     // Custo Ton Produzida = Total Cost / (Total Packed in tons)
     const costPerTonProduced = totalPacked > 0 ? totalCost / (totalPacked / 1000) : 0;
 
-    const daysInPeriod = Math.max(1, differenceInDays(end, start) + 1);
-    const avgSlaughterPerDay = totalRecep / daysInPeriod;
-    const avgFinishedProductPerDay = totalPacked / daysInPeriod;
+    const uniqueSlaughterDays = new Set(filteredLogs.map(log => log.date)).size;
+    const daysToDivide = Math.max(1, uniqueSlaughterDays);
+    const avgSlaughterPerDay = totalRecep / daysToDivide;
+    const avgFinishedProductPerDay = totalPacked / daysToDivide;
 
     return { 
       totalGta, 

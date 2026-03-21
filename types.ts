@@ -357,6 +357,7 @@ export interface UtilityLog {
   date: string;
   type: 'water' | 'energy';
   reading: number;
+  horimetro?: number;
   userId: string;
   timestamp: string;
   updatedAt: number;
