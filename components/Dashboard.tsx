@@ -52,16 +52,19 @@ const Dashboard: React.FC<Props> = ({ state }) => {
     (state.mortalityLogs || []).forEach(m => {
       let bId = m.batchId;
       if (!bId && m.cageId) {
-        const cage = (state.cages || []).find(c => c.id === m.cageId);
-        if (cage?.batchId) {
-          const batch = (state.batches || []).find(b => b.id === cage.batchId);
-          if (batch && m.date >= batch.settlementDate) {
-            bId = cage.batchId;
-          }
+        // 1. Check if there's a harvest for this cage/batch that happened after this mortality
+        const harvest = (state.harvestLogs || []).find(h => h.cageId === m.cageId && h.date >= m.date);
+        if (harvest) {
+          bId = harvest.batchId;
         } else {
-          // Fallback for harvested cages: find the first harvest after the mortality date
-          const harvest = (state.harvestLogs || []).find(h => h.cageId === m.cageId && h.date >= m.date);
-          if (harvest) bId = harvest.batchId;
+          // 2. Check if it belongs to the current batch of the cage
+          const cage = (state.cages || []).find(c => c.id === m.cageId);
+          if (cage?.batchId) {
+            const batch = (state.batches || []).find(b => b.id === cage.batchId);
+            if (batch && m.date >= batch.settlementDate) {
+              bId = cage.batchId;
+            }
+          }
         }
       }
       
@@ -75,18 +78,20 @@ const Dashboard: React.FC<Props> = ({ state }) => {
     (state.feedingLogs || []).forEach(f => {
       let bId = f.batchId;
       if (!bId && f.cageId) {
-        const cage = (state.cages || []).find(c => c.id === f.cageId);
-        if (cage?.batchId) {
-          const batch = (state.batches || []).find(b => b.id === cage.batchId);
-          const fDate = (f.timestamp || '').split('T')[0];
-          if (batch && fDate >= batch.settlementDate) {
-            bId = cage.batchId;
-          }
+        const fDate = (f.timestamp || '').split('T')[0];
+        // 1. Check harvest logs first (historical data)
+        const harvest = (state.harvestLogs || []).find(h => h.cageId === f.cageId && h.date >= fDate);
+        if (harvest) {
+          bId = harvest.batchId;
         } else {
-          // Fallback for harvested cages
-          const fDate = (f.timestamp || '').split('T')[0];
-          const harvest = (state.harvestLogs || []).find(h => h.cageId === f.cageId && h.date >= fDate);
-          if (harvest) bId = harvest.batchId;
+          // 2. Check current cage assignment
+          const cage = (state.cages || []).find(c => c.id === f.cageId);
+          if (cage?.batchId) {
+            const batch = (state.batches || []).find(b => b.id === cage.batchId);
+            if (batch && fDate >= batch.settlementDate) {
+              bId = cage.batchId;
+            }
+          }
         }
       }
       
@@ -115,8 +120,13 @@ const Dashboard: React.FC<Props> = ({ state }) => {
       // Fallback for old logs missing initialFishCount
       let initial = h.initialFishCount;
       if (!initial) {
+        const batch = (state.batches || []).find(b => b.id === h.batchId);
         const cageMortality = (state.mortalityLogs || [])
-          .filter(m => m.cageId === h.cageId && m.date <= h.date)
+          .filter(m => {
+            if (m.cageId !== h.cageId) return false;
+            if (m.batchId) return m.batchId === h.batchId;
+            return batch && m.date >= batch.settlementDate && m.date <= h.date;
+          })
           .reduce((acc, curr) => acc + curr.count, 0);
         initial = h.fishCount + cageMortality;
       }

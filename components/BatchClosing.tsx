@@ -98,11 +98,16 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     const mortalityLogs = (state.mortalityLogs || []).filter(m => {
       let bId = m.batchId;
       if (!bId && m.cageId) {
-        const cage = (state.cages || []).find(c => c.id === m.cageId);
-        if (cage?.batchId === batch.id) bId = batch.id;
-        else {
-          const harvest = (state.harvestLogs || []).find(h => h.cageId === m.cageId && h.batchId === batch.id);
-          if (harvest) bId = batch.id;
+        // 1. Check harvest logs for this specific batch
+        const harvest = (state.harvestLogs || []).find(h => h.cageId === m.cageId && h.batchId === batch.id);
+        if (harvest && m.date <= harvest.date) {
+          bId = batch.id;
+        } else {
+          // 2. Check current cage assignment
+          const cage = (state.cages || []).find(c => c.id === m.cageId);
+          if (cage?.batchId === batch.id && m.date >= batch.settlementDate) {
+            bId = batch.id;
+          }
         }
       }
       return bId === batch.id;
@@ -113,11 +118,17 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     const feedingLogs = (state.feedingLogs || []).filter(f => {
       let bId = f.batchId;
       if (!bId && f.cageId) {
-        const cage = (state.cages || []).find(c => c.id === f.cageId);
-        if (cage?.batchId === batch.id) bId = batch.id;
-        else {
-          const harvest = (state.harvestLogs || []).find(h => h.cageId === f.cageId && h.batchId === batch.id);
-          if (harvest) bId = batch.id;
+        const fDate = (f.timestamp || '').split('T')[0];
+        // 1. Check harvest logs for this specific batch
+        const harvest = (state.harvestLogs || []).find(h => h.cageId === f.cageId && h.batchId === batch.id);
+        if (harvest && fDate <= harvest.date) {
+          bId = batch.id;
+        } else {
+          // 2. Check current cage assignment
+          const cage = (state.cages || []).find(c => c.id === f.cageId);
+          if (cage?.batchId === batch.id && fDate >= batch.settlementDate) {
+            bId = batch.id;
+          }
         }
       }
       return bId === batch.id;
