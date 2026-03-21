@@ -164,7 +164,7 @@ const FeedingLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
         l.id === editingId ? {
           ...l,
           cageId: formData.cageId,
-          batchId: cage?.batchId || l.batchId,
+          batchId: formBatchId || l.batchId,
           feedTypeId: formData.feedTypeId,
           amount: amountNum,
           timestamp: `${formData.date}T${formData.time}:00`,
@@ -188,11 +188,10 @@ const FeedingLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       onUpdate({ ...state, feedingLogs: updatedLogs, feedTypes: updatedFeeds });
       setEditingId(null);
     } else {
-      const cage = cageMap.get(formData.cageId);
       const newLog: IFeedingLog = {
         id: generateId(),
         cageId: formData.cageId,
-        batchId: cage?.batchId,
+        batchId: formBatchId,
         feedTypeId: formData.feedTypeId,
         amount: amountNum,
         timestamp: `${formData.date}T${formData.time}:00`,

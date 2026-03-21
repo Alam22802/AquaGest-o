@@ -249,8 +249,13 @@ const BatchManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
 
       // Safe fallback: if batchId is missing, check if cage was occupied
       if (!bId && cage?.batchId) {
-        bId = cage.batchId;
-      } else if (!bId && m.cageId) {
+        const batch = (state.batches || []).find((b) => b.id === cage.batchId);
+        if (batch && m.date >= batch.settlementDate) {
+          bId = cage.batchId;
+        }
+      }
+      
+      if (!bId && m.cageId) {
         // Fallback for harvested cages: find the harvest log that matches this cage and date
         const harvest = (state.harvestLogs || []).find(
           (h) => h.cageId === m.cageId && h.date >= (m.date || ""),
@@ -283,8 +288,13 @@ const BatchManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       if (!bId && b.cageId) {
         const cage = (state.cages || []).find((c) => c.id === b.cageId);
         if (cage?.batchId) {
-          bId = cage.batchId;
-        } else {
+          const batch = (state.batches || []).find((bt) => bt.id === cage.batchId);
+          if (batch && b.date >= batch.settlementDate) {
+            bId = cage.batchId;
+          }
+        }
+        
+        if (!bId) {
           const harvest = (state.harvestLogs || []).find(
             (h) => h.cageId === b.cageId && h.date >= (b.date || ""),
           );
