@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { AppState, CageStatus, User } from '../types';
-import { Settings, CheckCircle2, AlertTriangle, Eraser, Calendar, Clock, ArrowRight, Box, Eye, Warehouse } from 'lucide-react';
+import { Settings, CheckCircle2, AlertTriangle, Eraser, Calendar, Clock, ArrowRight, Box, Eye, Warehouse, Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
 import SlaughterhouseMaintenance from './SlaughterhouseMaintenance';
 
@@ -107,7 +107,7 @@ const Maintenance: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       );
       
       const recentlyHarvested = state.cages.filter(c => 
-        !c.batchId && harvestedFromBatchIds.has(c.id) && c.status === 'Disponível'
+        !c.batchId && harvestedFromBatchIds.has(c.id) && (c.status === 'Limpeza' || c.status === 'Manutenção')
       );
       
       // Combine and remove duplicates just in case
@@ -124,9 +124,19 @@ const Maintenance: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
 
   const batchesWithCages = useMemo(() => {
     const activeBatchIds = new Set(state.cages.filter(c => c.batchId).map(c => c.batchId!));
-    const harvestedBatchIds = new Set((state.harvestLogs || []).map(h => h.batchId));
     
-    return state.batches.filter(b => activeBatchIds.has(b.id) || harvestedBatchIds.has(b.id));
+    // Batches that have cages recently harvested and still "Available" (needing maintenance/cleaning)
+    const batchesWithAvailableHarvestedCages = new Set<string>();
+    (state.harvestLogs || []).forEach(h => {
+      const cage = state.cages.find(c => c.id === h.cageId);
+      if (cage && !cage.batchId && (cage.status === 'Limpeza' || cage.status === 'Manutenção')) {
+        batchesWithAvailableHarvestedCages.add(h.batchId);
+      }
+    });
+
+    return state.batches.filter(b => 
+      !b.isClosed && (activeBatchIds.has(b.id) || batchesWithAvailableHarvestedCages.has(b.id))
+    );
   }, [state.batches, state.cages, state.harvestLogs]);
 
   return (

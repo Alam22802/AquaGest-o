@@ -24,6 +24,7 @@ const HarvestManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
   const [totalWeight, setTotalWeight] = useState('');
   const [averageWeight, setAverageWeight] = useState('');
   const [fishCount, setFishCount] = useState('');
+  const [unitPrice, setUnitPrice] = useState('');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -80,6 +81,7 @@ const HarvestManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
           fishCount: Number(fishCount),
           totalWeight: Number(totalWeight),
           averageWeight: averageWeight ? Number(averageWeight) : undefined,
+          unitPrice: unitPrice ? Number(unitPrice) : undefined,
           date,
           updatedAt: Date.now()
         } : l
@@ -98,6 +100,7 @@ const HarvestManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
         fishCount: Number(fishCount),
         totalWeight: Number(totalWeight),
         averageWeight: averageWeight ? Number(averageWeight) : undefined,
+        unitPrice: unitPrice ? Number(unitPrice) : undefined,
         initialFishCount: selectedCage?.initialFishCount,
         date,
         userId: currentUser.id,
@@ -113,7 +116,7 @@ const HarvestManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
           initialFishCount: undefined, 
           settlementDate: undefined,
           harvestDate: undefined,
-          status: 'Disponível' as const,
+          status: 'Limpeza' as const,
           maintenanceStartDate: undefined,
           maintenanceEndDate: undefined,
           updatedAt: Date.now()
@@ -133,7 +136,23 @@ const HarvestManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
     setTimeout(() => setSaveSuccess(false), 3000);
     
     // Reset form
-    resetForm();
+    if (editingId) {
+      resetForm();
+    } else {
+      // Check if there are more cages in the batch
+      const remainingCages = state.cages.filter(c => c.batchId === selectedBatchId && c.id !== selectedCageId);
+      if (remainingCages.length === 0) {
+        resetForm();
+      } else {
+        // Only clear cage-specific fields, keep batch selected
+        setEditingId(null);
+        setSelectedCageId('');
+        setTotalWeight('');
+        setAverageWeight('');
+        setFishCount('');
+        setUnitPrice('');
+      }
+    }
   };
 
   const resetForm = () => {
@@ -143,6 +162,7 @@ const HarvestManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
     setTotalWeight('');
     setAverageWeight('');
     setFishCount('');
+    setUnitPrice('');
     setDate(new Date().toISOString().split('T')[0]);
   };
 
@@ -153,6 +173,7 @@ const HarvestManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
     setTotalWeight(log.totalWeight.toString());
     setAverageWeight(log.averageWeight?.toString() || '');
     setFishCount(log.fishCount.toString());
+    setUnitPrice(log.unitPrice?.toString() || '');
     setDate(log.date);
     
     // Scroll to form
@@ -190,9 +211,14 @@ const HarvestManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
 
   const finalizedBatches = useMemo(() => {
     return batches.filter(batch => {
-      const hasHarvests = (state.harvestLogs || []).some(h => h.batchId === batch.id);
-      const hasCages = state.cages.some(c => c.batchId === batch.id);
-      return hasHarvests && !hasCages;
+      if (batch.isClosed) return false;
+      
+      const batchCages = state.cages.filter(c => c.batchId === batch.id);
+      const harvestedFish = (state.harvestLogs || [])
+        .filter(h => h.batchId === batch.id)
+        .reduce((acc, curr) => acc + curr.fishCount, 0);
+        
+      return harvestedFish > 0 && batchCages.length === 0;
     }).map(batch => {
       const mortality = (state.mortalityLogs || [])
         .filter(m => m.batchId === batch.id)
@@ -205,15 +231,55 @@ const HarvestManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
       const expected = batch.initialQuantity - mortality;
       const accuracy = expected > 0 ? (harvested / expected) * 100 : 0;
 
+      // Find cages that were in this batch and are currently in 'Limpeza' or 'Manutenção'
+      const batchCageIds = new Set((state.harvestLogs || [])
+        .filter(h => h.batchId === batch.id)
+        .map(h => h.cageId));
+      
+      const cagesToRelease = state.cages.filter(c => 
+        batchCageIds.has(c.id) && 
+        (c.status === 'Limpeza' || c.status === 'Manutenção') &&
+        !c.batchId
+      );
+
       return {
         ...batch,
         mortality,
         harvested,
         expected,
-        accuracy
+        accuracy,
+        cagesToRelease
       };
     });
   }, [batches, state.harvestLogs, state.cages, state.mortalityLogs]);
+
+  const handleReleaseCages = (batchId: string) => {
+    if (!hasPermission) return;
+    
+    const batchData = finalizedBatches.find(b => b.id === batchId);
+    if (!batchData || batchData.cagesToRelease.length === 0) return;
+
+    const cageIdsToRelease = new Set(batchData.cagesToRelease.map(c => c.id));
+    
+    const updatedCages = state.cages.map(c => 
+      cageIdsToRelease.has(c.id) ? {
+        ...c,
+        status: 'Disponível' as const,
+        batchId: undefined,
+        initialFishCount: undefined,
+        settlementDate: undefined,
+        harvestDate: undefined,
+        maintenanceStartDate: undefined,
+        maintenanceEndDate: undefined,
+        updatedAt: Date.now()
+      } : c
+    );
+
+    onUpdate({
+      ...state,
+      cages: updatedCages
+    });
+  };
 
   const removeLog = (id: string) => {
     if (!hasPermission) return;
@@ -366,6 +432,18 @@ const HarvestManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
             </div>
 
             <div className="space-y-1">
+              <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-widest">Preço por kg (R$)</label>
+              <input 
+                type="number" 
+                step="0.01"
+                placeholder="0.00"
+                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none focus:ring-2 focus:ring-blue-500/10 text-xs"
+                value={unitPrice}
+                onChange={e => setUnitPrice(e.target.value)}
+              />
+            </div>
+
+            <div className="space-y-1">
               <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-widest">Data</label>
               <div className="relative">
                 <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-300" />
@@ -404,7 +482,7 @@ const HarvestManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
             </div>
             <h3 className="text-xl font-black mb-6 flex items-center gap-3 uppercase tracking-tighter italic">
               <TrendingUp className="w-6 h-6 text-indigo-400" />
-              Assertividade de Lotes Finalizados
+              Lotes Encerrados - Liberação de Gaiolas
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {finalizedBatches.map(fb => (
@@ -415,7 +493,7 @@ const HarvestManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
                       <h4 className="text-lg font-black uppercase italic">{fb.name}</h4>
                     </div>
                     <div className="text-right">
-                      <span className="text-[10px] font-black text-indigo-300 uppercase tracking-widest block mb-1">Assertividade</span>
+                      <span className="text-[10px] font-black text-indigo-300 uppercase tracking-widest block mb-1">Sobrevivência</span>
                       <span className={`text-2xl font-black ${fb.accuracy >= 98 ? 'text-emerald-400' : fb.accuracy >= 95 ? 'text-blue-400' : 'text-amber-400'}`}>
                         {fb.accuracy.toFixed(1)}%
                       </span>
@@ -431,6 +509,29 @@ const HarvestManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
                       <span className="text-xs font-bold text-emerald-400">{fb.harvested}</span>
                     </div>
                   </div>
+                  
+                  {fb.cagesToRelease.length > 0 && (
+                    <div className="mt-4 pt-4 border-t border-white/5 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-black text-indigo-300 uppercase tracking-widest">Gaiolas em Limpeza/Manutenção</span>
+                        <span className="text-[10px] font-black text-white bg-indigo-500 px-2 py-0.5 rounded-full">{fb.cagesToRelease.length}</span>
+                      </div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {fb.cagesToRelease.map(c => (
+                          <span key={c.id} className="px-2 py-1 bg-white/5 text-[9px] font-black text-indigo-200 rounded-lg uppercase border border-white/10">
+                            {c.name}
+                          </span>
+                        ))}
+                      </div>
+                      <button 
+                        onClick={() => handleReleaseCages(fb.id)}
+                        className="w-full py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-emerald-500/20 transition-all active:scale-95 flex items-center justify-center gap-2"
+                      >
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                        Liberar Gaiolas para Novos Povoamentos
+                      </button>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -477,6 +578,7 @@ const HarvestManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
                   <th className="px-6 py-4">Lote / Gaiola</th>
                   <th className="px-6 py-4 text-right">Peso Médio</th>
                   <th className="px-6 py-4 text-right">Peso Total</th>
+                  <th className="px-6 py-4 text-right">Preço/kg</th>
                   <th className="px-6 py-4 text-right">Qtd Peixes</th>
                   <th className="px-6 py-4 text-center">Ações</th>
                 </tr>
@@ -520,6 +622,9 @@ const HarvestManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
                       </td>
                       <td className="px-6 py-4 text-right text-xs font-black text-emerald-600">
                         {log.totalWeight?.toLocaleString()} kg
+                      </td>
+                      <td className="px-6 py-4 text-right text-xs font-black text-amber-600">
+                        {log.unitPrice ? `R$ ${log.unitPrice.toLocaleString()}` : '-'}
                       </td>
                       <td className="px-6 py-4 text-right text-xs font-black text-blue-600">
                         {calculatedFishCount?.toLocaleString()} un

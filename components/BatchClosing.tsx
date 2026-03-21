@@ -145,12 +145,15 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
 
     let biomassBeforeHarvest = 0;
     let avgWeightBeforeHarvest = batch.initialUnitWeight;
+    let expectedFish = batch.initialQuantity - mortality;
+
     if (firstHarvestDate) {
       const mortalityBeforeHarvest = mortalityLogs
         .filter(m => m.date < firstHarvestDate)
         .reduce((acc, curr) => acc + curr.count, 0);
       
       const liveFishBeforeHarvest = batch.initialQuantity - mortalityBeforeHarvest;
+      expectedFish = liveFishBeforeHarvest;
       
       const biometriesBeforeHarvest = (state.biometryLogs || [])
         .filter(b => {
@@ -167,10 +170,17 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
         });
 
       if (biometriesBeforeHarvest.length > 0) {
-        const lastDate = biometriesBeforeHarvest.reduce((max, log) => log.date > max ? log.date : max, "");
-        const lastDayLogs = biometriesBeforeHarvest.filter(log => log.date === lastDate);
-        if (lastDayLogs.length > 0) {
-          avgWeightBeforeHarvest = lastDayLogs.reduce((acc, log) => acc + log.averageWeight, 0) / lastDayLogs.length;
+        // Prioritize biometry on the harvest day itself
+        const harvestDayLogs = biometriesBeforeHarvest.filter(log => log.date === firstHarvestDate);
+        if (harvestDayLogs.length > 0) {
+          avgWeightBeforeHarvest = harvestDayLogs.reduce((acc, log) => acc + log.averageWeight, 0) / harvestDayLogs.length;
+        } else {
+          // Fallback to the most recent biometry up to the harvest day
+          const lastDate = biometriesBeforeHarvest.reduce((max, log) => log.date > max ? log.date : max, "");
+          const lastDayLogs = biometriesBeforeHarvest.filter(log => log.date === lastDate);
+          if (lastDayLogs.length > 0) {
+            avgWeightBeforeHarvest = lastDayLogs.reduce((acc, log) => acc + log.averageWeight, 0) / lastDayLogs.length;
+          }
         }
       }
       biomassBeforeHarvest = (liveFishBeforeHarvest * avgWeightBeforeHarvest) / 1000;
@@ -212,6 +222,8 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       .filter(e => e.batchId === batch.id);
     
     const totalExpenses = expenses.reduce((acc, curr) => acc + curr.value, 0);
+    const totalRevenue = harvests.reduce((acc, curr) => acc + (curr.totalWeight * (curr.unitPrice || 0)), 0);
+    const totalProfit = totalRevenue - totalExpenses;
 
     const categories = Array.from(new Set((state.batchExpenses || []).map(e => e.category))).sort();
     const items = Array.from(new Set((state.batchExpenses || []).map(e => e.description))).sort();
@@ -231,30 +243,18 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       : new Date();
     const totalDays = isNaN(differenceInDays(endDate, startDate)) ? 0 : differenceInDays(endDate, startDate);
 
-    // Survival Rate: (Initial - Mortality) / Initial
+    // Survival Rate (Predicted): (Expected Fish / Initial)
     const survivalRate = batch.initialQuantity > 0 
-      ? ((batch.initialQuantity - mortality) / batch.initialQuantity) * 100 
+      ? (expectedFish / batch.initialQuantity) * 100 
       : 0;
 
-    // Biomass Before Harvest: (Avg Weight * Remaining Quantity) / 1000
-    // If not already calculated via firstHarvestDate logic
-    if (biomassBeforeHarvest === 0) {
-      const currentAvgWeightBeforeHarvest = (state.biometryLogs || [])
-        .filter(b => {
-          let bId = b.batchId;
-          if (!bId && b.cageId) {
-             const cage = (state.cages || []).find(c => c.id === b.cageId);
-             if (cage?.batchId === batch.id) bId = batch.id;
-          }
-          return bId === batch.id;
-        })
-        .reduce((acc, curr, _, arr) => acc + curr.averageWeight / arr.length, 0);
-      
-      biomassBeforeHarvest = (currentAvgWeightBeforeHarvest * (batch.initialQuantity - mortality)) / 1000;
-    }
+    // Biomass Before Harvest: (Avg Weight * Expected Fish) / 1000
+    // This is our predicted biomass for comparison
+    const expectedWeight = expectedFish * (avgWeightBeforeHarvest / 1000);
+    biomassBeforeHarvest = expectedWeight;
 
-    // FCA (Theoretical): Total Feed / Biomass Before Harvest
-    const fcaTheoretical = biomassBeforeHarvest > 0 ? (feeding / 1000) / biomassBeforeHarvest : 0;
+    // FCA Previsto: Total Feed / Predicted Biomass
+    const fcaTheoretical = expectedWeight > 0 ? (feeding / 1000) / expectedWeight : 0;
 
     // FCA Real: Total Feed / Harvested Weight
     const fcaReal = harvestedWeight > 0 ? (feeding / 1000) / harvestedWeight : 0;
@@ -263,14 +263,11 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     const divisor = slaughteredWeight || harvestedWeight;
     const costPerKg = divisor > 0 ? totalExpenses / divisor : 0;
 
-    // Expected Fish: Initial - Mortality
-    const expectedFish = batch.initialQuantity - mortality;
-    
-    // Expected Weight: Expected Fish * avgWeightBeforeHarvest
-    const expectedWeight = expectedFish * (avgWeightBeforeHarvest / 1000);
+    // Accuracy (Assertividade): Harvested Weight / Expected Weight
+    const accuracy = expectedWeight > 0 ? (harvestedWeight / expectedWeight) * 100 : 0;
 
-    // Accuracy: Harvested Fish / Expected Fish
-    const accuracy = expectedFish > 0 ? (harvestedFish / expectedFish) * 100 : 0;
+    // Real Survival Rate: Harvested Fish / Initial Quantity
+    const survivalRateReal = batch.initialQuantity > 0 ? (harvestedFish / batch.initialQuantity) * 100 : 0;
 
     // Group logs by cage for detailed view
     const logsByCage = new Map<string, {
@@ -300,6 +297,8 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       feedingByType,
       harvestedFish,
       harvestedWeight,
+      totalRevenue,
+      totalProfit,
       slaughteredWeight,
       slaughteredCount,
       expenses,
@@ -311,6 +310,7 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       fcaReal,
       costPerKg,
       accuracy,
+      survivalRateReal,
       expectedFish,
       expectedWeight,
       liveFish,
@@ -522,7 +522,7 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                     <span className="text-xl font-black text-amber-600 italic">{formatNumber(batchData.feeding / 1000, 1)}kg</span>
                   </div>
                   <div className="space-y-1">
-                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">FCA (Teórico)</span>
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">FCA Previsto</span>
                     <span className="text-xl font-black text-indigo-600 italic">{formatNumber(batchData.fcaTheoretical, 2)}</span>
                   </div>
                   <div className="space-y-1">
@@ -556,7 +556,7 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                     <span className="text-sm font-black text-slate-600 uppercase">{formatNumber(batchData.batch.initialQuantity)} un</span>
                   </div>
                   <div className="space-y-1">
-                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Sobrevivência</span>
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Sobrevivência Prevista</span>
                     <span className="text-sm font-black text-emerald-500 uppercase">{formatNumber(batchData.survivalRate, 1)}%</span>
                   </div>
                   <div className="space-y-1">
@@ -576,7 +576,7 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                 <div className="space-y-6">
                   <div className="p-4 bg-white/5 rounded-2xl border border-white/10">
                     <div className="flex justify-between items-center mb-2">
-                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Assertividade do Lote</span>
+                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Taxa de Sobrevivência do Lote</span>
                       <span className="text-lg font-black text-indigo-400 italic">{formatNumber(batchData.accuracy, 1)}%</span>
                     </div>
                     <div className="w-full bg-white/10 h-1.5 rounded-full overflow-hidden">
@@ -588,6 +588,22 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                   </div>
 
                   <div className="grid grid-cols-2 gap-6">
+                    <div className="space-y-1">
+                      <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest block">Sobrevivência Prevista</span>
+                      <span className="text-lg font-black italic text-emerald-400">{formatNumber(batchData.survivalRate, 1)}%</span>
+                    </div>
+                    <div className="space-y-1">
+                      <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest block">Sobrevivência Real</span>
+                      <span className="text-lg font-black italic text-blue-400">{formatNumber(batchData.survivalRateReal, 1)}%</span>
+                    </div>
+                    <div className="space-y-1">
+                      <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest block">FCA Previsto</span>
+                      <span className="text-lg font-black italic text-indigo-400">{formatNumber(batchData.fcaTheoretical, 2)}</span>
+                    </div>
+                    <div className="space-y-1">
+                      <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest block">FCA Real</span>
+                      <span className="text-lg font-black italic text-amber-400">{formatNumber(batchData.fcaReal, 2)}</span>
+                    </div>
                     <div className="space-y-1">
                       <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest block">Peixes Despescados</span>
                       <span className="text-lg font-black italic">{formatNumber(batchData.harvestedFish)} un</span>
@@ -639,6 +655,20 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                   <div className="p-4 bg-emerald-50 rounded-2xl border border-emerald-100">
                     <span className="text-[10px] font-black text-emerald-600 uppercase tracking-widest block mb-1">Custo por KG</span>
                     <span className="text-2xl font-black text-emerald-700 italic">{formatCurrency(batchData.costPerKg)}</span>
+                  </div>
+
+                  <div className="p-4 bg-blue-50 rounded-2xl border border-blue-100">
+                    <span className="text-[10px] font-black text-blue-600 uppercase tracking-widest block mb-1">Receita Total</span>
+                    <span className="text-2xl font-black text-blue-700 italic">{formatCurrency(batchData.totalRevenue)}</span>
+                  </div>
+
+                  <div className={`p-4 rounded-2xl border ${batchData.totalProfit >= 0 ? 'bg-indigo-50 border-indigo-100' : 'bg-red-50 border-red-100'}`}>
+                    <span className={`text-[10px] font-black uppercase tracking-widest block mb-1 ${batchData.totalProfit >= 0 ? 'text-indigo-600' : 'text-red-600'}`}>
+                      Resultado (Lucro/Prejuízo)
+                    </span>
+                    <span className={`text-2xl font-black italic ${batchData.totalProfit >= 0 ? 'text-indigo-700' : 'text-red-700'}`}>
+                      {formatCurrency(batchData.totalProfit)}
+                    </span>
                   </div>
                 </div>
 

@@ -267,6 +267,7 @@ export interface HarvestLog {
   fishCount: number;
   totalWeight: number;
   averageWeight?: number;
+  unitPrice?: number; // Preço por kg na despesca
   initialFishCount?: number; // Qtd inicial na gaiola no momento da despesca
   date: string;
   userId: string;
