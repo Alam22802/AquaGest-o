@@ -111,8 +111,9 @@ const HarvestManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
           ...c, 
           batchId: undefined, 
           initialFishCount: undefined, 
+          settlementDate: undefined,
+          harvestDate: undefined,
           status: 'Disponível' as const,
-          harvestDate: date,
           maintenanceStartDate: undefined,
           maintenanceEndDate: undefined,
           updatedAt: Date.now()
@@ -424,10 +425,6 @@ const HarvestManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
                     <div>
                       <span className="text-[8px] font-black text-indigo-300 uppercase block">Povoado</span>
                       <span className="text-xs font-bold">{fb.initialQuantity}</span>
-                    </div>
-                    <div>
-                      <span className="text-[8px] font-black text-indigo-300 uppercase block">Mortos</span>
-                      <span className="text-xs font-bold text-red-400">{fb.mortality}</span>
                     </div>
                     <div>
                       <span className="text-[8px] font-black text-indigo-300 uppercase block">Despesca</span>

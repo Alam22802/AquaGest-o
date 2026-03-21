@@ -189,73 +189,37 @@ const BatchManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     const activeCageMortalityByBatch = new Map<string, number>();
     const nurseryMortalityByBatch = new Map<string, number>();
     (state.mortalityLogs || []).forEach(m => {
-      let bId = m.batchId;
-      const cage = m.cageId ? (state.cages || []).find(c => c.id === m.cageId) : null;
+      const bId = m.batchId;
+      if (!bId) return;
       
-      // Tenta encontrar o lote se não estiver no log
-      if (!bId && cage?.batchId) {
-        bId = cage.batchId;
-      } else if (!bId && m.cageId) {
-        // Se a gaiola já foi despescada, tenta encontrar o lote pelo log de despesca
-        const harvest = (state.harvestLogs || []).find(h => h.cageId === m.cageId && h.date >= (m.date || ''));
-        if (harvest) bId = harvest.batchId;
+      mortalityByBatch.set(bId, (mortalityByBatch.get(bId) || 0) + m.count);
+      
+      const cage = m.cageId ? (state.cages || []).find(c => c.id === m.cageId) : null;
+      if (cage && cage.batchId === bId) {
+        activeCageMortalityByBatch.set(bId, (activeCageMortalityByBatch.get(bId) || 0) + m.count);
       }
-
-      if (bId) {
-        mortalityByBatch.set(bId, (mortalityByBatch.get(bId) || 0) + m.count);
-        // Mortalidade em gaiola ATIVA (que ainda pertence ao lote)
-        if (cage && cage.batchId === bId) {
-          activeCageMortalityByBatch.set(bId, (activeCageMortalityByBatch.get(bId) || 0) + m.count);
-        }
-        // Mortalidade no berçário (sem gaiola)
-        if (!m.cageId) {
-          nurseryMortalityByBatch.set(bId, (nurseryMortalityByBatch.get(bId) || 0) + m.count);
-        }
+      
+      if (!m.cageId) {
+        nurseryMortalityByBatch.set(bId, (nurseryMortalityByBatch.get(bId) || 0) + m.count);
       }
     });
 
     const biometryByBatch = new Map<string, typeof state.biometryLogs>();
     (state.biometryLogs || []).forEach(b => {
-      let bId = b.batchId;
-      if (!bId && b.cageId) {
-        const cage = (state.cages || []).find(c => c.id === b.cageId);
-        if (cage?.batchId) {
-          bId = cage.batchId;
-        } else {
-          const harvest = (state.harvestLogs || []).find(h => h.cageId === b.cageId && h.date >= (b.date || ''));
-          if (harvest) bId = harvest.batchId;
-        }
-      }
+      const bId = b.batchId;
+      if (!bId) return;
       
-      if (bId) {
-        const list = biometryByBatch.get(bId) || [];
-        list.push(b);
-        biometryByBatch.set(bId, list);
-      }
+      const list = biometryByBatch.get(bId) || [];
+      list.push(b);
+      biometryByBatch.set(bId, list);
     });
 
     const feedingByBatch = new Map<string, number>();
     (state.feedingLogs || []).forEach(f => {
-      let bId = f.batchId;
-      if (!bId && f.cageId) {
-        const cage = (state.cages || []).find(c => c.id === f.cageId);
-        if (cage?.batchId) {
-          const batch = (state.batches || []).find(b => b.id === cage.batchId);
-          const fDate = (f.timestamp || '').split('T')[0];
-          if (batch && fDate >= batch.settlementDate) {
-            bId = cage.batchId;
-          }
-        } else {
-          // Fallback for harvested cages
-          const fDate = (f.timestamp || '').split('T')[0];
-          const harvest = (state.harvestLogs || []).find(h => h.cageId === f.cageId && h.date >= fDate);
-          if (harvest) bId = harvest.batchId;
-        }
-      }
+      const bId = f.batchId;
+      if (!bId) return;
       
-      if (bId) {
-        feedingByBatch.set(bId, (feedingByBatch.get(bId) || 0) + f.amount);
-      }
+      feedingByBatch.set(bId, (feedingByBatch.get(bId) || 0) + f.amount);
     });
 
     const harvestsByBatch = new Map<string, { fishCount: number, initialFishCount: number, weight: number }>();
