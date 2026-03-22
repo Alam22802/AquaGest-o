@@ -100,44 +100,42 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     const batch = (state.batches || []).find(b => b.id === selectedBatchId);
     if (!batch) return null;
 
-    // Robust mortality calculation
+    // Create lookups for better performance
+    const harvestsByBatch = (state.harvestLogs || []).filter(h => h.batchId === batch.id);
+    const harvestCages = new Set(harvestsByBatch.map(h => h.cageId));
+    const batchCages = new Set((state.cages || []).filter(c => c.batchId === batch.id).map(c => c.id));
+    
+    // Map for quick cage lookup
+    const cageMap = new Map((state.cages || []).map(c => [c.id, c]));
+
+    // Optimized mortality filtering
     const mortalityLogs = (state.mortalityLogs || []).filter(m => {
-      let bId = m.batchId;
-      if (!bId && m.cageId) {
-        // 1. Check harvest logs for this specific batch
-        const harvest = (state.harvestLogs || []).find(h => h.cageId === m.cageId && h.batchId === batch.id);
-        if (harvest && m.date <= harvest.date) {
-          bId = batch.id;
-        } else {
-          // 2. Check current cage assignment
-          const cage = (state.cages || []).find(c => c.id === m.cageId);
-          if (cage?.batchId === batch.id && m.date >= batch.settlementDate) {
-            bId = batch.id;
-          }
+      if (m.batchId === batch.id) return true;
+      if (m.cageId) {
+        if (harvestCages.has(m.cageId)) {
+          const harvest = harvestsByBatch.find(h => h.cageId === m.cageId);
+          return harvest && m.date <= harvest.date;
         }
+        const cage = cageMap.get(m.cageId);
+        return cage?.batchId === batch.id && m.date >= batch.settlementDate;
       }
-      return bId === batch.id;
+      return false;
     });
     const mortality = mortalityLogs.reduce((acc, curr) => acc + curr.count, 0);
 
-    // Robust feeding calculation
+    // Optimized feeding filtering
     const feedingLogs = (state.feedingLogs || []).filter(f => {
-      let bId = f.batchId;
-      if (!bId && f.cageId) {
+      if (f.batchId === batch.id) return true;
+      if (f.cageId) {
         const fDate = (f.timestamp || '').split('T')[0];
-        // 1. Check harvest logs for this specific batch
-        const harvest = (state.harvestLogs || []).find(h => h.cageId === f.cageId && h.batchId === batch.id);
-        if (harvest && fDate <= harvest.date) {
-          bId = batch.id;
-        } else {
-          // 2. Check current cage assignment
-          const cage = (state.cages || []).find(c => c.id === f.cageId);
-          if (cage?.batchId === batch.id && fDate >= batch.settlementDate) {
-            bId = batch.id;
-          }
+        if (harvestCages.has(f.cageId)) {
+          const harvest = harvestsByBatch.find(h => h.cageId === f.cageId);
+          return harvest && fDate <= harvest.date;
         }
+        const cage = cageMap.get(f.cageId);
+        return cage?.batchId === batch.id && fDate >= batch.settlementDate;
       }
-      return bId === batch.id;
+      return false;
     });
     
     const feeding = feedingLogs.reduce((acc, curr) => acc + curr.amount, 0);
@@ -149,20 +147,28 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       return acc;
     }, {} as Record<string, number>);
 
-    const harvests = (state.harvestLogs || [])
-      .filter(h => h.batchId === batch.id);
-    
-    const harvestedFish = harvests.reduce((acc, curr) => acc + curr.fishCount, 0);
-    const harvestedWeight = harvests.reduce((acc, curr) => acc + curr.totalWeight, 0);
+    const harvestedFish = harvestsByBatch.reduce((acc, curr) => acc + curr.fishCount, 0);
+    const harvestedWeight = harvestsByBatch.reduce((acc, curr) => acc + curr.totalWeight, 0);
 
     // Biomass before first harvest
-    const firstHarvestDate = harvests.length > 0 
-      ? harvests.reduce((min, h) => h.date < min ? h.date : min, harvests[0].date)
+    const firstHarvestDate = harvestsByBatch.length > 0 
+      ? harvestsByBatch.reduce((min, h) => h.date < min ? h.date : min, harvestsByBatch[0].date)
       : null;
 
     let biomassBeforeHarvest = 0;
     let avgWeightBeforeHarvest = batch.initialUnitWeight;
     let expectedFish = batch.initialQuantity - mortality;
+
+    // Optimized biometry filtering
+    const batchBiometries = (state.biometryLogs || []).filter(b => {
+      if (b.batchId === batch.id) return true;
+      if (b.cageId) {
+        if (harvestCages.has(b.cageId)) return true;
+        const cage = cageMap.get(b.cageId);
+        return cage?.batchId === batch.id;
+      }
+      return false;
+    });
 
     if (firstHarvestDate) {
       const mortalityBeforeHarvest = mortalityLogs
@@ -172,27 +178,13 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       const liveFishBeforeHarvest = batch.initialQuantity - mortalityBeforeHarvest;
       expectedFish = liveFishBeforeHarvest;
       
-      const biometriesBeforeHarvest = (state.biometryLogs || [])
-        .filter(b => {
-          let bId = b.batchId;
-          if (!bId && b.cageId) {
-             const cage = (state.cages || []).find(c => c.id === b.cageId);
-             if (cage?.batchId === batch.id) bId = batch.id;
-             else {
-                const harvest = (state.harvestLogs || []).find(h => h.cageId === b.cageId && h.batchId === batch.id);
-                if (harvest) bId = batch.id;
-             }
-          }
-          return bId === batch.id && b.date <= firstHarvestDate;
-        });
+      const biometriesBeforeHarvest = batchBiometries.filter(b => b.date <= firstHarvestDate);
 
       if (biometriesBeforeHarvest.length > 0) {
-        // Prioritize biometry on the harvest day itself
         const harvestDayLogs = biometriesBeforeHarvest.filter(log => log.date === firstHarvestDate);
         if (harvestDayLogs.length > 0) {
           avgWeightBeforeHarvest = harvestDayLogs.reduce((acc, log) => acc + log.averageWeight, 0) / harvestDayLogs.length;
         } else {
-          // Fallback to the most recent biometry up to the harvest day
           const lastDate = biometriesBeforeHarvest.reduce((max, log) => log.date > max ? log.date : max, "");
           const lastDayLogs = biometriesBeforeHarvest.filter(log => log.date === lastDate);
           if (lastDayLogs.length > 0) {
@@ -205,19 +197,6 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
 
     const liveFish = Math.max(0, batch.initialQuantity - mortality - harvestedFish);
     
-    const batchBiometries = (state.biometryLogs || []).filter(b => {
-      let bId = b.batchId;
-      if (!bId && b.cageId) {
-         const cage = (state.cages || []).find(c => c.id === b.cageId);
-         if (cage?.batchId === batch.id) bId = batch.id;
-         else {
-            const harvest = (state.harvestLogs || []).find(h => h.cageId === b.cageId && h.batchId === batch.id);
-            if (harvest) bId = batch.id;
-         }
-      }
-      return bId === batch.id;
-    });
-
     let currentAvgWeight = batch.initialUnitWeight;
     if (batchBiometries.length > 0) {
       const lastDate = batchBiometries.reduce((max, log) => log.date > max ? log.date : max, "");
@@ -244,7 +223,7 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     const totalExpenses = expenses.reduce((acc, curr) => acc + curr.value, 0);
     const totalRevenue = revenues.length > 0 
       ? revenues.reduce((acc, curr) => acc + (curr.receptionWeight * curr.unitPrice), 0)
-      : harvests.reduce((acc, curr) => acc + (curr.totalWeight * (curr.unitPrice || 0)), 0);
+      : harvestsByBatch.reduce((acc, curr) => acc + (curr.totalWeight * (curr.unitPrice || 0)), 0);
     
     const totalReceptionWeight = revenues.reduce((acc, curr) => acc + curr.receptionWeight, 0);
     const totalProfit = totalRevenue - totalExpenses;
@@ -276,8 +255,8 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     
     // Calculate total days
     const startDate = parseISO(batch.settlementDate);
-    const endDate = harvests.length > 0 
-      ? parseISO(harvests.reduce((max, h) => h.date > max ? h.date : max, batch.settlementDate))
+    const endDate = harvestsByBatch.length > 0 
+      ? parseISO(harvestsByBatch.reduce((max, h) => h.date > max ? h.date : max, batch.settlementDate))
       : new Date();
     const totalDays = isNaN(differenceInDays(endDate, startDate)) ? 0 : differenceInDays(endDate, startDate);
 
@@ -287,7 +266,6 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       : 0;
 
     // Biomass Before Harvest: (Avg Weight * Expected Fish) / 1000
-    // This is our predicted biomass for comparison
     const expectedWeight = expectedFish * (avgWeightBeforeHarvest / 1000);
     biomassBeforeHarvest = expectedWeight;
 
@@ -297,7 +275,7 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     // FCA Real: Total Feed / Harvested Weight
     const fcaReal = harvestedWeight > 0 ? (feeding / 1000) / harvestedWeight : 0;
 
-    // Cost per kg: Total Expenses / Slaughtered Weight (or harvested if slaughter not available)
+    // Cost per kg
     const divisor = slaughteredWeight || harvestedWeight;
     const costPerKg = divisor > 0 ? totalExpenses / divisor : 0;
 
@@ -316,10 +294,10 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     }>();
 
     // Get all cage IDs involved in this batch (from harvests)
-    const cageIds = Array.from(new Set(harvests.map(h => h.cageId)));
+    const cageIds = Array.from(new Set(harvestsByBatch.map(h => h.cageId)));
     
     cageIds.forEach(cId => {
-      const cage = (state.cages || []).find(c => c.id === cId);
+      const cage = cageMap.get(cId);
       logsByCage.set(cId, {
         cageName: cage?.name || `Gaiola ${cId.substring(0, 4)}`,
         feeding: feedingLogs.filter(f => f.cageId === cId).sort((a, b) => b.timestamp.localeCompare(a.timestamp)),

@@ -122,8 +122,6 @@ const App: React.FC = () => {
 
       setState(prev => {
         if (!prev) return remoteState;
-        // Only update if remote state is actually different
-        if (JSON.stringify(remoteState) === JSON.stringify(lastSavedStateRef.current)) return prev;
         
         const merged = ensureStateIntegrity(prev, remoteState, 'remote');
         lastSavedStateRef.current = remoteState;
