@@ -6,9 +6,10 @@ import {
   BarChart, Bar, Cell
 } from 'recharts';
 import { formatNumber } from '../utils/formatters';
-import { Fish, Utensils, Scale, TrendingUp, FishOff, Calendar, Layers, Download, Info, AlertTriangle, PackageSearch } from 'lucide-react';
+import { Fish, Utensils, Scale, TrendingUp, FishOff, Calendar, Layers, Download, Info, AlertTriangle, PackageSearch, CloudSun, Droplets, Wind, CloudRain, Thermometer, Umbrella, Cloud } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { format, isWithinInterval, parseISO, startOfDay, endOfDay, subDays } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 
 interface Props {
   state: AppState;
@@ -24,6 +25,130 @@ const MiniStat = ({ label, value, icon, color, subtext }: any) => (
     </div>
   </div>
 );
+
+const WeatherWidget = () => {
+  const [weather, setWeather] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchWeather = async () => {
+      try {
+        // Fetch weather for Araguari-MG using Open-Meteo (Free, no key required)
+        // Coordinates: -18.6475, -48.1872
+        const response = await fetch('https://api.open-meteo.com/v1/forecast?latitude=-18.6475&longitude=-48.1872&current_weather=true&daily=weathercode,temperature_2m_max,temperature_2m_min,precipitation_probability_max,precipitation_sum&timezone=auto');
+        if (!response.ok) throw new Error('Weather fetch failed');
+        const data = await response.json();
+        setWeather(data);
+      } catch (error) {
+        console.error('Error fetching weather:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchWeather();
+  }, []);
+
+  const getWeatherInfo = (code: number) => {
+    // WMO Weather interpretation codes
+    if (code === 0) return { icon: <CloudSun className="w-6 h-6" />, desc: 'Céu Limpo' };
+    if (code <= 3) return { icon: <Cloud className="w-6 h-6" />, desc: 'Parcialmente Nublado' };
+    if (code <= 48) return { icon: <Cloud className="w-6 h-6" />, desc: 'Nevoeiro' };
+    if (code <= 55) return { icon: <CloudRain className="w-6 h-6" />, desc: 'Garoa' };
+    if (code <= 65) return { icon: <CloudRain className="w-6 h-6" />, desc: 'Chuva' };
+    if (code <= 82) return { icon: <CloudRain className="w-6 h-6" />, desc: 'Pancadas de Chuva' };
+    if (code <= 99) return { icon: <CloudRain className="w-6 h-6" />, desc: 'Tempestade' };
+    return { icon: <CloudSun className="w-6 h-6" />, desc: 'N/A' };
+  };
+
+  if (loading) {
+    return (
+      <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm animate-pulse flex flex-col gap-6">
+        <div className="flex items-center gap-4">
+          <div className="w-12 h-12 bg-slate-100 rounded-2xl" />
+          <div className="space-y-2 flex-1">
+            <div className="h-3 bg-slate-100 rounded w-1/4" />
+            <div className="h-6 bg-slate-100 rounded w-1/2" />
+          </div>
+        </div>
+        <div className="grid grid-cols-5 gap-2">
+          {[1, 2, 3, 4, 5].map(i => <div key={i} className="h-20 bg-slate-50 rounded-xl" />)}
+        </div>
+      </div>
+    );
+  }
+
+  if (!weather || !weather.current_weather || !weather.daily) return null;
+
+  const current = weather.current_weather;
+  const daily = weather.daily;
+  const currentInfo = getWeatherInfo(current.weathercode);
+
+  return (
+    <div className="bg-[#344434] rounded-2xl p-4 text-[#e4e4d4] shadow-lg shadow-black/10 flex flex-col gap-4 overflow-hidden relative group border border-white/5">
+      <div className="relative z-10 flex flex-col sm:flex-row items-center justify-between gap-4">
+        <div className="flex items-center gap-4 text-left">
+          <div className="p-3 bg-white/5 backdrop-blur-md rounded-xl border border-white/10 shadow-inner">
+            {currentInfo.icon}
+          </div>
+          <div>
+            <div className="flex items-center gap-2 mb-0.5">
+              <span className="text-[9px] font-black uppercase tracking-[0.2em] text-[#e4e4d4]/60">Clima em Tempo Real</span>
+              <span className="px-1.5 py-0.5 bg-white/10 rounded text-[8px] font-black uppercase tracking-widest text-[#e4e4d4] border border-white/5">Araguari-MG</span>
+            </div>
+            <div className="flex items-baseline gap-2">
+              <h2 className="text-3xl font-black tracking-tighter italic drop-shadow-sm">{Math.round(current.temperature)}°C</h2>
+              <span className="text-xs font-bold text-[#e4e4d4]/80 capitalize">{currentInfo.desc}</span>
+            </div>
+          </div>
+        </div>
+        
+        <div className="hidden sm:block text-right">
+          <div className="text-[9px] font-black text-[#e4e4d4]/40 uppercase tracking-widest mb-0.5">Atualizado</div>
+          <div className="text-[11px] font-bold text-[#e4e4d4]/70">{format(new Date(), 'HH:mm')}</div>
+        </div>
+      </div>
+
+      {/* Previsão 5 Dias */}
+      <div className="relative z-10 grid grid-cols-5 gap-2">
+        {daily.time.slice(1, 6).map((date: string, index: number) => {
+          const idx = index + 1;
+          const info = getWeatherInfo(daily.weathercode[idx]);
+          const rainProb = daily.precipitation_probability_max[idx];
+          const rainSum = daily.precipitation_sum[idx];
+          
+          return (
+            <div key={date} className="bg-white/5 backdrop-blur-sm p-2 rounded-xl border border-white/5 flex flex-col items-center text-center transition-all hover:bg-white/10">
+              <span className="text-[8px] font-black uppercase tracking-widest text-[#e4e4d4]/50 mb-1">
+                {format(parseISO(date), 'eee', { locale: ptBR })}
+              </span>
+              <div className="mb-1 text-[#e4e4d4]/80 scale-75">
+                {info.icon}
+              </div>
+              <div className="flex items-center gap-1">
+                <span className="text-xs font-black">{Math.round(daily.temperature_2m_max[idx])}°</span>
+                <span className="text-[9px] font-bold text-[#e4e4d4]/40">{Math.round(daily.temperature_2m_min[idx])}°</span>
+              </div>
+              
+              {(rainProb > 20 || rainSum > 0) && (
+                <div className="mt-1.5 pt-1.5 border-t border-white/5 w-full flex flex-col items-center gap-0.5">
+                  <div className="flex items-center gap-0.5 text-[8px] font-black text-blue-300 uppercase">
+                    <Umbrella className="w-2 h-2" />
+                    {rainProb}%
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Decorative background elements */}
+      <div className="absolute right-[-15px] top-[-15px] opacity-5 group-hover:scale-110 transition-transform duration-1000">
+        <CloudSun className="w-32 h-32" />
+      </div>
+    </div>
+  );
+};
 
 const Dashboard: React.FC<Props> = ({ state }) => {
   const [selectedBatchId, setSelectedBatchId] = useState<string>('');
@@ -719,6 +844,9 @@ const Dashboard: React.FC<Props> = ({ state }) => {
 
   return (
     <div className="space-y-6 pb-20">
+      {/* Clima Tempo */}
+      <WeatherWidget />
+
       {/* Alerta de Estoque Baixo */}
       {lowStockFeeds.length > 0 && (
         <div className="bg-red-50 border border-red-200 rounded-3xl p-5 flex flex-col md:flex-row items-center gap-6 animate-in fade-in slide-in-from-top duration-500 shadow-lg shadow-red-500/5">

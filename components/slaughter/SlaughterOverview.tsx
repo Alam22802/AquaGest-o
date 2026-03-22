@@ -24,13 +24,13 @@ const SlaughterSummary = React.memo(({ stats, startDate, endDate, onStartDateCha
     totalRendering: number;
     yieldPercentage: number;
     count: number;
-    waterPerTon: number;
-    energyKwPerTon: number;
-    laborPerTon: number;
+    waterCostPerKg: number;
+    energyCostPerKg: number;
+    laborPerKg: number;
     freightPerKgLive: number;
     totalSlaughterCondemnation: number;
     totalInvoiceValue: number;
-    costPerTonProduced: number;
+    costPerKgProduced: number;
     totalTransportCondemnation: number;
     avgSlaughterPerDay: number;
     avgFinishedProductPerDay: number;
@@ -153,10 +153,10 @@ const SlaughterSummary = React.memo(({ stats, startDate, endDate, onStartDateCha
                 </div>
              </div>
              <div className="space-y-2 border-l-2 border-indigo-500/50 pl-6 bg-indigo-500/5 rounded-r-xl py-2 -ml-2">
-                <div className="text-[9px] font-black text-indigo-300 uppercase tracking-widest">Custo Ton Produzida</div>
+                <div className="text-[9px] font-black text-indigo-300 uppercase tracking-widest">Custo KG Produzido</div>
                 <div className="text-xl font-black text-indigo-200 flex items-baseline gap-1">
                    <span className="text-[10px] opacity-40">R$</span>
-                   {formatNumber(stats.costPerTonProduced, 2)}
+                   {formatNumber(stats.costPerKgProduced, 2)}
                 </div>
              </div>
              <div className="space-y-2 border-l-2 border-white/20 pl-6">
@@ -167,24 +167,24 @@ const SlaughterSummary = React.memo(({ stats, startDate, endDate, onStartDateCha
                 </div>
              </div>
              <div className="space-y-2 border-l-2 border-white/20 pl-6">
-                <div className="text-[9px] font-black opacity-40 uppercase tracking-widest">Mão De Obra/Ton</div>
+                <div className="text-[9px] font-black opacity-40 uppercase tracking-widest">Mão De Obra/KG</div>
                 <div className="text-xl font-black text-white/90 flex items-baseline gap-1">
                    <span className="text-[10px] opacity-40">R$</span>
-                   {formatNumber(stats.laborPerTon, 2)}
+                   {formatNumber(stats.laborPerKg, 2)}
                 </div>
              </div>
              <div className="space-y-2 border-l-2 border-white/20 pl-6">
-                <div className="text-[9px] font-black opacity-40 uppercase tracking-widest">Consumo Água/Ton</div>
+                <div className="text-[9px] font-black opacity-40 uppercase tracking-widest">Custo Água/KG</div>
                 <div className="text-xl font-black text-white/90 flex items-baseline gap-1">
-                   {formatNumber(stats.waterPerTon, 2)}
-                   <span className="text-[10px] opacity-40">L/Ton</span>
+                   <span className="text-[10px] opacity-40">R$</span>
+                   {formatNumber(stats.waterCostPerKg, 2)}
                 </div>
              </div>
              <div className="space-y-2 border-l-2 border-white/20 pl-6">
-                <div className="text-[9px] font-black opacity-40 uppercase tracking-widest">Consumo Kw/Ton</div>
+                <div className="text-[9px] font-black opacity-40 uppercase tracking-widest">Custo Energia/KG</div>
                 <div className="text-xl font-black text-white/90 flex items-baseline gap-1">
-                   {formatNumber(stats.energyKwPerTon, 2)}
-                   <span className="text-[10px] opacity-40">kWh/Ton</span>
+                   <span className="text-[10px] opacity-40">R$</span>
+                   {formatNumber(stats.energyCostPerKg, 2)}
                 </div>
              </div>
           </div>
@@ -468,14 +468,14 @@ const SlaughterOverview: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
     const totalRendering = filteredLogs.reduce((acc, l) => acc + (l.renderingWeight || 0), 0);
     const yieldPercentage = totalRecep > 0 ? (totalPacked / totalRecep) * 100 : 0;
 
-    const totalWaterLiters = filteredExpenses.filter(e => e.category === 'Água').reduce((acc, e) => acc + (e.quantity || 0), 0);
-    const waterPerTon = totalRecep > 0 ? totalWaterLiters / (totalRecep / 1000) : 0;
+    const totalWaterValue = filteredExpenses.filter(e => e.category === 'Água').reduce((acc, e) => acc + e.value, 0);
+    const waterCostPerKg = totalPacked > 0 ? totalWaterValue / totalPacked : 0;
 
-    const totalEnergyKw = filteredExpenses.filter(e => e.category === 'Energia').reduce((acc, e) => acc + (e.quantity || 0), 0);
-    const energyKwPerTon = totalRecep > 0 ? totalEnergyKw / (totalRecep / 1000) : 0;
+    const totalEnergyValue = filteredExpenses.filter(e => e.category === 'Energia').reduce((acc, e) => acc + e.value, 0);
+    const energyCostPerKg = totalPacked > 0 ? totalEnergyValue / totalPacked : 0;
 
     const totalSalaryValue = filteredExpenses.filter(e => e.category === 'Folha de Pagamento').reduce((acc, e) => acc + e.value, 0);
-    const laborPerTon = totalRecep > 0 ? (totalSalaryValue / (totalRecep / 1000)) : 0;
+    const laborPerKg = totalPacked > 0 ? (totalSalaryValue / totalPacked) : 0;
 
     const totalFreightValue = filteredLogs.reduce((acc, l) => acc + (l.freightValue || 0), 0);
     const freightPerKgLive = totalRecep > 0 ? totalFreightValue / totalRecep : 0;
@@ -485,12 +485,13 @@ const SlaughterOverview: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
 
     const totalInvoiceValue = filteredLogs.reduce((acc, l) => acc + (l.invoiceValue || 0), 0);
     
-    // Calculate total cost for the period (Invoices + Freight + All other expenses)
-    const totalOtherExpenses = filteredExpenses.reduce((acc, e) => acc + e.value, 0);
-    const totalCost = totalInvoiceValue + totalFreightValue + totalOtherExpenses;
+    // User requested: "para custo considere valor total das notas, frete/ kg vivo, mão de obra/ton produzido"
+    // And "leve a mesma logica para agua e energia"
+    // We use the total values for these components to calculate the cost per KG produced.
+    const totalCost = totalInvoiceValue + totalFreightValue + totalSalaryValue + totalWaterValue + totalEnergyValue;
     
-    // Custo Ton Produzida = Total Cost / (Total Packed in tons)
-    const costPerTonProduced = totalPacked > 0 ? totalCost / (totalPacked / 1000) : 0;
+    // Custo KG Produzido = Total Cost (Invoices + Freight + Labor + Water + Energy) / Total Packed
+    const costPerKgProduced = totalPacked > 0 ? totalCost / totalPacked : 0;
 
     const uniqueSlaughterDays = new Set(filteredLogs.map(log => log.date)).size;
     const daysToDivide = Math.max(1, uniqueSlaughterDays);
@@ -504,13 +505,13 @@ const SlaughterOverview: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
       totalRendering,
       yieldPercentage, 
       count: filteredLogs.length,
-      waterPerTon,
-      energyKwPerTon,
-      laborPerTon,
+      waterCostPerKg,
+      energyCostPerKg,
+      laborPerKg,
       freightPerKgLive,
       totalSlaughterCondemnation,
       totalInvoiceValue,
-      costPerTonProduced,
+      costPerKgProduced,
       totalTransportCondemnation,
       avgSlaughterPerDay,
       avgFinishedProductPerDay
