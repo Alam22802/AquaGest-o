@@ -375,6 +375,16 @@ export interface BatchExpense {
   updatedAt?: number;
 }
 
+export interface BatchRevenue {
+  id: string;
+  batchId: string;
+  receptionWeight: number;
+  unitPrice: number;
+  date: string;
+  userId: string;
+  updatedAt?: number;
+}
+
 export interface AppState {
   users: User[];
   lines: Line[];
@@ -404,6 +414,7 @@ export interface AppState {
   harvestLogs?: HarvestLog[];
   harvestSchedules?: HarvestSchedule[];
   batchExpenses?: BatchExpense[];
+  batchRevenues?: BatchRevenue[];
   coldStorageLogs?: ColdStorageLog[];
   utilityLogs?: UtilityLog[];
   protocols: ProductionProtocol[];

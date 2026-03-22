@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo } from 'react';
-import { AppState, Batch, BatchExpense, User } from '../types';
+import { AppState, Batch, BatchExpense, BatchRevenue, User } from '../types';
 import { format, differenceInDays, parseISO } from 'date-fns';
 import { formatNumber, formatCurrency } from '../utils/formatters';
 import { 
@@ -56,6 +56,12 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     date: new Date().toISOString().split('T')[0],
     amount: ''
   });
+  const [revenueForm, setRevenueForm] = useState({
+    receptionWeight: '',
+    unitPrice: '',
+    date: new Date().toISOString().split('T')[0]
+  });
+  const [formType, setFormType] = useState<'expense' | 'revenue'>('expense');
   const [isAddingCategory, setIsAddingCategory] = useState(false);
   const [isAddingItem, setIsAddingItem] = useState(false);
   const [editingExpenseId, setEditingExpenseId] = useState<string | null>(null);
@@ -232,14 +238,35 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     const expenses = (state.batchExpenses || [])
       .filter(e => e.batchId === batch.id);
     
+    const revenues = (state.batchRevenues || [])
+      .filter(r => r.batchId === batch.id);
+    
     const totalExpenses = expenses.reduce((acc, curr) => acc + curr.value, 0);
-    const totalRevenue = harvests.reduce((acc, curr) => acc + (curr.totalWeight * (curr.unitPrice || 0)), 0);
+    const totalRevenue = revenues.length > 0 
+      ? revenues.reduce((acc, curr) => acc + (curr.receptionWeight * curr.unitPrice), 0)
+      : harvests.reduce((acc, curr) => acc + (curr.totalWeight * (curr.unitPrice || 0)), 0);
+    
+    const totalReceptionWeight = revenues.reduce((acc, curr) => acc + curr.receptionWeight, 0);
     const totalProfit = totalRevenue - totalExpenses;
 
     const categories = Array.from(new Set((state.batchExpenses || []).map(e => e.category))).sort();
     const items = Array.from(new Set((state.batchExpenses || []).map(e => e.description))).sort();
 
-    const filteredExpenses = expenses.filter(e => {
+    const allEntries = [
+      ...expenses.map(e => ({ ...e, type: 'expense' as const })),
+      ...revenues.map(r => ({ 
+        id: r.id, 
+        batchId: r.batchId, 
+        description: `Venda: ${formatNumber(r.receptionWeight, 1)}kg @ ${formatCurrency(r.unitPrice)}/kg`,
+        category: 'Receita',
+        value: r.receptionWeight * r.unitPrice,
+        date: r.date,
+        userId: r.userId,
+        type: 'revenue' as const
+      }))
+    ];
+
+    const filteredEntries = allEntries.filter(e => {
       const matchCategory = !filterCategory || e.category === filterCategory;
       const matchItem = !filterItem || e.description.toLowerCase().includes(filterItem.toLowerCase());
       return matchCategory && matchItem;
@@ -330,9 +357,10 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       logsByCage,
       categories,
       items,
-      filteredExpenses
+      filteredEntries,
+      totalReceptionWeight
     };
-  }, [selectedBatchId, state.batches, state.mortalityLogs, state.feedingLogs, state.harvestLogs, state.slaughterLogs, state.batchExpenses, state.protocols, state.biometryLogs, state.cages, state.feedTypes, filterCategory, filterItem]);
+  }, [selectedBatchId, state.batches, state.mortalityLogs, state.feedingLogs, state.harvestLogs, state.slaughterLogs, state.batchExpenses, state.batchRevenues, state.protocols, state.biometryLogs, state.cages, state.feedTypes, filterCategory, filterItem]);
 
   const handleAddExpense = (e: React.FormEvent) => {
     e.preventDefault();
@@ -377,7 +405,34 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     setEditingExpenseId(null);
   };
 
-  const startEditExpense = (expense: BatchExpense) => {
+  const handleAddRevenue = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedBatchId || !revenueForm.receptionWeight || !revenueForm.unitPrice) return;
+
+    const newRevenue: BatchRevenue = {
+      id: generateId(),
+      batchId: selectedBatchId,
+      receptionWeight: Number(revenueForm.receptionWeight),
+      unitPrice: Number(revenueForm.unitPrice),
+      date: revenueForm.date,
+      userId: currentUser.id,
+      updatedAt: Date.now()
+    };
+
+    onUpdate({
+      ...state,
+      batchRevenues: [...(state.batchRevenues || []), newRevenue]
+    });
+
+    setRevenueForm({
+      receptionWeight: '',
+      unitPrice: '',
+      date: new Date().toISOString().split('T')[0]
+    });
+  };
+
+  const startEditExpense = (expense: any) => {
+    if (expense.type === 'revenue') return;
     setEditingExpenseId(expense.id);
     setExpenseForm({
       category: expense.category,
@@ -401,12 +456,20 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     setIsAddingItem(false);
   };
 
-  const removeExpense = (id: string) => {
-    if (!confirm('Excluir este gasto?')) return;
-    onUpdate({
-      ...state,
-      batchExpenses: (state.batchExpenses || []).filter(e => e.id !== id)
-    });
+  const removeExpense = (id: string, type: 'expense' | 'revenue' = 'expense') => {
+    if (!confirm(`Excluir este ${type === 'expense' ? 'gasto' : 'lançamento de receita'}?`)) return;
+    
+    if (type === 'expense') {
+      onUpdate({
+        ...state,
+        batchExpenses: (state.batchExpenses || []).filter(e => e.id !== id)
+      });
+    } else {
+      onUpdate({
+        ...state,
+        batchRevenues: (state.batchRevenues || []).filter(r => r.id !== id)
+      });
+    }
   };
 
   const handleCloseBatch = () => {
@@ -587,7 +650,7 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                 <div className="space-y-6">
                   <div className="p-4 bg-white/5 rounded-2xl border border-white/10">
                     <div className="flex justify-between items-center mb-2">
-                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Taxa de Sobrevivência do Lote</span>
+                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Taxa de Assertividade do Lote</span>
                       <span className="text-lg font-black text-indigo-400 italic">{formatNumber(batchData.accuracy, 1)}%</span>
                     </div>
                     <div className="w-full bg-white/10 h-1.5 rounded-full overflow-hidden">
@@ -630,6 +693,10 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                     <div className="space-y-1">
                       <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest block">Peso Previsto</span>
                       <span className="text-lg font-black italic text-blue-400">{formatNumber(batchData.expectedWeight, 1)}kg</span>
+                    </div>
+                    <div className="space-y-1">
+                      <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest block">Peso Recepção</span>
+                      <span className="text-lg font-black italic text-emerald-400">{formatNumber(batchData.totalReceptionWeight, 1)}kg</span>
                     </div>
                   </div>
 
@@ -701,147 +768,217 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                 )}
               </div>
 
-              {/* Add Expense Form */}
+              {/* Add Entry Form */}
               {!batchData.batch.isClosed && (
                 <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-200">
+                  <div className="flex bg-slate-100 p-1 rounded-2xl mb-6">
+                    <button 
+                      onClick={() => setFormType('expense')}
+                      className={`flex-1 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${formType === 'expense' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                    >
+                      Despesa
+                    </button>
+                    <button 
+                      onClick={() => setFormType('revenue')}
+                      className={`flex-1 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${formType === 'revenue' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                    >
+                      Receita
+                    </button>
+                  </div>
+
                   <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest flex items-center gap-2 italic mb-6">
-                    <Plus className="w-4 h-4 text-blue-600" />
-                    {editingExpenseId ? 'Editar Despesa' : 'Lançar Despesa'}
+                    {formType === 'expense' ? (
+                      <>
+                        <Plus className="w-4 h-4 text-blue-600" />
+                        {editingExpenseId ? 'Editar Despesa' : 'Lançar Despesa'}
+                      </>
+                    ) : (
+                      <>
+                        <TrendingUp className="w-4 h-4 text-emerald-600" />
+                        Lançar Receita
+                      </>
+                    )}
                   </h3>
                   
-                  <form onSubmit={handleAddExpense} className="space-y-4">
-                    <div>
-                      <label className="block text-[10px] font-black text-slate-400 uppercase mb-1 tracking-widest ml-1">Categoria</label>
-                      {!isAddingCategory ? (
-                        <select 
-                          className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 font-bold text-sm"
-                          value={expenseForm.category}
-                          onChange={e => {
-                            if (e.target.value === 'new') {
-                              setIsAddingCategory(true);
-                              setExpenseForm({ ...expenseForm, category: '' });
-                            } else {
-                              setExpenseForm({ ...expenseForm, category: e.target.value });
-                            }
-                          }}
-                          required
-                        >
-                          <option value="">Selecione...</option>
-                          {batchData.categories.map(cat => (
-                            <option key={cat} value={cat}>{cat}</option>
-                          ))}
-                          <option value="new" className="text-blue-600 font-black">+ Cadastrar Nova Categoria</option>
-                        </select>
-                      ) : (
-                        <div className="flex gap-2">
-                          <input 
-                            type="text" 
-                            autoFocus
-                            placeholder="Nova Categoria"
-                            className="flex-1 px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 font-bold text-sm"
+                  {formType === 'expense' ? (
+                    <form onSubmit={handleAddExpense} className="space-y-4">
+                      <div>
+                        <label className="block text-[10px] font-black text-slate-400 uppercase mb-1 tracking-widest ml-1">Categoria</label>
+                        {!isAddingCategory ? (
+                          <select 
+                            className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 font-bold text-sm"
                             value={expenseForm.category}
-                            onChange={e => setExpenseForm({ ...expenseForm, category: e.target.value })}
+                            onChange={e => {
+                              if (e.target.value === 'new') {
+                                setIsAddingCategory(true);
+                                setExpenseForm({ ...expenseForm, category: '' });
+                              } else {
+                                setExpenseForm({ ...expenseForm, category: e.target.value });
+                              }
+                            }}
                             required
-                          />
-                          <button 
-                            type="button"
-                            onClick={() => setIsAddingCategory(false)}
-                            className="px-4 py-3 bg-slate-100 text-slate-500 rounded-2xl font-black text-[10px] uppercase"
                           >
-                            Voltar
-                          </button>
-                        </div>
-                      )}
-                    </div>
+                            <option value="">Selecione...</option>
+                            {batchData.categories.map(cat => (
+                              <option key={cat} value={cat}>{cat}</option>
+                            ))}
+                            <option value="new" className="text-blue-600 font-black">+ Cadastrar Nova Categoria</option>
+                          </select>
+                        ) : (
+                          <div className="flex gap-2">
+                            <input 
+                              type="text" 
+                              autoFocus
+                              placeholder="Nova Categoria"
+                              className="flex-1 px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 font-bold text-sm"
+                              value={expenseForm.category}
+                              onChange={e => setExpenseForm({ ...expenseForm, category: e.target.value })}
+                              required
+                            />
+                            <button 
+                              type="button"
+                              onClick={() => setIsAddingCategory(false)}
+                              className="px-4 py-3 bg-slate-100 text-slate-500 rounded-2xl font-black text-[10px] uppercase"
+                            >
+                              Voltar
+                            </button>
+                          </div>
+                        )}
+                      </div>
 
-                    <div>
-                      <label className="block text-[10px] font-black text-slate-400 uppercase mb-1 tracking-widest ml-1">Item (Lançamento)</label>
-                      {!isAddingItem ? (
-                        <select 
-                          className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 font-bold text-sm"
-                          value={expenseForm.item}
-                          onChange={e => {
-                            if (e.target.value === 'new') {
-                              setIsAddingItem(true);
-                              setExpenseForm({ ...expenseForm, item: '' });
-                            } else {
-                              setExpenseForm({ ...expenseForm, item: e.target.value });
-                            }
-                          }}
-                          required
-                        >
-                          <option value="">Selecione...</option>
-                          {batchData.items.map(item => (
-                            <option key={item} value={item}>{item}</option>
-                          ))}
-                          <option value="new" className="text-blue-600 font-black">+ Cadastrar Novo Item</option>
-                        </select>
-                      ) : (
-                        <div className="flex gap-2">
-                          <input 
-                            type="text" 
-                            autoFocus
-                            placeholder="Novo Item"
-                            className="flex-1 px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 font-bold text-sm"
+                      <div>
+                        <label className="block text-[10px] font-black text-slate-400 uppercase mb-1 tracking-widest ml-1">Item (Lançamento)</label>
+                        {!isAddingItem ? (
+                          <select 
+                            className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 font-bold text-sm"
                             value={expenseForm.item}
-                            onChange={e => setExpenseForm({ ...expenseForm, item: e.target.value })}
+                            onChange={e => {
+                              if (e.target.value === 'new') {
+                                setIsAddingItem(true);
+                                setExpenseForm({ ...expenseForm, item: '' });
+                              } else {
+                                setExpenseForm({ ...expenseForm, item: e.target.value });
+                              }
+                            }}
                             required
+                          >
+                            <option value="">Selecione...</option>
+                            {batchData.items.map(item => (
+                              <option key={item} value={item}>{item}</option>
+                            ))}
+                            <option value="new" className="text-blue-600 font-black">+ Cadastrar Novo Item</option>
+                          </select>
+                        ) : (
+                          <div className="flex gap-2">
+                            <input 
+                              type="text" 
+                              autoFocus
+                              placeholder="Novo Item"
+                              className="flex-1 px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 font-bold text-sm"
+                              value={expenseForm.item}
+                              onChange={e => setExpenseForm({ ...expenseForm, item: e.target.value })}
+                              required
+                            />
+                            <button 
+                              type="button"
+                              onClick={() => setIsAddingItem(false)}
+                              className="px-4 py-3 bg-slate-100 text-slate-500 rounded-2xl font-black text-[10px] uppercase"
+                            >
+                              Voltar
+                            </button>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="grid grid-cols-1 gap-4">
+                        <div>
+                          <label className="block text-[10px] font-black text-slate-400 uppercase mb-1 tracking-widest ml-1">Data</label>
+                          <input 
+                            type="date" 
+                            required
+                            className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 font-bold text-xs"
+                            value={expenseForm.date}
+                            onChange={e => setExpenseForm({...expenseForm, date: e.target.value})}
                           />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-black text-slate-400 uppercase mb-1 tracking-widest ml-1">Valor (R$)</label>
+                          <input 
+                            type="number" 
+                            step="0.01"
+                            required
+                            placeholder="0,00"
+                            className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 font-bold text-xs"
+                            value={expenseForm.amount}
+                            onChange={e => setExpenseForm({...expenseForm, amount: e.target.value})}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="flex gap-3">
+                        {editingExpenseId && (
                           <button 
                             type="button"
-                            onClick={() => setIsAddingItem(false)}
-                            className="px-4 py-3 bg-slate-100 text-slate-500 rounded-2xl font-black text-[10px] uppercase"
+                            onClick={cancelEdit}
+                            className="flex-1 py-4 bg-slate-100 text-slate-600 rounded-2xl font-black uppercase tracking-widest text-xs hover:bg-slate-200 transition-all"
                           >
-                            Voltar
+                            Cancelar
                           </button>
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="grid grid-cols-1 gap-4">
+                        )}
+                        <button 
+                          type="submit"
+                          disabled={!hasPermission}
+                          className="flex-[2] py-4 bg-slate-900 text-white rounded-2xl font-black uppercase tracking-widest text-xs shadow-xl shadow-slate-200 hover:bg-black transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          {editingExpenseId ? 'Salvar Alterações' : 'Confirmar Lançamento'}
+                        </button>
+                      </div>
+                    </form>
+                  ) : (
+                    <form onSubmit={handleAddRevenue} className="space-y-4">
                       <div>
                         <label className="block text-[10px] font-black text-slate-400 uppercase mb-1 tracking-widest ml-1">Data</label>
                         <input 
                           type="date" 
                           required
                           className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 font-bold text-xs"
-                          value={expenseForm.date}
-                          onChange={e => setExpenseForm({...expenseForm, date: e.target.value})}
+                          value={revenueForm.date}
+                          onChange={e => setRevenueForm({...revenueForm, date: e.target.value})}
                         />
                       </div>
                       <div>
-                        <label className="block text-[10px] font-black text-slate-400 uppercase mb-1 tracking-widest ml-1">Valor (R$)</label>
+                        <label className="block text-[10px] font-black text-slate-400 uppercase mb-1 tracking-widest ml-1">Peso de Recepção (kg)</label>
                         <input 
                           type="number" 
                           step="0.01"
                           required
                           placeholder="0,00"
                           className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 font-bold text-xs"
-                          value={expenseForm.amount}
-                          onChange={e => setExpenseForm({...expenseForm, amount: e.target.value})}
+                          value={revenueForm.receptionWeight}
+                          onChange={e => setRevenueForm({...revenueForm, receptionWeight: e.target.value})}
                         />
                       </div>
-                    </div>
-
-                    <div className="flex gap-3">
-                      {editingExpenseId && (
-                        <button 
-                          type="button"
-                          onClick={cancelEdit}
-                          className="flex-1 py-4 bg-slate-100 text-slate-600 rounded-2xl font-black uppercase tracking-widest text-xs hover:bg-slate-200 transition-all"
-                        >
-                          Cancelar
-                        </button>
-                      )}
+                      <div>
+                        <label className="block text-[10px] font-black text-slate-400 uppercase mb-1 tracking-widest ml-1">Valor de Venda por kg (R$)</label>
+                        <input 
+                          type="number" 
+                          step="0.01"
+                          required
+                          placeholder="0,00"
+                          className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 font-bold text-xs"
+                          value={revenueForm.unitPrice}
+                          onChange={e => setRevenueForm({...revenueForm, unitPrice: e.target.value})}
+                        />
+                      </div>
                       <button 
                         type="submit"
                         disabled={!hasPermission}
-                        className="flex-[2] py-4 bg-slate-900 text-white rounded-2xl font-black uppercase tracking-widest text-xs shadow-xl shadow-slate-200 hover:bg-black transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="w-full py-4 bg-emerald-600 text-white rounded-2xl font-black uppercase tracking-widest text-xs shadow-xl shadow-emerald-100 hover:bg-emerald-700 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
-                        {editingExpenseId ? 'Salvar Alterações' : 'Confirmar Lançamento'}
+                        Confirmar Receita
                       </button>
-                    </div>
-                  </form>
+                    </form>
+                  )}
                 </div>
               )}
             </div>
@@ -895,26 +1032,31 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-50">
-                    {batchData.filteredExpenses.map(expense => {
-                      const user = state.users.find(u => u.id === expense.userId);
+                    {batchData.filteredEntries.map(entry => {
+                      const user = state.users.find(u => u.id === entry.userId);
+                      const isRevenue = entry.type === 'revenue';
                       return (
-                        <tr key={expense.id} className="group hover:bg-slate-50 transition-colors">
-                          <td className="py-4 text-xs font-bold text-slate-600">{safeDateFormat(expense.date, 'dd/MM/yyyy')}</td>
-                          <td className="py-4 text-xs font-black text-slate-400 uppercase italic">{expense.category}</td>
-                          <td className="py-4 text-xs font-black text-slate-800 uppercase italic">{expense.description}</td>
+                        <tr key={entry.id} className="group hover:bg-slate-50 transition-colors">
+                          <td className="py-4 text-xs font-bold text-slate-600">{safeDateFormat(entry.date, 'dd/MM/yyyy')}</td>
+                          <td className="py-4 text-xs font-black text-slate-400 uppercase italic">{entry.category}</td>
+                          <td className="py-4 text-xs font-black text-slate-800 uppercase italic">{entry.description}</td>
                           <td className="py-4 text-xs font-bold text-slate-500 italic">{user?.name || '---'}</td>
-                          <td className="py-4 text-right text-xs font-black text-emerald-600">{formatCurrency(expense.value)}</td>
+                          <td className={`py-4 text-right text-xs font-black ${isRevenue ? 'text-blue-600' : 'text-emerald-600'}`}>
+                            {isRevenue ? '+' : ''}{formatCurrency(entry.value)}
+                          </td>
                           <td className="py-4 text-right">
                             <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-all">
+                              {!isRevenue && (
+                                <button 
+                                  onClick={() => startEditExpense(entry)}
+                                  className="p-2 text-slate-300 hover:text-blue-500 transition-colors"
+                                  title="Editar"
+                                >
+                                  <Edit2 className="w-4 h-4" />
+                                </button>
+                              )}
                               <button 
-                                onClick={() => startEditExpense(expense)}
-                                className="p-2 text-slate-300 hover:text-blue-500 transition-colors"
-                                title="Editar"
-                              >
-                                <Edit2 className="w-4 h-4" />
-                              </button>
-                              <button 
-                                onClick={() => removeExpense(expense.id)}
+                                onClick={() => removeExpense(entry.id, entry.type)}
                                 className="p-2 text-slate-300 hover:text-red-500 transition-colors"
                                 title="Excluir"
                               >
@@ -925,7 +1067,7 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                         </tr>
                       );
                     })}
-                    {batchData.filteredExpenses.length === 0 && (
+                    {batchData.filteredEntries.length === 0 && (
                       <tr>
                         <td colSpan={6} className="py-12 text-center">
                           <DollarSign className="w-8 h-8 text-slate-200 mx-auto mb-2" />
