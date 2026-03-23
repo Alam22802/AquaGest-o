@@ -276,7 +276,7 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     const fcaReal = harvestedWeight > 0 ? (feeding / 1000) / harvestedWeight : 0;
 
     // Cost per kg
-    const divisor = totalReceptionWeight || slaughteredWeight || harvestedWeight;
+    const divisor = totalReceptionWeight;
     const costPerKg = divisor > 0 ? totalExpenses / divisor : 0;
 
     // Accuracy (Assertividade): Harvested Weight / Expected Weight
@@ -385,7 +385,7 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
 
   const handleAddRevenue = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedBatchId || !revenueForm.receptionWeight || !revenueForm.unitPrice) return;
+    if (!selectedBatchId || revenueForm.receptionWeight === '' || revenueForm.unitPrice === '') return;
 
     const newRevenue: BatchRevenue = {
       id: generateId(),
@@ -705,6 +705,11 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                 </h3>
 
                 <div className="space-y-4">
+                  <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">Peso Recepção Total</span>
+                    <span className="text-2xl font-black text-slate-800 italic">{formatNumber(batchData.totalReceptionWeight, 1)} kg</span>
+                  </div>
+
                   <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
                     <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">Custo Total Acumulado</span>
                     <span className="text-2xl font-black text-slate-800 italic">{formatCurrency(batchData.totalExpenses)}</span>
