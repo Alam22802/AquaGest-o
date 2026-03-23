@@ -276,7 +276,7 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     const fcaReal = harvestedWeight > 0 ? (feeding / 1000) / harvestedWeight : 0;
 
     // Cost per kg
-    const divisor = slaughteredWeight || harvestedWeight;
+    const divisor = totalReceptionWeight || slaughteredWeight || harvestedWeight;
     const costPerKg = divisor > 0 ? totalExpenses / divisor : 0;
 
     // Accuracy (Assertividade): Harvested Weight / Expected Weight
