@@ -65,6 +65,7 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
   const [isAddingCategory, setIsAddingCategory] = useState(false);
   const [isAddingItem, setIsAddingItem] = useState(false);
   const [editingExpenseId, setEditingExpenseId] = useState<string | null>(null);
+  const [editingRevenueId, setEditingRevenueId] = useState<string | null>(null);
   const [filterCategory, setFilterCategory] = useState('');
   const [filterItem, setFilterItem] = useState('');
 
@@ -387,8 +388,7 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     e.preventDefault();
     if (!selectedBatchId || revenueForm.receptionWeight === '' || revenueForm.unitPrice === '') return;
 
-    const newRevenue: BatchRevenue = {
-      id: generateId(),
+    const revenueData = {
       batchId: selectedBatchId,
       receptionWeight: Number(revenueForm.receptionWeight),
       unitPrice: Number(revenueForm.unitPrice),
@@ -397,9 +397,22 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       updatedAt: Date.now()
     };
 
+    let updatedRevenues;
+    if (editingRevenueId) {
+      updatedRevenues = (state.batchRevenues || []).map(r => 
+        r.id === editingRevenueId ? { ...r, ...revenueData } : r
+      );
+    } else {
+      const newRevenue: BatchRevenue = {
+        id: generateId(),
+        ...revenueData
+      };
+      updatedRevenues = [...(state.batchRevenues || []), newRevenue];
+    }
+
     onUpdate({
       ...state,
-      batchRevenues: [...(state.batchRevenues || []), newRevenue]
+      batchRevenues: updatedRevenues
     });
 
     setRevenueForm({
@@ -407,11 +420,25 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       unitPrice: '',
       date: new Date().toISOString().split('T')[0]
     });
+    setEditingRevenueId(null);
   };
 
   const startEditExpense = (expense: any) => {
-    if (expense.type === 'revenue') return;
+    if (expense.type === 'revenue') {
+      const revenue = (state.batchRevenues || []).find(r => r.id === expense.id);
+      if (!revenue) return;
+      setFormType('revenue');
+      setEditingRevenueId(revenue.id);
+      setEditingExpenseId(null);
+      setRevenueForm({
+        receptionWeight: revenue.receptionWeight.toString(),
+        unitPrice: revenue.unitPrice.toString(),
+        date: revenue.date
+      });
+      return;
+    }
     setEditingExpenseId(expense.id);
+    setEditingRevenueId(null);
     setExpenseForm({
       category: expense.category,
       item: expense.description,
@@ -424,11 +451,17 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
 
   const cancelEdit = () => {
     setEditingExpenseId(null);
+    setEditingRevenueId(null);
     setExpenseForm({
       category: '',
       item: '',
       date: new Date().toISOString().split('T')[0],
       amount: ''
+    });
+    setRevenueForm({
+      receptionWeight: '',
+      unitPrice: '',
+      date: new Date().toISOString().split('T')[0]
     });
     setIsAddingCategory(false);
     setIsAddingItem(false);
@@ -955,13 +988,24 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                           onChange={e => setRevenueForm({...revenueForm, unitPrice: e.target.value})}
                         />
                       </div>
-                      <button 
-                        type="submit"
-                        disabled={!hasPermission}
-                        className="w-full py-4 bg-emerald-600 text-white rounded-2xl font-black uppercase tracking-widest text-xs shadow-xl shadow-emerald-100 hover:bg-emerald-700 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        Confirmar Receita
-                      </button>
+                      <div className="flex gap-3">
+                        {editingRevenueId && (
+                          <button 
+                            type="button"
+                            onClick={cancelEdit}
+                            className="flex-1 py-4 bg-slate-100 text-slate-600 rounded-2xl font-black uppercase tracking-widest text-xs hover:bg-slate-200 transition-all"
+                          >
+                            Cancelar
+                          </button>
+                        )}
+                        <button 
+                          type="submit"
+                          disabled={!hasPermission}
+                          className="w-full py-4 bg-emerald-600 text-white rounded-2xl font-black uppercase tracking-widest text-xs shadow-xl shadow-emerald-100 hover:bg-emerald-700 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          {editingRevenueId ? 'Salvar Alterações' : 'Confirmar Receita'}
+                        </button>
+                      </div>
                     </form>
                   )}
                 </div>
@@ -1031,15 +1075,13 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                           </td>
                           <td className="py-4 text-right">
                             <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-all">
-                              {!isRevenue && (
-                                <button 
-                                  onClick={() => startEditExpense(entry)}
-                                  className="p-2 text-slate-300 hover:text-blue-500 transition-colors"
-                                  title="Editar"
-                                >
-                                  <Edit2 className="w-4 h-4" />
-                                </button>
-                              )}
+                              <button 
+                                onClick={() => startEditExpense(entry)}
+                                className="p-2 text-slate-300 hover:text-blue-500 transition-colors"
+                                title="Editar"
+                              >
+                                <Edit2 className="w-4 h-4" />
+                              </button>
                               <button 
                                 onClick={() => removeExpense(entry.id, entry.type)}
                                 className="p-2 text-slate-300 hover:text-red-500 transition-colors"
