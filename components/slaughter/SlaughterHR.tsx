@@ -37,10 +37,14 @@ const SlaughterHR: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
 
   const [showNewRoleInput, setShowNewRoleInput] = useState(false);
   const [newRoleName, setNewRoleName] = useState('');
+  const [editingRole, setEditingRole] = useState<string | null>(null);
   const [showNewDeptInput, setShowNewDeptInput] = useState(false);
   const [newDeptName, setNewDeptName] = useState('');
+  const [editingDept, setEditingDept] = useState<string | null>(null);
   const [showNewEntryTypeInput, setShowNewEntryTypeInput] = useState(false);
   const [newEntryTypeName, setNewEntryTypeName] = useState('');
+  const [editingEntryType, setEditingEntryType] = useState<string | null>(null);
+  const [showSettings, setShowSettings] = useState(false);
 
   const [editingEntryId, setEditingEntryId] = useState<string | null>(null);
   const [entryForm, setEntryForm] = useState({
@@ -316,6 +320,64 @@ const SlaughterHR: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     onUpdate({ ...state, slaughterHRIndicators: indicators.filter(i => i.id !== id) });
   };
 
+  const updateRole = (oldRole: string, newRole: string) => {
+    if (!newRole.trim() || roles.includes(newRole.trim())) return;
+    const updatedRoles = roles.map(r => r === oldRole ? newRole.trim() : r);
+    const updatedEmployees = employees.map(emp => emp.role === oldRole ? { ...emp, role: newRole.trim() } : emp);
+    const updatedVacancies = vacancies.map(v => v.role === oldRole ? { ...v, role: newRole.trim() } : v);
+    onUpdate({ 
+      ...state, 
+      slaughterHRRoles: updatedRoles, 
+      slaughterEmployees: updatedEmployees,
+      slaughterHRVacancies: updatedVacancies
+    });
+    setEditingRole(null);
+    setNewRoleName('');
+  };
+
+  const deleteRole = (role: string) => {
+    if (!confirm(`Deseja excluir o cargo "${role}"?`)) return;
+    onUpdate({ ...state, slaughterHRRoles: roles.filter(r => r !== role) });
+  };
+
+  const updateDepartment = (oldDept: string, newDept: string) => {
+    if (!newDept.trim() || departments.includes(newDept.trim())) return;
+    const updatedDepts = departments.map(d => d === oldDept ? newDept.trim() : d);
+    const updatedEmployees = employees.map(emp => emp.department === oldDept ? { ...emp, department: newDept.trim() } : emp);
+    const updatedVacancies = vacancies.map(v => v.department === oldDept ? { ...v, department: newDept.trim() } : v);
+    onUpdate({ 
+      ...state, 
+      slaughterHRDepartments: updatedDepts, 
+      slaughterEmployees: updatedEmployees,
+      slaughterHRVacancies: updatedVacancies
+    });
+    setEditingDept(null);
+    setNewDeptName('');
+  };
+
+  const deleteDepartment = (dept: string) => {
+    if (!confirm(`Deseja excluir o setor "${dept}"?`)) return;
+    onUpdate({ ...state, slaughterHRDepartments: departments.filter(d => d !== dept) });
+  };
+
+  const updateEntryType = (oldType: string, newType: string) => {
+    if (!newType.trim() || entryTypes.includes(newType.trim())) return;
+    const updatedTypes = entryTypes.map(t => t === oldType ? newType.trim() : t);
+    const updatedEntries = entries.map(ent => ent.type === oldType ? { ...ent, type: newType.trim() } : ent);
+    onUpdate({ 
+      ...state, 
+      slaughterHREntryTypes: updatedTypes,
+      slaughterHREntries: updatedEntries
+    });
+    setEditingEntryType(null);
+    setNewEntryTypeName('');
+  };
+
+  const deleteEntryType = (type: string) => {
+    if (!confirm(`Deseja excluir o tipo de lançamento "${type}"?`)) return;
+    onUpdate({ ...state, slaughterHREntryTypes: entryTypes.filter(t => t !== type) });
+  };
+
   return (
     <div className="space-y-8">
       <div className="flex gap-4 border-b border-slate-200 overflow-x-auto">
@@ -337,7 +399,190 @@ const SlaughterHR: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
         >
           Indicadores
         </button>
+        <div className="flex-1" />
+        <button 
+          onClick={() => setShowSettings(!showSettings)}
+          className={`pb-4 px-4 text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap flex items-center gap-2 ${showSettings ? 'text-[#344434]' : 'text-slate-400'}`}
+        >
+          <Layout className="w-4 h-4" />
+          Configurações
+        </button>
       </div>
+
+      {showSettings && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 bg-slate-50 p-8 rounded-[2.5rem] border border-slate-200">
+          <div className="space-y-4">
+            <h4 className="text-xs font-black text-slate-800 uppercase tracking-widest flex items-center gap-2">
+              <Briefcase className="w-4 h-4" />
+              Cargos
+            </h4>
+            <div className="space-y-2">
+              {roles.map(role => (
+                <div key={role} className="flex items-center justify-between bg-white p-3 rounded-xl border border-slate-200 group">
+                  {editingRole === role ? (
+                    <div className="flex gap-2 w-full">
+                      <input 
+                        type="text"
+                        className="flex-1 px-3 py-1 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold outline-none"
+                        value={newRoleName}
+                        onChange={e => setNewRoleName(e.target.value)}
+                        autoFocus
+                      />
+                      <button 
+                        onClick={() => updateRole(role, newRoleName)}
+                        className="px-2 py-1 bg-[#344434] text-white rounded-lg text-[9px] font-black uppercase"
+                      >
+                        OK
+                      </button>
+                      <button 
+                        onClick={() => setEditingRole(null)}
+                        className="px-2 py-1 bg-slate-100 text-slate-400 rounded-lg text-[9px] font-black uppercase"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </div>
+                  ) : (
+                    <>
+                      <span className="text-xs font-bold text-slate-700">{role}</span>
+                      <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button 
+                          onClick={() => {
+                            setEditingRole(role);
+                            setNewRoleName(role);
+                          }}
+                          className="p-1.5 text-slate-400 hover:text-amber-500 transition-colors"
+                        >
+                          <Edit3 className="w-3.5 h-3.5" />
+                        </button>
+                        <button 
+                          onClick={() => deleteRole(role)}
+                          className="p-1.5 text-slate-400 hover:text-red-500 transition-colors"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            <h4 className="text-xs font-black text-slate-800 uppercase tracking-widest flex items-center gap-2">
+              <Layout className="w-4 h-4" />
+              Setores
+            </h4>
+            <div className="space-y-2">
+              {departments.map(dept => (
+                <div key={dept} className="flex items-center justify-between bg-white p-3 rounded-xl border border-slate-200 group">
+                  {editingDept === dept ? (
+                    <div className="flex gap-2 w-full">
+                      <input 
+                        type="text"
+                        className="flex-1 px-3 py-1 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold outline-none"
+                        value={newDeptName}
+                        onChange={e => setNewDeptName(e.target.value)}
+                        autoFocus
+                      />
+                      <button 
+                        onClick={() => updateDepartment(dept, newDeptName)}
+                        className="px-2 py-1 bg-[#344434] text-white rounded-lg text-[9px] font-black uppercase"
+                      >
+                        OK
+                      </button>
+                      <button 
+                        onClick={() => setEditingDept(null)}
+                        className="px-2 py-1 bg-slate-100 text-slate-400 rounded-lg text-[9px] font-black uppercase"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </div>
+                  ) : (
+                    <>
+                      <span className="text-xs font-bold text-slate-700">{dept}</span>
+                      <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button 
+                          onClick={() => {
+                            setEditingDept(dept);
+                            setNewDeptName(dept);
+                          }}
+                          className="p-1.5 text-slate-400 hover:text-amber-500 transition-colors"
+                        >
+                          <Edit3 className="w-3.5 h-3.5" />
+                        </button>
+                        <button 
+                          onClick={() => deleteDepartment(dept)}
+                          className="p-1.5 text-slate-400 hover:text-red-500 transition-colors"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            <h4 className="text-xs font-black text-slate-800 uppercase tracking-widest flex items-center gap-2">
+              <CheckSquare className="w-4 h-4" />
+              Tipos de Lançamento
+            </h4>
+            <div className="space-y-2">
+              {entryTypes.map(type => (
+                <div key={type} className="flex items-center justify-between bg-white p-3 rounded-xl border border-slate-200 group">
+                  {editingEntryType === type ? (
+                    <div className="flex gap-2 w-full">
+                      <input 
+                        type="text"
+                        className="flex-1 px-3 py-1 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold outline-none"
+                        value={newEntryTypeName}
+                        onChange={e => setNewEntryTypeName(e.target.value)}
+                        autoFocus
+                      />
+                      <button 
+                        onClick={() => updateEntryType(type, newEntryTypeName)}
+                        className="px-2 py-1 bg-[#344434] text-white rounded-lg text-[9px] font-black uppercase"
+                      >
+                        OK
+                      </button>
+                      <button 
+                        onClick={() => setEditingEntryType(null)}
+                        className="px-2 py-1 bg-slate-100 text-slate-400 rounded-lg text-[9px] font-black uppercase"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </div>
+                  ) : (
+                    <>
+                      <span className="text-xs font-bold text-slate-700">{type}</span>
+                      <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button 
+                          onClick={() => {
+                            setEditingEntryType(type);
+                            setNewEntryTypeName(type);
+                          }}
+                          className="p-1.5 text-slate-400 hover:text-amber-500 transition-colors"
+                        >
+                          <Edit3 className="w-3.5 h-3.5" />
+                        </button>
+                        <button 
+                          onClick={() => deleteEntryType(type)}
+                          className="p-1.5 text-slate-400 hover:text-red-500 transition-colors"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {activeSubTab === 'registration' && (
         <div className="space-y-12">
@@ -349,9 +594,9 @@ const SlaughterHR: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                 <UserPlus className="w-6 h-6" />
                 {editingEmployeeId ? 'Editar Colaborador' : 'Novo Colaborador'}
               </h3>
-              <form onSubmit={handleSaveEmployee} className="space-y-4">
-                <div className="grid grid-cols-3 gap-4">
-                  <div className="space-y-1">
+              <form onSubmit={handleSaveEmployee} className="space-y-6">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div className="sm:col-span-1 space-y-1">
                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Matrícula</label>
                     <input 
                       type="text" required 
@@ -360,7 +605,7 @@ const SlaughterHR: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                       onChange={e => setEmployeeForm({...employeeForm, registrationNumber: e.target.value})}
                     />
                   </div>
-                  <div className="col-span-2 space-y-1">
+                  <div className="sm:col-span-2 space-y-1">
                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Nome Completo</label>
                     <input 
                       type="text" required 
@@ -370,12 +615,12 @@ const SlaughterHR: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                     />
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1">
                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Cargo</label>
                     <div className="flex gap-2">
                       <select 
-                        className="flex-1 px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none text-xs"
+                        className="flex-1 px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none text-xs min-w-0"
                         value={employeeForm.role}
                         onChange={e => setEmployeeForm({...employeeForm, role: e.target.value})}
                       >
@@ -387,7 +632,7 @@ const SlaughterHR: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                       <button 
                         type="button"
                         onClick={() => setShowNewRoleInput(!showNewRoleInput)}
-                        className="p-3.5 bg-slate-100 text-slate-600 rounded-2xl hover:bg-slate-200 transition-colors"
+                        className="p-3.5 bg-slate-100 text-slate-600 rounded-2xl hover:bg-slate-200 transition-colors shrink-0"
                       >
                         <Plus className="w-4 h-4" />
                       </button>
@@ -397,7 +642,7 @@ const SlaughterHR: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                         <input 
                           type="text"
                           placeholder="Novo cargo..."
-                          className="flex-1 px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl font-bold outline-none text-xs"
+                          className="flex-1 px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl font-bold outline-none text-xs min-w-0"
                           value={newRoleName}
                           onChange={e => setNewRoleName(e.target.value)}
                         />
@@ -414,7 +659,7 @@ const SlaughterHR: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                               setShowNewRoleInput(false);
                             }
                           }}
-                          className="px-3 py-1 bg-[#344434] text-white rounded-xl font-black uppercase text-[9px]"
+                          className="px-3 py-1 bg-[#344434] text-white rounded-xl font-black uppercase text-[9px] shrink-0"
                         >
                           OK
                         </button>
@@ -425,7 +670,7 @@ const SlaughterHR: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Setor</label>
                     <div className="flex gap-2">
                       <select 
-                        className="flex-1 px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none text-xs"
+                        className="flex-1 px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none text-xs min-w-0"
                         value={employeeForm.department}
                         onChange={e => setEmployeeForm({...employeeForm, department: e.target.value})}
                       >
@@ -437,7 +682,7 @@ const SlaughterHR: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                       <button 
                         type="button"
                         onClick={() => setShowNewDeptInput(!showNewDeptInput)}
-                        className="p-3.5 bg-slate-100 text-slate-600 rounded-2xl hover:bg-slate-200 transition-colors"
+                        className="p-3.5 bg-slate-100 text-slate-600 rounded-2xl hover:bg-slate-200 transition-colors shrink-0"
                       >
                         <Plus className="w-4 h-4" />
                       </button>
@@ -447,7 +692,7 @@ const SlaughterHR: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                         <input 
                           type="text"
                           placeholder="Novo setor..."
-                          className="flex-1 px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl font-bold outline-none text-xs"
+                          className="flex-1 px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl font-bold outline-none text-xs min-w-0"
                           value={newDeptName}
                           onChange={e => setNewDeptName(e.target.value)}
                         />
@@ -464,7 +709,7 @@ const SlaughterHR: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                               setShowNewDeptInput(false);
                             }
                           }}
-                          className="px-3 py-1 bg-[#344434] text-white rounded-xl font-black uppercase text-[9px]"
+                          className="px-3 py-1 bg-[#344434] text-white rounded-xl font-black uppercase text-[9px] shrink-0"
                         >
                           OK
                         </button>
@@ -472,7 +717,7 @@ const SlaughterHR: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                     )}
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1">
                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Status</label>
                     <select 
@@ -494,6 +739,7 @@ const SlaughterHR: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                     />
                   </div>
                 </div>
+
                 <button type="submit" className="w-full py-4 bg-[#344434] text-white rounded-2xl font-black uppercase tracking-widest text-xs shadow-lg hover:bg-[#2a382a] transition-all">
                   {editingEmployeeId ? 'Salvar Alterações' : 'Cadastrar Colaborador'}
                 </button>
@@ -739,7 +985,7 @@ const SlaughterHR: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                   <Briefcase className="w-6 h-6" />
                   {editingEntryId ? 'Editar Lançamento' : 'Novo Lançamento'}
                 </h3>
-                <form onSubmit={handleSaveEntry} className="space-y-4">
+                <form onSubmit={handleSaveEntry} className="space-y-6">
                   <div className="space-y-1">
                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Colaboradores</label>
                     <div className="relative">
@@ -777,8 +1023,8 @@ const SlaughterHR: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                             ) : (
                               <Square className="w-4 h-4 text-slate-300" />
                             )}
-                            <div>
-                              <div className="text-xs font-bold text-slate-800">{emp.name}</div>
+                            <div className="min-w-0">
+                              <div className="text-xs font-bold text-slate-800 truncate">{emp.name}</div>
                               <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{emp.registrationNumber}</div>
                             </div>
                           </div>
@@ -789,12 +1035,12 @@ const SlaughterHR: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-1">
                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Tipo</label>
                       <div className="flex gap-2">
                         <select 
-                          className="flex-1 px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none text-xs"
+                          className="flex-1 px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none text-xs min-w-0"
                           value={entryForm.type}
                           onChange={e => setEntryForm({...entryForm, type: e.target.value})}
                         >
@@ -805,7 +1051,7 @@ const SlaughterHR: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                         <button 
                           type="button"
                           onClick={() => setShowNewEntryTypeInput(!showNewEntryTypeInput)}
-                          className="p-3.5 bg-slate-100 text-slate-600 rounded-2xl hover:bg-slate-200 transition-colors"
+                          className="p-3.5 bg-slate-100 text-slate-600 rounded-2xl hover:bg-slate-200 transition-colors shrink-0"
                         >
                           <Plus className="w-4 h-4" />
                         </button>
@@ -815,7 +1061,7 @@ const SlaughterHR: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                           <input 
                             type="text"
                             placeholder="Novo tipo..."
-                            className="flex-1 px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl font-bold outline-none text-xs"
+                            className="flex-1 px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl font-bold outline-none text-xs min-w-0"
                             value={newEntryTypeName}
                             onChange={e => setNewEntryTypeName(e.target.value)}
                           />
@@ -832,7 +1078,7 @@ const SlaughterHR: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                                 setShowNewEntryTypeInput(false);
                               }
                             }}
-                            className="px-3 py-1 bg-[#344434] text-white rounded-xl font-black uppercase text-[9px]"
+                            className="px-3 py-1 bg-[#344434] text-white rounded-xl font-black uppercase text-[9px] shrink-0"
                           >
                             OK
                           </button>
@@ -849,6 +1095,7 @@ const SlaughterHR: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                       />
                     </div>
                   </div>
+
 
                   {entryForm.type === 'Atestado' && (
                     <div className="space-y-1">
