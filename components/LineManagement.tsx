@@ -60,7 +60,8 @@ const LineManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     onUpdate({
       ...state,
       lines: (state.lines || []).filter(l => l.id !== id),
-      cages: (state.cages || []).filter(c => c.lineId !== id)
+      cages: (state.cages || []).filter(c => c.lineId !== id),
+      deletedIds: [...(state.deletedIds || []), id, ...(state.cages || []).filter(c => c.lineId === id).map(c => c.id)]
     });
   };
 

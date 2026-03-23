@@ -144,6 +144,7 @@ const BatchManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     onUpdate({
       ...state,
       batches: (state.batches || []).filter((b) => b.id !== id),
+      deletedIds: [...(state.deletedIds || []), id]
     });
   };
 

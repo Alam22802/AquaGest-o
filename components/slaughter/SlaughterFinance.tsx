@@ -101,7 +101,11 @@ const SlaughterFinance: React.FC<Props> = ({ state, onUpdate, currentUser }) => 
 
   const removeExpense = (id: string) => {
     if (!confirm('Deseja excluir este custo?')) return;
-    onUpdate({ ...state, slaughterExpenses: expenses.filter(e => e.id !== id) });
+    onUpdate({ 
+      ...state, 
+      slaughterExpenses: expenses.filter(e => e.id !== id),
+      deletedIds: [...(state.deletedIds || []), id]
+    });
   };
 
   const handleUnitCalculation = (field: 'qty' | 'unit', val: string) => {

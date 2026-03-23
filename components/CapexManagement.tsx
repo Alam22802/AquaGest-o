@@ -242,14 +242,19 @@ const CapexManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
 
   const removePortfolio = (id: string) => {
     if (!hasPermission || !confirm('Excluir esta carteira? Todos os projetos vinculados perderão a referência.')) return;
-    onUpdate({ ...state, portfolios: (state.portfolios || []).filter(p => p.id !== id) });
+    onUpdate({ 
+      ...state, 
+      portfolios: (state.portfolios || []).filter(p => p.id !== id),
+      deletedIds: [...(state.deletedIds || []), id]
+    });
   };
 
   const removeProject = (id: string) => {
     if (!hasPermission || !confirm('Excluir este projeto?')) return;
     onUpdate({ 
       ...state, 
-      capexProjects: (state.capexProjects || []).filter(p => p.id !== id) 
+      capexProjects: (state.capexProjects || []).filter(p => p.id !== id),
+      deletedIds: [...(state.deletedIds || []), id]
     });
   };
 
@@ -257,7 +262,8 @@ const CapexManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     if (!hasPermission || !confirm('Excluir este lançamento de nota?')) return;
     onUpdate({ 
       ...state, 
-      capexInvoices: (state.capexInvoices || []).filter(i => i.id !== id) 
+      capexInvoices: (state.capexInvoices || []).filter(i => i.id !== id),
+      deletedIds: [...(state.deletedIds || []), id]
     });
   };
 

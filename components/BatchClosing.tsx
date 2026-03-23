@@ -440,12 +440,14 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     if (type === 'expense') {
       onUpdate({
         ...state,
-        batchExpenses: (state.batchExpenses || []).filter(e => e.id !== id)
+        batchExpenses: (state.batchExpenses || []).filter(e => e.id !== id),
+        deletedIds: [...(state.deletedIds || []), id]
       });
     } else {
       onUpdate({
         ...state,
-        batchRevenues: (state.batchRevenues || []).filter(r => r.id !== id)
+        batchRevenues: (state.batchRevenues || []).filter(r => r.id !== id),
+        deletedIds: [...(state.deletedIds || []), id]
       });
     }
   };

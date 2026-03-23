@@ -287,7 +287,8 @@ const HarvestManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
     
     onUpdate({
       ...state,
-      harvestLogs: (state.harvestLogs || []).filter(l => l.id !== id)
+      harvestLogs: (state.harvestLogs || []).filter(l => l.id !== id),
+      deletedIds: [...(state.deletedIds || []), id]
     });
     
     if (selectedLogIds.has(id)) {
@@ -321,7 +322,8 @@ const HarvestManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
 
     onUpdate({
       ...state,
-      harvestLogs: (state.harvestLogs || []).filter(l => !selectedLogIds.has(l.id))
+      harvestLogs: (state.harvestLogs || []).filter(l => !selectedLogIds.has(l.id)),
+      deletedIds: [...(state.deletedIds || []), ...Array.from(selectedLogIds)]
     });
     setSelectedLogIds(new Set());
   };

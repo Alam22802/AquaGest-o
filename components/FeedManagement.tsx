@@ -138,7 +138,8 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     onUpdate({
       ...state,
       feedTypes: (state.feedTypes || []).filter(f => f.id !== id),
-      feedStockLogs: (state.feedStockLogs || []).filter(l => l.feedTypeId !== id)
+      feedStockLogs: (state.feedStockLogs || []).filter(l => l.feedTypeId !== id),
+      deletedIds: [...(state.deletedIds || []), id, ...(state.feedStockLogs || []).filter(l => l.feedTypeId === id).map(l => l.id)]
     });
   };
 

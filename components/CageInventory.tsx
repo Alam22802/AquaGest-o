@@ -203,7 +203,8 @@ const CageInventory: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     if (!confirm(`Tem certeza que deseja remover a gaiola "${cage?.name}" permanentemente?`)) return;
     onUpdate({
       ...state,
-      cages: (state.cages || []).filter(c => c.id !== id)
+      cages: (state.cages || []).filter(c => c.id !== id),
+      deletedIds: [...(state.deletedIds || []), id]
     });
   };
 
@@ -236,7 +237,8 @@ const CageInventory: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     if (!confirm(`Tem certeza que deseja remover as ${formatNumber(selectedIds.length, 0)} gaiolas selecionadas permanentemente?`)) return;
     onUpdate({
       ...state,
-      cages: (state.cages || []).filter(c => !selectedIds.includes(c.id))
+      cages: (state.cages || []).filter(c => !selectedIds.includes(c.id)),
+      deletedIds: [...(state.deletedIds || []), ...selectedIds]
     });
     setSelectedIds([]);
   };

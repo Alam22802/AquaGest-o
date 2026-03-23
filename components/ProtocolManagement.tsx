@@ -65,7 +65,11 @@ const ProtocolManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) =
   const removeProtocol = (id: string) => {
     if (!hasPermission) return;
     if (!confirm('Excluir este modelo de produção? Lotes vinculados perderão a referência de meta.')) return;
-    onUpdate({ ...state, protocols: (state.protocols || []).filter(p => p.id !== id) });
+    onUpdate({ 
+      ...state, 
+      protocols: (state.protocols || []).filter(p => p.id !== id),
+      deletedIds: [...(state.deletedIds || []), id]
+    });
   };
 
   return (

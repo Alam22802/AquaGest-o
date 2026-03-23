@@ -103,7 +103,8 @@ const SlaughterhouseMaintenance: React.FC<Props> = ({ state, onUpdate, currentUs
     if (!confirm('Deseja excluir este registro de temperatura?')) return;
     onUpdate({
       ...state,
-      coldStorageLogs: (state.coldStorageLogs || []).filter(l => l.id !== id)
+      coldStorageLogs: (state.coldStorageLogs || []).filter(l => l.id !== id),
+      deletedIds: [...(state.deletedIds || []), id]
     });
   };
 
@@ -112,7 +113,8 @@ const SlaughterhouseMaintenance: React.FC<Props> = ({ state, onUpdate, currentUs
     if (!confirm('Deseja excluir este registro de consumo?')) return;
     onUpdate({
       ...state,
-      utilityLogs: (state.utilityLogs || []).filter(l => l.id !== id)
+      utilityLogs: (state.utilityLogs || []).filter(l => l.id !== id),
+      deletedIds: [...(state.deletedIds || []), id]
     });
   };
 

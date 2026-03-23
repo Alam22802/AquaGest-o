@@ -120,7 +120,11 @@ const BiometryLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
   const removeLog = (id: string) => {
     if (!hasPermission) return;
     if (!confirm('Excluir esta pesagem?')) return;
-    onUpdate({ ...state, biometryLogs: (state.biometryLogs || []).filter(b => b.id !== id) });
+    onUpdate({ 
+      ...state, 
+      biometryLogs: (state.biometryLogs || []).filter(b => b.id !== id),
+      deletedIds: [...(state.deletedIds || []), id]
+    });
   };
 
   return (

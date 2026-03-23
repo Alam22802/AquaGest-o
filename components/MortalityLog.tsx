@@ -121,7 +121,8 @@ const MortalityLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
 
     onUpdate({
       ...state,
-      mortalityLogs: (state.mortalityLogs || []).filter(l => !selectedLogIds.has(l.id))
+      mortalityLogs: (state.mortalityLogs || []).filter(l => !selectedLogIds.has(l.id)),
+      deletedIds: [...(state.deletedIds || []), ...Array.from(selectedLogIds)]
     });
     setSelectedLogIds(new Set());
   };
@@ -173,7 +174,11 @@ const MortalityLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
   const removeLog = (id: string) => {
     if (!hasPermission) return;
     if (!confirm('Deseja excluir este registro de perda?')) return;
-    onUpdate({ ...state, mortalityLogs: (state.mortalityLogs || []).filter(m => m.id !== id) });
+    onUpdate({ 
+      ...state, 
+      mortalityLogs: (state.mortalityLogs || []).filter(m => m.id !== id),
+      deletedIds: [...(state.deletedIds || []), id]
+    });
   };
 
   return (

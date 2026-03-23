@@ -140,7 +140,8 @@ const FeedingLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     onUpdate({
       ...state,
       feedingLogs: (state.feedingLogs || []).filter(l => !selectedLogIds.has(l.id)),
-      feedTypes: updatedFeeds
+      feedTypes: updatedFeeds,
+      deletedIds: [...(state.deletedIds || []), ...Array.from(selectedLogIds)]
     });
     setSelectedLogIds(new Set());
   };
