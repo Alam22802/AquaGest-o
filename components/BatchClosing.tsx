@@ -507,11 +507,11 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     <div className="space-y-8 animate-in fade-in duration-500 print:p-0">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 print:hidden">
         <div>
-          <h2 className="text-2xl font-black text-slate-800 uppercase tracking-tighter italic flex items-center gap-3">
+          <h2 className="text-2xl font-black text-black uppercase tracking-tighter italic flex items-center gap-3">
             <FileText className="w-8 h-8 text-blue-600" />
             Fechamento de Lote
           </h2>
-          <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Resumo financeiro e produtivo do lote finalizado</p>
+          <p className="text-xs font-bold text-slate-600 uppercase tracking-widest">Resumo financeiro e produtivo do lote finalizado</p>
         </div>
 
         <div className="flex items-center gap-3">
@@ -544,25 +544,25 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
           <div className="hidden print:block border-b-2 border-slate-900 pb-8 mb-8">
             <div className="flex justify-between items-start">
               <div>
-                <h1 className="text-3xl font-black uppercase italic tracking-tighter text-slate-900">AquaGestão - Relatório de Fechamento</h1>
-                <p className="text-sm font-bold text-slate-500 uppercase tracking-widest mt-1">Relatório Gerencial de Desempenho e Custos</p>
+                <h1 className="text-3xl font-black uppercase italic tracking-tighter text-black">AquaGestão - Relatório de Fechamento</h1>
+                <p className="text-sm font-bold text-slate-600 uppercase tracking-widest mt-1">Relatório Gerencial de Desempenho e Custos</p>
               </div>
               <div className="text-right">
-                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Data de Emissão</p>
+                <span className="text-[10px] font-black text-slate-600 uppercase tracking-widest block mb-1">Data de Emissão</span>
                 <p className="text-sm font-bold text-slate-900">{format(new Date(), 'dd/MM/yyyy HH:mm')}</p>
               </div>
             </div>
             <div className="mt-8 grid grid-cols-3 gap-8">
               <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
-                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">Lote</span>
+                <span className="text-[10px] font-black text-slate-600 uppercase tracking-widest block mb-1">Lote</span>
                 <span className="text-lg font-black text-slate-900 uppercase italic">{batchData.batch.name}</span>
               </div>
               <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
-                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">Povoamento</span>
+                <span className="text-[10px] font-black text-slate-600 uppercase tracking-widest block mb-1">Povoamento</span>
                 <span className="text-lg font-black text-slate-900">{safeDateFormat(batchData.batch.settlementDate, 'dd/MM/yyyy')}</span>
               </div>
               <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
-                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">Status</span>
+                <span className="text-[10px] font-black text-slate-600 uppercase tracking-widest block mb-1">Status</span>
                 <span className={`text-lg font-black uppercase italic ${batchData.batch.isClosed ? 'text-emerald-600' : 'text-amber-600'}`}>
                   {batchData.batch.isClosed ? 'Lote Fechado' : 'Aguardando Fechamento'}
                 </span>
@@ -577,7 +577,7 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                 {/* Produção Summary */}
                 <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-200 space-y-6 print:shadow-none print:border-slate-100">
                   <div className="flex items-center justify-between">
-                    <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest flex items-center gap-2 italic">
+                    <h3 className="text-sm font-black text-black uppercase tracking-widest flex items-center gap-2 italic">
                       <TrendingUp className="w-4 h-4 text-blue-600" />
                       Visão Geral do Lote
                     </h3>
@@ -593,37 +593,37 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                 
                 <div className="grid grid-cols-2 gap-6">
                   <div className="space-y-1">
-                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Estoque Vivo Atual</span>
+                    <span className="text-[10px] font-black text-slate-600 uppercase tracking-widest block">Estoque Vivo Atual</span>
                     <span className="text-xl font-black text-slate-800 italic">{formatNumber(batchData.liveFish)} un</span>
                   </div>
                   <div className="space-y-1">
-                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Mortalidade Atual</span>
+                    <span className="text-[10px] font-black text-slate-600 uppercase tracking-widest block">Mortalidade Atual</span>
                     <span className="text-xl font-black text-red-600 italic">{formatNumber(batchData.mortality)} un</span>
                   </div>
                   <div className="space-y-1">
-                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Biomassa Atual</span>
+                    <span className="text-[10px] font-black text-slate-600 uppercase tracking-widest block">Biomassa Atual</span>
                     <span className="text-xl font-black text-blue-600 italic">{formatNumber(batchData.currentBiomassKg, 1)}kg</span>
                   </div>
                   <div className="space-y-1">
-                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Ração Consumida Total</span>
+                    <span className="text-[10px] font-black text-slate-600 uppercase tracking-widest block">Ração Consumida Total</span>
                     <span className="text-xl font-black text-amber-600 italic">{formatNumber(batchData.feeding / 1000, 1)}kg</span>
                   </div>
                   <div className="space-y-1">
-                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">FCA Previsto</span>
+                    <span className="text-[10px] font-black text-slate-600 uppercase tracking-widest block">FCA Previsto</span>
                     <span className="text-xl font-black text-indigo-600 italic">{formatNumber(batchData.fcaTheoretical, 2)}</span>
                   </div>
                   <div className="space-y-1">
-                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Biomassa Pré-Despesca</span>
+                    <span className="text-[10px] font-black text-slate-600 uppercase tracking-widest block">Biomassa Pré-Despesca</span>
                     <span className="text-xl font-black text-emerald-600 italic">{formatNumber(batchData.biomassBeforeHarvest, 1)}kg</span>
                   </div>
                 </div>
 
                 <div className="pt-6 border-t border-slate-100">
-                  <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Consumo Estratificado por Modelo</h4>
+                  <h4 className="text-[10px] font-black text-slate-600 uppercase tracking-widest mb-4">Consumo Estratificado por Modelo</h4>
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                     {Object.entries(batchData.feedingByType).map(([type, amount]) => (
                       <div key={type} className="bg-slate-50 p-3 rounded-xl border border-slate-100">
-                        <span className="text-[8px] font-black text-slate-400 uppercase block truncate" title={type}>{type}</span>
+                        <span className="text-[8px] font-black text-slate-600 uppercase block truncate" title={type}>{type}</span>
                         <span className="text-xs font-black text-slate-700 italic">{formatNumber(amount / 1000, 1)}kg</span>
                       </div>
                     ))}
@@ -635,19 +635,19 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
 
                 <div className="pt-6 border-t border-slate-100 grid grid-cols-2 gap-6">
                   <div className="space-y-1">
-                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Biomassa Inicial</span>
+                    <span className="text-[10px] font-black text-slate-600 uppercase tracking-widest block">Biomassa Inicial</span>
                     <span className="text-sm font-black text-slate-600 uppercase">{formatNumber((batchData.batch.initialQuantity * batchData.batch.initialUnitWeight) / 1000, 1)}kg</span>
                   </div>
                   <div className="space-y-1">
-                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Qtd Inicial</span>
+                    <span className="text-[10px] font-black text-slate-600 uppercase tracking-widest block">Qtd Inicial</span>
                     <span className="text-sm font-black text-slate-600 uppercase">{formatNumber(batchData.batch.initialQuantity)} un</span>
                   </div>
                   <div className="space-y-1">
-                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Sobrevivência Prevista</span>
+                    <span className="text-[10px] font-black text-slate-600 uppercase tracking-widest block">Sobrevivência Prevista</span>
                     <span className="text-sm font-black text-emerald-500 uppercase">{formatNumber(batchData.survivalRate, 1)}%</span>
                   </div>
                   <div className="space-y-1">
-                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Dias Totais</span>
+                    <span className="text-[10px] font-black text-slate-600 uppercase tracking-widest block">Dias Totais</span>
                     <span className="text-sm font-black text-blue-600 uppercase">{batchData.totalDays} dias</span>
                   </div>
                 </div>
@@ -655,15 +655,15 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
 
               {/* Slaughter Comparison */}
               <div className="bg-slate-900 p-8 rounded-[2.5rem] shadow-xl text-white space-y-6">
-                <h3 className="text-sm font-black text-indigo-400 uppercase tracking-widest flex items-center gap-2 italic">
-                  <CheckCircle2 className="w-4 h-4" />
+                <h3 className="text-sm font-black text-white uppercase tracking-widest flex items-center gap-2 italic">
+                  <CheckCircle2 className="w-4 h-4 text-indigo-400" />
                   Dados de Despesca vs Real
                 </h3>
 
                 <div className="space-y-6">
                   <div className="p-4 bg-white/5 rounded-2xl border border-white/10">
                     <div className="flex justify-between items-center mb-2">
-                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Taxa de Assertividade do Lote</span>
+                      <span className="text-[10px] font-black text-white uppercase tracking-widest">Taxa de Assertividade do Lote</span>
                       <span className="text-lg font-black text-indigo-400 italic">{formatNumber(batchData.accuracy, 1)}%</span>
                     </div>
                     <div className="w-full bg-white/10 h-1.5 rounded-full overflow-hidden">
@@ -676,35 +676,35 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
 
                   <div className="grid grid-cols-2 gap-6">
                     <div className="space-y-1">
-                      <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest block">Sobrevivência Prevista</span>
+                      <span className="text-[10px] font-black text-white uppercase tracking-widest block">Sobrevivência Prevista</span>
                       <span className="text-lg font-black italic text-emerald-400">{formatNumber(batchData.survivalRate, 1)}%</span>
                     </div>
                     <div className="space-y-1">
-                      <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest block">Sobrevivência Real</span>
+                      <span className="text-[10px] font-black text-white uppercase tracking-widest block">Sobrevivência Real</span>
                       <span className="text-lg font-black italic text-blue-400">{formatNumber(batchData.survivalRateReal, 1)}%</span>
                     </div>
                     <div className="space-y-1">
-                      <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest block">FCA Previsto</span>
+                      <span className="text-[10px] font-black text-white uppercase tracking-widest block">FCA Previsto</span>
                       <span className="text-lg font-black italic text-indigo-400">{formatNumber(batchData.fcaTheoretical, 2)}</span>
                     </div>
                     <div className="space-y-1">
-                      <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest block">FCA Real</span>
+                      <span className="text-[10px] font-black text-white uppercase tracking-widest block">FCA Real</span>
                       <span className="text-lg font-black italic text-amber-400">{formatNumber(batchData.fcaReal, 2)}</span>
                     </div>
                     <div className="space-y-1">
-                      <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest block">Peixes Despescados</span>
+                      <span className="text-[10px] font-black text-white uppercase tracking-widest block">Peixes Despescados</span>
                       <span className="text-lg font-black italic">{formatNumber(batchData.harvestedFish)} un</span>
                     </div>
                     <div className="space-y-1">
-                      <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest block">Peso Total Deck</span>
+                      <span className="text-[10px] font-black text-white uppercase tracking-widest block">Peso Total Deck</span>
                       <span className="text-lg font-black italic">{formatNumber(batchData.harvestedWeight, 1)}kg</span>
                     </div>
                     <div className="space-y-1">
-                      <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest block">Peixes Previstos</span>
+                      <span className="text-[10px] font-black text-white uppercase tracking-widest block">Peixes Previstos</span>
                       <span className="text-lg font-black italic text-blue-400">{formatNumber(batchData.expectedFish)} un</span>
                     </div>
                     <div className="space-y-1">
-                      <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest block">Peso Previsto</span>
+                      <span className="text-[10px] font-black text-white uppercase tracking-widest block">Peso Previsto</span>
                       <span className="text-lg font-black italic text-blue-400">{formatNumber(batchData.expectedWeight, 1)}kg</span>
                     </div>
                   </div>
@@ -717,24 +717,24 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
           <div className="space-y-8">
               {/* Cost Analysis Card */}
               <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-200 space-y-6">
-                <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest flex items-center gap-2 italic">
+                <h3 className="text-sm font-black text-black uppercase tracking-widest flex items-center gap-2 italic">
                   <DollarSign className="w-4 h-4 text-emerald-600" />
                   Análise de Custos
                 </h3>
 
                 <div className="space-y-4">
                   <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
-                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">Peso Recepção Frigorífico (kg)</span>
+                    <span className="text-[10px] font-black text-slate-600 uppercase tracking-widest block mb-1">Peso Recepção Frigorífico (kg)</span>
                     <span className="text-2xl font-black text-slate-800 italic">{formatNumber(batchData.totalReceptionWeight, 1)} kg</span>
                   </div>
 
                   <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
-                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">Custo Total Acumulado</span>
+                    <span className="text-[10px] font-black text-slate-600 uppercase tracking-widest block mb-1">Custo Total Acumulado</span>
                     <span className="text-2xl font-black text-slate-800 italic">{formatCurrency(batchData.totalExpenses)}</span>
                   </div>
 
                   <div className="p-4 bg-emerald-50 rounded-2xl border border-emerald-100">
-                    <span className="text-[10px] font-black text-emerald-600 uppercase tracking-widest block mb-1">Custo por KG</span>
+                    <span className="text-[10px] font-black text-emerald-700 uppercase tracking-widest block mb-1">Custo por KG</span>
                     <span className="text-2xl font-black text-emerald-700 italic">{formatCurrency(batchData.costPerKg)}</span>
                   </div>
                 </div>
@@ -751,8 +751,8 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
 
                 {batchData.batch.isClosed && (
                   <div className="p-4 bg-slate-100 rounded-2xl border border-slate-200 text-center">
-                    <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Lote Encerrado</p>
-                    <p className="text-[9px] font-bold text-slate-400 uppercase mt-1">Nenhuma alteração permitida</p>
+                    <p className="text-[10px] font-black text-slate-600 uppercase tracking-widest">Lote Encerrado</p>
+                    <p className="text-[9px] font-bold text-slate-600 uppercase mt-1">Nenhuma alteração permitida</p>
                   </div>
                 )}
               </div>
@@ -763,19 +763,19 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                   <div className="flex bg-slate-100 p-1 rounded-2xl mb-6">
                     <button 
                       onClick={() => setFormType('expense')}
-                      className={`flex-1 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${formType === 'expense' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                      className={`flex-1 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${formType === 'expense' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-800'}`}
                     >
                       Despesa
                     </button>
                     <button 
                       onClick={() => setFormType('revenue')}
-                      className={`flex-1 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${formType === 'revenue' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                      className={`flex-1 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${formType === 'revenue' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-800'}`}
                     >
                       Receita
                     </button>
                   </div>
 
-                  <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest flex items-center gap-2 italic mb-6">
+                  <h3 className="text-sm font-black text-black uppercase tracking-widest flex items-center gap-2 italic mb-6">
                     {formType === 'expense' ? (
                       <>
                         <Plus className="w-4 h-4 text-blue-600" />
@@ -792,7 +792,7 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                   {formType === 'expense' ? (
                     <form onSubmit={handleAddExpense} className="space-y-4">
                       <div>
-                        <label className="block text-[10px] font-black text-slate-400 uppercase mb-1 tracking-widest ml-1">Categoria</label>
+                        <label className="block text-[10px] font-black text-slate-600 uppercase mb-1 tracking-widest ml-1">Categoria</label>
                         {!isAddingCategory ? (
                           <select 
                             className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 font-bold text-sm"
@@ -827,7 +827,7 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                             <button 
                               type="button"
                               onClick={() => setIsAddingCategory(false)}
-                              className="px-4 py-3 bg-slate-100 text-slate-500 rounded-2xl font-black text-[10px] uppercase"
+                              className="px-4 py-3 bg-slate-100 text-slate-600 rounded-2xl font-black text-[10px] uppercase"
                             >
                               Voltar
                             </button>
@@ -836,7 +836,7 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                       </div>
 
                       <div>
-                        <label className="block text-[10px] font-black text-slate-400 uppercase mb-1 tracking-widest ml-1">Item (Lançamento)</label>
+                        <label className="block text-[10px] font-black text-slate-600 uppercase mb-1 tracking-widest ml-1">Item (Lançamento)</label>
                         {!isAddingItem ? (
                           <select 
                             className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 font-bold text-sm"
@@ -871,7 +871,7 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                             <button 
                               type="button"
                               onClick={() => setIsAddingItem(false)}
-                              className="px-4 py-3 bg-slate-100 text-slate-500 rounded-2xl font-black text-[10px] uppercase"
+                              className="px-4 py-3 bg-slate-100 text-slate-600 rounded-2xl font-black text-[10px] uppercase"
                             >
                               Voltar
                             </button>
@@ -881,7 +881,7 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
 
                       <div className="grid grid-cols-1 gap-4">
                         <div>
-                          <label className="block text-[10px] font-black text-slate-400 uppercase mb-1 tracking-widest ml-1">Data</label>
+                          <label className="block text-[10px] font-black text-slate-600 uppercase mb-1 tracking-widest ml-1">Data</label>
                           <input 
                             type="date" 
                             required
@@ -891,7 +891,7 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                           />
                         </div>
                         <div>
-                          <label className="block text-[10px] font-black text-slate-400 uppercase mb-1 tracking-widest ml-1">Valor (R$)</label>
+                          <label className="block text-[10px] font-black text-slate-600 uppercase mb-1 tracking-widest ml-1">Valor (R$)</label>
                           <input 
                             type="number" 
                             step="0.01"
@@ -926,7 +926,7 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                   ) : (
                     <form onSubmit={handleAddRevenue} className="space-y-4">
                       <div>
-                        <label className="block text-[10px] font-black text-slate-400 uppercase mb-1 tracking-widest ml-1">Data</label>
+                        <label className="block text-[10px] font-black text-slate-600 uppercase mb-1 tracking-widest ml-1">Data</label>
                         <input 
                           type="date" 
                           required
@@ -936,7 +936,7 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                         />
                       </div>
                       <div>
-                        <label className="block text-[10px] font-black text-slate-400 uppercase mb-1 tracking-widest ml-1">Peso Recepção Frigorífico (kg)</label>
+                        <label className="block text-[10px] font-black text-slate-600 uppercase mb-1 tracking-widest ml-1">Peso Recepção Frigorífico (kg)</label>
                         <input 
                           type="number" 
                           step="0.01"
@@ -975,14 +975,14 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
           {/* Expenses List */}
           <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-200">
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
-                <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest flex items-center gap-2 italic">
+                <h3 className="text-sm font-black text-black uppercase tracking-widest flex items-center gap-2 italic">
                   <DollarSign className="w-4 h-4 text-emerald-600" />
                   Quadro de Lançamentos
                 </h3>
                 
                 <div className="flex flex-wrap items-center gap-3">
                   <div className="flex items-center gap-2">
-                    <span className="text-[10px] font-black text-slate-400 uppercase">Filtrar:</span>
+                    <span className="text-[10px] font-black text-slate-600 uppercase">Filtrar:</span>
                     <select 
                       className="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-[10px] font-black uppercase outline-none focus:ring-2 focus:ring-blue-500/20"
                       value={filterCategory}
@@ -1011,11 +1011,11 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                 <table className="w-full">
                   <thead>
                     <tr className="border-b border-slate-100">
-                      <th className="text-left py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Data</th>
-                      <th className="text-left py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Categoria</th>
-                      <th className="text-left py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Lançamento (Item)</th>
-                      <th className="text-left py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Usuário</th>
-                      <th className="text-right py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Valor</th>
+                      <th className="text-left py-4 text-[10px] font-black text-slate-600 uppercase tracking-widest">Data</th>
+                      <th className="text-left py-4 text-[10px] font-black text-slate-600 uppercase tracking-widest">Categoria</th>
+                      <th className="text-left py-4 text-[10px] font-black text-slate-600 uppercase tracking-widest">Lançamento (Item)</th>
+                      <th className="text-left py-4 text-[10px] font-black text-slate-600 uppercase tracking-widest">Usuário</th>
+                      <th className="text-right py-4 text-[10px] font-black text-slate-600 uppercase tracking-widest">Valor</th>
                       <th className="w-20"></th>
                     </tr>
                   </thead>
@@ -1026,9 +1026,9 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                       return (
                         <tr key={entry.id} className="group hover:bg-slate-50 transition-colors">
                           <td className="py-4 text-xs font-bold text-slate-600">{safeDateFormat(entry.date, 'dd/MM/yyyy')}</td>
-                          <td className="py-4 text-xs font-black text-slate-400 uppercase italic">{entry.category}</td>
+                          <td className="py-4 text-xs font-black text-slate-600 uppercase italic">{entry.category}</td>
                           <td className="py-4 text-xs font-black text-slate-800 uppercase italic">{entry.description}</td>
-                          <td className="py-4 text-xs font-bold text-slate-500 italic">{user?.name || '---'}</td>
+                          <td className="py-4 text-xs font-bold text-slate-600 italic">{user?.name || '---'}</td>
                           <td className={`py-4 text-right text-xs font-black ${isRevenue ? 'text-blue-600' : 'text-emerald-600'}`}>
                             {isRevenue ? '+' : ''}{formatCurrency(entry.value)}
                           </td>
@@ -1057,7 +1057,7 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                       <tr>
                         <td colSpan={6} className="py-12 text-center">
                           <DollarSign className="w-8 h-8 text-slate-200 mx-auto mb-2" />
-                          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Nenhum lançamento encontrado.</p>
+                          <p className="text-[10px] font-black text-slate-600 uppercase tracking-widest">Nenhum lançamento encontrado.</p>
                         </td>
                       </tr>
                     )}
@@ -1074,26 +1074,26 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                   <FileText className="w-6 h-6 text-blue-600" />
                 </div>
                 <div>
-                  <h3 className="text-xl font-black text-slate-800 uppercase tracking-tighter italic">Detalhamento por Gaiola</h3>
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Histórico completo de manejos do lote</p>
+                  <h3 className="text-xl font-black text-black uppercase tracking-tighter italic">Detalhamento por Gaiola</h3>
+                  <p className="text-[10px] font-bold text-slate-600 uppercase tracking-widest">Histórico completo de manejos do lote</p>
                 </div>
               </div>
 
               <div className="grid grid-cols-1 gap-8">
                 {Array.from(batchData.logsByCage.entries()).map(([cageId, logs]) => (
                   <div key={cageId} className="bg-white rounded-[2.5rem] shadow-sm border border-slate-200 overflow-hidden print:border-slate-100 print:shadow-none">
-                    <div className="bg-slate-50 px-8 py-6 border-b border-slate-100 flex items-center justify-between">
+                    <div className="bg-slate-100 px-8 py-6 border-b border-slate-100 flex items-center justify-between">
                       <div className="flex items-center gap-3">
                         <Fish className="w-5 h-5 text-blue-600" />
-                        <h4 className="text-lg font-black text-slate-800 uppercase italic">{logs.cageName}</h4>
+                        <h4 className="text-lg font-black text-black uppercase italic">{logs.cageName}</h4>
                       </div>
                       <div className="flex gap-4">
                         <div className="text-right">
-                          <span className="text-[8px] font-black text-slate-400 uppercase block">Tratos</span>
+                          <span className="text-[8px] font-black text-slate-600 uppercase block">Tratos</span>
                           <span className="text-xs font-black text-slate-700">{logs.feeding.length}</span>
                         </div>
                         <div className="text-right">
-                          <span className="text-[8px] font-black text-slate-400 uppercase block">Mortes</span>
+                          <span className="text-[8px] font-black text-slate-600 uppercase block">Mortes</span>
                           <span className="text-xs font-black text-red-600">{logs.mortality.reduce((acc, m) => acc + m.count, 0)}</span>
                         </div>
                       </div>
@@ -1109,7 +1109,7 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                         <div className="space-y-2 max-h-[300px] overflow-y-auto pr-2 scrollbar-hide">
                           {logs.feeding.map((f, idx) => (
                             <div key={idx} className="flex items-center justify-between p-3 bg-slate-50 rounded-xl border border-slate-100">
-                              <span className="text-[10px] font-bold text-slate-500">{safeDateFormat(f.timestamp, 'dd/MM')}</span>
+                              <span className="text-[10px] font-bold text-slate-600">{safeDateFormat(f.timestamp, 'dd/MM')}</span>
                               <span className="text-xs font-black text-slate-800 italic">{formatNumber(f.amount / 1000, 1)}kg</span>
                             </div>
                           ))}
@@ -1163,8 +1163,8 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
             <FileText className="w-12 h-12 text-slate-200" />
           </div>
           <div>
-            <h3 className="text-lg font-black text-slate-400 uppercase tracking-widest italic">Nenhum Lote Selecionado</h3>
-            <p className="text-xs font-bold text-slate-300 uppercase tracking-widest mt-2">Selecione um lote acima para visualizar o fechamento</p>
+            <h3 className="text-lg font-black text-slate-600 uppercase tracking-widest italic">Nenhum Lote Selecionado</h3>
+            <p className="text-xs font-bold text-slate-600 uppercase tracking-widest mt-2">Selecione um lote acima para visualizar o fechamento</p>
           </div>
         </div>
       )}

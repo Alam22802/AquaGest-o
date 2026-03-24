@@ -502,29 +502,43 @@ const Dashboard: React.FC<Props> = ({ state }) => {
         if (standardBatch) {
           const bStart = parseISO(standardBatch.settlementDate);
           const refInitialW = standardBatch.initialUnitWeight;
-          const bLogs = (state.biometryLogs || []).filter(l => {
-            const logDate = parseISO(l.date);
-            const cutoffDate = parseISO('2026-03-04');
-            if (logDate > cutoffDate) return false;
+          const cutoffDate = parseISO('2026-03-09');
+          
+          const bLogs = (state.biometryLogs || [])
+            .filter(l => {
+              const logDate = parseISO(l.date);
+              if (logDate > cutoffDate) return false;
+              if (l.batchId === standardBatch.id) return true;
+              if (!l.batchId && l.cageId) {
+                const cage = state.cages.find(c => c.id === l.cageId);
+                return cage?.batchId === standardBatch.id;
+              }
+              return false;
+            })
+            .sort((a, b) => parseISO(a.date).getTime() - parseISO(b.date).getTime());
 
-            if (l.batchId === standardBatch.id) return true;
-            if (!l.batchId && l.cageId) {
-              const cage = state.cages.find(c => c.id === l.cageId);
-              return cage?.batchId === standardBatch.id;
+          if (bLogs.length > 0) {
+            const lastLog = bLogs[bLogs.length - 1];
+            const daysElapsed = Math.max(1, Math.floor((parseISO(lastLog.date).getTime() - bStart.getTime()) / (1000 * 60 * 60 * 24)));
+            const growthRate = (lastLog.averageWeight - refInitialW) / daysElapsed;
+            
+            // Generate linear points for the standard curve
+            for (let i = 0; i <= totalDays; i += 15) {
+              standardCurvePoints.push({ day: i, weight: avgInitial + (i * growthRate) });
             }
-            return false;
-          });
-          standardCurvePoints = bLogs.map(l => ({
-            day: Math.floor((parseISO(l.date).getTime() - bStart.getTime()) / (1000 * 60 * 60 * 24)),
-            // Adjust weight relative to the current batch's initial weight
-            weight: avgInitial + (l.averageWeight - refInitialW)
-          })).sort((a, b) => a.day - b.day);
-          // Add initial point matching current batch
-          standardCurvePoints = [{ day: 0, weight: avgInitial }, ...standardCurvePoints];
+            if (!standardCurvePoints.some(p => p.day === totalDays)) {
+              standardCurvePoints.push({ day: totalDays, weight: avgInitial + (totalDays * growthRate) });
+            }
+          } else {
+            // Fallback if no logs found
+            for (let i = 0; i <= totalDays; i += 15) {
+              standardCurvePoints.push({ day: i, weight: avgInitial + (i * 5.4) });
+            }
+          }
         } else {
           // Mock standard curve if batch not found
           for (let i = 0; i <= totalDays; i += 15) {
-            standardCurvePoints.push({ day: i, weight: avgInitial + (i * 5.4) }); // 5.4g/day growth (targets ~1kg at 180d)
+            standardCurvePoints.push({ day: i, weight: avgInitial + (i * 5.4) });
           }
         }
       }
@@ -835,24 +849,37 @@ const Dashboard: React.FC<Props> = ({ state }) => {
         if (standardBatch) {
           const bStart = parseISO(standardBatch.settlementDate);
           const refInitialW = standardBatch.initialUnitWeight;
-          const bLogs = (state.biometryLogs || []).filter(l => {
-            const logDate = parseISO(l.date);
-            const cutoffDate = parseISO('2026-03-04');
-            if (logDate > cutoffDate) return false;
+          const cutoffDate = parseISO('2026-03-09');
+          
+          const bLogs = (state.biometryLogs || [])
+            .filter(l => {
+              const logDate = parseISO(l.date);
+              if (logDate > cutoffDate) return false;
+              if (l.batchId === standardBatch.id) return true;
+              if (!l.batchId && l.cageId) {
+                const cage = state.cages.find(c => c.id === l.cageId);
+                return cage?.batchId === standardBatch.id;
+              }
+              return false;
+            })
+            .sort((a, b) => parseISO(a.date).getTime() - parseISO(b.date).getTime());
 
-            if (l.batchId === standardBatch.id) return true;
-            if (!l.batchId && l.cageId) {
-              const cage = state.cages.find(c => c.id === l.cageId);
-              return cage?.batchId === standardBatch.id;
+          if (bLogs.length > 0) {
+            const lastLog = bLogs[bLogs.length - 1];
+            const daysElapsed = Math.max(1, Math.floor((parseISO(lastLog.date).getTime() - bStart.getTime()) / (1000 * 60 * 60 * 24)));
+            const growthRate = (lastLog.averageWeight - refInitialW) / daysElapsed;
+            
+            for (let i = 0; i <= totalDays; i += 15) {
+              standardCurvePoints.push({ day: i, weight: initialWeight + (i * growthRate) });
             }
-            return false;
-          });
-          standardCurvePoints = bLogs.map(l => ({
-            day: Math.floor((parseISO(l.date).getTime() - bStart.getTime()) / (1000 * 60 * 60 * 24)),
-            // Adjust weight relative to the current batch's initial weight
-            weight: initialWeight + (l.averageWeight - refInitialW)
-          })).sort((a, b) => a.day - b.day);
-          standardCurvePoints = [{ day: 0, weight: initialWeight }, ...standardCurvePoints];
+            if (!standardCurvePoints.some(p => p.day === totalDays)) {
+              standardCurvePoints.push({ day: totalDays, weight: initialWeight + (totalDays * growthRate) });
+            }
+          } else {
+            for (let i = 0; i <= totalDays; i += 15) {
+              standardCurvePoints.push({ day: i, weight: initialWeight + (i * 5.4) });
+            }
+          }
         }
       }
 
