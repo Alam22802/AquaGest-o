@@ -24,7 +24,7 @@ const SlaughterSummary = React.memo(({ stats, startDate, endDate, onStartDateCha
     totalRendering: number;
     yieldPercentage: number;
     count: number;
-    waterCostPerKg: number;
+    waterConsumptionPerKg: number;
     energyCostPerKg: number;
     laborPerKg: number;
     freightPerKgLive: number;
@@ -174,10 +174,10 @@ const SlaughterSummary = React.memo(({ stats, startDate, endDate, onStartDateCha
                 </div>
              </div>
              <div className="space-y-2 border-l-2 border-white/20 pl-6">
-                <div className="text-[9px] font-black opacity-40 uppercase tracking-widest">Custo Água/KG</div>
+                <div className="text-[9px] font-black opacity-40 uppercase tracking-widest">Consumo Água/KG</div>
                 <div className="text-xl font-black text-white/90 flex items-baseline gap-1">
-                   <span className="text-[10px] opacity-40">R$</span>
-                   {formatNumber(stats.waterCostPerKg, 2)}
+                   {formatNumber(stats.waterConsumptionPerKg, 2)}
+                   <span className="text-[10px] opacity-40">L/kg</span>
                 </div>
              </div>
              <div className="space-y-2 border-l-2 border-white/20 pl-6">
@@ -462,6 +462,14 @@ const SlaughterOverview: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
       }
     });
 
+    const filteredUtilityLogs = (state.utilityLogs || []).filter(log => {
+      try {
+        return isWithinInterval(parseISO(log.date), { start, end });
+      } catch {
+        return false;
+      }
+    });
+
     const totalGta = filteredLogs.reduce((acc, l) => acc + (l.gtaWeight || 0), 0);
     const totalRecep = filteredLogs.reduce((acc, l) => acc + (l.receptionWeight || 0), 0);
     const totalPacked = filteredLogs.reduce((acc, l) => acc + (l.packedQuantity || 0), 0);
@@ -469,7 +477,24 @@ const SlaughterOverview: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
     const yieldPercentage = totalRecep > 0 ? (totalPacked / totalRecep) * 100 : 0;
 
     const totalWaterValue = filteredExpenses.filter(e => e.category === 'Água').reduce((acc, e) => acc + e.value, 0);
-    const waterCostPerKg = totalPacked > 0 ? totalWaterValue / totalPacked : 0;
+    
+    // Calculate total water consumed from utility logs (readings)
+    const totalWaterConsumed = filteredUtilityLogs
+      .filter(l => l.type === 'water')
+      .reduce((acc, log) => {
+        const sameTypeLogs = (state.utilityLogs || [])
+          .filter(l => l.type === 'water')
+          .sort((a, b) => b.date.localeCompare(a.date) || b.timestamp.localeCompare(a.timestamp));
+        
+        const currentIndex = sameTypeLogs.findIndex(l => l.id === log.id);
+        if (currentIndex === -1 || currentIndex === sameTypeLogs.length - 1) return acc;
+        
+        const previousLog = sameTypeLogs[currentIndex + 1];
+        const consumption = log.reading - previousLog.reading;
+        return acc + (consumption > 0 ? consumption : 0);
+      }, 0);
+
+    const waterConsumptionPerKg = totalPacked > 0 ? totalWaterConsumed / totalPacked : 0;
 
     const totalEnergyValue = filteredExpenses.filter(e => e.category === 'Energia').reduce((acc, e) => acc + e.value, 0);
     const energyCostPerKg = totalPacked > 0 ? totalEnergyValue / totalPacked : 0;
@@ -505,7 +530,7 @@ const SlaughterOverview: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
       totalRendering,
       yieldPercentage, 
       count: filteredLogs.length,
-      waterCostPerKg,
+      waterConsumptionPerKg,
       energyCostPerKg,
       laborPerKg,
       freightPerKgLive,
