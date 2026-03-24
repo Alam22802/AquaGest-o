@@ -58,7 +58,7 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
   });
   const [revenueForm, setRevenueForm] = useState({
     receptionWeight: '',
-    unitPrice: '',
+    unitPrice: '0',
     date: new Date().toISOString().split('T')[0]
   });
   const [formType, setFormType] = useState<'expense' | 'revenue'>('expense');
@@ -237,9 +237,9 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       ...revenues.map(r => ({ 
         id: r.id, 
         batchId: r.batchId, 
-        description: `Venda: ${formatNumber(r.receptionWeight, 1)}kg @ ${formatCurrency(r.unitPrice)}/kg`,
+        description: `Peso Recepção Frigorífico: ${formatNumber(r.receptionWeight, 1)}kg`,
         category: 'Receita',
-        value: r.receptionWeight * r.unitPrice,
+        value: 0,
         date: r.date,
         userId: r.userId,
         type: 'revenue' as const
@@ -386,12 +386,12 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
 
   const handleAddRevenue = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedBatchId || revenueForm.receptionWeight === '' || revenueForm.unitPrice === '') return;
+    if (!selectedBatchId || revenueForm.receptionWeight === '') return;
 
     const revenueData = {
       batchId: selectedBatchId,
       receptionWeight: Number(revenueForm.receptionWeight),
-      unitPrice: Number(revenueForm.unitPrice),
+      unitPrice: 0,
       date: revenueForm.date,
       userId: currentUser.id,
       updatedAt: Date.now()
@@ -417,7 +417,7 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
 
     setRevenueForm({
       receptionWeight: '',
-      unitPrice: '',
+      unitPrice: '0',
       date: new Date().toISOString().split('T')[0]
     });
     setEditingRevenueId(null);
@@ -432,7 +432,7 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       setEditingExpenseId(null);
       setRevenueForm({
         receptionWeight: revenue.receptionWeight.toString(),
-        unitPrice: revenue.unitPrice.toString(),
+        unitPrice: '0',
         date: revenue.date
       });
       return;
@@ -460,7 +460,7 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     });
     setRevenueForm({
       receptionWeight: '',
-      unitPrice: '',
+      unitPrice: '0',
       date: new Date().toISOString().split('T')[0]
     });
     setIsAddingCategory(false);
@@ -696,7 +696,7 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                       <span className="text-lg font-black italic">{formatNumber(batchData.harvestedFish)} un</span>
                     </div>
                     <div className="space-y-1">
-                      <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest block">Peso Total</span>
+                      <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest block">Peso Total Deck</span>
                       <span className="text-lg font-black italic">{formatNumber(batchData.harvestedWeight, 1)}kg</span>
                     </div>
                     <div className="space-y-1">
@@ -706,21 +706,6 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                     <div className="space-y-1">
                       <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest block">Peso Previsto</span>
                       <span className="text-lg font-black italic text-blue-400">{formatNumber(batchData.expectedWeight, 1)}kg</span>
-                    </div>
-                    <div className="space-y-1">
-                      <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest block">Peso Recepção</span>
-                      <span className="text-lg font-black italic text-emerald-400">{formatNumber(batchData.totalReceptionWeight, 1)}kg</span>
-                    </div>
-                  </div>
-
-                  <div className="pt-6 border-t border-white/10 grid grid-cols-2 gap-6">
-                    <div className="space-y-1">
-                      <span className="text-[10px] font-black text-indigo-300 uppercase tracking-widest block">FCA Real</span>
-                      <span className="text-lg font-black text-emerald-400 italic">{formatNumber(batchData.fcaReal, 2)}</span>
-                    </div>
-                    <div className="space-y-1">
-                      <span className="text-[10px] font-black text-amber-400 uppercase tracking-widest block">Diferença Peso</span>
-                      <span className="text-lg font-black text-amber-400 italic">{formatNumber(Math.abs(batchData.harvestedWeight - batchData.expectedWeight), 1)}kg</span>
                     </div>
                   </div>
                 </div>
@@ -739,7 +724,7 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
 
                 <div className="space-y-4">
                   <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
-                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">Peso Recepção Total</span>
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">Peso Recepção Frigorífico (kg)</span>
                     <span className="text-2xl font-black text-slate-800 italic">{formatNumber(batchData.totalReceptionWeight, 1)} kg</span>
                   </div>
 
@@ -751,20 +736,6 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                   <div className="p-4 bg-emerald-50 rounded-2xl border border-emerald-100">
                     <span className="text-[10px] font-black text-emerald-600 uppercase tracking-widest block mb-1">Custo por KG</span>
                     <span className="text-2xl font-black text-emerald-700 italic">{formatCurrency(batchData.costPerKg)}</span>
-                  </div>
-
-                  <div className="p-4 bg-blue-50 rounded-2xl border border-blue-100">
-                    <span className="text-[10px] font-black text-blue-600 uppercase tracking-widest block mb-1">Receita Total</span>
-                    <span className="text-2xl font-black text-blue-700 italic">{formatCurrency(batchData.totalRevenue)}</span>
-                  </div>
-
-                  <div className={`p-4 rounded-2xl border ${batchData.totalProfit >= 0 ? 'bg-indigo-50 border-indigo-100' : 'bg-red-50 border-red-100'}`}>
-                    <span className={`text-[10px] font-black uppercase tracking-widest block mb-1 ${batchData.totalProfit >= 0 ? 'text-indigo-600' : 'text-red-600'}`}>
-                      Resultado (Lucro/Prejuízo)
-                    </span>
-                    <span className={`text-2xl font-black italic ${batchData.totalProfit >= 0 ? 'text-indigo-700' : 'text-red-700'}`}>
-                      {formatCurrency(batchData.totalProfit)}
-                    </span>
                   </div>
                 </div>
 
@@ -965,7 +936,7 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                         />
                       </div>
                       <div>
-                        <label className="block text-[10px] font-black text-slate-400 uppercase mb-1 tracking-widest ml-1">Peso de Recepção (kg)</label>
+                        <label className="block text-[10px] font-black text-slate-400 uppercase mb-1 tracking-widest ml-1">Peso Recepção Frigorífico (kg)</label>
                         <input 
                           type="number" 
                           step="0.01"
@@ -974,18 +945,6 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                           className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 font-bold text-xs"
                           value={revenueForm.receptionWeight}
                           onChange={e => setRevenueForm({...revenueForm, receptionWeight: e.target.value})}
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-[10px] font-black text-slate-400 uppercase mb-1 tracking-widest ml-1">Valor de Venda por kg (R$)</label>
-                        <input 
-                          type="number" 
-                          step="0.01"
-                          required
-                          placeholder="0,00"
-                          className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 font-bold text-xs"
-                          value={revenueForm.unitPrice}
-                          onChange={e => setRevenueForm({...revenueForm, unitPrice: e.target.value})}
                         />
                       </div>
                       <div className="flex gap-3">
