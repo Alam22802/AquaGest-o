@@ -693,11 +693,11 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                     </div>
                     <div className="space-y-1">
                       <span className="text-[10px] font-black text-white uppercase tracking-widest block">Peixes Despescados</span>
-                      <span className="text-lg font-black italic">{formatNumber(batchData.harvestedFish)} un</span>
+                      <span className="text-lg font-black italic text-cyan-400">{formatNumber(batchData.harvestedFish)} un</span>
                     </div>
                     <div className="space-y-1">
                       <span className="text-[10px] font-black text-white uppercase tracking-widest block">Peso Total Deck</span>
-                      <span className="text-lg font-black italic">{formatNumber(batchData.harvestedWeight, 1)}kg</span>
+                      <span className="text-lg font-black italic text-cyan-400">{formatNumber(batchData.harvestedWeight, 1)}kg</span>
                     </div>
                     <div className="space-y-1">
                       <span className="text-[10px] font-black text-white uppercase tracking-widest block">Peixes Previstos</span>
