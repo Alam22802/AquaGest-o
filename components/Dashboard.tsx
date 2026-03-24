@@ -154,6 +154,9 @@ const Dashboard: React.FC<Props> = ({ state }) => {
   const [selectedBatchId, setSelectedBatchId] = useState<string>('');
   const [reportStartDate, setReportStartDate] = useState<string>(format(subDays(new Date(), 30), 'yyyy-MM-dd'));
   const [reportEndDate, setReportEndDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'));
+  const [showSupplierCurve, setShowSupplierCurve] = useState<boolean>(false);
+  const [showStandardCurve, setShowStandardCurve] = useState<boolean>(false);
+  const [showContinueCurve, setShowContinueCurve] = useState<boolean>(false);
 
   const lowStockFeeds = useMemo(() => {
     return (state.feedTypes || []).filter(feed => {
@@ -416,6 +419,8 @@ const Dashboard: React.FC<Props> = ({ state }) => {
     
     let logs: any[] = [];
     let initialWeights: number[] = [];
+    let settlementDate = '';
+    let expectedHarvestDate = '';
 
     if (selectedBatchId === 'all') {
       const filteredBatches = (state.batches || []).filter(b => {
@@ -424,6 +429,10 @@ const Dashboard: React.FC<Props> = ({ state }) => {
       });
       
       initialWeights = filteredBatches.map(b => b.initialUnitWeight);
+      if (filteredBatches.length > 0) {
+        settlementDate = filteredBatches[0].settlementDate;
+        expectedHarvestDate = filteredBatches[0].expectedHarvestDate || '';
+      }
       
       logs = (state.biometryLogs || []).filter(l => {
         const batch = filteredBatches.find(b => b.id === l.batchId);
@@ -443,6 +452,8 @@ const Dashboard: React.FC<Props> = ({ state }) => {
       const batch = (state.batches || []).find(b => b.id === selectedBatchId);
       if (!batch) return [];
       initialWeights = [batch.initialUnitWeight];
+      settlementDate = batch.settlementDate;
+      expectedHarvestDate = batch.expectedHarvestDate || '';
       
       logs = (state.biometryLogs || []).filter(l => {
         if (l.batchId === selectedBatchId) return true;
@@ -459,7 +470,7 @@ const Dashboard: React.FC<Props> = ({ state }) => {
     
     const uniqueDates = Array.from(new Set(logs.map(l => l.date))).sort();
     
-    const data = uniqueDates.map(currentDate => {
+    const actualData = uniqueDates.map(currentDate => {
       const dayLogs = logs.filter(l => l.date === currentDate);
       const avgWeight = dayLogs.reduce((a, b) => a + b.averageWeight, 0) / dayLogs.length;
 
@@ -476,8 +487,190 @@ const Dashboard: React.FC<Props> = ({ state }) => {
     });
     
     const avgInitial = initialWeights.length > 0 ? initialWeights.reduce((a, b) => a + b, 0) / initialWeights.length : 0;
-    return [{ date: 'Início', weight: Math.round(avgInitial) }, ...data];
-  }, [state.biometryLogs, state.batches, state.cages, state.harvestLogs, selectedBatchId, batchStats]);
+    const baseData = [{ date: 'Início', weight: Math.round(avgInitial), fullDate: settlementDate }, ...actualData];
+
+    // Prediction Curves
+    if ((showSupplierCurve || showStandardCurve || showContinueCurve) && settlementDate && expectedHarvestDate) {
+      const start = parseISO(settlementDate);
+      const end = parseISO(expectedHarvestDate);
+      const totalDays = Math.max(1, Math.floor((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)));
+      
+      // Standard Curve (09/2025 - L1)
+      let standardCurvePoints: { day: number, weight: number }[] = [];
+      if (showStandardCurve) {
+        const standardBatch = state.batches.find(b => b.name.includes('09/2025 - L1'));
+        if (standardBatch) {
+          const bStart = parseISO(standardBatch.settlementDate);
+          const refInitialW = standardBatch.initialUnitWeight;
+          const bLogs = (state.biometryLogs || []).filter(l => {
+            const logDate = parseISO(l.date);
+            const cutoffDate = parseISO('2026-03-04');
+            if (logDate > cutoffDate) return false;
+
+            if (l.batchId === standardBatch.id) return true;
+            if (!l.batchId && l.cageId) {
+              const cage = state.cages.find(c => c.id === l.cageId);
+              return cage?.batchId === standardBatch.id;
+            }
+            return false;
+          });
+          standardCurvePoints = bLogs.map(l => ({
+            day: Math.floor((parseISO(l.date).getTime() - bStart.getTime()) / (1000 * 60 * 60 * 24)),
+            // Adjust weight relative to the current batch's initial weight
+            weight: avgInitial + (l.averageWeight - refInitialW)
+          })).sort((a, b) => a.day - b.day);
+          // Add initial point matching current batch
+          standardCurvePoints = [{ day: 0, weight: avgInitial }, ...standardCurvePoints];
+        } else {
+          // Mock standard curve if batch not found
+          for (let i = 0; i <= totalDays; i += 15) {
+            standardCurvePoints.push({ day: i, weight: avgInitial + (i * 5.4) }); // 5.4g/day growth (targets ~1kg at 180d)
+          }
+        }
+      }
+
+      // Supplier Curve (from Protocol)
+      let supplierCurvePoints: { day: number, weight: number }[] = [];
+      if (showSupplierCurve) {
+        const batch = selectedBatchId === 'all' ? (state.batches || []).find(b => b.id === (state.biometryLogs || []).find(l => l.batchId)?.batchId) : (state.batches || []).find(b => b.id === selectedBatchId);
+        const protocol = state.protocols.find(p => p.id === batch?.protocolId);
+        if (protocol?.supplierCurve && protocol.supplierCurve.some(p => p.weight > 0)) {
+          const sortedPoints = [...protocol.supplierCurve].sort((a, b) => a.day - b.day);
+          const refInitialW = sortedPoints[0].day === 0 ? sortedPoints[0].weight : (batch?.initialUnitWeight || avgInitial);
+          
+          supplierCurvePoints = sortedPoints.map(p => ({
+            day: p.day,
+            weight: avgInitial + (p.weight - refInitialW)
+          }));
+          
+          if (!supplierCurvePoints.some(p => p.day === 0)) {
+            supplierCurvePoints = [{ day: 0, weight: avgInitial }, ...supplierCurvePoints];
+          }
+        } else {
+          // Fallback mock if no curve registered
+          for (let i = 0; i <= totalDays; i += 15) {
+            supplierCurvePoints.push({ day: i, weight: avgInitial + (i * 5.7) }); // 5.7g/day growth
+          }
+        }
+      }
+
+      // Merge predictions into data
+      const allDates: string[] = [];
+      for (let i = 0; i <= totalDays; i += 7) {
+        const d = new Date(start.getTime() + i * 24 * 60 * 60 * 1000);
+        allDates.push(format(d, 'yyyy-MM-dd'));
+      }
+      if (!allDates.includes(expectedHarvestDate)) allDates.push(expectedHarvestDate);
+      if (!allDates.includes(settlementDate)) allDates.push(settlementDate);
+      uniqueDates.forEach(d => { if (!allDates.includes(d)) allDates.push(d); });
+      allDates.sort();
+
+      // Scale standard curve to target 950g at its last point
+      if (standardCurvePoints.length > 1) {
+        const lastPoint = standardCurvePoints[standardCurvePoints.length - 1];
+        const initialW = standardCurvePoints[0].weight;
+        const targetW = 950;
+        if (lastPoint.weight !== initialW) {
+          const scaleFactor = (targetW - initialW) / (lastPoint.weight - initialW);
+          standardCurvePoints = standardCurvePoints.map(p => ({
+            ...p,
+            weight: initialW + (p.weight - initialW) * scaleFactor
+          }));
+        }
+      }
+
+      // Scale supplier curve to target 950g at its last point
+      if (supplierCurvePoints.length > 1) {
+        const lastPoint = supplierCurvePoints[supplierCurvePoints.length - 1];
+        const initialW = supplierCurvePoints[0].weight;
+        const targetW = 950;
+        if (lastPoint.weight !== initialW) {
+          const scaleFactor = (targetW - initialW) / (lastPoint.weight - initialW);
+          supplierCurvePoints = supplierCurvePoints.map(p => ({
+            ...p,
+            weight: initialW + (p.weight - initialW) * scaleFactor
+          }));
+        }
+      }
+
+      const mockGrowthRate = (950 - avgInitial) / totalDays;
+
+      return allDates.map(d => {
+        const day = Math.floor((parseISO(d).getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+        const actual = actualData.find(ad => ad.fullDate === d);
+        
+        let supplierWeight = undefined;
+        if (showSupplierCurve) {
+          if (supplierCurvePoints.length > 0) {
+            const nextIdx = supplierCurvePoints.findIndex(p => p.day >= day);
+            if (nextIdx === 0) supplierWeight = supplierCurvePoints[0].weight;
+            else if (nextIdx === -1) {
+              const last = supplierCurvePoints[supplierCurvePoints.length - 1];
+              supplierWeight = last.weight + (day - last.day) * mockGrowthRate;
+            } else {
+              const p1 = supplierCurvePoints[nextIdx - 1];
+              const p2 = supplierCurvePoints[nextIdx];
+              supplierWeight = p1.weight + (p2.weight - p1.weight) * (day - p1.day) / (p2.day - p1.day);
+            }
+          } else {
+            supplierWeight = avgInitial + (day * mockGrowthRate);
+          }
+        }
+
+        let standardWeight = undefined;
+        if (showStandardCurve) {
+          if (standardCurvePoints.length > 0) {
+            const nextIdx = standardCurvePoints.findIndex(p => p.day >= day);
+            if (nextIdx === 0) standardWeight = standardCurvePoints[0].weight;
+            else if (nextIdx === -1) {
+              const last = standardCurvePoints[standardCurvePoints.length - 1];
+              standardWeight = last.weight + (day - last.day) * mockGrowthRate;
+            } else {
+              const p1 = standardCurvePoints[nextIdx - 1];
+              const p2 = standardCurvePoints[nextIdx];
+              standardWeight = p1.weight + (p2.weight - p1.weight) * (day - p1.day) / (p2.day - p1.day);
+            }
+          } else {
+            standardWeight = avgInitial + (day * mockGrowthRate);
+          }
+        }
+
+        let continueWeight = undefined;
+        if (showContinueCurve && actualData.length > 0) {
+          const lastActual = actualData[actualData.length - 1];
+          const lastActualDay = Math.floor((parseISO(lastActual.fullDate).getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+          
+          if (day >= lastActualDay) {
+            const targetW = 950;
+            const remainingDays = totalDays - lastActualDay;
+            const growthNeeded = remainingDays > 0 ? (targetW - lastActual.weight) / remainingDays : 0;
+            continueWeight = lastActual.weight + (day - lastActualDay) * growthNeeded;
+          }
+        }
+
+        let dateLabel = d;
+        try {
+          dateLabel = format(new Date(d + 'T12:00:00'), 'dd/MM');
+        } catch {}
+
+        let weight = actual?.weight;
+        if (d === settlementDate && weight === undefined) {
+          weight = Math.round(avgInitial);
+        }
+
+        return {
+          date: d === settlementDate ? 'Início' : dateLabel,
+          fullDate: d,
+          weight: weight,
+          supplierWeight: supplierWeight ? Math.round(supplierWeight) : undefined,
+          standardWeight: standardWeight ? Math.round(standardWeight) : undefined,
+          continueWeight: continueWeight ? Math.round(continueWeight) : undefined
+        };
+      });
+    }
+
+    return baseData;
+  }, [state.biometryLogs, state.batches, state.cages, state.harvestLogs, state.protocols, selectedBatchId, batchStats, showSupplierCurve, showStandardCurve, showContinueCurve]);
 
   const mortalityEvolutionData = useMemo(() => {
     if (!selectedBatchId) return [];
@@ -543,14 +736,25 @@ const Dashboard: React.FC<Props> = ({ state }) => {
     if (!selectedBatchId) return [];
     
     let relevantBatches: any[] = [];
+    let settlementDate = '';
+    let expectedHarvestDate = '';
+
     if (selectedBatchId === 'all') {
       relevantBatches = (state.batches || []).filter(b => {
         const stats = batchStats.find(s => s.id === b.id);
         return stats?.settlementBalance === 0;
       });
+      if (relevantBatches.length > 0) {
+        settlementDate = relevantBatches[0].settlementDate;
+        expectedHarvestDate = relevantBatches[0].expectedHarvestDate || '';
+      }
     } else {
       const batch = (state.batches || []).find(b => b.id === selectedBatchId);
-      if (batch) relevantBatches = [batch];
+      if (batch) {
+        relevantBatches = [batch];
+        settlementDate = batch.settlementDate;
+        expectedHarvestDate = batch.expectedHarvestDate || '';
+      }
     }
 
     if (relevantBatches.length === 0) return [];
@@ -581,7 +785,7 @@ const Dashboard: React.FC<Props> = ({ state }) => {
     // Use ONLY biometry dates as requested
     const biometryDates = Array.from(new Set(biometries.map(l => l.date))).sort();
     
-    const data = biometryDates.map(date => {
+    const actualData = biometryDates.map(date => {
       // "Estoque Vivo" at this specific date
       const cumMortality = mortalities.filter(m => m.date <= date).reduce((acc, m) => acc + m.count, 0);
       const cumHarvest = harvests.filter(h => h.date <= date).reduce((acc, h) => acc + h.fishCount, 0);
@@ -607,16 +811,205 @@ const Dashboard: React.FC<Props> = ({ state }) => {
       };
     });
 
-    return [
+    const baseData = [
       { 
         date: 'Início', 
+        fullDate: settlementDate,
         biomass: Number(((initialPop * initialWeight) / 1000).toFixed(1)), 
         weight: Math.round(initialWeight), 
         pop: initialPop 
       }, 
-      ...data
+      ...actualData
     ];
-  }, [state, selectedBatchId, batchStats]);
+
+    // Prediction Curves
+    if ((showSupplierCurve || showStandardCurve || showContinueCurve) && settlementDate && expectedHarvestDate) {
+      const start = parseISO(settlementDate);
+      const end = parseISO(expectedHarvestDate);
+      const totalDays = Math.max(1, Math.floor((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)));
+      
+      // Standard Curve (09/2025 - L1)
+      let standardCurvePoints: { day: number, weight: number }[] = [];
+      if (showStandardCurve) {
+        const standardBatch = state.batches.find(b => b.name.includes('09/2025 - L1'));
+        if (standardBatch) {
+          const bStart = parseISO(standardBatch.settlementDate);
+          const refInitialW = standardBatch.initialUnitWeight;
+          const bLogs = (state.biometryLogs || []).filter(l => {
+            const logDate = parseISO(l.date);
+            const cutoffDate = parseISO('2026-03-04');
+            if (logDate > cutoffDate) return false;
+
+            if (l.batchId === standardBatch.id) return true;
+            if (!l.batchId && l.cageId) {
+              const cage = state.cages.find(c => c.id === l.cageId);
+              return cage?.batchId === standardBatch.id;
+            }
+            return false;
+          });
+          standardCurvePoints = bLogs.map(l => ({
+            day: Math.floor((parseISO(l.date).getTime() - bStart.getTime()) / (1000 * 60 * 60 * 24)),
+            // Adjust weight relative to the current batch's initial weight
+            weight: initialWeight + (l.averageWeight - refInitialW)
+          })).sort((a, b) => a.day - b.day);
+          standardCurvePoints = [{ day: 0, weight: initialWeight }, ...standardCurvePoints];
+        }
+      }
+
+      // Supplier Curve (from Protocol)
+      let supplierCurvePoints: { day: number, weight: number }[] = [];
+      if (showSupplierCurve) {
+        const batch = selectedBatchId === 'all' ? (state.batches || []).find(b => b.id === (state.biometryLogs || []).find(l => l.batchId)?.batchId) : (state.batches || []).find(b => b.id === selectedBatchId);
+        const protocol = state.protocols.find(p => p.id === batch?.protocolId);
+        if (protocol?.supplierCurve && protocol.supplierCurve.some(p => p.weight > 0)) {
+          const sortedPoints = [...protocol.supplierCurve].sort((a, b) => a.day - b.day);
+          const refInitialW = sortedPoints[0].day === 0 ? sortedPoints[0].weight : (batch?.initialUnitWeight || initialWeight);
+          
+          supplierCurvePoints = sortedPoints.map(p => ({
+            day: p.day,
+            weight: initialWeight + (p.weight - refInitialW)
+          }));
+          
+          if (!supplierCurvePoints.some(p => p.day === 0)) {
+            supplierCurvePoints = [{ day: 0, weight: initialWeight }, ...supplierCurvePoints];
+          }
+        }
+      }
+
+      const allDates: string[] = [];
+      for (let i = 0; i <= totalDays; i += 7) {
+        const d = new Date(start.getTime() + i * 24 * 60 * 60 * 1000);
+        allDates.push(format(d, 'yyyy-MM-dd'));
+      }
+      if (!allDates.includes(expectedHarvestDate)) allDates.push(expectedHarvestDate);
+      if (!allDates.includes(settlementDate)) allDates.push(settlementDate);
+      biometryDates.forEach(d => { if (!allDates.includes(d)) allDates.push(d); });
+      allDates.sort();
+
+      // Scale standard curve to target 950g at its last point
+      if (standardCurvePoints.length > 1) {
+        const lastPoint = standardCurvePoints[standardCurvePoints.length - 1];
+        const initialW = standardCurvePoints[0].weight;
+        const targetW = 950;
+        if (lastPoint.weight !== initialW) {
+          const scaleFactor = (targetW - initialW) / (lastPoint.weight - initialW);
+          standardCurvePoints = standardCurvePoints.map(p => ({
+            ...p,
+            weight: initialW + (p.weight - initialW) * scaleFactor
+          }));
+        }
+      }
+
+      // Scale supplier curve to target 950g at its last point
+      if (supplierCurvePoints.length > 1) {
+        const lastPoint = supplierCurvePoints[supplierCurvePoints.length - 1];
+        const initialW = supplierCurvePoints[0].weight;
+        const targetW = 950;
+        if (lastPoint.weight !== initialW) {
+          const scaleFactor = (targetW - initialW) / (lastPoint.weight - initialW);
+          supplierCurvePoints = supplierCurvePoints.map(p => ({
+            ...p,
+            weight: initialW + (p.weight - initialW) * scaleFactor
+          }));
+        }
+      }
+
+      const mockGrowthRate = (950 - initialWeight) / totalDays;
+
+      const todayStr = format(new Date(), 'yyyy-MM-dd');
+      const totalMortalitySoFar = mortalities.filter(m => m.date <= todayStr).reduce((acc, m) => acc + m.count, 0);
+      const totalHarvestSoFar = harvests.filter(h => h.date <= todayStr).reduce((acc, h) => acc + h.fishCount, 0);
+      const currentLiveStock = Math.max(0, initialPop - totalMortalitySoFar - totalHarvestSoFar);
+
+      return allDates.map(d => {
+        const day = Math.floor((parseISO(d).getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+        const actual = actualData.find(ad => ad.fullDate === d);
+        
+        // Use current live stock for the entire prediction curve as requested
+        const estimatedPop = currentLiveStock;
+
+        let supplierBiomass = undefined;
+        if (showSupplierCurve) {
+          let supplierWeight = initialWeight + (day * mockGrowthRate);
+          if (supplierCurvePoints.length > 0) {
+            const nextIdx = supplierCurvePoints.findIndex(p => p.day >= day);
+            if (nextIdx === 0) supplierWeight = supplierCurvePoints[0].weight;
+            else if (nextIdx === -1) {
+              const last = supplierCurvePoints[supplierCurvePoints.length - 1];
+              supplierWeight = last.weight + (day - last.day) * mockGrowthRate;
+            } else {
+              const p1 = supplierCurvePoints[nextIdx - 1];
+              const p2 = supplierCurvePoints[nextIdx];
+              supplierWeight = p1.weight + (p2.weight - p1.weight) * (day - p1.day) / (p2.day - p1.day);
+            }
+          }
+          supplierBiomass = (estimatedPop * supplierWeight) / 1000;
+        }
+
+        let standardBiomass = undefined;
+        if (showStandardCurve) {
+          let standardWeight = initialWeight + (day * mockGrowthRate);
+          if (standardCurvePoints.length > 0) {
+            const nextIdx = standardCurvePoints.findIndex(p => p.day >= day);
+            if (nextIdx === 0) standardWeight = standardCurvePoints[0].weight;
+            else if (nextIdx === -1) {
+              const last = standardCurvePoints[standardCurvePoints.length - 1];
+              standardWeight = last.weight + (day - last.day) * mockGrowthRate;
+            } else {
+              const p1 = standardCurvePoints[nextIdx - 1];
+              const p2 = standardCurvePoints[nextIdx];
+              standardWeight = p1.weight + (p2.weight - p1.weight) * (day - p1.day) / (p2.day - p1.day);
+            }
+          }
+          standardBiomass = (estimatedPop * standardWeight) / 1000;
+        }
+
+        let dateLabel = d;
+        try {
+          dateLabel = format(new Date(d + 'T12:00:00'), 'dd/MM');
+        } catch {}
+
+        let biomass = actual?.biomass;
+        let weight = actual?.weight;
+        let pop = actual?.pop;
+
+        if (d === settlementDate && biomass === undefined) {
+          biomass = Number(((initialPop * initialWeight) / 1000).toFixed(1));
+          weight = Math.round(initialWeight);
+          pop = initialPop;
+        }
+
+        return {
+          date: d === settlementDate ? 'Início' : dateLabel,
+          fullDate: d,
+          biomass: biomass,
+          weight: weight,
+          pop: pop,
+          supplierBiomass: supplierBiomass ? Number(supplierBiomass.toFixed(1)) : undefined,
+          standardBiomass: standardBiomass ? Number(standardBiomass.toFixed(1)) : undefined,
+          continueBiomass: (showContinueCurve && actualData.length > 0) ? (() => {
+            const lastActual = actualData[actualData.length - 1];
+            const start = parseISO(settlementDate);
+            const lastActualDay = Math.floor((parseISO(lastActual.fullDate).getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+            const day = Math.floor((parseISO(d).getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+            
+            if (day >= lastActualDay) {
+              const end = parseISO(expectedHarvestDate);
+              const totalDays = Math.max(1, Math.floor((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)));
+              const targetW = 950;
+              const remainingDays = totalDays - lastActualDay;
+              const growthNeeded = remainingDays > 0 ? (targetW - lastActual.weight) / remainingDays : 0;
+              const projectedWeight = lastActual.weight + (day - lastActualDay) * growthNeeded;
+              return Number(((lastActual.pop * projectedWeight) / 1000).toFixed(1));
+            }
+            return undefined;
+          })() : undefined
+        };
+      });
+    }
+
+    return baseData;
+  }, [state, selectedBatchId, batchStats, showSupplierCurve, showStandardCurve, showContinueCurve]);
 
   const totalMortalityInChart = useMemo(() => {
     return mortalityEvolutionData.reduce((acc, curr) => acc + curr.count, 0);
@@ -951,6 +1344,20 @@ const Dashboard: React.FC<Props> = ({ state }) => {
         <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
           <div className="flex justify-between items-center mb-6">
             <h3 className="text-sm font-black text-slate-400 uppercase tracking-widest flex items-center gap-2 italic"><TrendingUp className="w-4 h-4" /> Evolução de Peso (Lote)</h3>
+            <div className="flex items-center gap-3">
+              <label className="flex items-center gap-1.5 cursor-pointer group">
+                <input type="checkbox" checked={showSupplierCurve} onChange={e => setShowSupplierCurve(e.target.checked)} className="w-3 h-3 rounded border-slate-300 text-amber-600 focus:ring-amber-500" />
+                <span className="text-[9px] font-black text-slate-400 uppercase group-hover:text-amber-600 transition-colors">Fornecedor</span>
+              </label>
+              <label className="flex items-center gap-1.5 cursor-pointer group">
+                <input type="checkbox" checked={showStandardCurve} onChange={e => setShowStandardCurve(e.target.checked)} className="w-3 h-3 rounded border-slate-300 text-violet-600 focus:ring-violet-500" />
+                <span className="text-[9px] font-black text-slate-400 uppercase group-hover:text-violet-600 transition-colors">Padrão</span>
+              </label>
+              <label className="flex items-center gap-1.5 cursor-pointer group">
+                <input type="checkbox" checked={showContinueCurve} onChange={e => setShowContinueCurve(e.target.checked)} className="w-3 h-3 rounded border-slate-300 text-blue-600 focus:ring-blue-500" />
+                <span className="text-[9px] font-black text-slate-400 uppercase group-hover:text-blue-600 transition-colors">Continue</span>
+              </label>
+            </div>
           </div>
           <div className="h-[250px]">
             <ResponsiveContainer width="100%" height="100%">
@@ -958,8 +1365,20 @@ const Dashboard: React.FC<Props> = ({ state }) => {
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                 <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{fontSize: 9, fontWeight: 700, fill: '#94a3b8'}} />
                 <YAxis axisLine={false} tickLine={false} tick={{fontSize: 9, fontWeight: 700, fill: '#94a3b8'}} />
-                <Tooltip />
-                <Line type="monotone" dataKey="weight" stroke="#3b82f6" strokeWidth={4} dot={{r: 4, fill: '#3b82f6', strokeWidth: 0}} />
+                <Tooltip 
+                  contentStyle={{ borderRadius: '1rem', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
+                  formatter={(value: number, name: string) => {
+                    if (name === 'weight') return [`${value} g`, 'Peso Real'];
+                    if (name === 'continueWeight') return [`${value} g`, 'Projeção Lote'];
+                    if (name === 'supplierWeight') return [`${value} g`, 'Prev. Fornecedor'];
+                    if (name === 'standardWeight') return [`${value} g`, 'Prev. Padrão'];
+                    return [value, name];
+                  }}
+                />
+                <Line type="monotone" dataKey="weight" stroke="#3b82f6" strokeWidth={4} dot={{r: 4, fill: '#3b82f6', strokeWidth: 0}} activeDot={{r: 6, strokeWidth: 0}} connectNulls />
+                {showContinueCurve && <Line type="monotone" dataKey="continueWeight" stroke="#3b82f6" strokeWidth={2} strokeDasharray="5 5" dot={false} connectNulls />}
+                {showSupplierCurve && <Line type="monotone" dataKey="supplierWeight" stroke="#f59e0b" strokeWidth={2} strokeDasharray="5 5" dot={false} connectNulls />}
+                {showStandardCurve && <Line type="monotone" dataKey="standardWeight" stroke="#8b5cf6" strokeWidth={2} strokeDasharray="5 5" dot={false} connectNulls />}
               </LineChart>
             </ResponsiveContainer>
           </div>
@@ -986,8 +1405,24 @@ const Dashboard: React.FC<Props> = ({ state }) => {
 
         <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm lg:col-span-2">
           <div className="flex justify-between items-center mb-6">
-            <h3 className="text-sm font-black text-slate-400 uppercase tracking-widest flex items-center gap-2 italic"><Scale className="w-4 h-4" /> Evolução da Biomassa Estimada (kg)</h3>
-            <div className="text-[10px] font-bold text-slate-400 uppercase">Considera despescas e mortalidade</div>
+            <div className="flex flex-col gap-1">
+              <h3 className="text-sm font-black text-slate-400 uppercase tracking-widest flex items-center gap-2 italic"><Scale className="w-4 h-4" /> Evolução da Biomassa Estimada (kg)</h3>
+              <div className="text-[10px] font-bold text-slate-400 uppercase">Considera despescas e mortalidade</div>
+            </div>
+            <div className="flex items-center gap-4">
+              <label className="flex items-center gap-1.5 cursor-pointer group">
+                <input type="checkbox" checked={showSupplierCurve} onChange={e => setShowSupplierCurve(e.target.checked)} className="w-3 h-3 rounded border-slate-300 text-amber-600 focus:ring-amber-500" />
+                <span className="text-[9px] font-black text-slate-400 uppercase group-hover:text-amber-600 transition-colors">Fornecedor</span>
+              </label>
+              <label className="flex items-center gap-1.5 cursor-pointer group">
+                <input type="checkbox" checked={showStandardCurve} onChange={e => setShowStandardCurve(e.target.checked)} className="w-3 h-3 rounded border-slate-300 text-violet-600 focus:ring-violet-500" />
+                <span className="text-[9px] font-black text-slate-400 uppercase group-hover:text-violet-600 transition-colors">Padrão</span>
+              </label>
+              <label className="flex items-center gap-1.5 cursor-pointer group">
+                <input type="checkbox" checked={showContinueCurve} onChange={e => setShowContinueCurve(e.target.checked)} className="w-3 h-3 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500" />
+                <span className="text-[9px] font-black text-slate-400 uppercase group-hover:text-emerald-600 transition-colors">Continue</span>
+              </label>
+            </div>
           </div>
           <div className="h-[300px]">
             <ResponsiveContainer width="100%" height="100%">
@@ -997,7 +1432,13 @@ const Dashboard: React.FC<Props> = ({ state }) => {
                 <YAxis axisLine={false} tickLine={false} tick={{fontSize: 9, fontWeight: 700, fill: '#94a3b8'}} />
                 <Tooltip 
                   contentStyle={{ borderRadius: '1rem', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
-                  formatter={(value: number) => [`${formatNumber(value)} kg`, 'Biomassa']}
+                  formatter={(value: number, name: string) => {
+                    if (name === 'biomass') return [`${formatNumber(value)} kg`, 'Biomassa Real'];
+                    if (name === 'continueBiomass') return [`${formatNumber(value)} kg`, 'Projeção Lote'];
+                    if (name === 'supplierBiomass') return [`${formatNumber(value)} kg`, 'Prev. Fornecedor'];
+                    if (name === 'standardBiomass') return [`${formatNumber(value)} kg`, 'Prev. Padrão'];
+                    return [value, name];
+                  }}
                 />
                 <Line 
                   type="monotone" 
@@ -1006,7 +1447,11 @@ const Dashboard: React.FC<Props> = ({ state }) => {
                   strokeWidth={4} 
                   dot={{r: 4, fill: '#10b981', strokeWidth: 0}}
                   activeDot={{r: 6, strokeWidth: 0}}
+                  connectNulls
                 />
+                {showContinueCurve && <Line type="monotone" dataKey="continueBiomass" stroke="#10b981" strokeWidth={2} strokeDasharray="5 5" dot={false} connectNulls />}
+                {showSupplierCurve && <Line type="monotone" dataKey="supplierBiomass" stroke="#f59e0b" strokeWidth={2} strokeDasharray="5 5" dot={false} connectNulls />}
+                {showStandardCurve && <Line type="monotone" dataKey="standardBiomass" stroke="#8b5cf6" strokeWidth={2} strokeDasharray="5 5" dot={false} connectNulls />}
               </LineChart>
             </ResponsiveContainer>
           </div>

@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { ProductionProtocol, AppState } from '../types';
-import { Plus, BookOpen, Trash2, Edit, X, Target, Clock, Activity } from 'lucide-react';
+import { Plus, BookOpen, Trash2, Edit, X, Target, Clock, Activity, TrendingUp } from 'lucide-react';
 
 interface Props {
   state: AppState;
@@ -23,7 +23,8 @@ const ProtocolManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) =
     species: '',
     targetWeight: '',
     expectedFca: '',
-    estimatedDays: ''
+    estimatedDays: '',
+    supplierCurve: Array.from({ length: 13 }, (_, i) => ({ day: i * 15, weight: 0 }))
   });
 
   const hasPermission = currentUser.isMaster || currentUser.canEdit;
@@ -33,33 +34,40 @@ const ProtocolManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) =
     if (!hasPermission) return;
     if (!formData.name || !formData.species) return;
 
+    const protocolData = {
+      name: formData.name,
+      species: formData.species,
+      targetWeight: Number(formData.targetWeight),
+      expectedFca: Number(formData.expectedFca),
+      estimatedDays: Number(formData.estimatedDays),
+      supplierCurve: formData.supplierCurve.map(p => ({ ...p, weight: Number(p.weight) })),
+      updatedAt: Date.now()
+    };
+
     if (editingId) {
       onUpdate({
         ...state,
         protocols: (state.protocols || []).map(p => p.id === editingId ? {
           ...p,
-          name: formData.name,
-          species: formData.species,
-          targetWeight: Number(formData.targetWeight),
-          expectedFca: Number(formData.expectedFca),
-          estimatedDays: Number(formData.estimatedDays),
-          updatedAt: Date.now()
+          ...protocolData
         } : p)
       });
       setEditingId(null);
     } else {
       const newProtocol: ProductionProtocol = {
         id: generateId(),
-        name: formData.name,
-        species: formData.species,
-        targetWeight: Number(formData.targetWeight),
-        expectedFca: Number(formData.expectedFca),
-        estimatedDays: Number(formData.estimatedDays),
-        updatedAt: Date.now()
+        ...protocolData
       };
       onUpdate({ ...state, protocols: [...(state.protocols || []), newProtocol] });
     }
-    setFormData({ name: '', species: '', targetWeight: '', expectedFca: '', estimatedDays: '' });
+    setFormData({ 
+      name: '', 
+      species: '', 
+      targetWeight: '', 
+      expectedFca: '', 
+      estimatedDays: '',
+      supplierCurve: Array.from({ length: 13 }, (_, i) => ({ day: i * 15, weight: 0 }))
+    });
   };
 
   const removeProtocol = (id: string) => {
@@ -105,7 +113,32 @@ const ProtocolManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) =
               <label className="block text-xs font-black text-slate-400 uppercase mb-1">Meta de FCA (Conversão Alimentar)</label>
               <input type="number" step="0.01" required placeholder="Ex: 1.45" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none font-bold" value={formData.expectedFca} onChange={e => setFormData({...formData, expectedFca: e.target.value})} />
             </div>
-            <button type="submit" className="col-span-2 py-4 bg-indigo-600 text-white rounded-2xl font-black uppercase tracking-widest text-xs shadow-xl active:scale-95 transition-all mt-2">
+
+            <div className="col-span-2 mt-4">
+              <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2">
+                <TrendingUp className="w-3 h-3" /> Curva de Peso Fornecedor (Biometrias a cada 15 dias)
+              </h4>
+              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3">
+                {formData.supplierCurve.map((point, idx) => (
+                  <div key={point.day} className="flex flex-col gap-1">
+                    <span className="text-[9px] font-black text-slate-400 uppercase text-center">Dia {point.day}</span>
+                    <input 
+                      type="number" 
+                      placeholder="Peso (g)" 
+                      className="w-full px-2 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none font-bold text-xs text-center" 
+                      value={point.weight || ''} 
+                      onChange={e => {
+                        const newCurve = [...formData.supplierCurve];
+                        newCurve[idx].weight = Number(e.target.value);
+                        setFormData({ ...formData, supplierCurve: newCurve });
+                      }} 
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <button type="submit" className="col-span-2 py-4 bg-indigo-600 text-white rounded-2xl font-black uppercase tracking-widest text-xs shadow-xl active:scale-95 transition-all mt-4">
               {editingId ? 'Salvar Alterações' : 'Cadastrar Modelo'}
             </button>
           </form>
@@ -135,7 +168,8 @@ const ProtocolManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) =
                       species: protocol.species,
                       targetWeight: protocol.targetWeight.toString(),
                       expectedFca: protocol.expectedFca.toString(),
-                      estimatedDays: protocol.estimatedDays.toString()
+                      estimatedDays: protocol.estimatedDays.toString(),
+                      supplierCurve: protocol.supplierCurve || Array.from({ length: 13 }, (_, i) => ({ day: i * 15, weight: 0 }))
                     });
                   }} className="text-slate-300 hover:text-indigo-600"><Edit className="w-4 h-4"/></button>
                   <button onClick={() => removeProtocol(protocol.id)} className="text-slate-300 hover:text-red-500"><Trash2 className="w-4 h-4"/></button>

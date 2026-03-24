@@ -32,6 +32,7 @@ export interface ProductionProtocol {
   targetWeight: number;
   expectedFca: number;
   estimatedDays: number;
+  supplierCurve?: { day: number; weight: number }[];
   userId?: string;
   updatedAt?: number;
 }
