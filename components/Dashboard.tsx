@@ -8,7 +8,7 @@ import {
 import { formatNumber } from '../utils/formatters';
 import { Fish, Utensils, Scale, TrendingUp, FishOff, Calendar, Layers, Download, Info, AlertTriangle, PackageSearch, CloudSun, Droplets, Wind, CloudRain, Thermometer, Umbrella, Cloud } from 'lucide-react';
 import * as XLSX from 'xlsx';
-import { format, isWithinInterval, parseISO, startOfDay, endOfDay, subDays } from 'date-fns';
+import { format, isWithinInterval, parseISO, startOfDay, endOfDay, subDays, differenceInDays, addDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
 interface Props {
@@ -493,10 +493,10 @@ const Dashboard: React.FC<Props> = ({ state }) => {
     const baseData = [{ date: 'Início', weight: Math.round(avgInitial), fullDate: settlementDate }, ...actualData];
 
     // Prediction Curves
-    if ((showSupplierCurve || showStandardCurve || showContinueCurve) && settlementDate && expectedHarvestDate) {
+    if ((showSupplierCurve || showStandardCurve || showContinueCurve) && settlementDate) {
       const start = parseISO(settlementDate);
-      const end = parseISO(expectedHarvestDate);
-      const totalDays = Math.max(1, Math.floor((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)));
+      const end = expectedHarvestDate ? parseISO(expectedHarvestDate) : addDays(start, 168);
+      const totalDays = Math.max(168, Math.floor((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)));
       
       // Standard Curve (Manual from ProtocolManagement)
       let standardCurvePoints: { day: number, weight: number }[] = [];
@@ -544,7 +544,7 @@ const Dashboard: React.FC<Props> = ({ state }) => {
       // Merge predictions into data
       const allDates: string[] = [];
       for (let i = 0; i <= totalDays; i += 7) {
-        const d = new Date(start.getTime() + i * 24 * 60 * 60 * 1000);
+        const d = addDays(start, i);
         allDates.push(format(d, 'yyyy-MM-dd'));
       }
       if (expectedHarvestDate && !allDates.includes(expectedHarvestDate)) allDates.push(expectedHarvestDate);
@@ -556,7 +556,7 @@ const Dashboard: React.FC<Props> = ({ state }) => {
       const mockGrowthRate = (targetW - avgInitial) / Math.max(1, totalDays);
 
       return allDates.map(d => {
-        const day = Math.floor((parseISO(d).getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+        const day = differenceInDays(parseISO(d), start);
         const actual = actualData.find(ad => ad.fullDate === d);
         
         let supplierWeight = undefined;
@@ -565,8 +565,8 @@ const Dashboard: React.FC<Props> = ({ state }) => {
             const nextIdx = supplierCurvePoints.findIndex(p => p.day >= day);
             if (nextIdx === 0) supplierWeight = supplierCurvePoints[0].weight;
             else if (nextIdx === -1) {
-              const last = supplierCurvePoints[supplierCurvePoints.length - 1];
-              supplierWeight = last.weight + (day - last.day) * mockGrowthRate;
+              // Stop the curve at the last registered point
+              supplierWeight = undefined;
             } else {
               const p1 = supplierCurvePoints[nextIdx - 1];
               const p2 = supplierCurvePoints[nextIdx];
@@ -583,8 +583,8 @@ const Dashboard: React.FC<Props> = ({ state }) => {
             const nextIdx = standardCurvePoints.findIndex(p => p.day >= day);
             if (nextIdx === 0) standardWeight = standardCurvePoints[0].weight;
             else if (nextIdx === -1) {
-              const last = standardCurvePoints[standardCurvePoints.length - 1];
-              standardWeight = last.weight + (day - last.day) * mockGrowthRate;
+              // Stop the curve at the last registered point
+              standardWeight = undefined;
             } else {
               const p1 = standardCurvePoints[nextIdx - 1];
               const p2 = standardCurvePoints[nextIdx];
@@ -783,10 +783,10 @@ const Dashboard: React.FC<Props> = ({ state }) => {
     ];
 
     // Prediction Curves
-    if ((showSupplierCurve || showStandardCurve || showContinueCurve) && settlementDate && expectedHarvestDate) {
+    if ((showSupplierCurve || showStandardCurve || showContinueCurve) && settlementDate) {
       const start = parseISO(settlementDate);
-      const end = parseISO(expectedHarvestDate);
-      const totalDays = Math.max(1, Math.floor((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)));
+      const end = expectedHarvestDate ? parseISO(expectedHarvestDate) : addDays(start, 168);
+      const totalDays = Math.max(168, Math.floor((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)));
       
       // Standard Curve (Manual from ProtocolManagement)
       let standardCurvePoints: { day: number, weight: number }[] = [];
@@ -828,7 +828,7 @@ const Dashboard: React.FC<Props> = ({ state }) => {
 
       const allDates: string[] = [];
       for (let i = 0; i <= totalDays; i += 7) {
-        const d = new Date(start.getTime() + i * 24 * 60 * 60 * 1000);
+        const d = addDays(start, i);
         allDates.push(format(d, 'yyyy-MM-dd'));
       }
       if (expectedHarvestDate && !allDates.includes(expectedHarvestDate)) allDates.push(expectedHarvestDate);
@@ -845,7 +845,7 @@ const Dashboard: React.FC<Props> = ({ state }) => {
       const currentLiveStock = Math.max(0, initialPop - totalMortalitySoFar - totalHarvestSoFar);
 
       return allDates.map(d => {
-        const day = Math.floor((parseISO(d).getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+        const day = differenceInDays(parseISO(d), start);
         const actual = actualData.find(ad => ad.fullDate === d);
         
         // Use current live stock for the entire prediction curve as requested
@@ -858,15 +858,17 @@ const Dashboard: React.FC<Props> = ({ state }) => {
             const nextIdx = supplierCurvePoints.findIndex(p => p.day >= day);
             if (nextIdx === 0) supplierWeight = supplierCurvePoints[0].weight;
             else if (nextIdx === -1) {
-              const last = supplierCurvePoints[supplierCurvePoints.length - 1];
-              supplierWeight = last.weight + (day - last.day) * mockGrowthRate;
+              // Stop the curve at the last registered point
+              supplierWeight = undefined;
             } else {
               const p1 = supplierCurvePoints[nextIdx - 1];
               const p2 = supplierCurvePoints[nextIdx];
               supplierWeight = p1.weight + (p2.weight - p1.weight) * (day - p1.day) / (p2.day - p1.day);
             }
           }
-          supplierBiomass = (estimatedPop * supplierWeight) / 1000;
+          if (supplierWeight !== undefined) {
+            supplierBiomass = (estimatedPop * supplierWeight) / 1000;
+          }
         }
 
         let standardBiomass = undefined;
@@ -876,15 +878,17 @@ const Dashboard: React.FC<Props> = ({ state }) => {
             const nextIdx = standardCurvePoints.findIndex(p => p.day >= day);
             if (nextIdx === 0) standardWeight = standardCurvePoints[0].weight;
             else if (nextIdx === -1) {
-              const last = standardCurvePoints[standardCurvePoints.length - 1];
-              standardWeight = last.weight + (day - last.day) * mockGrowthRate;
+              // Stop the curve at the last registered point
+              standardWeight = undefined;
             } else {
               const p1 = standardCurvePoints[nextIdx - 1];
               const p2 = standardCurvePoints[nextIdx];
               standardWeight = p1.weight + (p2.weight - p1.weight) * (day - p1.day) / (p2.day - p1.day);
             }
           }
-          standardBiomass = (estimatedPop * standardWeight) / 1000;
+          if (standardWeight !== undefined) {
+            standardBiomass = (estimatedPop * standardWeight) / 1000;
+          }
         }
 
         let dateLabel = d;
