@@ -414,6 +414,9 @@ const Dashboard: React.FC<Props> = ({ state }) => {
     };
   }, [batchStats, filteredBatchStats, selectedBatchId]);
 
+  const batch = selectedBatchId === 'all' ? (state.batches || []).find(b => b.id === (state.biometryLogs || []).find(l => l.batchId)?.batchId) : (state.batches || []).find(b => b.id === selectedBatchId);
+  const protocol = state.protocols.find(p => p.id === batch?.protocolId);
+
   const biometryEvolutionData = useMemo(() => {
     if (!selectedBatchId) return [];
     
@@ -546,8 +549,6 @@ const Dashboard: React.FC<Props> = ({ state }) => {
       // Supplier Curve (from Protocol)
       let supplierCurvePoints: { day: number, weight: number }[] = [];
       if (showSupplierCurve) {
-        const batch = selectedBatchId === 'all' ? (state.batches || []).find(b => b.id === (state.biometryLogs || []).find(l => l.batchId)?.batchId) : (state.batches || []).find(b => b.id === selectedBatchId);
-        const protocol = state.protocols.find(p => p.id === batch?.protocolId);
         if (protocol?.supplierCurve && protocol.supplierCurve.some(p => p.weight > 0)) {
           const sortedPoints = [...protocol.supplierCurve].sort((a, b) => a.day - b.day);
           const refInitialW = sortedPoints[0].day === 0 ? sortedPoints[0].weight : (batch?.initialUnitWeight || avgInitial);
@@ -574,15 +575,13 @@ const Dashboard: React.FC<Props> = ({ state }) => {
         const d = new Date(start.getTime() + i * 24 * 60 * 60 * 1000);
         allDates.push(format(d, 'yyyy-MM-dd'));
       }
-      if (!allDates.includes(expectedHarvestDate)) allDates.push(expectedHarvestDate);
-      if (!allDates.includes(settlementDate)) allDates.push(settlementDate);
+      if (expectedHarvestDate && !allDates.includes(expectedHarvestDate)) allDates.push(expectedHarvestDate);
+      if (settlementDate && !allDates.includes(settlementDate)) allDates.push(settlementDate);
       uniqueDates.forEach(d => { if (!allDates.includes(d)) allDates.push(d); });
       allDates.sort();
 
       // Scale standard curve to target weight at its last point
       if (standardCurvePoints.length > 1) {
-        const batch = selectedBatchId === 'all' ? (state.batches || []).find(b => b.id === (state.biometryLogs || []).find(l => l.batchId)?.batchId) : (state.batches || []).find(b => b.id === selectedBatchId);
-        const protocol = state.protocols.find(p => p.id === batch?.protocolId);
         const lastPoint = standardCurvePoints[standardCurvePoints.length - 1];
         const initialW = standardCurvePoints[0].weight;
         const targetW = protocol?.targetWeight || 950;
@@ -597,9 +596,6 @@ const Dashboard: React.FC<Props> = ({ state }) => {
 
       // Scale supplier curve to target weight at its last point (only if it's the mock curve)
       if (supplierCurvePoints.length > 1) {
-        const batch = selectedBatchId === 'all' ? (state.batches || []).find(b => b.id === (state.biometryLogs || []).find(l => l.batchId)?.batchId) : (state.batches || []).find(b => b.id === selectedBatchId);
-        const protocol = state.protocols.find(p => p.id === batch?.protocolId);
-        
         // If it's a protocol curve, we DON'T scale it because the user wants it to end with their last biometry
         const isProtocolCurve = protocol?.supplierCurve && protocol.supplierCurve.some(p => p.weight > 0);
         
@@ -617,10 +613,8 @@ const Dashboard: React.FC<Props> = ({ state }) => {
         }
       }
 
-      const batch = selectedBatchId === 'all' ? (state.batches || []).find(b => b.id === (state.biometryLogs || []).find(l => l.batchId)?.batchId) : (state.batches || []).find(b => b.id === selectedBatchId);
-      const protocol = state.protocols.find(p => p.id === batch?.protocolId);
       const targetW = protocol?.targetWeight || 950;
-      const mockGrowthRate = (targetW - avgInitial) / totalDays;
+      const mockGrowthRate = (targetW - avgInitial) / Math.max(1, totalDays);
 
       return allDates.map(d => {
         const day = Math.floor((parseISO(d).getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
@@ -899,8 +893,6 @@ const Dashboard: React.FC<Props> = ({ state }) => {
       // Supplier Curve (from Protocol)
       let supplierCurvePoints: { day: number, weight: number }[] = [];
       if (showSupplierCurve) {
-        const batch = selectedBatchId === 'all' ? (state.batches || []).find(b => b.id === (state.biometryLogs || []).find(l => l.batchId)?.batchId) : (state.batches || []).find(b => b.id === selectedBatchId);
-        const protocol = state.protocols.find(p => p.id === batch?.protocolId);
         if (protocol?.supplierCurve && protocol.supplierCurve.some(p => p.weight > 0)) {
           const sortedPoints = [...protocol.supplierCurve].sort((a, b) => a.day - b.day);
           const refInitialW = sortedPoints[0].day === 0 ? sortedPoints[0].weight : (batch?.initialUnitWeight || initialWeight);
@@ -921,8 +913,8 @@ const Dashboard: React.FC<Props> = ({ state }) => {
         const d = new Date(start.getTime() + i * 24 * 60 * 60 * 1000);
         allDates.push(format(d, 'yyyy-MM-dd'));
       }
-      if (!allDates.includes(expectedHarvestDate)) allDates.push(expectedHarvestDate);
-      if (!allDates.includes(settlementDate)) allDates.push(settlementDate);
+      if (expectedHarvestDate && !allDates.includes(expectedHarvestDate)) allDates.push(expectedHarvestDate);
+      if (settlementDate && !allDates.includes(settlementDate)) allDates.push(settlementDate);
       biometryDates.forEach(d => { if (!allDates.includes(d)) allDates.push(d); });
       allDates.sort();
 
@@ -960,7 +952,7 @@ const Dashboard: React.FC<Props> = ({ state }) => {
       }
 
       const targetW = protocol?.targetWeight || 950;
-      const mockGrowthRate = (targetW - initialWeight) / totalDays;
+      const mockGrowthRate = (targetW - initialWeight) / Math.max(1, totalDays);
 
       const todayStr = format(new Date(), 'yyyy-MM-dd');
       const totalMortalitySoFar = mortalities.filter(m => m.date <= todayStr).reduce((acc, m) => acc + m.count, 0);
