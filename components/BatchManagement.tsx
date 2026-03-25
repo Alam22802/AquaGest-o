@@ -1548,13 +1548,24 @@ const BatchManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                         <div className="grid grid-cols-2 gap-4 pt-3 border-t border-slate-50">
                           <div className="flex flex-col">
                             <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1">
-                              <Scale className="w-2.5 h-2.5" /> Peso Médio
+                              <Scale className="w-2.5 h-2.5" /> Peso Médio Inicial
+                            </span>
+                            <span className="text-lg font-black text-slate-700 leading-none mt-1">
+                              {formatNumber(batch.initialUnitWeight, 1)}g
+                            </span>
+                          </div>
+                          <div className="flex flex-col items-end">
+                            <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1">
+                              <Scale className="w-2.5 h-2.5" /> Peso Médio Atual
                             </span>
                             <span className="text-lg font-black text-blue-600 leading-none mt-1">
                               {formatNumber(batch.currentAvgWeight, 1)}g
                             </span>
                           </div>
-                          <div className="flex flex-col items-end">
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4 pt-3 border-t border-slate-50">
+                          <div className="flex flex-col">
                             <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1">
                               <TrendingUp className="w-2.5 h-2.5" /> Biomassa
                               Total
@@ -1563,10 +1574,7 @@ const BatchManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                               {formatNumber(batch.totalProducedBiomassKg, 1)}kg
                             </span>
                           </div>
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-4 pt-3 border-t border-slate-50">
-                          <div className="flex flex-col">
+                          <div className="flex flex-col items-end">
                             <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1">
                               <Package className="w-2.5 h-2.5" /> Ração Total
                             </span>
@@ -1574,7 +1582,10 @@ const BatchManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                               {formatNumber(batch.totalFeed / 1000, 1)}kg
                             </span>
                           </div>
-                          <div className="flex flex-col items-end">
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4 pt-3 border-t border-slate-50">
+                          <div className="flex flex-col">
                             <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1">
                               <TrendingUp className="w-2.5 h-2.5" /> FCA
                             </span>
@@ -1582,10 +1593,7 @@ const BatchManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                               {formatNumber(batch.fca, 2)}
                             </span>
                           </div>
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-4 pt-3 border-t border-slate-50">
-                          <div className="flex flex-col">
+                          <div className="flex flex-col items-end">
                             <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1">
                               <Fish className="w-2.5 h-2.5" /> Peixes Produzidos
                             </span>
@@ -1593,7 +1601,10 @@ const BatchManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                               {formatNumber(batch.totalProducedCount)} un
                             </span>
                           </div>
-                          <div className="flex flex-col items-end">
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4 pt-3 border-t border-slate-50">
+                          <div className="flex flex-col">
                             <div className="flex items-center gap-2">
                               <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
                                 Saldo Povoam.
@@ -1620,33 +1631,30 @@ const BatchManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                               {formatNumber(batch.balance)} un
                             </span>
                           </div>
+                          <div className="flex flex-col items-end">
+                            <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
+                              Total Despescado
+                            </span>
+                            <span className="text-lg font-black text-blue-600 leading-none mt-1">
+                              {formatNumber(batch.harvestedFish)} un
+                            </span>
+                          </div>
                         </div>
 
                         <div className="grid grid-cols-2 gap-4 pt-3 border-t border-slate-50">
                           <div className="flex flex-col">
                             <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
-                              Total Despescado
+                              Mortalidade
                             </span>
-                            <span className="text-sm font-black text-blue-600">
-                              {formatNumber(batch.harvestedFish)} un
+                            <span className="text-lg font-black text-red-500 leading-none mt-1">
+                              {formatNumber(batch.mortality)} un
                             </span>
                           </div>
                           <div className="flex flex-col items-end">
                             <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
-                              Mortalidade
-                            </span>
-                            <span className="text-sm font-black text-red-500">
-                              {formatNumber(batch.mortality)} un
-                            </span>
-                          </div>
-                        </div>
-
-                        <div className="flex justify-between items-center pt-3 border-t border-slate-50">
-                          <div className="flex flex-col">
-                            <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
                               Total Povoado
                             </span>
-                            <span className="text-sm font-black text-slate-700">
+                            <span className="text-lg font-black text-slate-700 leading-none mt-1">
                               {formatNumber(batch.initialQuantity)} un
                             </span>
                           </div>

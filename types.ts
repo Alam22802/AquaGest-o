@@ -420,9 +420,13 @@ export interface AppState {
   slaughterSupplyInvoices?: SlaughterSupplyInvoice[];
   slaughterSupplyCategories?: string[];
   slaughterExpenseCategories?: string[];
+  slaughterExpenseCategoriesUpdated?: number;
   slaughterHREntryTypes?: string[];
+  slaughterHREntryTypesUpdated?: number;
   slaughterHRDepartments?: string[];
+  slaughterHRDepartmentsUpdated?: number;
   slaughterHRRoles?: string[];
+  slaughterHRRolesUpdated?: number;
   harvestLogs?: HarvestLog[];
   harvestSchedules?: HarvestSchedule[];
   batchExpenses?: BatchExpense[];

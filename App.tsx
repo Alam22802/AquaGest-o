@@ -247,6 +247,8 @@ const App: React.FC = () => {
         slaughterExpenses: injectTimestamps(prev.slaughterExpenses || [], newState.slaughterExpenses || []),
         slaughterEmployees: injectTimestamps(prev.slaughterEmployees || [], newState.slaughterEmployees || []),
         slaughterHRIndicators: injectTimestamps(prev.slaughterHRIndicators || [], newState.slaughterHRIndicators || []),
+        slaughterHREntries: injectTimestamps(prev.slaughterHREntries || [], newState.slaughterHREntries || []),
+        slaughterHRVacancies: injectTimestamps(prev.slaughterHRVacancies || [], newState.slaughterHRVacancies || []),
         slaughterSupplyItems: injectTimestamps(prev.slaughterSupplyItems || [], newState.slaughterSupplyItems || []),
         slaughterSuppliers: injectTimestamps(prev.slaughterSuppliers || [], newState.slaughterSuppliers || []),
         slaughterSupplyRequests: injectTimestamps(prev.slaughterSupplyRequests || [], newState.slaughterSupplyRequests || []),
@@ -257,6 +259,10 @@ const App: React.FC = () => {
         portfolios: injectTimestamps(prev.portfolios, newState.portfolios),
         capexProjects: injectTimestamps(prev.capexProjects, newState.capexProjects),
         capexInvoices: injectTimestamps(prev.capexInvoices, newState.capexInvoices),
+        slaughterHRRolesUpdated: JSON.stringify(prev.slaughterHRRoles) !== JSON.stringify(newState.slaughterHRRoles) ? Date.now() : prev.slaughterHRRolesUpdated,
+        slaughterHRDepartmentsUpdated: JSON.stringify(prev.slaughterHRDepartments) !== JSON.stringify(newState.slaughterHRDepartments) ? Date.now() : prev.slaughterHRDepartmentsUpdated,
+        slaughterHREntryTypesUpdated: JSON.stringify(prev.slaughterHREntryTypes) !== JSON.stringify(newState.slaughterHREntryTypes) ? Date.now() : prev.slaughterHREntryTypesUpdated,
+        slaughterExpenseCategoriesUpdated: JSON.stringify(prev.slaughterExpenseCategories) !== JSON.stringify(newState.slaughterExpenseCategories) ? Date.now() : prev.slaughterExpenseCategoriesUpdated,
       };
 
       const findDeleted = (oldList: any[], newList: any[]) => {
@@ -279,6 +285,8 @@ const App: React.FC = () => {
         ...findDeleted(prev.slaughterExpenses || [], stateWithTimestamps.slaughterExpenses || []),
         ...findDeleted(prev.slaughterEmployees || [], stateWithTimestamps.slaughterEmployees || []),
         ...findDeleted(prev.slaughterHRIndicators || [], stateWithTimestamps.slaughterHRIndicators || []),
+        ...findDeleted(prev.slaughterHREntries || [], stateWithTimestamps.slaughterHREntries || []),
+        ...findDeleted(prev.slaughterHRVacancies || [], stateWithTimestamps.slaughterHRVacancies || []),
         ...findDeleted(prev.slaughterSupplyItems || [], stateWithTimestamps.slaughterSupplyItems || []),
         ...findDeleted(prev.slaughterSuppliers || [], stateWithTimestamps.slaughterSuppliers || []),
         ...findDeleted(prev.slaughterSupplyRequests || [], stateWithTimestamps.slaughterSupplyRequests || []),

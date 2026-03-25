@@ -21,7 +21,7 @@ const generateId = () => {
 };
 
 const SlaughterHR: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
-  const [activeSubTab, setActiveSubTab] = useState<'registration' | 'entries' | 'indicators'>('registration');
+  const [activeSubTab, setActiveSubTab] = useState<'employees' | 'sectors' | 'entries' | 'indicators'>('employees');
   const [filterMonth, setFilterMonth] = useState(new Date().getMonth() + 1);
   const [filterYear, setFilterYear] = useState(new Date().getFullYear());
   const [filterEmployeeId, setFilterEmployeeId] = useState<string>('all');
@@ -382,10 +382,16 @@ const SlaughterHR: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     <div className="space-y-8">
       <div className="flex gap-4 border-b border-slate-200 overflow-x-auto">
         <button 
-          onClick={() => setActiveSubTab('registration')}
-          className={`pb-4 px-4 text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap ${activeSubTab === 'registration' ? 'border-b-2 border-[#344434] text-[#344434]' : 'text-slate-400'}`}
+          onClick={() => setActiveSubTab('employees')}
+          className={`pb-4 px-4 text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap ${activeSubTab === 'employees' ? 'border-b-2 border-[#344434] text-[#344434]' : 'text-slate-400'}`}
         >
-          Cadastro
+          Pessoas
+        </button>
+        <button 
+          onClick={() => setActiveSubTab('sectors')}
+          className={`pb-4 px-4 text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap ${activeSubTab === 'sectors' ? 'border-b-2 border-[#344434] text-[#344434]' : 'text-slate-400'}`}
+        >
+          Setores
         </button>
         <button 
           onClick={() => setActiveSubTab('entries')}
@@ -584,7 +590,7 @@ const SlaughterHR: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
         </div>
       )}
 
-      {activeSubTab === 'registration' && (
+      {activeSubTab === 'employees' && (
         <div className="space-y-12">
           {/* Employees Section */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -809,9 +815,13 @@ const SlaughterHR: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
             </div>
           </div>
         </div>
+      </div>
+      )}
 
-        {/* Vacancy Board Section */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      {activeSubTab === 'sectors' && (
+        <div className="space-y-12">
+          {/* Vacancy Board Section */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             <div className="lg:col-span-1">
               <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-200">
                 <h3 className="text-xl font-black text-slate-800 mb-8 uppercase tracking-tighter italic flex items-center gap-3">

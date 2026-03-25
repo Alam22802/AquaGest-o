@@ -598,15 +598,19 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                     )}
                   </div>
                 
-                <div className="grid grid-cols-2 gap-6">
-                  <div className="space-y-1">
-                    <span className="text-[10px] font-black text-slate-600 uppercase tracking-widest block">Estoque Vivo Atual</span>
-                    <span className="text-xl font-black text-slate-800 italic">{formatNumber(batchData.liveFish)} un</span>
-                  </div>
-                  <div className="space-y-1">
-                    <span className="text-[10px] font-black text-slate-600 uppercase tracking-widest block">Mortalidade Atual</span>
-                    <span className="text-xl font-black text-red-600 italic">{formatNumber(batchData.mortality)} un</span>
-                  </div>
+                  <div className="grid grid-cols-2 gap-6">
+                    <div className="space-y-1">
+                      <span className="text-[10px] font-black text-slate-600 uppercase tracking-widest block">Peso Médio Inicial</span>
+                      <span className="text-xl font-black text-slate-700 italic">{formatNumber(batchData.batch.initialUnitWeight, 1)}g</span>
+                    </div>
+                    <div className="space-y-1">
+                      <span className="text-[10px] font-black text-slate-600 uppercase tracking-widest block">Estoque Vivo Atual</span>
+                      <span className="text-xl font-black text-slate-800 italic">{formatNumber(batchData.liveFish)} un</span>
+                    </div>
+                    <div className="space-y-1">
+                      <span className="text-[10px] font-black text-slate-600 uppercase tracking-widest block">Mortalidade Atual</span>
+                      <span className="text-xl font-black text-red-600 italic">{formatNumber(batchData.mortality)} un</span>
+                    </div>
                   <div className="space-y-1">
                     <span className="text-[10px] font-black text-slate-600 uppercase tracking-widest block">Biomassa Atual</span>
                     <span className="text-xl font-black text-blue-600 italic">{formatNumber(batchData.currentBiomassKg, 1)}kg</span>
