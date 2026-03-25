@@ -273,8 +273,14 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     // FCA Previsto: Total Feed / Predicted Biomass
     const fcaTheoretical = expectedWeight > 0 ? (feeding / 1000) / expectedWeight : 0;
 
-    // FCA Real: Total Feed / Harvested Weight
-    const fcaReal = harvestedWeight > 0 ? (feeding / 1000) / harvestedWeight : 0;
+    // FCA Real: Total Feed / Frigorific Reception Weight (fallback to Harvested Weight)
+    const fcaReal = totalReceptionWeight > 0 
+      ? (feeding / 1000) / totalReceptionWeight 
+      : (harvestedWeight > 0 ? (feeding / 1000) / harvestedWeight : 0);
+
+    // GPD: (Final Avg Weight - Initial Weight) / Total Days
+    const finalAvgWeight = harvestedFish > 0 ? (harvestedWeight / harvestedFish) * 1000 : currentAvgWeight;
+    const gpd = totalDays > 0 ? (finalAvgWeight - batch.initialUnitWeight) / totalDays : 0;
 
     // Cost per kg
     const divisor = totalReceptionWeight;
@@ -325,6 +331,7 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       survivalRate,
       fcaTheoretical,
       fcaReal,
+      gpd,
       costPerKg,
       accuracy,
       survivalRateReal,
@@ -706,6 +713,11 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                     <div className="space-y-1">
                       <span className="text-[10px] font-black text-white uppercase tracking-widest block">Peso Previsto</span>
                       <span className="text-lg font-black italic text-blue-400">{formatNumber(batchData.expectedWeight, 1)}kg</span>
+                    </div>
+
+                    <div className="col-span-2 pt-4 border-t border-white/10 flex justify-between items-center">
+                      <span className="text-[10px] font-black text-white uppercase tracking-widest">GPD (Crescimento Diário)</span>
+                      <span className="text-lg font-black italic text-cyan-400">{formatNumber(batchData.gpd, 2)}g/dia</span>
                     </div>
                   </div>
                 </div>
