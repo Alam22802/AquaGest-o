@@ -409,7 +409,6 @@ export interface FeedingTableRow {
 export interface FeedingTable {
   id: string;
   name: string;
-  feedTypeId: string;
   recriaInicial: FeedingTableRow[];
   recriaFinal: FeedingTableRow[];
   crescimento: FeedingTableRow[];

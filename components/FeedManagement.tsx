@@ -59,7 +59,6 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
 
   const [tableFormData, setTableFormData] = useState({
     name: '',
-    feedTypeId: '',
     recriaInicial: createEmptyRows(3, 1),
     recriaFinal: createEmptyRows(4, 4),
     crescimento: createEmptyRows(5, 8),
@@ -291,7 +290,7 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
   const handleSaveFeedingTable = (e: React.FormEvent) => {
     e.preventDefault();
     if (!hasPermission) return;
-    if (!tableFormData.name || !tableFormData.feedTypeId) return;
+    if (!tableFormData.name) return;
 
     const newTable = {
       ...tableFormData,
@@ -308,7 +307,6 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     setEditingTableId(null);
     setTableFormData({
       name: '',
-      feedTypeId: '',
       recriaInicial: createEmptyRows(3, 1),
       recriaFinal: createEmptyRows(4, 4),
       crescimento: createEmptyRows(5, 8),
@@ -331,7 +329,6 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     setEditingTableId(table.id);
     setTableFormData({
       name: table.name,
-      feedTypeId: table.feedTypeId,
       recriaInicial: table.recriaInicial,
       recriaFinal: table.recriaFinal,
       crescimento: table.crescimento,
@@ -341,9 +338,9 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
   };
 
   const updateRow = (phase: 'recriaInicial' | 'recriaFinal' | 'crescimento' | 'terminacao', index: number, field: string, value: string) => {
-    const numValue = Number(value);
+    const finalValue = field === 'feedTypeId' ? value : Number(value);
     const newPhases = { ...tableFormData };
-    newPhases[phase][index] = { ...newPhases[phase][index], [field]: numValue };
+    newPhases[phase][index] = { ...newPhases[phase][index], [field]: finalValue };
     setTableFormData(newPhases);
   };
 
@@ -749,7 +746,7 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                         const allRows = table ? [...table.recriaInicial, ...table.recriaFinal, ...table.crescimento, ...table.terminacao] : [];
                         const row = allRows.find(r => r.week === Number(calcData.currentWeek));
                         if (row) {
-                          const feed = feedMap.get(row.feedTypeId || table?.feedTypeId || '');
+                          const feed = feedMap.get(row.feedTypeId || '');
                           return feed ? `Ração: ${feed.name}` : 'Ração não definida';
                         }
                         return '';
@@ -768,7 +765,7 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                 {editingTableId ? 'Editar Tabela de Trato' : 'Nova Tabela de Trato Indicado'}
               </h3>
               <form onSubmit={handleSaveFeedingTable} className="space-y-10">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 gap-6">
                   <div>
                     <label className="block text-[10px] font-black text-slate-400 uppercase mb-2 tracking-widest">Nome da Tabela</label>
                     <input
@@ -779,18 +776,6 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                       value={tableFormData.name}
                       onChange={(e) => setTableFormData({ ...tableFormData, name: e.target.value })}
                     />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-black text-slate-400 uppercase mb-2 tracking-widest">Ração Padrão</label>
-                    <select
-                      required
-                      className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none focus:ring-2 focus:ring-blue-500/20"
-                      value={tableFormData.feedTypeId}
-                      onChange={(e) => setTableFormData({ ...tableFormData, feedTypeId: e.target.value })}
-                    >
-                      <option value="">Selecione...</option>
-                      {(state.feedTypes || []).map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
-                    </select>
                   </div>
                 </div>
 
@@ -832,7 +817,7 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                                   value={row.feedTypeId || ''}
                                   onChange={(e) => updateRow(phase.id, idx, 'feedTypeId', e.target.value)}
                                 >
-                                  <option value="">Padrão</option>
+                                  <option value="">Selecione...</option>
                                   {(state.feedTypes || []).map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
                                 </select>
                               </td>
@@ -890,7 +875,6 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                         setEditingTableId(null);
                         setTableFormData({
                           name: '',
-                          feedTypeId: '',
                           recriaInicial: createEmptyRows(3, 1),
                           recriaFinal: createEmptyRows(4, 4),
                           crescimento: createEmptyRows(5, 8),
@@ -931,7 +915,6 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                 <thead className="bg-slate-50 text-[10px] font-black text-slate-400 uppercase tracking-widest">
                   <tr>
                     <th className="px-6 py-4">Nome da Tabela</th>
-                    <th className="px-6 py-4">Ração Padrão</th>
                     <th className="px-6 py-4">Total Semanas</th>
                     <th className="px-6 py-4">Última Atualização</th>
                     {hasPermission && <th className="px-6 py-4 text-center">Ações</th>}
@@ -939,12 +922,10 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {(state.feedingTables || []).map(table => {
-                    const feed = feedMap.get(table.feedTypeId);
                     const totalWeeks = table.terminacao.length > 0 ? table.terminacao[table.terminacao.length - 1].week : 0;
                     return (
                       <tr key={table.id} className="hover:bg-slate-50 transition-colors">
                         <td className="px-6 py-4 font-black text-slate-800 uppercase">{table.name}</td>
-                        <td className="px-6 py-4 text-xs font-bold text-slate-600">{feed?.name || '---'}</td>
                         <td className="px-6 py-4 text-xs font-bold text-slate-600">{totalWeeks} semanas</td>
                         <td className="px-6 py-4 text-xs font-bold text-slate-400">
                           {table.updatedAt ? format(table.updatedAt, 'dd/MM/yyyy HH:mm') : '---'}
