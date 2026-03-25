@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { AppState, FeedType, FeedStockLog, User } from '../types';
-import { Plus, Package, TrendingDown, AlertCircle, Calendar, Settings2, Edit, Trash2, X, ArrowUpDown, Clock, User as UserIcon, Filter, CheckSquare, Square } from 'lucide-react';
+import { Plus, Package, TrendingDown, AlertCircle, Calendar, Settings2, Edit, Trash2, X, ArrowUpDown, Clock, User as UserIcon, Filter, CheckSquare, Square, Info, FileText } from 'lucide-react';
 import { subDays, format, parseISO } from 'date-fns';
 import { formatNumber } from '../utils/formatters';
 
@@ -20,6 +20,7 @@ const generateId = () => {
 };
 
 const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
+  const [activeSubTab, setActiveSubTab] = useState<'stock' | 'recommended'>('stock');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formData, setFormData] = useState({ 
     name: '',
@@ -43,6 +44,35 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     feedId: '', 
     amount: '', 
     date: new Date().toISOString().split('T')[0] 
+  });
+
+  const createEmptyRows = (count: number, startWeek: number) => {
+    return Array.from({ length: count }, (_, i) => ({
+      week: startWeek + i,
+      averageWeight: 0,
+      gpd: 0,
+      feedPercentagePV: 0,
+      feedingsPerDay: 3,
+      feedTypeId: ''
+    }));
+  };
+
+  const [tableFormData, setTableFormData] = useState({
+    name: '',
+    feedTypeId: '',
+    recriaInicial: createEmptyRows(3, 1),
+    recriaFinal: createEmptyRows(4, 4),
+    crescimento: createEmptyRows(5, 8),
+    terminacao: createEmptyRows(14, 13)
+  });
+
+  const [editingTableId, setEditingTableId] = useState<string | null>(null);
+
+  const [calcData, setCalcData] = useState({
+    fishCount: '1000',
+    currentWeek: '1',
+    averageWeight: '',
+    selectedTableId: ''
   });
 
   const { userMap, feedMap } = useMemo(() => {
@@ -246,12 +276,6 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       feedUpdates.set(log.feedTypeId, current + log.amount);
     });
 
-    const updatedFeeds = state.feedTypes.map(f => {
-      const adjustment = feedUpdates.get(f.id);
-      if (adjustment) return { ...f, totalStock: f.totalStock - adjustment };
-      return f;
-    });
-
     onUpdate({
       ...state,
       feedStockLogs: (state.feedStockLogs || []).filter(l => !selectedLogIds.has(l.id)),
@@ -264,9 +288,112 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     setSelectedLogIds(new Set());
   };
 
+  const handleSaveFeedingTable = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!hasPermission) return;
+    if (!tableFormData.name || !tableFormData.feedTypeId) return;
+
+    const newTable = {
+      ...tableFormData,
+      id: editingTableId || generateId(),
+      userId: currentUser.id,
+      updatedAt: Date.now()
+    };
+
+    const updatedTables = editingTableId
+      ? (state.feedingTables || []).map(t => t.id === editingTableId ? newTable : t)
+      : [newTable, ...(state.feedingTables || [])];
+
+    onUpdate({ ...state, feedingTables: updatedTables });
+    setEditingTableId(null);
+    setTableFormData({
+      name: '',
+      feedTypeId: '',
+      recriaInicial: createEmptyRows(3, 1),
+      recriaFinal: createEmptyRows(4, 4),
+      crescimento: createEmptyRows(5, 8),
+      terminacao: createEmptyRows(14, 13)
+    });
+  };
+
+  const removeFeedingTable = (id: string) => {
+    if (!hasPermission) return;
+    if (!confirm('Excluir esta tabela de trato?')) return;
+    onUpdate({
+      ...state,
+      feedingTables: (state.feedingTables || []).filter(t => t.id !== id),
+      deletedIds: [...(state.deletedIds || []), id]
+    });
+  };
+
+  const startEditTable = (table: any) => {
+    if (!hasPermission) return;
+    setEditingTableId(table.id);
+    setTableFormData({
+      name: table.name,
+      feedTypeId: table.feedTypeId,
+      recriaInicial: table.recriaInicial,
+      recriaFinal: table.recriaFinal,
+      crescimento: table.crescimento,
+      terminacao: table.terminacao
+    });
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const updateRow = (phase: 'recriaInicial' | 'recriaFinal' | 'crescimento' | 'terminacao', index: number, field: string, value: string) => {
+    const numValue = Number(value);
+    const newPhases = { ...tableFormData };
+    newPhases[phase][index] = { ...newPhases[phase][index], [field]: numValue };
+    setTableFormData(newPhases);
+  };
+
+  const calculatedFeed = useMemo(() => {
+    if (!calcData.selectedTableId || !calcData.currentWeek || !calcData.fishCount) return 0;
+    
+    const table = (state.feedingTables || []).find(t => t.id === calcData.selectedTableId);
+    if (!table) return 0;
+
+    const week = Number(calcData.currentWeek);
+    const fishCount = Number(calcData.fishCount);
+    
+    // Find the row for the given week
+    const allRows = [
+      ...table.recriaInicial,
+      ...table.recriaFinal,
+      ...table.crescimento,
+      ...table.terminacao
+    ];
+    
+    const row = allRows.find(r => r.week === week);
+    if (!row) return 0;
+
+    // If user provided a specific average weight, use it, otherwise use the table's weight
+    const weight = calcData.averageWeight ? Number(calcData.averageWeight) : row.averageWeight;
+    
+    // Feed Amount (kg) = (Fish Count * Weight (g) / 1000) * (Feed % PV / 100)
+    return (fishCount * weight / 1000) * (row.feedPercentagePV / 100);
+  }, [calcData, state.feedingTables]);
+
   return (
     <div className="space-y-8">
-      {hasPermission ? (
+      <div className="flex bg-slate-100 p-1 rounded-2xl w-fit mb-4">
+        <button
+          onClick={() => setActiveSubTab('stock')}
+          className={`px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeSubTab === 'stock' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+        >
+          Estoque de Ração
+        </button>
+        <button
+          onClick={() => setActiveSubTab('recommended')}
+          className={`px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeSubTab === 'recommended' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+        >
+          Trato Indicado
+        </button>
+      </div>
+
+      {activeSubTab === 'stock' ? (
+        <React.Fragment>
+          {hasPermission ? (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <div className={`bg-white p-6 rounded-3xl shadow-sm border transition-all ${editingId ? 'border-amber-200 ring-4 ring-amber-50' : 'border-slate-200'}`}>
             <h3 className="text-lg font-black text-slate-800 mb-6 flex items-center justify-between uppercase tracking-tighter italic">
@@ -541,6 +668,313 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
           </div>
         )}
       </div>
+    </React.Fragment>
+  ) : (
+        <div className="space-y-8 animate-in fade-in duration-500">
+          {/* Calculator Section */}
+          <div className="bg-slate-900 p-8 rounded-[2.5rem] shadow-2xl text-white">
+            <h3 className="text-lg font-black mb-8 flex items-center gap-3 uppercase tracking-tighter italic">
+              <TrendingDown className="w-6 h-6 text-blue-400" />
+              Calculadora de Trato
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 items-end">
+              <div>
+                <label className="block text-[10px] font-black text-slate-400 uppercase mb-2 tracking-widest">Tabela de Referência</label>
+                <select
+                  className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-2xl font-bold text-sm outline-none focus:ring-2 focus:ring-blue-500/20 text-white"
+                  value={calcData.selectedTableId}
+                  onChange={(e) => setCalcData({ ...calcData, selectedTableId: e.target.value })}
+                >
+                  <option value="">Selecione uma tabela...</option>
+                  {(state.feedingTables || []).map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-[10px] font-black text-slate-400 uppercase mb-2 tracking-widest">Quantidade de Peixes</label>
+                <input
+                  type="number"
+                  className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-2xl font-bold text-sm outline-none focus:ring-2 focus:ring-blue-500/20 text-white"
+                  value={calcData.fishCount}
+                  onChange={(e) => setCalcData({ ...calcData, fishCount: e.target.value })}
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-black text-slate-400 uppercase mb-2 tracking-widest">Semana Atual</label>
+                <input
+                  type="number"
+                  className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-2xl font-bold text-sm outline-none focus:ring-2 focus:ring-blue-500/20 text-white"
+                  value={calcData.currentWeek}
+                  onChange={(e) => setCalcData({ ...calcData, currentWeek: e.target.value })}
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-black text-slate-400 uppercase mb-2 tracking-widest">Peso Médio (g) (Opcional)</label>
+                <input
+                  type="number"
+                  placeholder="Usar da tabela"
+                  className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-2xl font-bold text-sm outline-none focus:ring-2 focus:ring-blue-500/20 text-white"
+                  value={calcData.averageWeight}
+                  onChange={(e) => setCalcData({ ...calcData, averageWeight: e.target.value })}
+                />
+              </div>
+            </div>
+
+            <div className="mt-8 p-6 bg-blue-600/20 border border-blue-500/30 rounded-3xl flex flex-col md:flex-row items-center justify-between gap-4">
+              <div className="flex items-center gap-4">
+                <div className="p-4 bg-blue-500 rounded-2xl">
+                  <Package className="w-8 h-8 text-white" />
+                </div>
+                <div>
+                  <p className="text-[10px] font-black text-blue-300 uppercase tracking-widest">Quantidade de Ração Estimada</p>
+                  <h4 className="text-3xl font-black italic">{formatNumber(calculatedFeed, 2)} kg <span className="text-sm not-italic opacity-60">/ dia</span></h4>
+                </div>
+              </div>
+              <div className="text-right">
+                <p className="text-[10px] font-black text-blue-300 uppercase tracking-widest">Baseado na % PV da Tabela</p>
+                <div className="space-y-1">
+                  <p className="text-xs font-bold opacity-80">
+                    {calcData.selectedTableId ? (
+                      (() => {
+                        const table = (state.feedingTables || []).find(t => t.id === calcData.selectedTableId);
+                        const allRows = table ? [...table.recriaInicial, ...table.recriaFinal, ...table.crescimento, ...table.terminacao] : [];
+                        const row = allRows.find(r => r.week === Number(calcData.currentWeek));
+                        return row ? `${formatNumber(row.feedPercentagePV, 2)}% PV` : 'Semana não encontrada';
+                      })()
+                    ) : 'Selecione uma tabela'}
+                  </p>
+                  {calcData.selectedTableId && (
+                    <p className="text-[10px] font-black text-blue-400 uppercase tracking-widest">
+                      {(() => {
+                        const table = (state.feedingTables || []).find(t => t.id === calcData.selectedTableId);
+                        const allRows = table ? [...table.recriaInicial, ...table.recriaFinal, ...table.crescimento, ...table.terminacao] : [];
+                        const row = allRows.find(r => r.week === Number(calcData.currentWeek));
+                        if (row) {
+                          const feed = feedMap.get(row.feedTypeId || table?.feedTypeId || '');
+                          return feed ? `Ração: ${feed.name}` : 'Ração não definida';
+                        }
+                        return '';
+                      })()}
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {hasPermission ? (
+            <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-200">
+              <h3 className="text-lg font-black text-slate-800 mb-8 flex items-center gap-3 uppercase tracking-tighter italic">
+                <Settings2 className="w-6 h-6 text-blue-500" />
+                {editingTableId ? 'Editar Tabela de Trato' : 'Nova Tabela de Trato Indicado'}
+              </h3>
+              <form onSubmit={handleSaveFeedingTable} className="space-y-10">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <label className="block text-[10px] font-black text-slate-400 uppercase mb-2 tracking-widest">Nome da Tabela</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="Ex: Tilápia Ciclo Verão"
+                      className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none focus:ring-2 focus:ring-blue-500/20"
+                      value={tableFormData.name}
+                      onChange={(e) => setTableFormData({ ...tableFormData, name: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-black text-slate-400 uppercase mb-2 tracking-widest">Ração Padrão</label>
+                    <select
+                      required
+                      className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none focus:ring-2 focus:ring-blue-500/20"
+                      value={tableFormData.feedTypeId}
+                      onChange={(e) => setTableFormData({ ...tableFormData, feedTypeId: e.target.value })}
+                    >
+                      <option value="">Selecione...</option>
+                      {(state.feedTypes || []).map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
+                    </select>
+                  </div>
+                </div>
+
+                {/* Phases */}
+                {[
+                  { id: 'recriaInicial' as const, label: 'RECRIA INICIAL', rows: 3 },
+                  { id: 'recriaFinal' as const, label: 'RECRIA FINAL', rows: 4 },
+                  { id: 'crescimento' as const, label: 'CRESCIMENTO', rows: 5 },
+                  { id: 'terminacao' as const, label: 'TERMINAÇÃO', rows: 14 }
+                ].map(phase => (
+                  <div key={phase.id} className="space-y-4">
+                    <h4 className="text-xs font-black text-blue-600 uppercase tracking-widest border-l-4 border-blue-600 pl-3">{phase.label}</h4>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left min-w-[800px]">
+                        <thead className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
+                          <tr>
+                            <th className="px-2 py-2 w-16">Semana</th>
+                            <th className="px-2 py-2">Ração</th>
+                            <th className="px-2 py-2">Peso Médio (g)</th>
+                            <th className="px-2 py-2">GPD (g/dia)</th>
+                            <th className="px-2 py-2">Trato Diário (% PV)</th>
+                            <th className="px-2 py-2">Tratos/Dia</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {tableFormData[phase.id].map((row: any, idx: number) => (
+                            <tr key={idx}>
+                              <td className="px-2 py-2">
+                                <input
+                                  type="number"
+                                  className="w-full px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg font-bold text-xs outline-none"
+                                  value={row.week}
+                                  onChange={(e) => updateRow(phase.id, idx, 'week', e.target.value)}
+                                />
+                              </td>
+                              <td className="px-2 py-2">
+                                <select
+                                  className="w-full px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg font-bold text-[10px] outline-none"
+                                  value={row.feedTypeId || ''}
+                                  onChange={(e) => updateRow(phase.id, idx, 'feedTypeId', e.target.value)}
+                                >
+                                  <option value="">Padrão</option>
+                                  {(state.feedTypes || []).map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
+                                </select>
+                              </td>
+                              <td className="px-2 py-2">
+                                <input
+                                  type="number"
+                                  step="0.1"
+                                  className="w-full px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg font-bold text-xs outline-none"
+                                  value={row.averageWeight || ''}
+                                  onChange={(e) => updateRow(phase.id, idx, 'averageWeight', e.target.value)}
+                                />
+                              </td>
+                              <td className="px-2 py-2">
+                                <input
+                                  type="number"
+                                  step="0.01"
+                                  className="w-full px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg font-bold text-xs outline-none"
+                                  value={row.gpd || ''}
+                                  onChange={(e) => updateRow(phase.id, idx, 'gpd', e.target.value)}
+                                />
+                              </td>
+                              <td className="px-2 py-2">
+                                <div className="relative">
+                                  <input
+                                    type="number"
+                                    step="0.01"
+                                    className="w-full px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg font-bold text-xs outline-none pr-6"
+                                    value={row.feedPercentagePV || ''}
+                                    onChange={(e) => updateRow(phase.id, idx, 'feedPercentagePV', e.target.value)}
+                                  />
+                                  <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400">%</span>
+                                </div>
+                              </td>
+                              <td className="px-2 py-2">
+                                <input
+                                  type="number"
+                                  className="w-full px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg font-bold text-xs outline-none"
+                                  value={row.feedingsPerDay || ''}
+                                  onChange={(e) => updateRow(phase.id, idx, 'feedingsPerDay', e.target.value)}
+                                />
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                ))}
+
+                <div className="flex justify-end gap-3 pt-4">
+                  {editingTableId && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditingTableId(null);
+                        setTableFormData({
+                          name: '',
+                          feedTypeId: '',
+                          recriaInicial: createEmptyRows(3, 1),
+                          recriaFinal: createEmptyRows(4, 4),
+                          crescimento: createEmptyRows(5, 8),
+                          terminacao: createEmptyRows(14, 13)
+                        });
+                      }}
+                      className="px-8 py-4 bg-slate-100 text-slate-600 rounded-2xl font-black uppercase tracking-widest text-xs hover:bg-slate-200 transition-all"
+                    >
+                      Cancelar
+                    </button>
+                  )}
+                  <button
+                    type="submit"
+                    className="px-12 py-4 bg-blue-600 text-white rounded-2xl font-black uppercase tracking-widest text-xs shadow-xl shadow-blue-500/20 hover:bg-blue-700 transition-all active:scale-95"
+                  >
+                    {editingTableId ? 'Atualizar Tabela' : 'Salvar Tabela'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          ) : (
+            <div className="bg-slate-100 p-8 rounded-3xl border border-dashed border-slate-300 flex flex-col items-center gap-4 text-center">
+              <Info className="w-10 h-10 text-slate-300" />
+              <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-400">Modo Leitura Ativo</h4>
+              <p className="text-[9px] font-bold text-slate-400 uppercase">Você não possui permissão para gerenciar tabelas de trato.</p>
+            </div>
+          )}
+
+          <div className="bg-white rounded-[2.5rem] shadow-sm border border-slate-200 overflow-hidden">
+            <div className="p-6 border-b border-slate-100 flex items-center justify-between">
+              <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest italic flex items-center gap-2">
+                <FileText className="w-5 h-5 text-blue-500" />
+                Tabelas de Trato Cadastradas
+              </h3>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left">
+                <thead className="bg-slate-50 text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                  <tr>
+                    <th className="px-6 py-4">Nome da Tabela</th>
+                    <th className="px-6 py-4">Ração Padrão</th>
+                    <th className="px-6 py-4">Total Semanas</th>
+                    <th className="px-6 py-4">Última Atualização</th>
+                    {hasPermission && <th className="px-6 py-4 text-center">Ações</th>}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {(state.feedingTables || []).map(table => {
+                    const feed = feedMap.get(table.feedTypeId);
+                    const totalWeeks = table.terminacao.length > 0 ? table.terminacao[table.terminacao.length - 1].week : 0;
+                    return (
+                      <tr key={table.id} className="hover:bg-slate-50 transition-colors">
+                        <td className="px-6 py-4 font-black text-slate-800 uppercase">{table.name}</td>
+                        <td className="px-6 py-4 text-xs font-bold text-slate-600">{feed?.name || '---'}</td>
+                        <td className="px-6 py-4 text-xs font-bold text-slate-600">{totalWeeks} semanas</td>
+                        <td className="px-6 py-4 text-xs font-bold text-slate-400">
+                          {table.updatedAt ? format(table.updatedAt, 'dd/MM/yyyy HH:mm') : '---'}
+                        </td>
+                        {hasPermission && (
+                          <td className="px-6 py-4 text-center">
+                            <div className="flex justify-center gap-2">
+                              <button onClick={() => startEditTable(table)} className="p-2 text-slate-300 hover:text-blue-500 transition-colors">
+                                <Edit className="w-4 h-4" />
+                              </button>
+                              <button onClick={() => removeFeedingTable(table.id)} className="p-2 text-slate-300 hover:text-red-500 transition-colors">
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </td>
+                        )}
+                      </tr>
+                    );
+                  })}
+                  {(state.feedingTables || []).length === 0 && (
+                    <tr>
+                      <td colSpan={5} className="px-6 py-10 text-center text-slate-400 font-bold uppercase text-[10px] tracking-widest italic">Nenhuma tabela cadastrada.</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

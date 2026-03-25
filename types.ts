@@ -397,6 +397,27 @@ export interface StandardCurve {
   updatedAt?: number;
 }
 
+export interface FeedingTableRow {
+  week: number;
+  averageWeight: number;
+  gpd: number;
+  feedPercentagePV: number;
+  feedingsPerDay: number;
+  feedTypeId: string;
+}
+
+export interface FeedingTable {
+  id: string;
+  name: string;
+  feedTypeId: string;
+  recriaInicial: FeedingTableRow[];
+  recriaFinal: FeedingTableRow[];
+  crescimento: FeedingTableRow[];
+  terminacao: FeedingTableRow[];
+  userId?: string;
+  updatedAt?: number;
+}
+
 export interface AppState {
   users: User[];
   lines: Line[];
@@ -438,6 +459,7 @@ export interface AppState {
   portfolios: InvestmentPortfolio[];
   capexProjects: CapexProject[];
   capexInvoices: CapexInvoice[];
+  feedingTables?: FeedingTable[];
   farmTargetCapacity?: number;
   notificationSettings?: NotificationSettings;
   supabaseConfig?: { url: string; key: string };
