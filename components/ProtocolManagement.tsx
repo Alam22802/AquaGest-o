@@ -24,10 +24,37 @@ const ProtocolManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) =
     targetWeight: '',
     expectedFca: '',
     estimatedDays: '',
-    supplierCurve: Array.from({ length: 13 }, (_, i) => ({ day: i * 15, weight: 0 }))
+    supplierCurve: Array.from({ length: 25 }, (_, i) => ({ day: i, weight: 0 }))
   });
 
   const hasPermission = currentUser.isMaster || currentUser.canEdit;
+
+  const generateCurve = () => {
+    const curve = [...formData.supplierCurve];
+    const filledPoints = curve.filter(p => p.weight > 0).sort((a, b) => a.day - b.day);
+    
+    if (filledPoints.length < 2) {
+      alert('Preencha pelo menos duas biometrias (ex: Semana 0 e Semana 4) para gerar a curva.');
+      return;
+    }
+    
+    const first = filledPoints[0];
+    const last = filledPoints[filledPoints.length - 1];
+    
+    const weeklyGrowthRate = (last.weight - first.weight) / (last.day - first.day);
+    
+    const newCurve = curve.map(p => {
+      // Logic: Linear growth based on the rate between first and last filled points
+      const projectedWeight = Math.max(0, Math.round(first.weight + weeklyGrowthRate * (p.day - first.day)));
+      
+      // If it's one of the points the user manually filled, we can keep it or overwrite it.
+      // The user said "garantir que a curva termine com a ultima biometria colocada na indicação"
+      // which suggests they want the projection to follow that last point.
+      return { ...p, weight: projectedWeight };
+    });
+    
+    setFormData({ ...formData, supplierCurve: newCurve });
+  };
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
@@ -66,7 +93,7 @@ const ProtocolManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) =
       targetWeight: '', 
       expectedFca: '', 
       estimatedDays: '',
-      supplierCurve: Array.from({ length: 13 }, (_, i) => ({ day: i * 15, weight: 0 }))
+      supplierCurve: Array.from({ length: 25 }, (_, i) => ({ day: i, weight: 0 }))
     });
   };
 
@@ -115,16 +142,25 @@ const ProtocolManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) =
             </div>
 
             <div className="col-span-2 mt-4">
-              <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2">
-                <TrendingUp className="w-3 h-3" /> Curva de Peso Fornecedor (Biometrias a cada 15 dias)
-              </h4>
-              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3">
+              <div className="flex items-center justify-between mb-3">
+                <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                  <TrendingUp className="w-3 h-3" /> Curva de Peso Fornecedor (Semanas)
+                </h4>
+                <button 
+                  type="button"
+                  onClick={generateCurve}
+                  className="text-[9px] font-black text-indigo-600 uppercase tracking-widest bg-indigo-50 px-3 py-1 rounded-lg hover:bg-indigo-100 transition-colors"
+                >
+                  Gerar Curva
+                </button>
+              </div>
+              <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-8 gap-3">
                 {formData.supplierCurve.map((point, idx) => (
                   <div key={point.day} className="flex flex-col gap-1">
-                    <span className="text-[9px] font-black text-slate-400 uppercase text-center">Dia {point.day}</span>
+                    <span className="text-[9px] font-black text-slate-400 uppercase text-center">Sem. {point.day}</span>
                     <input 
                       type="number" 
-                      placeholder="Peso (g)" 
+                      placeholder="g" 
                       className="w-full px-2 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none font-bold text-xs text-center" 
                       value={point.weight || ''} 
                       onChange={e => {
@@ -169,7 +205,7 @@ const ProtocolManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) =
                       targetWeight: protocol.targetWeight.toString(),
                       expectedFca: protocol.expectedFca.toString(),
                       estimatedDays: protocol.estimatedDays.toString(),
-                      supplierCurve: protocol.supplierCurve || Array.from({ length: 13 }, (_, i) => ({ day: i * 15, weight: 0 }))
+                      supplierCurve: protocol.supplierCurve || Array.from({ length: 25 }, (_, i) => ({ day: i, weight: 0 }))
                     });
                   }} className="text-slate-300 hover:text-indigo-600"><Edit className="w-4 h-4"/></button>
                   <button onClick={() => removeProtocol(protocol.id)} className="text-slate-300 hover:text-red-500"><Trash2 className="w-4 h-4"/></button>
