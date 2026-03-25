@@ -505,7 +505,9 @@ const Dashboard: React.FC<Props> = ({ state }) => {
           .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))[0];
         
         if (latestStandardCurve) {
-          const sortedPoints = [...latestStandardCurve.curve].sort((a, b) => a.day - b.day);
+          const sortedPoints = [...latestStandardCurve.curve]
+            .filter(p => p.weight > 0)
+            .sort((a, b) => a.day - b.day);
           
           standardCurvePoints = sortedPoints.map(p => ({
             day: p.day * 7, // Convert weeks to days
@@ -523,7 +525,9 @@ const Dashboard: React.FC<Props> = ({ state }) => {
       let supplierCurvePoints: { day: number, weight: number }[] = [];
       if (showSupplierCurve) {
         if (protocol?.supplierCurve && protocol.supplierCurve.some(p => p.weight > 0)) {
-          const sortedPoints = [...protocol.supplierCurve].sort((a, b) => a.day - b.day);
+          const sortedPoints = [...protocol.supplierCurve]
+            .filter(p => p.weight > 0)
+            .sort((a, b) => a.day - b.day);
           
           supplierCurvePoints = sortedPoints.map(p => ({
             day: p.day * 7, // Convert weeks to days
@@ -626,7 +630,7 @@ const Dashboard: React.FC<Props> = ({ state }) => {
     }
 
     return baseData;
-  }, [state.biometryLogs, state.batches, state.cages, state.harvestLogs, state.protocols, selectedBatchId, batchStats, showSupplierCurve, showStandardCurve, showContinueCurve]);
+  }, [state.biometryLogs, state.batches, state.cages, state.harvestLogs, state.protocols, state.standardCurves, selectedBatchId, batchStats, showSupplierCurve, showStandardCurve, showContinueCurve]);
 
   const mortalityEvolutionData = useMemo(() => {
     if (!selectedBatchId) return [];
@@ -791,7 +795,9 @@ const Dashboard: React.FC<Props> = ({ state }) => {
           .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))[0];
         
         if (latestStandardCurve) {
-          const sortedPoints = [...latestStandardCurve.curve].sort((a, b) => a.day - b.day);
+          const sortedPoints = [...latestStandardCurve.curve]
+            .filter(p => p.weight > 0)
+            .sort((a, b) => a.day - b.day);
           
           standardCurvePoints = sortedPoints.map(p => ({
             day: p.day * 7, // Convert weeks to days
@@ -809,7 +815,9 @@ const Dashboard: React.FC<Props> = ({ state }) => {
       let supplierCurvePoints: { day: number, weight: number }[] = [];
       if (showSupplierCurve) {
         if (protocol?.supplierCurve && protocol.supplierCurve.some(p => p.weight > 0)) {
-          const sortedPoints = [...protocol.supplierCurve].sort((a, b) => a.day - b.day);
+          const sortedPoints = [...protocol.supplierCurve]
+            .filter(p => p.weight > 0)
+            .sort((a, b) => a.day - b.day);
           
           supplierCurvePoints = sortedPoints.map(p => ({
             day: p.day * 7, // Convert weeks to days

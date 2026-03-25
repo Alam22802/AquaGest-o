@@ -223,13 +223,6 @@ const ProtocolManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) =
                     <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
                       <TrendingUp className="w-3 h-3" /> Curva de Peso Fornecedor (Semanas)
                     </h4>
-                    <button 
-                      type="button"
-                      onClick={generateCurve}
-                      className="text-[9px] font-black text-indigo-600 uppercase tracking-widest bg-indigo-50 px-3 py-1 rounded-lg hover:bg-indigo-100 transition-colors"
-                    >
-                      Gerar Curva
-                    </button>
                   </div>
                   <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 gap-2">
                     {formData.supplierCurve.map((point, idx) => (
@@ -336,13 +329,6 @@ const ProtocolManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) =
                     <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
                       <TrendingUp className="w-3 h-3" /> Preenchimento da Curva (Semanas)
                     </h4>
-                    <button 
-                      type="button"
-                      onClick={generateStandardCurve}
-                      className="text-[9px] font-black text-emerald-600 uppercase tracking-widest bg-emerald-50 px-3 py-1 rounded-lg hover:bg-emerald-100 transition-colors"
-                    >
-                      Gerar Curva
-                    </button>
                   </div>
                   <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 gap-2">
                     {standardCurveFormData.curve.map((point, idx) => (
