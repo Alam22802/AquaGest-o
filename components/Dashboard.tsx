@@ -498,48 +498,21 @@ const Dashboard: React.FC<Props> = ({ state }) => {
       const end = parseISO(expectedHarvestDate);
       const totalDays = Math.max(1, Math.floor((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)));
       
-      // Standard Curve (09/2025 - L1)
+      // Standard Curve (Manual from ProtocolManagement)
       let standardCurvePoints: { day: number, weight: number }[] = [];
       if (showStandardCurve) {
-        const standardBatch = state.batches.find(b => b.name.includes('09/2025 - L1'));
-        if (standardBatch) {
-          const bStart = parseISO(standardBatch.settlementDate);
-          const refInitialW = standardBatch.initialUnitWeight;
-          const cutoffDate = parseISO('2026-03-09');
+        const latestStandardCurve = (state.standardCurves || [])
+          .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))[0];
+        
+        if (latestStandardCurve) {
+          const sortedPoints = [...latestStandardCurve.curve].sort((a, b) => a.day - b.day);
           
-          const bLogs = (state.biometryLogs || [])
-            .filter(l => {
-              const logDate = parseISO(l.date);
-              if (logDate > cutoffDate) return false;
-              if (l.batchId === standardBatch.id) return true;
-              if (!l.batchId && l.cageId) {
-                const cage = state.cages.find(c => c.id === l.cageId);
-                return cage?.batchId === standardBatch.id;
-              }
-              return false;
-            })
-            .sort((a, b) => parseISO(a.date).getTime() - parseISO(b.date).getTime());
-
-          if (bLogs.length > 0) {
-            const lastLog = bLogs[bLogs.length - 1];
-            const daysElapsed = Math.max(1, Math.floor((parseISO(lastLog.date).getTime() - bStart.getTime()) / (1000 * 60 * 60 * 24)));
-            const growthRate = (lastLog.averageWeight - refInitialW) / daysElapsed;
-            
-            // Generate linear points for the standard curve
-            for (let i = 0; i <= totalDays; i += 15) {
-              standardCurvePoints.push({ day: i, weight: avgInitial + (i * growthRate) });
-            }
-            if (!standardCurvePoints.some(p => p.day === totalDays)) {
-              standardCurvePoints.push({ day: totalDays, weight: avgInitial + (totalDays * growthRate) });
-            }
-          } else {
-            // Fallback if no logs found
-            for (let i = 0; i <= totalDays; i += 15) {
-              standardCurvePoints.push({ day: i, weight: avgInitial + (i * 5.4) });
-            }
-          }
+          standardCurvePoints = sortedPoints.map(p => ({
+            day: p.day * 7, // Convert weeks to days
+            weight: p.weight
+          }));
         } else {
-          // Mock standard curve if batch not found
+          // Fallback mock if no curve registered
           for (let i = 0; i <= totalDays; i += 15) {
             standardCurvePoints.push({ day: i, weight: avgInitial + (i * 5.4) });
           }
@@ -551,16 +524,11 @@ const Dashboard: React.FC<Props> = ({ state }) => {
       if (showSupplierCurve) {
         if (protocol?.supplierCurve && protocol.supplierCurve.some(p => p.weight > 0)) {
           const sortedPoints = [...protocol.supplierCurve].sort((a, b) => a.day - b.day);
-          const refInitialW = sortedPoints[0].day === 0 ? sortedPoints[0].weight : (batch?.initialUnitWeight || avgInitial);
           
           supplierCurvePoints = sortedPoints.map(p => ({
             day: p.day * 7, // Convert weeks to days
-            weight: avgInitial + (p.weight - refInitialW)
+            weight: p.weight
           }));
-          
-          if (!supplierCurvePoints.some(p => p.day === 0)) {
-            supplierCurvePoints = [{ day: 0, weight: avgInitial }, ...supplierCurvePoints];
-          }
         } else {
           // Fallback mock if no curve registered
           for (let i = 0; i <= totalDays; i += 15) {
@@ -579,39 +547,6 @@ const Dashboard: React.FC<Props> = ({ state }) => {
       if (settlementDate && !allDates.includes(settlementDate)) allDates.push(settlementDate);
       uniqueDates.forEach(d => { if (!allDates.includes(d)) allDates.push(d); });
       allDates.sort();
-
-      // Scale standard curve to target weight at its last point
-      if (standardCurvePoints.length > 1) {
-        const lastPoint = standardCurvePoints[standardCurvePoints.length - 1];
-        const initialW = standardCurvePoints[0].weight;
-        const targetW = protocol?.targetWeight || 950;
-        if (lastPoint.weight !== initialW) {
-          const scaleFactor = (targetW - initialW) / (lastPoint.weight - initialW);
-          standardCurvePoints = standardCurvePoints.map(p => ({
-            ...p,
-            weight: initialW + (p.weight - initialW) * scaleFactor
-          }));
-        }
-      }
-
-      // Scale supplier curve to target weight at its last point (only if it's the mock curve)
-      if (supplierCurvePoints.length > 1) {
-        // If it's a protocol curve, we DON'T scale it because the user wants it to end with their last biometry
-        const isProtocolCurve = protocol?.supplierCurve && protocol.supplierCurve.some(p => p.weight > 0);
-        
-        if (!isProtocolCurve) {
-          const lastPoint = supplierCurvePoints[supplierCurvePoints.length - 1];
-          const initialW = supplierCurvePoints[0].weight;
-          const targetW = protocol?.targetWeight || 950;
-          if (lastPoint.weight !== initialW) {
-            const scaleFactor = (targetW - initialW) / (lastPoint.weight - initialW);
-            supplierCurvePoints = supplierCurvePoints.map(p => ({
-              ...p,
-              weight: initialW + (p.weight - initialW) * scaleFactor
-            }));
-          }
-        }
-      }
 
       const targetW = protocol?.targetWeight || 950;
       const mockGrowthRate = (targetW - avgInitial) / Math.max(1, totalDays);
@@ -849,43 +784,23 @@ const Dashboard: React.FC<Props> = ({ state }) => {
       const end = parseISO(expectedHarvestDate);
       const totalDays = Math.max(1, Math.floor((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)));
       
-      // Standard Curve (09/2025 - L1)
+      // Standard Curve (Manual from ProtocolManagement)
       let standardCurvePoints: { day: number, weight: number }[] = [];
       if (showStandardCurve) {
-        const standardBatch = state.batches.find(b => b.name.includes('09/2025 - L1'));
-        if (standardBatch) {
-          const bStart = parseISO(standardBatch.settlementDate);
-          const refInitialW = standardBatch.initialUnitWeight;
-          const cutoffDate = parseISO('2026-03-09');
+        const latestStandardCurve = (state.standardCurves || [])
+          .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))[0];
+        
+        if (latestStandardCurve) {
+          const sortedPoints = [...latestStandardCurve.curve].sort((a, b) => a.day - b.day);
           
-          const bLogs = (state.biometryLogs || [])
-            .filter(l => {
-              const logDate = parseISO(l.date);
-              if (logDate > cutoffDate) return false;
-              if (l.batchId === standardBatch.id) return true;
-              if (!l.batchId && l.cageId) {
-                const cage = state.cages.find(c => c.id === l.cageId);
-                return cage?.batchId === standardBatch.id;
-              }
-              return false;
-            })
-            .sort((a, b) => parseISO(a.date).getTime() - parseISO(b.date).getTime());
-
-          if (bLogs.length > 0) {
-            const lastLog = bLogs[bLogs.length - 1];
-            const daysElapsed = Math.max(1, Math.floor((parseISO(lastLog.date).getTime() - bStart.getTime()) / (1000 * 60 * 60 * 24)));
-            const growthRate = (lastLog.averageWeight - refInitialW) / daysElapsed;
-            
-            for (let i = 0; i <= totalDays; i += 15) {
-              standardCurvePoints.push({ day: i, weight: initialWeight + (i * growthRate) });
-            }
-            if (!standardCurvePoints.some(p => p.day === totalDays)) {
-              standardCurvePoints.push({ day: totalDays, weight: initialWeight + (totalDays * growthRate) });
-            }
-          } else {
-            for (let i = 0; i <= totalDays; i += 15) {
-              standardCurvePoints.push({ day: i, weight: initialWeight + (i * 5.4) });
-            }
+          standardCurvePoints = sortedPoints.map(p => ({
+            day: p.day * 7, // Convert weeks to days
+            weight: p.weight
+          }));
+        } else {
+          // Fallback mock if no curve registered
+          for (let i = 0; i <= totalDays; i += 15) {
+            standardCurvePoints.push({ day: i, weight: initialWeight + (i * 5.4) });
           }
         }
       }
@@ -895,16 +810,11 @@ const Dashboard: React.FC<Props> = ({ state }) => {
       if (showSupplierCurve) {
         if (protocol?.supplierCurve && protocol.supplierCurve.some(p => p.weight > 0)) {
           const sortedPoints = [...protocol.supplierCurve].sort((a, b) => a.day - b.day);
-          const refInitialW = sortedPoints[0].day === 0 ? sortedPoints[0].weight : (batch?.initialUnitWeight || initialWeight);
           
           supplierCurvePoints = sortedPoints.map(p => ({
             day: p.day * 7, // Convert weeks to days
-            weight: initialWeight + (p.weight - refInitialW)
+            weight: p.weight
           }));
-          
-          if (!supplierCurvePoints.some(p => p.day === 0)) {
-            supplierCurvePoints = [{ day: 0, weight: initialWeight }, ...supplierCurvePoints];
-          }
         }
       }
 
@@ -917,39 +827,6 @@ const Dashboard: React.FC<Props> = ({ state }) => {
       if (settlementDate && !allDates.includes(settlementDate)) allDates.push(settlementDate);
       biometryDates.forEach(d => { if (!allDates.includes(d)) allDates.push(d); });
       allDates.sort();
-
-      // Scale standard curve to target weight at its last point
-      if (standardCurvePoints.length > 1) {
-        const lastPoint = standardCurvePoints[standardCurvePoints.length - 1];
-        const initialW = standardCurvePoints[0].weight;
-        const targetW = protocol?.targetWeight || 950;
-        if (lastPoint.weight !== initialW) {
-          const scaleFactor = (targetW - initialW) / (lastPoint.weight - initialW);
-          standardCurvePoints = standardCurvePoints.map(p => ({
-            ...p,
-            weight: initialW + (p.weight - initialW) * scaleFactor
-          }));
-        }
-      }
-
-      // Scale supplier curve to target weight at its last point (only if it's the mock curve)
-      if (supplierCurvePoints.length > 1) {
-        // If it's a protocol curve, we DON'T scale it because the user wants it to end with their last biometry
-        const isProtocolCurve = protocol?.supplierCurve && protocol.supplierCurve.some(p => p.weight > 0);
-        
-        if (!isProtocolCurve) {
-          const lastPoint = supplierCurvePoints[supplierCurvePoints.length - 1];
-          const initialW = supplierCurvePoints[0].weight;
-          const targetW = protocol?.targetWeight || 950;
-          if (lastPoint.weight !== initialW) {
-            const scaleFactor = (targetW - initialW) / (lastPoint.weight - initialW);
-            supplierCurvePoints = supplierCurvePoints.map(p => ({
-              ...p,
-              weight: initialW + (p.weight - initialW) * scaleFactor
-            }));
-          }
-        }
-      }
 
       const targetW = protocol?.targetWeight || 950;
       const mockGrowthRate = (targetW - initialWeight) / Math.max(1, totalDays);

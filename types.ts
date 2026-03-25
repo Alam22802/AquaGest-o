@@ -386,6 +386,17 @@ export interface BatchRevenue {
   updatedAt?: number;
 }
 
+export interface StandardCurve {
+  id: string;
+  name: string;
+  sampleBatch: string;
+  insertionDate: string;
+  curve: { day: number; weight: number }[];
+  userId: string;
+  userName: string;
+  updatedAt?: number;
+}
+
 export interface AppState {
   users: User[];
   lines: Line[];
@@ -419,6 +430,7 @@ export interface AppState {
   coldStorageLogs?: ColdStorageLog[];
   utilityLogs?: UtilityLog[];
   protocols: ProductionProtocol[];
+  standardCurves?: StandardCurve[];
   portfolios: InvestmentPortfolio[];
   capexProjects: CapexProject[];
   capexInvoices: CapexInvoice[];
