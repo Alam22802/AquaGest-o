@@ -1,8 +1,8 @@
 
 import React, { useState, useMemo } from 'react';
 import { Cage, AppState, User } from '../types';
-import { Trash2, Box, Edit, X, Ruler, Users, Tag, Calendar, LayoutDashboard, Info, Layers, Eye } from 'lucide-react';
-import { format } from 'date-fns';
+import { Trash2, Box, Edit, X, Ruler, Users, Tag, Calendar, LayoutDashboard, Info, Layers, Eye, Filter, CheckSquare, Square, Save } from 'lucide-react';
+import { format, parseISO } from 'date-fns';
 
 const generateId = () => {
   try {
@@ -20,6 +20,14 @@ interface Props {
 
 const CageManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [filterBatchId, setFilterBatchId] = useState<string>('all');
+  const [selectedCages, setSelectedCages] = useState<string[]>([]);
+  const [showBulkEdit, setShowBulkEdit] = useState(false);
+  const [bulkData, setBulkData] = useState({
+    settlementDate: '',
+    harvestDate: '',
+    lineId: ''
+  });
   const [formData, setFormData] = useState({
     cageId: '',
     lineId: '',
@@ -131,6 +139,50 @@ const CageManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
 
   const occupiedCages = (state.cages || []).filter(c => c.status === 'Ocupada');
 
+  const filteredCages = useMemo(() => {
+    if (filterBatchId === 'all') return occupiedCages;
+    return occupiedCages.filter(c => c.batchId === filterBatchId);
+  }, [occupiedCages, filterBatchId]);
+
+  const toggleSelectCage = (id: string) => {
+    setSelectedCages(prev => 
+      prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+    );
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedCages.length === filteredCages.length) {
+      setSelectedCages([]);
+    } else {
+      setSelectedCages(filteredCages.map(c => c.id));
+    }
+  };
+
+  const handleBulkUpdate = () => {
+    if (!hasPermission || selectedCages.length === 0) return;
+    if (!bulkData.settlementDate && !bulkData.harvestDate && !bulkData.lineId) return;
+
+    if (!confirm(`Deseja aplicar as alterações em ${selectedCages.length} gaiolas?`)) return;
+
+    const updatedCages = (state.cages || []).map(c => {
+      if (selectedCages.includes(c.id)) {
+        return {
+          ...c,
+          settlementDate: bulkData.settlementDate || c.settlementDate,
+          harvestDate: bulkData.harvestDate || c.harvestDate,
+          lineId: bulkData.lineId || c.lineId,
+          updatedAt: Date.now()
+        };
+      }
+      return c;
+    });
+
+    onUpdate({ ...state, cages: updatedCages });
+    setShowBulkEdit(false);
+    setSelectedCages([]);
+    setBulkData({ settlementDate: '', harvestDate: '', lineId: '' });
+  };
+
   return (
     <div className="space-y-8 pb-20">
       {hasPermission ? (
@@ -234,8 +286,127 @@ const CageManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
         </div>
       )}
 
+      <div className="flex flex-col md:flex-row items-center justify-between gap-4 bg-white p-4 rounded-3xl border border-slate-200 shadow-sm">
+        <div className="flex items-center gap-3 w-full md:w-auto">
+          <div className="p-2 bg-slate-50 text-slate-400 rounded-xl">
+            <Filter className="w-5 h-5" />
+          </div>
+          <div className="flex-1 min-w-[200px]">
+            <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Filtrar por Lote</label>
+            <select 
+              className="w-full bg-transparent border-none outline-none font-black text-slate-800 text-sm p-0 cursor-pointer"
+              value={filterBatchId}
+              onChange={(e) => {
+                setFilterBatchId(e.target.value);
+                setSelectedCages([]);
+              }}
+            >
+              <option value="all">Todos os Lotes Ativos</option>
+              {(state.batches || []).filter(b => !b.isClosed).map(b => (
+                <option key={b.id} value={b.id}>{b.name}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        {hasPermission && filteredCages.length > 0 && (
+          <div className="flex items-center gap-2 w-full md:w-auto">
+            <button 
+              onClick={toggleSelectAll}
+              className="flex-1 md:flex-none px-4 py-2 bg-slate-50 hover:bg-slate-100 text-slate-600 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2"
+            >
+              {selectedCages.length === filteredCages.length ? <CheckSquare className="w-4 h-4" /> : <Square className="w-4 h-4" />}
+              {selectedCages.length === filteredCages.length ? 'Desmarcar Todos' : 'Selecionar Todos'}
+            </button>
+            {selectedCages.length > 0 && (
+              <button 
+                onClick={() => setShowBulkEdit(true)}
+                className="flex-1 md:flex-none px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 shadow-lg shadow-blue-600/20"
+              >
+                <Edit className="w-4 h-4" /> Edição em Massa ({selectedCages.length})
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+
+      {showBulkEdit && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white w-full max-w-lg rounded-[2.5rem] shadow-2xl border border-slate-200 overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+              <div>
+                <h3 className="text-xl font-black text-slate-800 uppercase tracking-tighter italic">Edição em Massa</h3>
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Alterando {selectedCages.length} gaiolas selecionadas</p>
+              </div>
+              <button onClick={() => setShowBulkEdit(false)} className="p-2 hover:bg-slate-200 rounded-xl transition-colors">
+                <X className="w-6 h-6 text-slate-400" />
+              </button>
+            </div>
+            
+            <div className="p-8 space-y-6">
+              <div className="grid grid-cols-1 gap-4">
+                <div>
+                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Data de Povoamento</label>
+                  <input 
+                    type="date" 
+                    className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 font-bold text-slate-700"
+                    value={bulkData.settlementDate}
+                    onChange={(e) => setBulkData({...bulkData, settlementDate: e.target.value})}
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Previsão de Despesca</label>
+                  <input 
+                    type="date" 
+                    className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 font-bold text-slate-700"
+                    value={bulkData.harvestDate}
+                    onChange={(e) => setBulkData({...bulkData, harvestDate: e.target.value})}
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Linha/Setor</label>
+                  <select 
+                    className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 font-bold text-slate-700"
+                    value={bulkData.lineId}
+                    onChange={(e) => setBulkData({...bulkData, lineId: e.target.value})}
+                  >
+                    <option value="">Manter atual...</option>
+                    {(state.lines || []).map(line => (
+                      <option key={line.id} value={line.id}>{line.name}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="bg-amber-50 border border-amber-100 p-4 rounded-2xl flex items-start gap-3">
+                <Info className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+                <p className="text-[10px] font-bold text-amber-700 uppercase leading-relaxed">
+                  Campos deixados em branco não serão alterados. As mudanças serão aplicadas instantaneamente a todas as gaiolas marcadas.
+                </p>
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button 
+                  onClick={() => setShowBulkEdit(false)}
+                  className="flex-1 py-4 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-2xl font-black uppercase tracking-widest text-[11px] transition-all"
+                >
+                  Cancelar
+                </button>
+                <button 
+                  onClick={handleBulkUpdate}
+                  className="flex-[2] py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl font-black uppercase tracking-widest text-[11px] shadow-xl shadow-blue-600/20 transition-all flex items-center justify-center gap-2"
+                >
+                  <Save className="w-4 h-4" /> Aplicar Alterações
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {occupiedCages.map(cage => {
+        {filteredCages.map(cage => {
+          const isSelected = selectedCages.includes(cage.id);
           const batch = (state.batches || []).find(b => b.id === cage.batchId);
           const line = (state.lines || []).find(l => l.id === cage.lineId);
           const mortalities = (state.mortalityLogs || []).filter(m => {
@@ -247,13 +418,23 @@ const CageManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
           const currentCount = (cage.initialFishCount || 0) - mortalities;
           
           return (
-            <div key={cage.id} className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden group hover:border-blue-200 transition-all">
-              <div className="p-4 bg-blue-50/30 border-b border-slate-100 flex justify-between items-center">
-                <div className="flex items-center gap-2">
-                  <Box className="w-4 h-4 text-blue-600" />
-                  <div>
-                    <span className="font-black text-slate-800 uppercase tracking-tighter block">{cage.name}</span>
-                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{line?.name || 'Setor não definido'}</span>
+            <div key={cage.id} className={`bg-white rounded-3xl shadow-sm border transition-all overflow-hidden group ${isSelected ? 'border-blue-500 ring-2 ring-blue-500/20' : 'border-slate-200 hover:border-blue-200'}`}>
+              <div className={`p-4 border-b flex justify-between items-center ${isSelected ? 'bg-blue-50 border-blue-100' : 'bg-blue-50/30 border-slate-100'}`}>
+                <div className="flex items-center gap-3">
+                  {hasPermission && (
+                    <button 
+                      onClick={() => toggleSelectCage(cage.id)}
+                      className={`p-1 rounded-lg transition-colors ${isSelected ? 'text-blue-600' : 'text-slate-300 hover:text-blue-400'}`}
+                    >
+                      {isSelected ? <CheckSquare className="w-5 h-5" /> : <Square className="w-5 h-5" />}
+                    </button>
+                  )}
+                  <div className="flex items-center gap-2">
+                    <Box className="w-4 h-4 text-blue-600" />
+                    <div>
+                      <span className="font-black text-slate-800 uppercase tracking-tighter block">{cage.name}</span>
+                      <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{line?.name || 'Setor não definido'}</span>
+                    </div>
                   </div>
                 </div>
                 {hasPermission && (
@@ -282,10 +463,10 @@ const CageManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
             </div>
           );
         })}
-        {occupiedCages.length === 0 && (
+        {filteredCages.length === 0 && (
           <div className="col-span-full py-24 text-center">
             <Info className="w-10 h-10 text-slate-200 mx-auto mb-4" />
-            <h4 className="text-slate-400 font-black uppercase tracking-widest text-xs">Nenhum povoamento ativo encontrado.</h4>
+            <h4 className="text-slate-400 font-black uppercase tracking-widest text-xs">Nenhum povoamento ativo encontrado para este filtro.</h4>
           </div>
         )}
       </div>
