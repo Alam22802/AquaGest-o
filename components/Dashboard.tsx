@@ -1267,7 +1267,7 @@ const Dashboard: React.FC<Props> = ({ state }) => {
       </div>
 
       {/* Gráficos Evolutivos */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="flex flex-col gap-6">
         <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
           <div className="flex justify-between items-center mb-6">
             <h3 className="text-sm font-black text-slate-400 uppercase tracking-widest flex items-center gap-2 italic"><TrendingUp className="w-4 h-4" /> Evolução de Peso (Lote)</h3>
@@ -1286,7 +1286,7 @@ const Dashboard: React.FC<Props> = ({ state }) => {
               </label>
             </div>
           </div>
-          <div className="h-[250px]">
+          <div className="h-[350px]">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={biometryEvolutionData}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
@@ -1317,7 +1317,7 @@ const Dashboard: React.FC<Props> = ({ state }) => {
             </div>
             <div className="mt-1"><span className="text-[11px] font-black text-red-600 bg-red-50 px-2 py-0.5 rounded-lg">Perdas Totais: {totalMortalityInChart} un</span></div>
           </div>
-          <div className="h-[250px]">
+          <div className="h-[350px]">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={mortalityEvolutionData}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
@@ -1330,7 +1330,7 @@ const Dashboard: React.FC<Props> = ({ state }) => {
           </div>
         </div>
 
-        <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm lg:col-span-2">
+        <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
           <div className="flex justify-between items-center mb-6">
             <div className="flex flex-col gap-1">
               <h3 className="text-sm font-black text-slate-400 uppercase tracking-widest flex items-center gap-2 italic"><Scale className="w-4 h-4" /> Evolução da Biomassa Estimada (kg)</h3>
@@ -1351,7 +1351,7 @@ const Dashboard: React.FC<Props> = ({ state }) => {
               </label>
             </div>
           </div>
-          <div className="h-[300px]">
+          <div className="h-[350px]">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={biomassEvolutionData}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
