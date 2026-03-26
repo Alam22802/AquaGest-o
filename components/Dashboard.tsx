@@ -611,6 +611,7 @@ const Dashboard: React.FC<Props> = ({ state }) => {
         return {
           date: d === settlementDate ? 'Início' : dateLabel,
           fullDate: d,
+          isHarvestDate: expectedHarvestDate && d === expectedHarvestDate,
           weight: weight,
           supplierWeight: supplierWeight ? Math.round(supplierWeight) : undefined,
           standardWeight: standardWeight ? Math.round(standardWeight) : undefined,
@@ -1293,7 +1294,30 @@ const Dashboard: React.FC<Props> = ({ state }) => {
                   }}
                 />
                 <Line type="monotone" dataKey="weight" stroke="#3b82f6" strokeWidth={4} dot={{r: 4, fill: '#3b82f6', strokeWidth: 0}} activeDot={{r: 6, strokeWidth: 0}} connectNulls />
-                {showContinueCurve && <Line type="monotone" dataKey="continueWeight" stroke="#3b82f6" strokeWidth={2} strokeDasharray="5 5" dot={false} connectNulls />}
+                {showContinueCurve && (
+                  <Line 
+                    type="monotone" 
+                    dataKey="continueWeight" 
+                    stroke="#3b82f6" 
+                    strokeWidth={2} 
+                    strokeDasharray="5 5" 
+                    dot={(props: any) => {
+                      const { cx, cy, payload } = props;
+                      if (payload.isHarvestDate) {
+                        return (
+                          <g key={`harvest-dot-${payload.fullDate}`}>
+                            <circle cx={cx} cy={cy} r={6} fill="#3b82f6" stroke="white" strokeWidth={2} />
+                            <text x={cx} y={cy - 15} textAnchor="middle" fontSize={8} fontWeight={900} fill="#3b82f6" style={{ textTransform: 'uppercase' }}>
+                              Despesca Programada
+                            </text>
+                          </g>
+                        );
+                      }
+                      return null;
+                    }} 
+                    connectNulls 
+                  />
+                )}
                 {showSupplierCurve && <Line type="monotone" dataKey="supplierWeight" stroke="#f59e0b" strokeWidth={2} strokeDasharray="5 5" dot={false} connectNulls />}
                 {showStandardCurve && <Line type="monotone" dataKey="standardWeight" stroke="#8b5cf6" strokeWidth={2} strokeDasharray="5 5" dot={false} connectNulls />}
               </LineChart>
