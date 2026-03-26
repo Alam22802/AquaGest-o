@@ -1264,15 +1264,15 @@ const Dashboard: React.FC<Props> = ({ state }) => {
             <div className="flex items-center gap-3">
               <label className="flex items-center gap-1.5 cursor-pointer group">
                 <input type="checkbox" checked={showSupplierCurve} onChange={e => setShowSupplierCurve(e.target.checked)} className="w-3 h-3 rounded border-slate-300 text-amber-600 focus:ring-amber-500" />
-                <span className="text-[9px] font-black text-slate-400 uppercase group-hover:text-amber-600 transition-colors">Fornecedor</span>
+                <span className="text-[9px] font-black text-slate-400 uppercase group-hover:text-amber-600 transition-colors">Curva Fornecedor</span>
               </label>
               <label className="flex items-center gap-1.5 cursor-pointer group">
                 <input type="checkbox" checked={showStandardCurve} onChange={e => setShowStandardCurve(e.target.checked)} className="w-3 h-3 rounded border-slate-300 text-violet-600 focus:ring-violet-500" />
-                <span className="text-[9px] font-black text-slate-400 uppercase group-hover:text-violet-600 transition-colors">Padrão</span>
+                <span className="text-[9px] font-black text-slate-400 uppercase group-hover:text-violet-600 transition-colors">Curva Padrão</span>
               </label>
               <label className="flex items-center gap-1.5 cursor-pointer group">
                 <input type="checkbox" checked={showContinueCurve} onChange={e => setShowContinueCurve(e.target.checked)} className="w-3 h-3 rounded border-slate-300 text-blue-600 focus:ring-blue-500" />
-                <span className="text-[9px] font-black text-slate-400 uppercase group-hover:text-blue-600 transition-colors">Continue</span>
+                <span className="text-[9px] font-black text-slate-400 uppercase group-hover:text-blue-600 transition-colors">Projeção Lote</span>
               </label>
             </div>
           </div>
@@ -1285,10 +1285,10 @@ const Dashboard: React.FC<Props> = ({ state }) => {
                 <Tooltip 
                   contentStyle={{ borderRadius: '1rem', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
                   formatter={(value: number, name: string) => {
-                    if (name === 'weight') return [`${value} g`, 'Peso Real'];
-                    if (name === 'continueWeight') return [`${value} g`, 'Projeção Lote'];
-                    if (name === 'supplierWeight') return [`${value} g`, 'Prev. Fornecedor'];
-                    if (name === 'standardWeight') return [`${value} g`, 'Prev. Padrão'];
+                    if (name === 'weight') return [`${value} g`, 'PESO REAL'];
+                    if (name === 'continueWeight') return [`${value} g`, 'PROJEÇÃO LOTE'];
+                    if (name === 'supplierWeight') return [`${value} g`, 'CURVA FORNECEDOR'];
+                    if (name === 'standardWeight') return [`${value} g`, 'CURVA PADRÃO'];
                     return [value, name];
                   }}
                 />
