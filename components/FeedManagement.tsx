@@ -71,7 +71,8 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     fishCount: '1000',
     currentWeek: '1',
     averageWeight: '',
-    selectedTableId: ''
+    selectedTableId: '',
+    calculationDays: '1'
   });
 
   const { userMap, feedMap } = useMemo(() => {
@@ -368,7 +369,9 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     const weight = calcData.averageWeight ? Number(calcData.averageWeight) : row.averageWeight;
     
     // Feed Amount (kg) = (Fish Count * Weight (g) / 1000) * (Feed % PV / 100)
-    return (fishCount * weight / 1000) * (row.feedPercentagePV / 100);
+    const dailyFeed = (fishCount * weight / 1000) * (row.feedPercentagePV / 100);
+    const days = Number(calcData.calculationDays) || 1;
+    return dailyFeed * days;
   }, [calcData, state.feedingTables]);
 
   return (
@@ -674,7 +677,7 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
               <TrendingDown className="w-6 h-6 text-blue-400" />
               Calculadora de Trato
             </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 items-end">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 items-end">
               <div>
                 <label className="block text-[10px] font-black text-slate-400 uppercase mb-2 tracking-widest">Tabela de Referência</label>
                 <select
@@ -705,13 +708,26 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                 />
               </div>
               <div>
-                <label className="block text-[10px] font-black text-slate-400 uppercase mb-2 tracking-widest">Peso Médio (g) (Opcional)</label>
+                <label className="block text-[10px] font-black text-slate-400 uppercase mb-2 tracking-widest">Peso Médio (g)</label>
+                <div className="w-full px-4 py-3 bg-slate-800/50 border border-slate-700 rounded-2xl font-bold text-sm text-blue-400 flex items-center">
+                  {calcData.selectedTableId ? (
+                    (() => {
+                      const table = (state.feedingTables || []).find(t => t.id === calcData.selectedTableId);
+                      const allRows = table ? [...table.recriaInicial, ...table.recriaFinal, ...table.crescimento, ...table.terminacao] : [];
+                      const row = allRows.find(r => r.week === Number(calcData.currentWeek));
+                      return row ? `${formatNumber(row.averageWeight, 1)}g` : '---';
+                    })()
+                  ) : '---'}
+                </div>
+              </div>
+              <div>
+                <label className="block text-[10px] font-black text-slate-400 uppercase mb-2 tracking-widest">Dias para Cálculo</label>
                 <input
                   type="number"
-                  placeholder="Usar da tabela"
+                  min="1"
                   className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-2xl font-bold text-sm outline-none focus:ring-2 focus:ring-blue-500/20 text-white"
-                  value={calcData.averageWeight}
-                  onChange={(e) => setCalcData({ ...calcData, averageWeight: e.target.value })}
+                  value={calcData.calculationDays}
+                  onChange={(e) => setCalcData({ ...calcData, calculationDays: e.target.value })}
                 />
               </div>
             </div>
@@ -723,12 +739,17 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                 </div>
                 <div>
                   <p className="text-[10px] font-black text-blue-300 uppercase tracking-widest">Quantidade de Ração Estimada</p>
-                  <h4 className="text-3xl font-black italic">{formatNumber(calculatedFeed, 2)} kg <span className="text-sm not-italic opacity-60">/ dia</span></h4>
+                  <h4 className="text-3xl font-black italic">
+                    {formatNumber(calculatedFeed, 2)} kg 
+                    <span className="text-sm not-italic opacity-60 ml-2">
+                      / {calcData.calculationDays === '1' ? 'dia' : `${calcData.calculationDays} dias`}
+                    </span>
+                  </h4>
                 </div>
               </div>
               <div className="text-right">
                 <p className="text-[10px] font-black text-blue-300 uppercase tracking-widest">Baseado na % PV da Tabela</p>
-                <div className="space-y-1">
+                <div className="space-y-2">
                   <p className="text-xs font-bold opacity-80">
                     {calcData.selectedTableId ? (
                       (() => {
@@ -740,18 +761,20 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                     ) : 'Selecione uma tabela'}
                   </p>
                   {calcData.selectedTableId && (
-                    <p className="text-[10px] font-black text-blue-400 uppercase tracking-widest">
-                      {(() => {
-                        const table = (state.feedingTables || []).find(t => t.id === calcData.selectedTableId);
-                        const allRows = table ? [...table.recriaInicial, ...table.recriaFinal, ...table.crescimento, ...table.terminacao] : [];
-                        const row = allRows.find(r => r.week === Number(calcData.currentWeek));
-                        if (row) {
-                          const feed = feedMap.get(row.feedTypeId || '');
-                          return feed ? `Ração: ${feed.name}` : 'Ração não definida';
-                        }
-                        return '';
-                      })()}
-                    </p>
+                    <div className="bg-blue-500/20 px-4 py-2 rounded-xl border border-blue-400/30">
+                      <p className="text-xs font-black text-blue-400 uppercase tracking-widest">
+                        {(() => {
+                          const table = (state.feedingTables || []).find(t => t.id === calcData.selectedTableId);
+                          const allRows = table ? [...table.recriaInicial, ...table.recriaFinal, ...table.crescimento, ...table.terminacao] : [];
+                          const row = allRows.find(r => r.week === Number(calcData.currentWeek));
+                          if (row) {
+                            const feed = feedMap.get(row.feedTypeId || '');
+                            return feed ? `Ração Indicada: ${feed.name}` : 'Ração não definida para esta semana';
+                          }
+                          return '';
+                        })()}
+                      </p>
+                    </div>
                   )}
                 </div>
               </div>
@@ -792,7 +815,7 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                       <table className="w-full text-left min-w-[800px]">
                         <thead className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
                           <tr>
-                            <th className="px-2 py-2 w-16">Semana</th>
+                            <th className="px-2 py-2 w-24">Semana</th>
                             <th className="px-2 py-2">Ração</th>
                             <th className="px-2 py-2">Peso Médio (g)</th>
                             <th className="px-2 py-2">GPD (g/dia)</th>
@@ -803,7 +826,7 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                         <tbody className="divide-y divide-slate-100">
                           {tableFormData[phase.id].map((row: any, idx: number) => (
                             <tr key={idx}>
-                              <td className="px-2 py-2">
+                              <td className="px-2 py-2 w-24">
                                 <input
                                   type="number"
                                   className="w-full px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg font-bold text-xs outline-none"
