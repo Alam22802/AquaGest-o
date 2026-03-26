@@ -391,7 +391,7 @@ const SlaughterHR: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
           onClick={() => setActiveSubTab('sectors')}
           className={`pb-4 px-4 text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap ${activeSubTab === 'sectors' ? 'border-b-2 border-[#344434] text-[#344434]' : 'text-slate-400'}`}
         >
-          Setores
+          Cadastros
         </button>
         <button 
           onClick={() => setActiveSubTab('entries')}
@@ -820,115 +820,299 @@ const SlaughterHR: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
 
       {activeSubTab === 'sectors' && (
         <div className="space-y-12">
-          {/* Vacancy Board Section */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            <div className="lg:col-span-1">
-              <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-200">
-                <h3 className="text-xl font-black text-slate-800 mb-8 uppercase tracking-tighter italic flex items-center gap-3">
-                  <Layout className="w-6 h-6" />
-                  {editingVacancyId ? 'Editar Quadro' : 'Novo Quadro de Vagas'}
-                </h3>
-                <form onSubmit={handleSaveVacancy} className="space-y-4">
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Setor</label>
-                    <select 
-                      className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none text-xs"
-                      value={vacancyForm.department}
-                      onChange={e => setVacancyForm({...vacancyForm, department: e.target.value})}
-                      required
-                    >
-                      <option value="">Selecione...</option>
-                      {departments.map(dept => (
-                        <option key={dept} value={dept}>{dept}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Cargo</label>
-                    <select 
-                      className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none text-xs"
-                      value={vacancyForm.role}
-                      onChange={e => setVacancyForm({...vacancyForm, role: e.target.value})}
-                      required
-                    >
-                      <option value="">Selecione...</option>
-                      {roles.map(role => (
-                        <option key={role} value={role}>{role}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Total de Vagas</label>
-                    <input 
-                      type="number" required 
-                      className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none text-xs"
-                      value={vacancyForm.totalVacancies}
-                      onChange={e => setVacancyForm({...vacancyForm, totalVacancies: e.target.value})}
-                    />
-                  </div>
-                  <button type="submit" className="w-full py-4 bg-[#344434] text-white rounded-2xl font-black uppercase tracking-widest text-xs shadow-lg hover:bg-[#2a382a] transition-all">
-                    {editingVacancyId ? 'Salvar Alterações' : 'Cadastrar Vagas'}
+          {/* 1. Vacancy Board Table (Quadro de cadastro de vagas) */}
+          <div className="bg-white border border-slate-200 rounded-[2.5rem] overflow-hidden shadow-sm">
+            <div className="p-8 border-b border-slate-100 flex justify-between items-center">
+              <h3 className="text-xl font-black text-slate-800 uppercase tracking-tighter italic flex items-center gap-3">
+                <Layout className="w-6 h-6" />
+                Quadro de Vagas
+              </h3>
+            </div>
+            <table className="w-full text-left border-collapse">
+              <thead className="bg-slate-50 text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                <tr>
+                  <th className="px-8 py-5">Setor</th>
+                  <th className="px-8 py-5">Cargo</th>
+                  <th className="px-8 py-5">Vagas</th>
+                  <th className="px-8 py-5">Preenchidas</th>
+                  <th className="px-8 py-5 text-center">Ações</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {vacancies.map(v => {
+                  const filled = employees.filter(e => e.department === v.department && e.role === v.role && e.status === 'Ativo').length;
+                  return (
+                    <tr key={v.id} className="hover:bg-slate-50/50 transition-colors">
+                      <td className="px-8 py-6 text-xs font-bold text-slate-800">{v.department}</td>
+                      <td className="px-8 py-6 text-xs text-slate-600">{v.role}</td>
+                      <td className="px-8 py-6 text-xs font-black text-slate-400">{v.totalVacancies}</td>
+                      <td className="px-8 py-6">
+                        <div className="flex items-center gap-2">
+                          <div className="text-xs font-bold text-slate-800">{filled}</div>
+                          <div className="text-[10px] font-black text-slate-400">({formatNumber((filled / v.totalVacancies) * 100, 0)}%)</div>
+                        </div>
+                      </td>
+                      <td className="px-8 py-6">
+                        <div className="flex justify-center gap-2">
+                          <button onClick={() => {
+                            setEditingVacancyId(v.id);
+                            setVacancyForm({
+                              department: v.department,
+                              role: v.role,
+                              totalVacancies: v.totalVacancies.toString()
+                            });
+                            // Scroll to form
+                            const formElement = document.getElementById('vacancy-form');
+                            formElement?.scrollIntoView({ behavior: 'smooth' });
+                          }} className="p-2 text-slate-300 hover:text-amber-500 transition-colors"><Edit3 className="w-4 h-4" /></button>
+                          <button onClick={() => removeVacancy(v.id)} className="p-2 text-slate-300 hover:text-red-500 transition-colors"><Trash2 className="w-4 h-4" /></button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+                {vacancies.length === 0 && (
+                  <tr>
+                    <td colSpan={5} className="px-8 py-12 text-center text-slate-400 text-xs font-bold uppercase tracking-widest">
+                      Nenhum quadro de vagas cadastrado.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {/* 2. Registration Boxes (Setores and Cargos) */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            {/* Box for Setores */}
+            <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-200">
+              <h3 className="text-xl font-black text-slate-800 mb-8 uppercase tracking-tighter italic flex items-center gap-3">
+                <Layout className="w-6 h-6" />
+                Cadastro de Setores
+              </h3>
+              <div className="space-y-6">
+                <div className="flex gap-2">
+                  <input 
+                    type="text"
+                    placeholder="Novo setor..."
+                    className="flex-1 px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none text-xs"
+                    value={newDeptName}
+                    onChange={e => setNewDeptName(e.target.value)}
+                  />
+                  <button 
+                    onClick={() => {
+                      if (newDeptName.trim() && !departments.includes(newDeptName.trim())) {
+                        onUpdate({
+                          ...state,
+                          slaughterHRDepartments: [...departments, newDeptName.trim()]
+                        });
+                        setNewDeptName('');
+                      }
+                    }}
+                    className="px-6 py-3.5 bg-[#344434] text-white rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-md hover:bg-[#2a382a] transition-all"
+                  >
+                    Adicionar
                   </button>
-                </form>
+                </div>
+                <div className="space-y-2 max-h-60 overflow-y-auto pr-2 custom-scrollbar">
+                  {departments.map(dept => (
+                    <div key={dept} className="flex items-center justify-between bg-slate-50 p-3 rounded-xl border border-slate-100 group">
+                      {editingDept === dept ? (
+                        <div className="flex gap-2 w-full">
+                          <input 
+                            type="text"
+                            className="flex-1 px-3 py-1 bg-white border border-slate-200 rounded-lg text-xs font-bold outline-none"
+                            value={newDeptName}
+                            onChange={e => setNewDeptName(e.target.value)}
+                            autoFocus
+                          />
+                          <button 
+                            onClick={() => updateDepartment(dept, newDeptName)}
+                            className="px-2 py-1 bg-[#344434] text-white rounded-lg text-[9px] font-black uppercase"
+                          >
+                            OK
+                          </button>
+                          <button 
+                            onClick={() => setEditingDept(null)}
+                            className="px-2 py-1 bg-slate-100 text-slate-400 rounded-lg text-[9px] font-black uppercase"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </div>
+                      ) : (
+                        <>
+                          <span className="text-xs font-bold text-slate-700">{dept}</span>
+                          <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button 
+                              onClick={() => {
+                                setEditingDept(dept);
+                                setNewDeptName(dept);
+                              }}
+                              className="p-1.5 text-slate-400 hover:text-amber-500 transition-colors"
+                            >
+                              <Edit3 className="w-3.5 h-3.5" />
+                            </button>
+                            <button 
+                              onClick={() => deleteDepartment(dept)}
+                              className="p-1.5 text-slate-400 hover:text-red-500 transition-colors"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
 
-            <div className="lg:col-span-2">
-              <div className="bg-white border border-slate-200 rounded-[2.5rem] overflow-hidden shadow-sm">
-                <div className="p-6 border-b border-slate-100">
-                  <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest">Distribuição de Vagas</h3>
+            {/* Box for Cargos */}
+            <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-200">
+              <h3 className="text-xl font-black text-slate-800 mb-8 uppercase tracking-tighter italic flex items-center gap-3">
+                <Briefcase className="w-6 h-6" />
+                Cadastro de Cargos
+              </h3>
+              <div className="space-y-6">
+                <div className="flex gap-2">
+                  <input 
+                    type="text"
+                    placeholder="Novo cargo..."
+                    className="flex-1 px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none text-xs"
+                    value={newRoleName}
+                    onChange={e => setNewRoleName(e.target.value)}
+                  />
+                  <button 
+                    onClick={() => {
+                      if (newRoleName.trim() && !roles.includes(newRoleName.trim())) {
+                        onUpdate({
+                          ...state,
+                          slaughterHRRoles: [...roles, newRoleName.trim()]
+                        });
+                        setNewRoleName('');
+                      }
+                    }}
+                    className="px-6 py-3.5 bg-[#344434] text-white rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-md hover:bg-[#2a382a] transition-all"
+                  >
+                    Adicionar
+                  </button>
                 </div>
-                <table className="w-full text-left border-collapse">
-                  <thead className="bg-slate-50 text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                    <tr>
-                      <th className="px-8 py-5">Setor</th>
-                      <th className="px-8 py-5">Cargo</th>
-                      <th className="px-8 py-5">Vagas</th>
-                      <th className="px-8 py-5">Preenchidas</th>
-                      <th className="px-8 py-5 text-center">Ações</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {vacancies.map(v => {
-                      const filled = employees.filter(e => e.department === v.department && e.role === v.role && e.status === 'Ativo').length;
-                      return (
-                        <tr key={v.id} className="hover:bg-slate-50/50 transition-colors">
-                          <td className="px-8 py-6 text-xs font-bold text-slate-800">{v.department}</td>
-                          <td className="px-8 py-6 text-xs text-slate-600">{v.role}</td>
-                          <td className="px-8 py-6 text-xs font-black text-slate-400">{v.totalVacancies}</td>
-                          <td className="px-8 py-6">
-                            <div className="flex items-center gap-2">
-                              <div className="text-xs font-bold text-slate-800">{filled}</div>
-                              <div className="text-[10px] font-black text-slate-400">({formatNumber((filled / v.totalVacancies) * 100, 0)}%)</div>
-                            </div>
-                          </td>
-                          <td className="px-8 py-6">
-                            <div className="flex justify-center gap-2">
-                              <button onClick={() => {
-                                setEditingVacancyId(v.id);
-                                setVacancyForm({
-                                  department: v.department,
-                                  role: v.role,
-                                  totalVacancies: v.totalVacancies.toString()
-                                });
-                              }} className="p-2 text-slate-300 hover:text-amber-500 transition-colors"><Edit3 className="w-4 h-4" /></button>
-                              <button onClick={() => removeVacancy(v.id)} className="p-2 text-slate-300 hover:text-red-500 transition-colors"><Trash2 className="w-4 h-4" /></button>
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                    {vacancies.length === 0 && (
-                      <tr>
-                        <td colSpan={5} className="px-8 py-12 text-center text-slate-400 text-xs font-bold uppercase tracking-widest">
-                          Nenhum quadro de vagas cadastrado.
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
+                <div className="space-y-2 max-h-60 overflow-y-auto pr-2 custom-scrollbar">
+                  {roles.map(role => (
+                    <div key={role} className="flex items-center justify-between bg-slate-50 p-3 rounded-xl border border-slate-100 group">
+                      {editingRole === role ? (
+                        <div className="flex gap-2 w-full">
+                          <input 
+                            type="text"
+                            className="flex-1 px-3 py-1 bg-white border border-slate-200 rounded-lg text-xs font-bold outline-none"
+                            value={newRoleName}
+                            onChange={e => setNewRoleName(e.target.value)}
+                            autoFocus
+                          />
+                          <button 
+                            onClick={() => updateRole(role, newRoleName)}
+                            className="px-2 py-1 bg-[#344434] text-white rounded-lg text-[9px] font-black uppercase"
+                          >
+                            OK
+                          </button>
+                          <button 
+                            onClick={() => setEditingRole(null)}
+                            className="px-2 py-1 bg-slate-100 text-slate-400 rounded-lg text-[9px] font-black uppercase"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </div>
+                      ) : (
+                        <>
+                          <span className="text-xs font-bold text-slate-700">{role}</span>
+                          <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button 
+                              onClick={() => {
+                                setEditingRole(role);
+                                setNewRoleName(role);
+                              }}
+                              className="p-1.5 text-slate-400 hover:text-amber-500 transition-colors"
+                            >
+                              <Edit3 className="w-3.5 h-3.5" />
+                            </button>
+                            <button 
+                              onClick={() => deleteRole(role)}
+                              className="p-1.5 text-slate-400 hover:text-red-500 transition-colors"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
+          </div>
+
+          {/* 3. New Vacancy Form (Novo Quadro de Vagas) - LAST */}
+          <div id="vacancy-form" className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-200">
+            <h3 className="text-xl font-black text-slate-800 mb-8 uppercase tracking-tighter italic flex items-center gap-3">
+              <Layout className="w-6 h-6" />
+              {editingVacancyId ? 'Editar Quadro de Vagas' : 'Novo Quadro de Vagas'}
+            </h3>
+            <form onSubmit={handleSaveVacancy} className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="space-y-1">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Setor</label>
+                <select 
+                  className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none text-xs"
+                  value={vacancyForm.department}
+                  onChange={e => setVacancyForm({...vacancyForm, department: e.target.value})}
+                  required
+                >
+                  <option value="">Selecione...</option>
+                  {departments.map(dept => (
+                    <option key={dept} value={dept}>{dept}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="space-y-1">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Cargo</label>
+                <select 
+                  className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none text-xs"
+                  value={vacancyForm.role}
+                  onChange={e => setVacancyForm({...vacancyForm, role: e.target.value})}
+                  required
+                >
+                  <option value="">Selecione...</option>
+                  {roles.map(role => (
+                    <option key={role} value={role}>{role}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="space-y-1">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Total de Vagas</label>
+                <div className="flex gap-4">
+                  <input 
+                    type="number" required 
+                    className="flex-1 px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none text-xs"
+                    value={vacancyForm.totalVacancies}
+                    onChange={e => setVacancyForm({...vacancyForm, totalVacancies: e.target.value})}
+                  />
+                  <button type="submit" className="px-8 py-3.5 bg-[#344434] text-white rounded-2xl font-black uppercase tracking-widest text-[10px] shadow-lg hover:bg-[#2a382a] transition-all whitespace-nowrap">
+                    {editingVacancyId ? 'Salvar Alterações' : 'Cadastrar Vagas'}
+                  </button>
+                  {editingVacancyId && (
+                    <button 
+                      type="button"
+                      onClick={() => {
+                        setEditingVacancyId(null);
+                        setVacancyForm({ department: '', role: '', totalVacancies: '' });
+                      }}
+                      className="px-4 py-3.5 bg-slate-100 text-slate-400 rounded-2xl font-black uppercase tracking-widest text-[10px] hover:bg-slate-200 transition-all"
+                    >
+                      Cancelar
+                    </button>
+                  )}
+                </div>
+              </div>
+            </form>
           </div>
         </div>
       )}
