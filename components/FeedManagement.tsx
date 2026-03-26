@@ -672,44 +672,44 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
   ) : (
         <div className="space-y-8 animate-in fade-in duration-500">
           {/* Calculator Section */}
-          <div className="bg-slate-900 p-8 rounded-[2.5rem] shadow-2xl text-white">
-            <h3 className="text-lg font-black mb-8 flex items-center gap-3 uppercase tracking-tighter italic">
+          <div className="bg-[#344434] p-8 rounded-[2.5rem] shadow-2xl text-[#e4e4d4]">
+            <h3 className="text-lg font-black mb-8 flex items-center gap-3 uppercase tracking-tighter italic text-white">
               <TrendingDown className="w-6 h-6 text-blue-400" />
               Calculadora de Trato
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 items-end">
               <div>
-                <label className="block text-[10px] font-black text-slate-400 uppercase mb-2 tracking-widest">Tabela de Referência</label>
+                <label className="block text-[10px] font-black text-[#e4e4d4]/60 uppercase mb-2 tracking-widest">Tabela de Referência</label>
                 <select
-                  className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-2xl font-bold text-sm outline-none focus:ring-2 focus:ring-blue-500/20 text-white"
+                  className="w-full px-4 py-3 bg-black/20 border border-white/10 rounded-2xl font-bold text-sm outline-none focus:ring-2 focus:ring-blue-500/20 text-white"
                   value={calcData.selectedTableId}
                   onChange={(e) => setCalcData({ ...calcData, selectedTableId: e.target.value })}
                 >
-                  <option value="">Selecione uma tabela...</option>
-                  {(state.feedingTables || []).map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                  <option value="" className="bg-[#344434]">Selecione uma tabela...</option>
+                  {(state.feedingTables || []).map(t => <option key={t.id} value={t.id} className="bg-[#344434]">{t.name}</option>)}
                 </select>
               </div>
               <div>
-                <label className="block text-[10px] font-black text-slate-400 uppercase mb-2 tracking-widest">Quantidade de Peixes</label>
+                <label className="block text-[10px] font-black text-[#e4e4d4]/60 uppercase mb-2 tracking-widest">Quantidade de Peixes</label>
                 <input
                   type="number"
-                  className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-2xl font-bold text-sm outline-none focus:ring-2 focus:ring-blue-500/20 text-white"
+                  className="w-full px-4 py-3 bg-black/20 border border-white/10 rounded-2xl font-bold text-sm outline-none focus:ring-2 focus:ring-blue-500/20 text-white"
                   value={calcData.fishCount}
                   onChange={(e) => setCalcData({ ...calcData, fishCount: e.target.value })}
                 />
               </div>
               <div>
-                <label className="block text-[10px] font-black text-slate-400 uppercase mb-2 tracking-widest">Semana Atual</label>
+                <label className="block text-[10px] font-black text-[#e4e4d4]/60 uppercase mb-2 tracking-widest">Semana Atual</label>
                 <input
                   type="number"
-                  className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-2xl font-bold text-sm outline-none focus:ring-2 focus:ring-blue-500/20 text-white"
+                  className="w-full px-4 py-3 bg-black/20 border border-white/10 rounded-2xl font-bold text-sm outline-none focus:ring-2 focus:ring-blue-500/20 text-white"
                   value={calcData.currentWeek}
                   onChange={(e) => setCalcData({ ...calcData, currentWeek: e.target.value })}
                 />
               </div>
               <div>
-                <label className="block text-[10px] font-black text-slate-400 uppercase mb-2 tracking-widest">Peso Médio (g)</label>
-                <div className="w-full px-4 py-3 bg-slate-800/50 border border-slate-700 rounded-2xl font-bold text-sm text-blue-400 flex items-center">
+                <label className="block text-[10px] font-black text-[#e4e4d4]/60 uppercase mb-2 tracking-widest">Peso Médio (g)</label>
+                <div className="w-full px-4 py-3 bg-black/30 border border-white/10 rounded-2xl font-bold text-sm text-blue-400 flex items-center">
                   {calcData.selectedTableId ? (
                     (() => {
                       const table = (state.feedingTables || []).find(t => t.id === calcData.selectedTableId);
@@ -721,25 +721,25 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                 </div>
               </div>
               <div>
-                <label className="block text-[10px] font-black text-slate-400 uppercase mb-2 tracking-widest">Dias para Cálculo</label>
+                <label className="block text-[10px] font-black text-[#e4e4d4]/60 uppercase mb-2 tracking-widest">Dias para Cálculo</label>
                 <input
                   type="number"
                   min="1"
-                  className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-2xl font-bold text-sm outline-none focus:ring-2 focus:ring-blue-500/20 text-white"
+                  className="w-full px-4 py-3 bg-black/20 border border-white/10 rounded-2xl font-bold text-sm outline-none focus:ring-2 focus:ring-blue-500/20 text-white"
                   value={calcData.calculationDays}
                   onChange={(e) => setCalcData({ ...calcData, calculationDays: e.target.value })}
                 />
               </div>
             </div>
 
-            <div className="mt-8 p-6 bg-blue-600/20 border border-blue-500/30 rounded-3xl flex flex-col md:flex-row items-center justify-between gap-4">
+            <div className="mt-8 p-6 bg-white/5 border border-white/10 rounded-3xl flex flex-col md:flex-row items-center justify-between gap-4">
               <div className="flex items-center gap-4">
-                <div className="p-4 bg-blue-500 rounded-2xl">
+                <div className="p-4 bg-blue-600 rounded-2xl shadow-lg">
                   <Package className="w-8 h-8 text-white" />
                 </div>
                 <div>
-                  <p className="text-[10px] font-black text-blue-300 uppercase tracking-widest">Quantidade de Ração Estimada</p>
-                  <h4 className="text-3xl font-black italic">
+                  <p className="text-[10px] font-black text-[#e4e4d4]/60 uppercase tracking-widest">Quantidade de Ração Estimada</p>
+                  <h4 className="text-3xl font-black italic text-white">
                     {formatNumber(calculatedFeed, 2)} kg 
                     <span className="text-sm not-italic opacity-60 ml-2">
                       / {calcData.calculationDays === '1' ? 'dia' : `${calcData.calculationDays} dias`}
@@ -748,9 +748,9 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                 </div>
               </div>
               <div className="text-right">
-                <p className="text-[10px] font-black text-blue-300 uppercase tracking-widest">Baseado na % PV da Tabela</p>
+                <p className="text-[10px] font-black text-[#e4e4d4]/60 uppercase tracking-widest">Baseado na % PV da Tabela</p>
                 <div className="space-y-2">
-                  <p className="text-xs font-bold opacity-80">
+                  <p className="text-xs font-bold text-white">
                     {calcData.selectedTableId ? (
                       (() => {
                         const table = (state.feedingTables || []).find(t => t.id === calcData.selectedTableId);
@@ -761,7 +761,7 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                     ) : 'Selecione uma tabela'}
                   </p>
                   {calcData.selectedTableId && (
-                    <div className="bg-blue-500/20 px-4 py-2 rounded-xl border border-blue-400/30">
+                    <div className="bg-blue-600/20 px-4 py-2 rounded-xl border border-blue-500/30">
                       <p className="text-xs font-black text-blue-400 uppercase tracking-widest">
                         {(() => {
                           const table = (state.feedingTables || []).find(t => t.id === calcData.selectedTableId);
