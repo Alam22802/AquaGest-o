@@ -500,7 +500,7 @@ const Dashboard: React.FC<Props> = ({ state }) => {
       
       // Standard Curve (Manual from ProtocolManagement)
       let standardCurvePoints: { day: number, weight: number }[] = [];
-      if (showStandardCurve) {
+      if (showStandardCurve || showContinueCurve) {
         const latestStandardCurve = (state.standardCurves || [])
           .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))[0];
         
@@ -523,7 +523,7 @@ const Dashboard: React.FC<Props> = ({ state }) => {
 
       // Supplier Curve (from Protocol)
       let supplierCurvePoints: { day: number, weight: number }[] = [];
-      if (showSupplierCurve) {
+      if (showSupplierCurve || showContinueCurve) {
         if (protocol?.supplierCurve && protocol.supplierCurve.some(p => p.weight > 0)) {
           const sortedPoints = [...protocol.supplierCurve]
             .filter(p => p.weight > 0)
@@ -596,15 +596,105 @@ const Dashboard: React.FC<Props> = ({ state }) => {
         }
 
         let continueWeight = undefined;
-        if (showContinueCurve && actualData.length > 0) {
-          const lastActual = actualData[actualData.length - 1];
+        const dataForProjection = [...baseData].filter(d => d.weight !== undefined);
+        if (showContinueCurve && dataForProjection.length > 0) {
+          const lastActual = dataForProjection[dataForProjection.length - 1];
           const lastActualDay = Math.floor((parseISO(lastActual.fullDate).getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
           
           if (day >= lastActualDay) {
-            const targetW = 950;
-            const remainingDays = totalDays - lastActualDay;
-            const growthNeeded = remainingDays > 0 ? (targetW - lastActual.weight) / remainingDays : 0;
-            continueWeight = lastActual.weight + (day - lastActualDay) * growthNeeded;
+            // Helper to get weight from a curve at a specific day with extrapolation
+            const getWeightAtDay = (points: {day: number, weight: number}[]) => {
+              if (points.length === 0) return null;
+              const nextIdx = points.findIndex(p => p.day >= day);
+              if (nextIdx === 0) return points[0].weight;
+              if (nextIdx === -1) {
+                if (points.length < 2) return points[0].weight;
+                const p1 = points[points.length - 2];
+                const p2 = points[points.length - 1];
+                const rate = (p2.weight - p1.weight) / Math.max(1, p2.day - p1.day);
+                return p2.weight + rate * (day - p2.day);
+              }
+              const p1 = points[nextIdx - 1];
+              const p2 = points[nextIdx];
+              return p1.weight + (p2.weight - p1.weight) * (day - p1.day) / Math.max(1, p2.day - p1.day);
+            };
+
+            const getWeightAtLastDay = (points: {day: number, weight: number}[]) => {
+              if (points.length === 0) return null;
+              const nextIdx = points.findIndex(p => p.day >= lastActualDay);
+              if (nextIdx === 0) return points[0].weight;
+              if (nextIdx === -1) {
+                if (points.length < 2) return points[0].weight;
+                const p1 = points[points.length - 2];
+                const p2 = points[points.length - 1];
+                const rate = (p2.weight - p1.weight) / Math.max(1, p2.day - p1.day);
+                return p2.weight + rate * (lastActualDay - p2.day);
+              }
+              const p1 = points[nextIdx - 1];
+              const p2 = points[nextIdx];
+              return p1.weight + (p2.weight - p1.weight) * (lastActualDay - p1.day) / Math.max(1, p2.day - p1.day);
+            };
+
+            const sW_last = getWeightAtLastDay(standardCurvePoints);
+            const pW_last = getWeightAtLastDay(supplierCurvePoints);
+            const sW_curr = getWeightAtDay(standardCurvePoints);
+            const pW_curr = getWeightAtDay(supplierCurvePoints);
+
+            // 1. Calculate Batch's historical growth rate (g/day)
+            const firstActual = dataForProjection[0];
+            const firstActualDay = Math.floor((parseISO(firstActual.fullDate).getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+            const totalBatchDays = Math.max(1, lastActualDay - firstActualDay);
+            let batchGrowthRate = (lastActual.weight - firstActual.weight) / totalBatchDays;
+            
+            // If growth is 0 or negative (likely just settled or bad data), 
+            // don't let it pull the projection down.
+            const isBatchRateReliable = totalBatchDays >= 7 && batchGrowthRate > 0;
+
+            // 2. Calculate Reference growth rates individually
+            let standardRate = 0;
+            let supplierRate = 0;
+            let hasStandard = false;
+            let hasSupplier = false;
+
+            if (sW_last !== null && sW_curr !== null) {
+              standardRate = (sW_curr - sW_last) / Math.max(1, day - lastActualDay);
+              hasStandard = true;
+            }
+            if (pW_last !== null && pW_curr !== null) {
+              supplierRate = (pW_curr - pW_last) / Math.max(1, day - lastActualDay);
+              hasSupplier = true;
+            }
+
+            // 3. Blend the rates (Interpolation of the 3 curves)
+            let blendedRate = 0;
+            const rates = [];
+            if (hasStandard) rates.push(standardRate);
+            if (hasSupplier) rates.push(supplierRate);
+            
+            const avgRefRate = rates.length > 0 ? rates.reduce((a, b) => a + b, 0) / rates.length : 0;
+
+            if (isBatchRateReliable) {
+              // If we have reliable batch data, average it with the references
+              // This is the "3-way interpolation" (Batch + Standard + Supplier) / 3
+              if (rates.length > 0) {
+                blendedRate = (batchGrowthRate + avgRefRate * rates.length) / (1 + rates.length);
+              } else {
+                blendedRate = batchGrowthRate;
+              }
+            } else {
+              // If no reliable batch data, follow the references 100%
+              blendedRate = avgRefRate;
+            }
+
+            if (blendedRate > 0) {
+              continueWeight = lastActual.weight + blendedRate * (day - lastActualDay);
+            } else {
+              // Fallback to linear projection to target
+              const targetW = protocol?.targetWeight || 950;
+              const remainingDays = Math.max(1, totalDays - lastActualDay);
+              const growthNeeded = (targetW - lastActual.weight) / remainingDays;
+              continueWeight = lastActual.weight + (day - lastActualDay) * growthNeeded;
+            }
           }
         }
 
