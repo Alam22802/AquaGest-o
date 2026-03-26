@@ -495,207 +495,109 @@ const Dashboard: React.FC<Props> = ({ state }) => {
     // Prediction Curves
     if ((showSupplierCurve || showStandardCurve || showContinueCurve) && settlementDate) {
       const start = parseISO(settlementDate);
-      const end = expectedHarvestDate ? parseISO(expectedHarvestDate) : addDays(start, 168);
-      const totalDays = Math.max(168, Math.floor((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)));
+      const targetW = protocol?.targetWeight || 950;
       
-      // Standard Curve (Manual from ProtocolManagement)
-      let standardCurvePoints: { day: number, weight: number }[] = [];
-      if (showStandardCurve || showContinueCurve) {
-        const latestStandardCurve = (state.standardCurves || [])
-          .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))[0];
+      // 1. Get Reference Points first to calculate rates
+      const getPoints = (curve: {day: number, weight: number}[], fallbackRate: number) => {
+        if (curve && curve.some(p => p.weight > 0)) {
+          return [...curve].filter(p => p.weight > 0).sort((a, b) => a.day - b.day).map(p => ({ day: p.day * 7, weight: p.weight }));
+        }
+        const pts = [];
+        for (let i = 0; i <= 210; i += 15) pts.push({ day: i, weight: avgInitial + (i * fallbackRate) });
+        return pts;
+      };
+
+      const latestStandardCurve = (state.standardCurves || []).sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))[0];
+      const standardCurvePoints = getPoints(latestStandardCurve?.curve || [], 5.4);
+      const supplierCurvePoints = getPoints(protocol?.supplierCurve || [], 5.7);
+
+      // 2. Calculate Blended Rate for Projection
+      let blendedRate = 0;
+      let lastActualDay = 0;
+      let lastWeight = avgInitial;
+      const dataForProjection = [...baseData].filter(d => d.weight !== undefined);
+      
+      if (dataForProjection.length > 0) {
+        const lastActual = dataForProjection[dataForProjection.length - 1];
+        lastWeight = lastActual.weight;
+        lastActualDay = Math.floor((parseISO(lastActual.fullDate).getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
         
-        if (latestStandardCurve) {
-          const sortedPoints = [...latestStandardCurve.curve]
-            .filter(p => p.weight > 0)
-            .sort((a, b) => a.day - b.day);
-          
-          standardCurvePoints = sortedPoints.map(p => ({
-            day: p.day * 7, // Convert weeks to days
-            weight: p.weight
-          }));
-        } else {
-          // Fallback mock if no curve registered
-          for (let i = 0; i <= totalDays; i += 15) {
-            standardCurvePoints.push({ day: i, weight: avgInitial + (i * 5.4) });
+        const firstActual = dataForProjection[0];
+        const firstActualDay = Math.floor((parseISO(firstActual.fullDate).getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+        const batchRate = (lastActual.weight - firstActual.weight) / Math.max(1, lastActualDay - firstActualDay);
+        
+        const getRefRateAtDay = (pts: any[], targetDay: number) => {
+          if (pts.length < 2) return 5.5;
+          const nextIdx = pts.findIndex(p => p.day > targetDay);
+          if (nextIdx <= 0) {
+            const p1 = pts[pts.length - 2];
+            const p2 = pts[pts.length - 1];
+            return (p2.weight - p1.weight) / Math.max(1, p2.day - p1.day);
           }
+          const p1 = pts[nextIdx - 1];
+          const p2 = pts[nextIdx];
+          return (p2.weight - p1.weight) / Math.max(1, p2.day - p1.day);
+        };
+
+        const sRate = getRefRateAtDay(standardCurvePoints, lastActualDay);
+        const pRate = getRefRateAtDay(supplierCurvePoints, lastActualDay);
+        
+        const isBatchRateReliable = (lastActualDay - firstActualDay) >= 7 && batchRate > 0;
+        if (isBatchRateReliable) {
+          blendedRate = (batchRate + sRate + pRate) / 3;
+        } else {
+          blendedRate = (sRate + pRate) / 2;
         }
+      } else {
+        blendedRate = (5.4 + 5.7) / 2;
       }
 
-      // Supplier Curve (from Protocol)
-      let supplierCurvePoints: { day: number, weight: number }[] = [];
-      if (showSupplierCurve || showContinueCurve) {
-        if (protocol?.supplierCurve && protocol.supplierCurve.some(p => p.weight > 0)) {
-          const sortedPoints = [...protocol.supplierCurve]
-            .filter(p => p.weight > 0)
-            .sort((a, b) => a.day - b.day);
-          
-          supplierCurvePoints = sortedPoints.map(p => ({
-            day: p.day * 7, // Convert weeks to days
-            weight: p.weight
-          }));
-        } else {
-          // Fallback mock if no curve registered
-          for (let i = 0; i <= totalDays; i += 15) {
-            supplierCurvePoints.push({ day: i, weight: avgInitial + (i * 5.7) }); // 5.7g/day growth
-          }
-        }
-      }
-
-      // Merge predictions into data
+      // 3. Determine Total Days (Extend if needed to reach target)
+      const daysToTarget = blendedRate > 0 ? (targetW - lastWeight) / blendedRate : 0;
+      const projectedTotalDays = Math.ceil(lastActualDay + daysToTarget);
+      
+      const end = expectedHarvestDate ? parseISO(expectedHarvestDate) : addDays(start, 168);
+      const baseTotalDays = Math.floor((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+      
+      const totalDays = Math.max(168, baseTotalDays, projectedTotalDays);
+      
       const allDates: string[] = [];
       for (let i = 0; i <= totalDays; i += 7) {
-        const d = addDays(start, i);
-        allDates.push(format(d, 'yyyy-MM-dd'));
+        allDates.push(format(addDays(start, i), 'yyyy-MM-dd'));
       }
       if (expectedHarvestDate && !allDates.includes(expectedHarvestDate)) allDates.push(expectedHarvestDate);
       if (settlementDate && !allDates.includes(settlementDate)) allDates.push(settlementDate);
       uniqueDates.forEach(d => { if (!allDates.includes(d)) allDates.push(d); });
       allDates.sort();
 
-      const targetW = protocol?.targetWeight || 950;
-      const mockGrowthRate = (targetW - avgInitial) / Math.max(1, totalDays);
+      const mockGrowthRate = (targetW - avgInitial) / Math.max(1, 168);
 
       return allDates.map(d => {
         const day = differenceInDays(parseISO(d), start);
         const actual = actualData.find(ad => ad.fullDate === d);
         
-        let supplierWeight = undefined;
-        if (showSupplierCurve) {
-          if (supplierCurvePoints.length > 0) {
-            const nextIdx = supplierCurvePoints.findIndex(p => p.day >= day);
-            if (nextIdx === 0) supplierWeight = supplierCurvePoints[0].weight;
-            else if (nextIdx === -1) {
-              // Stop the curve at the last registered point
-              supplierWeight = undefined;
-            } else {
-              const p1 = supplierCurvePoints[nextIdx - 1];
-              const p2 = supplierCurvePoints[nextIdx];
-              supplierWeight = p1.weight + (p2.weight - p1.weight) * (day - p1.day) / (p2.day - p1.day);
-            }
-          } else {
-            supplierWeight = avgInitial + (day * mockGrowthRate);
+        const getWeightAtDay = (points: {day: number, weight: number}[]) => {
+          if (points.length === 0) return null;
+          const nextIdx = points.findIndex(p => p.day >= day);
+          if (nextIdx === 0) return points[0].weight;
+          if (nextIdx === -1) {
+            const p1 = points[points.length - 2];
+            const p2 = points[points.length - 1];
+            const rate = (p2.weight - p1.weight) / Math.max(1, p2.day - p1.day);
+            return p2.weight + rate * (day - p2.day);
           }
-        }
+          const p1 = points[nextIdx - 1];
+          const p2 = points[nextIdx];
+          return p1.weight + (p2.weight - p1.weight) * (day - p1.day) / Math.max(1, p2.day - p1.day);
+        };
 
-        let standardWeight = undefined;
-        if (showStandardCurve) {
-          if (standardCurvePoints.length > 0) {
-            const nextIdx = standardCurvePoints.findIndex(p => p.day >= day);
-            if (nextIdx === 0) standardWeight = standardCurvePoints[0].weight;
-            else if (nextIdx === -1) {
-              // Stop the curve at the last registered point
-              standardWeight = undefined;
-            } else {
-              const p1 = standardCurvePoints[nextIdx - 1];
-              const p2 = standardCurvePoints[nextIdx];
-              standardWeight = p1.weight + (p2.weight - p1.weight) * (day - p1.day) / (p2.day - p1.day);
-            }
-          } else {
-            standardWeight = avgInitial + (day * mockGrowthRate);
-          }
-        }
-
+        let supplierWeight = showSupplierCurve ? getWeightAtDay(supplierCurvePoints) : undefined;
+        let standardWeight = showStandardCurve ? getWeightAtDay(standardCurvePoints) : undefined;
+        
         let continueWeight = undefined;
-        const dataForProjection = [...baseData].filter(d => d.weight !== undefined);
-        if (showContinueCurve && dataForProjection.length > 0) {
-          const lastActual = dataForProjection[dataForProjection.length - 1];
-          const lastActualDay = Math.floor((parseISO(lastActual.fullDate).getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
-          
-          if (day >= lastActualDay) {
-            // Helper to get weight from a curve at a specific day with extrapolation
-            const getWeightAtDay = (points: {day: number, weight: number}[]) => {
-              if (points.length === 0) return null;
-              const nextIdx = points.findIndex(p => p.day >= day);
-              if (nextIdx === 0) return points[0].weight;
-              if (nextIdx === -1) {
-                if (points.length < 2) return points[0].weight;
-                const p1 = points[points.length - 2];
-                const p2 = points[points.length - 1];
-                const rate = (p2.weight - p1.weight) / Math.max(1, p2.day - p1.day);
-                return p2.weight + rate * (day - p2.day);
-              }
-              const p1 = points[nextIdx - 1];
-              const p2 = points[nextIdx];
-              return p1.weight + (p2.weight - p1.weight) * (day - p1.day) / Math.max(1, p2.day - p1.day);
-            };
-
-            const getWeightAtLastDay = (points: {day: number, weight: number}[]) => {
-              if (points.length === 0) return null;
-              const nextIdx = points.findIndex(p => p.day >= lastActualDay);
-              if (nextIdx === 0) return points[0].weight;
-              if (nextIdx === -1) {
-                if (points.length < 2) return points[0].weight;
-                const p1 = points[points.length - 2];
-                const p2 = points[points.length - 1];
-                const rate = (p2.weight - p1.weight) / Math.max(1, p2.day - p1.day);
-                return p2.weight + rate * (lastActualDay - p2.day);
-              }
-              const p1 = points[nextIdx - 1];
-              const p2 = points[nextIdx];
-              return p1.weight + (p2.weight - p1.weight) * (lastActualDay - p1.day) / Math.max(1, p2.day - p1.day);
-            };
-
-            const sW_last = getWeightAtLastDay(standardCurvePoints);
-            const pW_last = getWeightAtLastDay(supplierCurvePoints);
-            const sW_curr = getWeightAtDay(standardCurvePoints);
-            const pW_curr = getWeightAtDay(supplierCurvePoints);
-
-            // 1. Calculate Batch's historical growth rate (g/day)
-            const firstActual = dataForProjection[0];
-            const firstActualDay = Math.floor((parseISO(firstActual.fullDate).getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
-            const totalBatchDays = Math.max(1, lastActualDay - firstActualDay);
-            let batchGrowthRate = (lastActual.weight - firstActual.weight) / totalBatchDays;
-            
-            // If growth is 0 or negative (likely just settled or bad data), 
-            // don't let it pull the projection down.
-            const isBatchRateReliable = totalBatchDays >= 7 && batchGrowthRate > 0;
-
-            // 2. Calculate Reference growth rates individually
-            let standardRate = 0;
-            let supplierRate = 0;
-            let hasStandard = false;
-            let hasSupplier = false;
-
-            if (sW_last !== null && sW_curr !== null) {
-              standardRate = (sW_curr - sW_last) / Math.max(1, day - lastActualDay);
-              hasStandard = true;
-            }
-            if (pW_last !== null && pW_curr !== null) {
-              supplierRate = (pW_curr - pW_last) / Math.max(1, day - lastActualDay);
-              hasSupplier = true;
-            }
-
-            // 3. Blend the rates (Interpolation of the 3 curves)
-            let blendedRate = 0;
-            const rates = [];
-            if (hasStandard) rates.push(standardRate);
-            if (hasSupplier) rates.push(supplierRate);
-            
-            const avgRefRate = rates.length > 0 ? rates.reduce((a, b) => a + b, 0) / rates.length : 0;
-
-            if (isBatchRateReliable) {
-              // If we have reliable batch data, average it with the references
-              // This is the "3-way interpolation" (Batch + Standard + Supplier) / 3
-              if (rates.length > 0) {
-                blendedRate = (batchGrowthRate + avgRefRate * rates.length) / (1 + rates.length);
-              } else {
-                blendedRate = batchGrowthRate;
-              }
-            } else {
-              // If no reliable batch data, follow the references 100%
-              blendedRate = avgRefRate;
-            }
-
-            if (blendedRate > 0) {
-              continueWeight = lastActual.weight + blendedRate * (day - lastActualDay);
-            } else {
-              // Fallback to linear projection to target
-              const targetW = protocol?.targetWeight || 950;
-              const remainingDays = Math.max(1, totalDays - lastActualDay);
-              const growthNeeded = (targetW - lastActual.weight) / remainingDays;
-              continueWeight = lastActual.weight + (day - lastActualDay) * growthNeeded;
-            }
-          }
+        if (showContinueCurve && day >= lastActualDay) {
+          continueWeight = lastWeight + blendedRate * (day - lastActualDay);
+          if (continueWeight > targetW + 100) continueWeight = undefined;
         }
 
         let dateLabel = d;
@@ -704,9 +606,7 @@ const Dashboard: React.FC<Props> = ({ state }) => {
         } catch {}
 
         let weight = actual?.weight;
-        if (d === settlementDate && weight === undefined) {
-          weight = Math.round(avgInitial);
-        }
+        if (d === settlementDate && weight === undefined) weight = Math.round(avgInitial);
 
         return {
           date: d === settlementDate ? 'Início' : dateLabel,
