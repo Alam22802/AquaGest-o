@@ -66,7 +66,7 @@ const Layout: React.FC<Props> = ({ children, activeTab, setActiveTab, currentUse
   };
 
   return (
-    <div className="min-h-screen flex flex-col md:flex-row bg-slate-50">
+    <div className="h-screen overflow-hidden flex flex-col md:flex-row bg-slate-50">
       <aside className={`
         fixed inset-y-0 left-0 z-50 w-72 bg-[#344434] text-[#e4e4d4] transform transition-transform duration-300 ease-in-out flex flex-col shadow-2xl
         md:relative md:translate-x-0 
@@ -118,7 +118,7 @@ const Layout: React.FC<Props> = ({ children, activeTab, setActiveTab, currentUse
         />
       )}
 
-      <div className="flex-1 flex flex-col h-screen overflow-hidden">
+      <div className="flex-1 flex flex-col overflow-hidden">
         <header 
           className="bg-white border-b border-slate-200 p-4 flex items-center justify-between md:hidden shrink-0"
           style={{ paddingTop: 'calc(1rem + env(safe-area-inset-top, 0px))' }}
