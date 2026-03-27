@@ -415,8 +415,8 @@ const SlaughterOverview: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
   const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
   const [saveSuccess, setSaveSuccess] = useState(false);
 
-  const [summaryStartDate, setSummaryStartDate] = useState(format(subDays(new Date(), 30), 'yyyy-MM-dd'));
-  const [summaryEndDate, setSummaryEndDate] = useState(format(new Date(), 'yyyy-MM-dd'));
+  const [summaryStartDate, setSummaryStartDate] = useState(format(startOfMonth(new Date()), 'yyyy-MM-dd'));
+  const [summaryEndDate, setSummaryEndDate] = useState(format(endOfMonth(new Date()), 'yyyy-MM-dd'));
 
   const [chartMonth, setChartMonth] = useState(new Date().getMonth());
   const [chartYear, setChartYear] = useState(new Date().getFullYear());

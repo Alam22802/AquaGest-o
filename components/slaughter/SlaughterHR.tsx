@@ -3,6 +3,7 @@ import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { AppState, SlaughterEmployee, SlaughterHRIndicator, SlaughterHREntry, SlaughterHRVacancy, User } from '../../types';
 import { Users, UserPlus, Trash2, Edit3, X, Calendar, Search, TrendingUp, Heart, AlertCircle, Briefcase, BarChart as BarChartIcon, CheckSquare, Square, Plus, Layout } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { formatNumber } from '../../utils/formatters';
 
@@ -18,6 +19,37 @@ const generateId = () => {
   } catch (e) {
     return Date.now().toString(36) + Math.random().toString(36).substring(2);
   }
+};
+
+const HeadcountTooltip = ({ active, payload, label }: any) => {
+  if (active && payload && payload.length) {
+    return (
+      <div className="bg-[#344434] p-4 rounded-2xl shadow-xl border border-white/10 text-[#e4e4d4]">
+        <p className="text-[11px] font-black mb-2 uppercase tracking-widest border-b border-white/10 pb-2">{label}</p>
+        <div className="space-y-2">
+          {payload.map((entry: any, index: number) => (
+            <div key={index} className="flex items-center justify-between gap-6">
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 rounded-full" style={{ backgroundColor: entry.color || entry.fill }} />
+                <span 
+                  className="text-[10px] font-black uppercase tracking-tighter"
+                  style={{ 
+                    color: entry.dataKey === 'vagas' ? '#e4e4d4' : '#ffffff',
+                    fontFamily: entry.dataKey === 'vagas' ? 'serif' : 'inherit',
+                    fontStyle: entry.dataKey === 'vagas' ? 'italic' : 'normal'
+                  }}
+                >
+                  {entry.name}:
+                </span>
+              </div>
+              <span className="text-xs font-black">{entry.value}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+  return null;
 };
 
 const SlaughterHR: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
@@ -80,25 +112,29 @@ const SlaughterHR: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
 
     // Filter entries by month/year and employee
     const filteredEntries = entries.filter(entry => {
-      const d = new Date(entry.date);
-      const matchesDate = (d.getMonth() + 1) === filterMonth && d.getFullYear() === filterYear;
+      const [y, m] = entry.date.split('-').map(Number);
+      const matchesDate = m === filterMonth && y === filterYear;
       const matchesEmployee = filterEmployeeId === 'all' || entry.employeeIds.includes(filterEmployeeId);
       return matchesDate && matchesEmployee;
     });
 
     // Calculate metrics from entries for the current filtered month/year
     const monthEntries = entries.filter(entry => {
-      const d = new Date(entry.date);
-      return (d.getMonth() + 1) === filterMonth && d.getFullYear() === filterYear;
+      const [y, m] = entry.date.split('-').map(Number);
+      return m === filterMonth && y === filterYear;
     });
 
-    const accidentsCount = monthEntries.filter(e => e.type === 'Acidente').length;
-    const turnoverCount = monthEntries.filter(e => e.type === 'Turnover').length;
+    const accidentsCount = monthEntries
+      .filter(e => e.type.toLowerCase().includes('acidente'))
+      .reduce((acc, e) => acc + e.employeeIds.length, 0);
+    const turnoverCount = monthEntries
+      .filter(e => e.type.toLowerCase().includes('turnover'))
+      .reduce((acc, e) => acc + e.employeeIds.length, 0);
     const turnoverRate = activeCount > 0 ? (turnoverCount / activeCount) * 100 : 0;
 
     const absentDays = monthEntries
-      .filter(e => e.type === 'Atestado' || e.type === 'Falta')
-      .reduce((acc, e) => acc + (e.days || 1), 0);
+      .filter(e => e.type.toLowerCase().includes('atestado') || e.type.toLowerCase().includes('falta'))
+      .reduce((acc, e) => acc + ((e.days || 1) * e.employeeIds.length), 0);
     const totalWorkDays = activeCount * 22;
     const absenteeismRate = totalWorkDays > 0 ? (absentDays / totalWorkDays) * 100 : 0;
 
@@ -111,15 +147,15 @@ const SlaughterHR: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
 
     const absenteeismData = last6Months.map(m => {
       const mEntries = entries.filter(e => {
-        const d = new Date(e.date);
-        return (d.getMonth() + 1) === m.month && d.getFullYear() === m.year;
+        const [y, month] = e.date.split('-').map(Number);
+        return month === m.month && y === m.year;
       });
       const mAbsentDays = mEntries
-        .filter(e => e.type === 'Atestado' || e.type === 'Falta')
-        .reduce((acc, e) => acc + (e.days || 1), 0);
+        .filter(e => e.type.toLowerCase().includes('atestado') || e.type.toLowerCase().includes('falta'))
+        .reduce((acc, e) => acc + ((e.days || 1) * e.employeeIds.length), 0);
       const mRate = (activeCount * 22) > 0 ? (mAbsentDays / (activeCount * 22)) * 100 : 0;
       return {
-        name: `${format(new Date(2000, m.month - 1), 'MMM')}/${m.year}`,
+        name: `${format(new Date(2000, m.month - 1), 'MMM', { locale: ptBR })}/${m.year}`,
         value: mRate
       };
     });
@@ -1131,26 +1167,57 @@ const SlaughterHR: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
 
       {activeSubTab === 'indicators' && (
         <div className="space-y-8">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <h3 className="text-xl font-black text-slate-800 uppercase tracking-tighter italic flex items-center gap-3">
+              <TrendingUp className="w-6 h-6 text-blue-500" />
+              Indicadores de RH
+            </h3>
+            <div className="flex items-center gap-2 bg-white p-2 rounded-2xl border border-slate-200 shadow-sm">
+              <Calendar className="w-4 h-4 text-slate-400 ml-2" />
+              <select 
+                value={filterMonth} 
+                onChange={e => setFilterMonth(Number(e.target.value))}
+                className="bg-transparent border-none text-[10px] font-black uppercase outline-none focus:ring-0 cursor-pointer text-slate-600 px-3"
+              >
+                {Array.from({ length: 12 }, (_, i) => (
+                  <option key={i + 1} value={i + 1}>
+                    {format(new Date(2000, i), 'MMMM', { locale: ptBR })}
+                  </option>
+                ))}
+              </select>
+              <div className="w-[1px] h-4 bg-slate-200"></div>
+              <select 
+                value={filterYear} 
+                onChange={e => setFilterYear(Number(e.target.value))}
+                className="bg-transparent border-none text-[10px] font-black uppercase outline-none focus:ring-0 cursor-pointer text-slate-600 px-3"
+              >
+                {[new Date().getFullYear(), new Date().getFullYear() - 1, new Date().getFullYear() - 2].map(y => (
+                  <option key={y} value={y}>{y}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-white p-6 rounded-[2rem] border border-slate-200 shadow-sm">
-            <div className="bg-blue-50/50 p-4 rounded-2xl flex items-center gap-3">
-              <Users className="w-4 h-4 text-blue-600" />
+            <div className="bg-[#e4e4d4]/30 p-4 rounded-2xl flex items-center gap-3 border border-[#344434]/5">
+              <Users className="w-4 h-4 text-[#344434]" />
               <div>
                 <div className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Quadro de Vagas</div>
                 <div className="flex items-baseline gap-2">
                   <div className="text-sm font-black text-slate-800">{formatNumber(stats.active)} / {formatNumber(stats.totalVacanciesCount)}</div>
-                  <div className="text-[10px] font-bold text-blue-600">{formatNumber(stats.occupancyRate, 1)}%</div>
+                  <div className="text-[10px] font-bold text-[#344434]">{formatNumber(stats.occupancyRate, 1)}%</div>
                 </div>
               </div>
             </div>
-            <div className="bg-amber-50/50 p-4 rounded-2xl flex items-center gap-3">
-              <TrendingUp className="w-4 h-4 text-amber-600" />
+            <div className="bg-[#e4e4d4]/30 p-4 rounded-2xl flex items-center gap-3 border border-[#344434]/5">
+              <TrendingUp className="w-4 h-4 text-[#344434]" />
               <div>
                 <div className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Turnover</div>
                 <div className="text-sm font-black text-slate-800">{formatNumber(stats.filteredIndicator?.turnover || 0, 1)}%</div>
               </div>
             </div>
-            <div className="bg-red-50/50 p-4 rounded-2xl flex items-center gap-3">
-              <Heart className="w-4 h-4 text-red-600" />
+            <div className="bg-[#e4e4d4]/30 p-4 rounded-2xl flex items-center gap-3 border border-[#344434]/5">
+              <Heart className="w-4 h-4 text-[#344434]" />
               <div>
                 <div className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Acidentes</div>
                 <div className="text-sm font-black text-slate-800">{formatNumber(stats.filteredIndicator?.accidents || 0)}</div>
@@ -1161,7 +1228,7 @@ const SlaughterHR: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
             <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-200">
               <div className="flex items-center gap-3 mb-8">
-                <div className="p-3 bg-blue-50 text-blue-600 rounded-2xl shadow-sm">
+                <div className="p-3 bg-[#e4e4d4] text-[#344434] rounded-2xl shadow-sm">
                   <TrendingUp className="w-6 h-6" />
                 </div>
                 <div>
@@ -1173,8 +1240,8 @@ const SlaughterHR: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={stats.absenteeismData}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                    <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 9, fontWeight: 900, fill: '#94a3b8'}} />
-                    <YAxis axisLine={false} tickLine={false} tick={{fontSize: 9, fontWeight: 900, fill: '#94a3b8'}} />
+                    <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 9, fontWeight: 900, fill: '#64748b'}} />
+                    <YAxis axisLine={false} tickLine={false} tick={{fontSize: 9, fontWeight: 900, fill: '#64748b'}} />
                     <Tooltip 
                       cursor={{fill: '#f8fafc'}} 
                       contentStyle={{borderRadius: '20px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)'}} 
@@ -1188,7 +1255,7 @@ const SlaughterHR: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
 
             <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-200">
               <div className="flex items-center gap-3 mb-8">
-                <div className="p-3 bg-emerald-50 text-emerald-600 rounded-2xl shadow-sm">
+                <div className="p-3 bg-[#e4e4d4] text-[#344434] rounded-2xl shadow-sm">
                   <Users className="w-6 h-6" />
                 </div>
                 <div>
@@ -1200,14 +1267,11 @@ const SlaughterHR: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={stats.headcountData} layout="vertical">
                     <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f1f5f9" />
-                    <XAxis type="number" axisLine={false} tickLine={false} tick={{fontSize: 9, fontWeight: 900, fill: '#94a3b8'}} />
-                    <YAxis dataKey="name" type="category" axisLine={false} tickLine={false} tick={{fontSize: 9, fontWeight: 900, fill: '#94a3b8'}} width={100} />
-                    <Tooltip 
-                      cursor={{fill: '#f8fafc'}} 
-                      contentStyle={{borderRadius: '20px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)'}} 
-                    />
-                    <Bar dataKey="vagas" name="Vagas Totais" fill="#e2e8f0" radius={[0, 6, 6, 0]} />
-                    <Bar dataKey="ocupadas" name="Vagas Ocupadas" fill="#10b981" radius={[0, 6, 6, 0]} />
+                    <XAxis type="number" axisLine={false} tickLine={false} tick={{fontSize: 9, fontWeight: 900, fill: '#64748b'}} />
+                    <YAxis dataKey="name" type="category" axisLine={false} tickLine={false} tick={{fontSize: 9, fontWeight: 900, fill: '#64748b'}} width={100} />
+                    <Tooltip content={<HeadcountTooltip />} />
+                    <Bar dataKey="vagas" name="Vagas Totais" fill="#e4e4d4" radius={[0, 6, 6, 0]} />
+                    <Bar dataKey="ocupadas" name="Vagas Ocupadas" fill="#344434" radius={[0, 6, 6, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>

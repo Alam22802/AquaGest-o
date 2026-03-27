@@ -345,6 +345,51 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     setTableFormData(newPhases);
   };
 
+  const findClosestWeek = (weight: number, tableId: string) => {
+    const table = (state.feedingTables || []).find(t => t.id === tableId);
+    if (!table) return null;
+
+    const allRows = [
+      ...table.recriaInicial,
+      ...table.recriaFinal,
+      ...table.crescimento,
+      ...table.terminacao
+    ];
+
+    if (allRows.length === 0) return null;
+
+    let closestRow = allRows[0];
+    let minDiff = Math.abs(allRows[0].averageWeight - weight);
+
+    allRows.forEach(row => {
+      const diff = Math.abs(row.averageWeight - weight);
+      if (diff < minDiff) {
+        minDiff = diff;
+        closestRow = row;
+      }
+    });
+
+    return closestRow.week;
+  };
+
+  const handleWeightChange = (val: string) => {
+    const weight = Number(val);
+    let newWeek = calcData.currentWeek;
+    
+    if (val && !isNaN(weight) && calcData.selectedTableId) {
+      const closestWeek = findClosestWeek(weight, calcData.selectedTableId);
+      if (closestWeek !== null) {
+        newWeek = closestWeek.toString();
+      }
+    }
+    
+    setCalcData({
+      ...calcData,
+      averageWeight: val,
+      currentWeek: newWeek
+    });
+  };
+
   const calculatedFeed = useMemo(() => {
     if (!calcData.selectedTableId || !calcData.currentWeek || !calcData.fishCount) return 0;
     
@@ -683,7 +728,17 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                 <select
                   className="w-full px-4 py-3 bg-black/20 border border-white/10 rounded-2xl font-bold text-sm outline-none focus:ring-2 focus:ring-blue-500/20 text-white"
                   value={calcData.selectedTableId}
-                  onChange={(e) => setCalcData({ ...calcData, selectedTableId: e.target.value })}
+                  onChange={(e) => {
+                    const tableId = e.target.value;
+                    let newWeek = calcData.currentWeek;
+                    if (calcData.averageWeight && tableId) {
+                      const closestWeek = findClosestWeek(Number(calcData.averageWeight), tableId);
+                      if (closestWeek !== null) {
+                        newWeek = closestWeek.toString();
+                      }
+                    }
+                    setCalcData({ ...calcData, selectedTableId: tableId, currentWeek: newWeek });
+                  }}
                 >
                   <option value="" className="bg-[#344434]">Selecione uma tabela...</option>
                   {(state.feedingTables || []).map(t => <option key={t.id} value={t.id} className="bg-[#344434]">{t.name}</option>)}
@@ -700,25 +755,19 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
               </div>
               <div>
                 <label className="block text-[10px] font-black text-[#e4e4d4]/60 uppercase mb-2 tracking-widest">Semana Atual</label>
-                <input
-                  type="number"
-                  className="w-full px-4 py-3 bg-black/20 border border-white/10 rounded-2xl font-bold text-sm outline-none focus:ring-2 focus:ring-blue-500/20 text-white"
-                  value={calcData.currentWeek}
-                  onChange={(e) => setCalcData({ ...calcData, currentWeek: e.target.value })}
-                />
+                <div className="w-full px-4 py-3 bg-black/30 border border-white/10 rounded-2xl font-bold text-sm text-blue-400 flex items-center">
+                  {calcData.currentWeek || '---'}
+                </div>
               </div>
               <div>
                 <label className="block text-[10px] font-black text-[#e4e4d4]/60 uppercase mb-2 tracking-widest">Peso Médio (g)</label>
-                <div className="w-full px-4 py-3 bg-black/30 border border-white/10 rounded-2xl font-bold text-sm text-blue-400 flex items-center">
-                  {calcData.selectedTableId ? (
-                    (() => {
-                      const table = (state.feedingTables || []).find(t => t.id === calcData.selectedTableId);
-                      const allRows = table ? [...table.recriaInicial, ...table.recriaFinal, ...table.crescimento, ...table.terminacao] : [];
-                      const row = allRows.find(r => r.week === Number(calcData.currentWeek));
-                      return row ? `${formatNumber(row.averageWeight, 1)}g` : '---';
-                    })()
-                  ) : '---'}
-                </div>
+                <input
+                  type="number"
+                  placeholder="Insira o peso..."
+                  className="w-full px-4 py-3 bg-black/20 border border-white/10 rounded-2xl font-bold text-sm outline-none focus:ring-2 focus:ring-blue-500/20 text-white"
+                  value={calcData.averageWeight}
+                  onChange={(e) => handleWeightChange(e.target.value)}
+                />
               </div>
               <div>
                 <label className="block text-[10px] font-black text-[#e4e4d4]/60 uppercase mb-2 tracking-widest">Dias para Cálculo</label>
