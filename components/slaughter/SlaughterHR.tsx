@@ -34,9 +34,7 @@ const HeadcountTooltip = ({ active, payload, label }: any) => {
                 <span 
                   className="text-[10px] font-black uppercase tracking-tighter"
                   style={{ 
-                    color: entry.dataKey === 'vagas' ? '#e4e4d4' : '#ffffff',
-                    fontFamily: entry.dataKey === 'vagas' ? 'serif' : 'inherit',
-                    fontStyle: entry.dataKey === 'vagas' ? 'italic' : 'normal'
+                    color: entry.dataKey === 'vagas' ? '#e4e4d4' : '#ffffff'
                   }}
                 >
                   {entry.name}:
@@ -910,7 +908,7 @@ const SlaughterHR: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                       className="bg-transparent border-none text-xs font-black uppercase outline-none focus:ring-0 cursor-pointer text-slate-600"
                     >
                       {Array.from({ length: 12 }, (_, i) => i + 1).map(m => (
-                        <option key={m} value={m}>{format(new Date(2000, m - 1), 'MMMM')}</option>
+                        <option key={m} value={m}>{format(new Date(2000, m - 1), 'MMMM', { locale: ptBR })}</option>
                       ))}
                     </select>
                     <span className="text-slate-300">/</span>
@@ -1169,7 +1167,7 @@ const SlaughterHR: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
         <div className="space-y-8">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
             <h3 className="text-xl font-black text-slate-800 uppercase tracking-tighter italic flex items-center gap-3">
-              <TrendingUp className="w-6 h-6 text-blue-500" />
+              <TrendingUp className="w-6 h-6 text-[#344434]" />
               Indicadores de RH
             </h3>
             <div className="flex items-center gap-2 bg-white p-2 rounded-2xl border border-slate-200 shadow-sm">
@@ -1198,6 +1196,32 @@ const SlaughterHR: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
             </div>
           </div>
 
+          {/* 1. Resumo de Indicadores (Calculado dos Lançamentos) - Agora em segundo */}
+          <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-200">
+            <h3 className="text-xl font-black text-slate-800 mb-8 uppercase tracking-tighter italic flex items-center gap-3">
+              <BarChartIcon className="w-6 h-6 text-[#344434]" />
+              Resumo de Indicadores (Calculado dos Lançamentos)
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="bg-[#e4e4d4]/20 p-6 rounded-3xl border border-[#344434]/5">
+                <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Absenteísmo</div>
+                <div className="text-2xl font-black text-[#344434]">{formatNumber(stats.filteredIndicator.absenteeism, 1)}%</div>
+                <div className="text-[10px] text-slate-400 mt-1">Baseado em faltas e atestados do mês</div>
+              </div>
+              <div className="bg-[#e4e4d4]/20 p-6 rounded-3xl border border-[#344434]/5">
+                <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Turnover</div>
+                <div className="text-2xl font-black text-[#344434]">{formatNumber(stats.filteredIndicator.turnover, 1)}%</div>
+                <div className="text-[10px] text-slate-400 mt-1">Baseado em desligamentos do mês</div>
+              </div>
+              <div className="bg-[#e4e4d4]/20 p-6 rounded-3xl border border-[#344434]/5">
+                <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Acidentes</div>
+                <div className="text-2xl font-black text-[#344434]">{formatNumber(stats.filteredIndicator.accidents)}</div>
+                <div className="text-[10px] text-slate-400 mt-1">Total de acidentes no mês</div>
+              </div>
+            </div>
+          </div>
+
+          {/* 2. Mini-cards de Status */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-white p-6 rounded-[2rem] border border-slate-200 shadow-sm">
             <div className="bg-[#e4e4d4]/30 p-4 rounded-2xl flex items-center gap-3 border border-[#344434]/5">
               <Users className="w-4 h-4 text-[#344434]" />
@@ -1225,7 +1249,8 @@ const SlaughterHR: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          {/* 3. Gráficos Empilhados Verticalmente */}
+          <div className="grid grid-cols-1 gap-8">
             <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-200">
               <div className="flex items-center gap-3 mb-8">
                 <div className="p-3 bg-[#e4e4d4] text-[#344434] rounded-2xl shadow-sm">
@@ -1274,34 +1299,6 @@ const SlaughterHR: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                     <Bar dataKey="ocupadas" name="Vagas Ocupadas" fill="#344434" radius={[0, 6, 6, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
-              </div>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            <div className="lg:col-span-3">
-              <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-200">
-                <h3 className="text-xl font-black text-slate-800 mb-8 uppercase tracking-tighter italic flex items-center gap-3">
-                  <BarChartIcon className="w-6 h-6" />
-                  Resumo de Indicadores (Calculado dos Lançamentos)
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  <div className="bg-slate-50 p-6 rounded-3xl border border-slate-100">
-                    <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Absenteísmo</div>
-                    <div className="text-2xl font-black text-slate-800">{formatNumber(stats.filteredIndicator.absenteeism, 1)}%</div>
-                    <div className="text-[10px] text-slate-400 mt-1">Baseado em faltas e atestados do mês</div>
-                  </div>
-                  <div className="bg-slate-50 p-6 rounded-3xl border border-slate-100">
-                    <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Turnover</div>
-                    <div className="text-2xl font-black text-slate-800">{formatNumber(stats.filteredIndicator.turnover, 1)}%</div>
-                    <div className="text-[10px] text-slate-400 mt-1">Baseado em desligamentos do mês</div>
-                  </div>
-                  <div className="bg-slate-50 p-6 rounded-3xl border border-slate-100">
-                    <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Acidentes</div>
-                    <div className="text-2xl font-black text-slate-800">{formatNumber(stats.filteredIndicator.accidents)}</div>
-                    <div className="text-[10px] text-slate-400 mt-1">Total de acidentes no mês</div>
-                  </div>
-                </div>
               </div>
             </div>
           </div>
