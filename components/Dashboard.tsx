@@ -594,10 +594,24 @@ const Dashboard: React.FC<Props> = ({ state }) => {
         let supplierWeight = showSupplierCurve ? getWeightAtDay(supplierCurvePoints) : undefined;
         let standardWeight = showStandardCurve ? getWeightAtDay(standardCurvePoints) : undefined;
         
+        // Apply limits: 180 days or target weight
+        if (day > 180) {
+          supplierWeight = undefined;
+          standardWeight = undefined;
+        } else {
+          if (supplierWeight !== null && supplierWeight !== undefined && supplierWeight > targetW + 10) {
+            supplierWeight = undefined;
+          }
+          if (standardWeight !== null && standardWeight !== undefined && standardWeight > targetW + 10) {
+            standardWeight = undefined;
+          }
+        }
+        
         let continueWeight = undefined;
         if (showContinueCurve && day >= lastActualDay) {
           continueWeight = lastWeight + blendedRate * (day - lastActualDay);
-          if (continueWeight > targetW + 100) continueWeight = undefined;
+          // Projection also stops at target weight
+          if (continueWeight > targetW + 10) continueWeight = undefined;
         }
 
         let dateLabel = d;
@@ -776,8 +790,23 @@ const Dashboard: React.FC<Props> = ({ state }) => {
     // Prediction Curves
     if ((showSupplierCurve || showStandardCurve || showContinueCurve) && settlementDate) {
       const start = parseISO(settlementDate);
+      const targetW = protocol?.targetWeight || 950;
+      
+      // Calculate projected days to reach target weight to ensure chart extends far enough
+      let projectedTotalDays = 168;
+      if (actualData.length > 0) {
+        const lastActual = actualData[actualData.length - 1];
+        const firstActual = actualData[0];
+        const lastActualDay = Math.floor((parseISO(lastActual.fullDate).getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+        const firstActualDay = Math.floor((parseISO(firstActual.fullDate).getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+        const batchRate = (lastActual.weight - firstActual.weight) / Math.max(1, lastActualDay - firstActualDay);
+        const daysToTarget = batchRate > 0 ? (targetW - lastActual.weight) / batchRate : 0;
+        projectedTotalDays = Math.ceil(lastActualDay + daysToTarget);
+      }
+
       const end = expectedHarvestDate ? parseISO(expectedHarvestDate) : addDays(start, 168);
-      const totalDays = Math.max(168, Math.floor((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)));
+      const baseTotalDays = Math.floor((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+      const totalDays = Math.max(168, baseTotalDays, projectedTotalDays);
       
       // Standard Curve (Manual from ProtocolManagement)
       let standardCurvePoints: { day: number, weight: number }[] = [];
@@ -827,8 +856,45 @@ const Dashboard: React.FC<Props> = ({ state }) => {
       biometryDates.forEach(d => { if (!allDates.includes(d)) allDates.push(d); });
       allDates.sort();
 
-      const targetW = protocol?.targetWeight || 950;
       const mockGrowthRate = (targetW - initialWeight) / Math.max(1, totalDays);
+
+      // Calculate Blended Rate for Projection (consistent with biometry chart)
+      let blendedRate = 0;
+      let lastActualDayForProj = 0;
+      let lastWeightForProj = initialWeight;
+      if (actualData.length > 0) {
+        const lastActual = actualData[actualData.length - 1];
+        const firstActual = actualData[0];
+        lastWeightForProj = lastActual.weight;
+        lastActualDayForProj = Math.floor((parseISO(lastActual.fullDate).getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+        const firstActualDay = Math.floor((parseISO(firstActual.fullDate).getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+        const batchRate = (lastActual.weight - firstActual.weight) / Math.max(1, lastActualDayForProj - firstActualDay);
+        
+        const getRefRateAtDay = (pts: any[], targetDay: number) => {
+          if (pts.length < 2) return 5.5;
+          const nextIdx = pts.findIndex(p => p.day > targetDay);
+          if (nextIdx <= 0) {
+            const p1 = pts[pts.length - 2];
+            const p2 = pts[pts.length - 1];
+            return (p2.weight - p1.weight) / Math.max(1, p2.day - p1.day);
+          }
+          const p1 = pts[nextIdx - 1];
+          const p2 = pts[nextIdx];
+          return (p2.weight - p1.weight) / Math.max(1, p2.day - p1.day);
+        };
+
+        const sRate = getRefRateAtDay(standardCurvePoints, lastActualDayForProj);
+        const pRate = getRefRateAtDay(supplierCurvePoints, lastActualDayForProj);
+        
+        const isBatchRateReliable = (lastActualDayForProj - firstActualDay) >= 7 && batchRate > 0;
+        if (isBatchRateReliable) {
+          blendedRate = (batchRate + sRate + pRate) / 3;
+        } else {
+          blendedRate = (sRate + pRate) / 2;
+        }
+      } else {
+        blendedRate = (5.4 + 5.7) / 2;
+      }
 
       const todayStr = format(new Date(), 'yyyy-MM-dd');
       const totalMortalitySoFar = mortalities.filter(m => m.date <= todayStr).reduce((acc, m) => acc + m.count, 0);
@@ -849,7 +915,6 @@ const Dashboard: React.FC<Props> = ({ state }) => {
             const nextIdx = supplierCurvePoints.findIndex(p => p.day >= day);
             if (nextIdx === 0) supplierWeight = supplierCurvePoints[0].weight;
             else if (nextIdx === -1) {
-              // Stop the curve at the last registered point
               supplierWeight = undefined;
             } else {
               const p1 = supplierCurvePoints[nextIdx - 1];
@@ -857,6 +922,11 @@ const Dashboard: React.FC<Props> = ({ state }) => {
               supplierWeight = p1.weight + (p2.weight - p1.weight) * (day - p1.day) / (p2.day - p1.day);
             }
           }
+
+          if (day > 180 || (supplierWeight !== undefined && supplierWeight > targetW + 10)) {
+            supplierWeight = undefined;
+          }
+
           if (supplierWeight !== undefined) {
             supplierBiomass = (estimatedPop * supplierWeight) / 1000;
           }
@@ -869,7 +939,6 @@ const Dashboard: React.FC<Props> = ({ state }) => {
             const nextIdx = standardCurvePoints.findIndex(p => p.day >= day);
             if (nextIdx === 0) standardWeight = standardCurvePoints[0].weight;
             else if (nextIdx === -1) {
-              // Stop the curve at the last registered point
               standardWeight = undefined;
             } else {
               const p1 = standardCurvePoints[nextIdx - 1];
@@ -877,6 +946,11 @@ const Dashboard: React.FC<Props> = ({ state }) => {
               standardWeight = p1.weight + (p2.weight - p1.weight) * (day - p1.day) / (p2.day - p1.day);
             }
           }
+
+          if (day > 180 || (standardWeight !== undefined && standardWeight > targetW + 10)) {
+            standardWeight = undefined;
+          }
+
           if (standardWeight !== undefined) {
             standardBiomass = (estimatedPop * standardWeight) / 1000;
           }
@@ -905,22 +979,10 @@ const Dashboard: React.FC<Props> = ({ state }) => {
           pop: pop,
           supplierBiomass: supplierBiomass ? Number(supplierBiomass.toFixed(1)) : undefined,
           standardBiomass: standardBiomass ? Number(standardBiomass.toFixed(1)) : undefined,
-          continueBiomass: (showContinueCurve && actualData.length > 0) ? (() => {
-            const lastActual = actualData[actualData.length - 1];
-            const start = parseISO(settlementDate);
-            const lastActualDay = Math.floor((parseISO(lastActual.fullDate).getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
-            const day = Math.floor((parseISO(d).getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
-            
-            if (day >= lastActualDay) {
-              const end = parseISO(expectedHarvestDate);
-              const totalDays = Math.max(1, Math.floor((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)));
-              const targetW = 950;
-              const remainingDays = totalDays - lastActualDay;
-              const growthNeeded = remainingDays > 0 ? (targetW - lastActual.weight) / remainingDays : 0;
-              const projectedWeight = lastActual.weight + (day - lastActualDay) * growthNeeded;
-              return Number(((lastActual.pop * projectedWeight) / 1000).toFixed(1));
-            }
-            return undefined;
+          continueBiomass: (showContinueCurve && day >= lastActualDayForProj) ? (() => {
+            const projectedWeight = lastWeightForProj + blendedRate * (day - lastActualDayForProj);
+            if (projectedWeight > targetW + 10) return undefined;
+            return Number(((estimatedPop * projectedWeight) / 1000).toFixed(1));
           })() : undefined
         };
       });
