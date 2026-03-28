@@ -99,7 +99,8 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
             name: formData.name,
             maxCapacity: Number(formData.maxCapacity),
             minStockPercentage: Number(formData.minStockPercentage),
-            totalStock: newStockGrams
+            totalStock: newStockGrams,
+            updatedAt: Date.now()
           };
         }
         return f;
@@ -113,7 +114,8 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
           amount: diff,
           type: 'Ajuste',
           timestamp: new Date().toISOString(),
-          userId: currentUser.id
+          userId: currentUser.id,
+          updatedAt: Date.now()
         });
       }
 
@@ -126,7 +128,8 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
         name: formData.name,
         totalStock: newStockGrams,
         maxCapacity: Number(formData.maxCapacity),
-        minStockPercentage: Number(formData.minStockPercentage)
+        minStockPercentage: Number(formData.minStockPercentage),
+        updatedAt: Date.now()
       };
 
       const newLogs = [...(state.feedStockLogs || [])];
@@ -137,7 +140,8 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
           amount: newStockGrams,
           type: 'Entrada',
           timestamp: new Date().toISOString(),
-          userId: currentUser.id
+          userId: currentUser.id,
+          updatedAt: Date.now()
         });
       }
 

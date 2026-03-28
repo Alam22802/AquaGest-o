@@ -143,6 +143,7 @@ export const ensureStateIntegrity = (state: any, mergeWith?: AppState, priority:
     slaughterPurchaseOrders: filterByTombstone(base.slaughterPurchaseOrders || []),
     slaughterSupplyInvoices: filterByTombstone(base.slaughterSupplyInvoices || []),
     slaughterSupplyCategories: base.slaughterSupplyCategories || initialState.slaughterSupplyCategories,
+    slaughterSupplyCategoriesUpdated: base.slaughterSupplyCategoriesUpdated || 0,
     protocols: filterByTombstone(base.protocols),
     standardCurves: filterByTombstone(base.standardCurves || []),
     portfolios: filterByTombstone(base.portfolios || []),
@@ -181,7 +182,8 @@ export const ensureStateIntegrity = (state: any, mergeWith?: AppState, priority:
       slaughterSupplyRequests: mergeArraysById(result.slaughterSupplyRequests || [], mergeWith.slaughterSupplyRequests || [], combinedDeletedIds, priority),
       slaughterPurchaseOrders: mergeArraysById(result.slaughterPurchaseOrders || [], mergeWith.slaughterPurchaseOrders || [], combinedDeletedIds, priority),
       slaughterSupplyInvoices: mergeArraysById(result.slaughterSupplyInvoices || [], mergeWith.slaughterSupplyInvoices || [], combinedDeletedIds, priority),
-      slaughterSupplyCategories: mergeWith.slaughterSupplyCategories || result.slaughterSupplyCategories,
+      slaughterSupplyCategories: (mergeWith.slaughterSupplyCategoriesUpdated || 0) > (result.slaughterSupplyCategoriesUpdated || 0) ? mergeWith.slaughterSupplyCategories : result.slaughterSupplyCategories,
+      slaughterSupplyCategoriesUpdated: Math.max(result.slaughterSupplyCategoriesUpdated || 0, mergeWith.slaughterSupplyCategoriesUpdated || 0),
       slaughterExpenseCategories: (mergeWith.slaughterExpenseCategoriesUpdated || 0) > (result.slaughterExpenseCategoriesUpdated || 0) ? mergeWith.slaughterExpenseCategories : result.slaughterExpenseCategories,
       slaughterExpenseCategoriesUpdated: Math.max(result.slaughterExpenseCategoriesUpdated || 0, mergeWith.slaughterExpenseCategoriesUpdated || 0),
       slaughterHREntryTypes: (mergeWith.slaughterHREntryTypesUpdated || 0) > (result.slaughterHREntryTypesUpdated || 0) ? mergeWith.slaughterHREntryTypes : result.slaughterHREntryTypes,
@@ -202,7 +204,9 @@ export const ensureStateIntegrity = (state: any, mergeWith?: AppState, priority:
       coldStorageLogs: mergeArraysById(result.coldStorageLogs || [], mergeWith.coldStorageLogs || [], combinedDeletedIds, priority),
       utilityLogs: mergeArraysById(result.utilityLogs || [], mergeWith.utilityLogs || [], combinedDeletedIds, priority),
       feedingTables: mergeArraysById(result.feedingTables || [], mergeWith.feedingTables || [], combinedDeletedIds, priority),
-      farmTargetCapacity: mergeWith.farmTargetCapacity !== undefined ? mergeWith.farmTargetCapacity : result.farmTargetCapacity,
+      farmTargetCapacity: priority === 'remote' 
+        ? (mergeWith.farmTargetCapacity !== undefined ? mergeWith.farmTargetCapacity : result.farmTargetCapacity)
+        : (result.farmTargetCapacity !== undefined ? result.farmTargetCapacity : mergeWith.farmTargetCapacity),
     };
   }
   return result;

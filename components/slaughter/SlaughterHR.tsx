@@ -32,10 +32,7 @@ const HeadcountTooltip = ({ active, payload, label }: any) => {
               <div className="flex items-center gap-2">
                 <div className="w-2 h-2 rounded-full" style={{ backgroundColor: entry.color || entry.fill }} />
                 <span 
-                  className="text-[10px] font-black uppercase tracking-tighter"
-                  style={{ 
-                    color: entry.dataKey === 'vagas' ? '#e4e4d4' : '#ffffff'
-                  }}
+                  className="text-[10px] font-black uppercase tracking-tighter text-white"
                 >
                   {entry.name}:
                 </span>

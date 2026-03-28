@@ -439,6 +439,7 @@ export interface AppState {
   slaughterPurchaseOrders?: SlaughterPurchaseOrder[];
   slaughterSupplyInvoices?: SlaughterSupplyInvoice[];
   slaughterSupplyCategories?: string[];
+  slaughterSupplyCategoriesUpdated?: number;
   slaughterExpenseCategories?: string[];
   slaughterExpenseCategoriesUpdated?: number;
   slaughterHREntryTypes?: string[];

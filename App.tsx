@@ -39,7 +39,46 @@ const App: React.FC = () => {
 
   const initApp = useCallback(async () => {
     try {
-      const data = await loadState();
+      let data = await loadState();
+      
+      // Migration: Inject missing timestamps to ensure sync works for old data
+      const inject = (arr: any[]) => (arr || []).map(i => i.updatedAt ? i : { ...i, updatedAt: Date.now() });
+      data = {
+        ...data,
+        users: inject(data.users),
+        lines: inject(data.lines),
+        batches: inject(data.batches),
+        cages: inject(data.cages),
+        feedTypes: inject(data.feedTypes),
+        feedingLogs: inject(data.feedingLogs),
+        feedStockLogs: inject(data.feedStockLogs),
+        mortalityLogs: inject(data.mortalityLogs),
+        biometryLogs: inject(data.biometryLogs),
+        slaughterLogs: inject(data.slaughterLogs),
+        slaughterExpenses: inject(data.slaughterExpenses || []),
+        slaughterEmployees: inject(data.slaughterEmployees || []),
+        slaughterHRIndicators: inject(data.slaughterHRIndicators || []),
+        slaughterHREntries: inject(data.slaughterHREntries || []),
+        slaughterHRVacancies: inject(data.slaughterHRVacancies || []),
+        slaughterSupplyItems: inject(data.slaughterSupplyItems || []),
+        slaughterSuppliers: inject(data.slaughterSuppliers || []),
+        slaughterSupplyRequests: inject(data.slaughterSupplyRequests || []),
+        slaughterPurchaseOrders: inject(data.slaughterPurchaseOrders || []),
+        slaughterSupplyInvoices: inject(data.slaughterSupplyInvoices || []),
+        harvestLogs: inject(data.harvestLogs || []),
+        harvestSchedules: inject(data.harvestSchedules || []),
+        batchExpenses: inject(data.batchExpenses || []),
+        batchRevenues: inject(data.batchRevenues || []),
+        coldStorageLogs: inject(data.coldStorageLogs || []),
+        utilityLogs: inject(data.utilityLogs || []),
+        protocols: inject(data.protocols),
+        standardCurves: inject(data.standardCurves || []),
+        feedingTables: inject(data.feedingTables || []),
+        portfolios: inject(data.portfolios),
+        capexProjects: inject(data.capexProjects),
+        capexInvoices: inject(data.capexInvoices),
+      };
+
       setState(data);
       lastSavedStateRef.current = data;
       
@@ -81,7 +120,7 @@ const App: React.FC = () => {
     
     setIsSyncingBackground(true);
     try {
-      const configToUse = currentUser.supabaseConfig || state.supabaseConfig;
+      const configToUse = state.supabaseConfig || currentUser.supabaseConfig;
       const remote = await fetchRemoteState(configToUse);
       
       if (remote) {
@@ -114,7 +153,7 @@ const App: React.FC = () => {
   useEffect(() => {
     if (!state || !currentUser || isLoading) return;
 
-    const configToUse = currentUser.supabaseConfig || state.supabaseConfig;
+    const configToUse = state.supabaseConfig || currentUser.supabaseConfig;
     if (!configToUse) return;
 
     const unsubscribe = subscribeToRemoteChanges(configToUse, (remoteState) => {
@@ -144,7 +183,7 @@ const App: React.FC = () => {
       
       isSavingRef.current = true; // Mark as saving/dirty immediately to protect local state
       saveTimeoutRef.current = setTimeout(() => {
-        const configToUse = currentUser?.supabaseConfig || state.supabaseConfig;
+        const configToUse = state.supabaseConfig || currentUser?.supabaseConfig;
         
         saveState(state, configToUse).then(() => {
           lastSavedStateRef.current = state;
@@ -270,6 +309,7 @@ const App: React.FC = () => {
         slaughterHRDepartmentsUpdated: JSON.stringify(prev.slaughterHRDepartments) !== JSON.stringify(newState.slaughterHRDepartments) ? Date.now() : prev.slaughterHRDepartmentsUpdated,
         slaughterHREntryTypesUpdated: JSON.stringify(prev.slaughterHREntryTypes) !== JSON.stringify(newState.slaughterHREntryTypes) ? Date.now() : prev.slaughterHREntryTypesUpdated,
         slaughterExpenseCategoriesUpdated: JSON.stringify(prev.slaughterExpenseCategories) !== JSON.stringify(newState.slaughterExpenseCategories) ? Date.now() : prev.slaughterExpenseCategoriesUpdated,
+        slaughterSupplyCategoriesUpdated: JSON.stringify(prev.slaughterSupplyCategories) !== JSON.stringify(newState.slaughterSupplyCategories) ? Date.now() : prev.slaughterSupplyCategoriesUpdated,
       };
 
       const findDeleted = (oldList: any[], newList: any[]) => {
@@ -371,7 +411,7 @@ const App: React.FC = () => {
   const renderContent = () => {
     if (!state || !currentUser) return null;
     switch (activeTab) {
-      case 'dashboard': return <Dashboard state={state} />;
+      case 'dashboard': return <Dashboard state={state} onSync={backgroundSync} isSyncing={isSyncingBackground} />;
       case 'capex': return <CapexManagement state={state} onUpdate={handleStateUpdate} currentUser={currentUser} />;
       case 'inventory': return <CageInventory state={state} onUpdate={handleStateUpdate} currentUser={currentUser} />;
       case 'maintenance': return <Maintenance state={state} onUpdate={handleStateUpdate} currentUser={currentUser} />;
