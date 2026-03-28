@@ -13,8 +13,6 @@ import { ptBR } from 'date-fns/locale';
 
 interface Props {
   state: AppState;
-  onSync?: () => Promise<void>;
-  isSyncing?: boolean;
 }
 
 const MiniStat = ({ label, value, icon, color, subtext }: any) => (
@@ -152,7 +150,7 @@ const WeatherWidget = () => {
   );
 };
 
-const Dashboard: React.FC<Props> = ({ state, onSync, isSyncing }) => {
+const Dashboard: React.FC<Props> = ({ state }) => {
   const [selectedBatchId, setSelectedBatchId] = useState<string>('');
   const [reportStartDate, setReportStartDate] = useState<string>(format(subDays(new Date(), 30), 'yyyy-MM-dd'));
   const [reportEndDate, setReportEndDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'));
@@ -1157,44 +1155,6 @@ const Dashboard: React.FC<Props> = ({ state, onSync, isSyncing }) => {
 
   return (
     <div className="space-y-6 pb-20">
-      {/* Barra de Sincronização e Status */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
-        <div className="flex items-center gap-4">
-          <div className={`p-3 rounded-2xl shadow-sm ${isSyncing ? 'bg-amber-50 text-amber-600 animate-pulse' : 'bg-emerald-50 text-emerald-600'}`}>
-            <Cloud className="w-6 h-6" />
-          </div>
-          <div>
-            <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Status da Sincronização</h3>
-            <div className="flex items-center gap-2">
-              <div className={`w-2 h-2 rounded-full ${isSyncing ? 'bg-amber-500' : 'bg-emerald-500'}`} />
-              <span className="text-sm font-black text-slate-700 uppercase tracking-tight italic">
-                {isSyncing ? 'Sincronizando com a Nuvem...' : 'Dados Sincronizados'}
-              </span>
-            </div>
-            {state.lastSync && (
-              <p className="text-[9px] font-bold text-slate-400 uppercase mt-0.5">
-                Última atualização: {new Date(state.lastSync).toLocaleString('pt-BR')}
-              </p>
-            )}
-          </div>
-        </div>
-        
-        {onSync && (
-          <button 
-            onClick={onSync}
-            disabled={isSyncing}
-            className={`w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-3 rounded-2xl font-black uppercase tracking-widest text-[10px] transition-all active:scale-95 shadow-lg ${
-              isSyncing 
-                ? 'bg-slate-100 text-slate-400 cursor-not-allowed' 
-                : 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-indigo-200'
-            }`}
-          >
-            <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
-            {isSyncing ? 'Sincronizando...' : 'Sincronizar Agora'}
-          </button>
-        )}
-      </div>
-
       {/* Clima Tempo */}
       <WeatherWidget />
 

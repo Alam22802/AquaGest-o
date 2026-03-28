@@ -11,17 +11,66 @@ import { exportData, getSupabase, ensureStateIntegrity, applyConfigFromLink } fr
 interface Props {
   state: AppState;
   onUpdate: (newState: AppState) => void;
+  currentUser: any;
+  onSync?: () => Promise<void>;
+  isSyncing?: boolean;
 }
 
-const CloudSettings: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
-  const [isSyncing, setIsSyncing] = useState(false);
+const CloudSettings: React.FC<Props> = ({ state, onUpdate, currentUser, onSync, isSyncing: isSyncingBackground }) => {
+  const [isSyncingLocal, setIsSyncingLocal] = useState(false);
+  const isSyncing = isSyncingLocal || isSyncingBackground;
 
   if (!currentUser.isMaster) {
     return (
-      <div className="flex flex-col items-center justify-center py-20 text-center space-y-4">
-        <Cloud className="w-16 h-16 text-slate-200" />
-        <h3 className="text-xl font-black text-slate-400 uppercase tracking-widest italic">Acesso Restrito</h3>
-        <p className="text-slate-400 font-bold uppercase text-xs max-w-md">Apenas o administrador mestre tem permissão para configurar a sincronização em nuvem.</p>
+      <div className="max-w-4xl mx-auto space-y-6 pb-24 animate-in fade-in duration-500">
+        <div className="flex flex-col items-center justify-center py-12 text-center space-y-6 bg-white rounded-[2.5rem] border border-slate-200 shadow-sm p-8">
+          <div className={`p-6 rounded-3xl shadow-lg ${isSyncing ? 'bg-amber-50 text-amber-600 animate-pulse' : 'bg-emerald-50 text-emerald-600'}`}>
+            <Cloud className="w-16 h-16" />
+          </div>
+          
+          <div>
+            <h3 className="text-2xl font-black text-slate-800 uppercase tracking-tighter italic">Sincronização de Dados</h3>
+            <p className="text-slate-400 font-bold uppercase text-[10px] tracking-widest mt-2 max-w-xs mx-auto">
+              Mantenha seus dados atualizados com o servidor central para garantir que toda a equipe veja as mesmas informações.
+            </p>
+          </div>
+
+          <div className="w-full max-w-sm p-6 bg-slate-50 rounded-3xl border border-slate-100 space-y-4">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Status Atual</span>
+              <div className="flex items-center gap-2">
+                <div className={`w-2 h-2 rounded-full ${isSyncing ? 'bg-amber-500 animate-pulse' : 'bg-emerald-500'}`} />
+                <span className="text-xs font-black text-slate-700 uppercase italic">
+                  {isSyncing ? 'Sincronizando...' : 'Conectado'}
+                </span>
+              </div>
+            </div>
+            
+            {state.lastSync && (
+              <div className="flex items-center justify-between pt-4 border-t border-slate-200/50">
+                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Última Sincronia</span>
+                <span className="text-[10px] font-bold text-slate-600">
+                  {new Date(state.lastSync).toLocaleString('pt-BR')}
+                </span>
+              </div>
+            )}
+          </div>
+
+          {onSync && (
+            <button 
+              onClick={onSync}
+              disabled={isSyncing}
+              className={`w-full max-w-sm flex items-center justify-center gap-3 py-5 rounded-[1.5rem] font-black uppercase tracking-widest text-xs transition-all active:scale-95 shadow-xl ${
+                isSyncing 
+                  ? 'bg-slate-100 text-slate-400 cursor-not-allowed' 
+                  : 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-indigo-200'
+              }`}
+            >
+              <RefreshCw className={`w-5 h-5 ${isSyncing ? 'animate-spin' : ''}`} />
+              {isSyncing ? 'Sincronizando...' : 'Sincronizar Agora'}
+            </button>
+          )}
+        </div>
       </div>
     );
   }
@@ -87,6 +136,10 @@ const CloudSettings: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
   };
 
   const syncNow = async () => {
+    if (onSync) {
+      await onSync();
+      return;
+    }
     const supabase = getSupabase(state.supabaseConfig);
     if (!supabase) {
       alert('Configure a conexão primeiro!');
@@ -160,7 +213,11 @@ create policy "Allow All Access" on farm_data for all using (true) with check (t
               connectionStatus === 'error' ? 'text-red-600' : 'text-slate-400'
             }`}>
               {isTesting ? 'Verificando...' : 
-               connectionStatus === 'success' ? 'Sistema Online & Sincronizado' : 
+               connectionStatus === 'success' ? (
+                 <span>
+                   Sistema Online {state.lastSync && `• Sincronizado em ${new Date(state.lastSync).toLocaleTimeString()}`}
+                 </span>
+               ) : 
                connectionStatus === 'error' ? `Falha: ${errorMessage}` : 'Aguardando Credenciais'}
             </p>
           </div>
