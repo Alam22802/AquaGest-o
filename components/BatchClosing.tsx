@@ -511,55 +511,79 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
   };
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-500 print:p-0">
+    <div id="batch-closing-report" className="space-y-8 animate-in fade-in duration-500 print:p-0 print:m-0 print:w-full">
       <style dangerouslySetInnerHTML={{ __html: `
         @media print {
           @page {
-            size: A4;
-            margin: 15mm;
+            size: A4 portrait;
+            margin: 10mm;
           }
           body {
             background: white !important;
             -webkit-print-color-adjust: exact !important;
             print-color-adjust: exact !important;
           }
-          .print-no-break {
-            break-inside: avoid;
+          /* Hide everything except our report */
+          body > *:not(#root), 
+          #root > *:not(.print-container-parent),
+          nav, aside, header, footer, .print\\:hidden {
+            display: none !important;
+          }
+          
+          .print-grid-4 {
+            display: grid !important;
+            grid-template-columns: repeat(4, 1fr) !important;
+            gap: 1rem !important;
+            width: 100% !important;
           }
           .print-grid-3 {
             display: grid !important;
             grid-template-columns: repeat(3, 1fr) !important;
-            gap: 1.5rem !important;
+            gap: 1rem !important;
+            width: 100% !important;
           }
           .print-grid-2 {
             display: grid !important;
             grid-template-columns: repeat(2, 1fr) !important;
-            gap: 1.5rem !important;
+            gap: 1rem !important;
+            width: 100% !important;
           }
           .print-card {
             border: 1px solid #e2e8f0 !important;
-            border-radius: 1.5rem !important;
+            border-radius: 1rem !important;
             box-shadow: none !important;
-            margin-bottom: 1.5rem !important;
-            padding: 1.5rem !important;
+            margin-bottom: 1rem !important;
+            padding: 1.25rem !important;
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
+            background: white !important;
           }
-          .print-bg-slate {
-            background-color: #f8fafc !important;
+          .print-no-break {
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
           }
-          .print-bg-blue {
-            background-color: #eff6ff !important;
+          .print-bg-slate { background-color: #f8fafc !important; }
+          .print-bg-blue { background-color: #eff6ff !important; }
+          .print-bg-emerald { background-color: #ecfdf5 !important; }
+          .print-text-blue { color: #2563eb !important; }
+          .print-text-emerald { color: #059669 !important; }
+          .print-text-red { color: #dc2626 !important; }
+          
+          /* Force visibility of print header */
+          .print-header {
+            display: block !important;
+            visibility: visible !important;
           }
-          .print-bg-emerald {
-            background-color: #ecfdf5 !important;
-          }
-          .print-text-blue {
-            color: #2563eb !important;
-          }
-          .print-text-emerald {
-            color: #059669 !important;
-          }
-          .print-text-red {
-            color: #dc2626 !important;
+          
+          /* Ensure tables expand */
+          table { width: 100% !important; }
+          
+          /* Fix distortions */
+          .print-container {
+            width: 100% !important;
+            max-width: none !important;
+            margin: 0 !important;
+            padding: 0 !important;
           }
         }
       `}} />
@@ -599,37 +623,49 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       {batchData ? (
         <div className="space-y-8">
           {/* Print Header (Only visible when printing) */}
-          <div className="hidden print:block border-b-2 border-slate-900 pb-8 mb-8">
-            <div className="flex justify-between items-start">
-              <div>
-                <h1 className="text-3xl font-black uppercase italic tracking-tighter text-black">AquaGestão - Relatório de Fechamento</h1>
-                <p className="text-sm font-bold text-slate-600 uppercase tracking-widest mt-1">Relatório Gerencial de Desempenho e Custos</p>
+          <div className="hidden print:block print-header border-b-4 border-slate-900 pb-8 mb-8">
+            <div className="flex justify-between items-center">
+              <div className="flex items-center gap-4">
+                <div className="w-16 h-16 bg-blue-600 rounded-2xl flex items-center justify-center">
+                  <FileText className="w-10 h-10 text-white" />
+                </div>
+                <div>
+                  <h1 className="text-4xl font-black uppercase italic tracking-tighter text-black leading-none">AquaGestão</h1>
+                  <p className="text-sm font-bold text-slate-600 uppercase tracking-widest mt-1">Relatório de Fechamento de Lote</p>
+                </div>
               </div>
               <div className="text-right">
-                <span className="text-[10px] font-black text-slate-600 uppercase tracking-widest block mb-1">Data de Emissão</span>
-                <p className="text-sm font-bold text-slate-900">{format(new Date(), 'dd/MM/yyyy HH:mm')}</p>
+                <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest block mb-1">Data de Emissão</span>
+                <p className="text-lg font-black text-slate-900">{format(new Date(), 'dd/MM/yyyy HH:mm')}</p>
               </div>
             </div>
-            <div className="mt-8 grid grid-cols-3 gap-8">
-              <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
-                <span className="text-[10px] font-black text-slate-600 uppercase tracking-widest block mb-1">Lote</span>
-                <span className="text-lg font-black text-slate-900 uppercase italic">{batchData.batch.name}</span>
+
+            <div className="mt-10 grid grid-cols-4 gap-4 print-grid-4">
+              <div className="p-5 bg-slate-50 rounded-2xl border-2 border-slate-200">
+                <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest block mb-1">Identificação do Lote</span>
+                <span className="text-2xl font-black text-slate-900 uppercase italic leading-tight">{batchData.batch.name}</span>
               </div>
-              <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
-                <span className="text-[10px] font-black text-slate-600 uppercase tracking-widest block mb-1">Povoamento</span>
-                <span className="text-lg font-black text-slate-900">{safeDateFormat(batchData.batch.settlementDate, 'dd/MM/yyyy')}</span>
+              <div className="p-5 bg-slate-50 rounded-2xl border-2 border-slate-200">
+                <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest block mb-1">Data Povoamento</span>
+                <span className="text-xl font-black text-slate-900">{safeDateFormat(batchData.batch.settlementDate, 'dd/MM/yyyy')}</span>
               </div>
-              <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
-                <span className="text-[10px] font-black text-slate-600 uppercase tracking-widest block mb-1">Status</span>
-                <span className={`text-lg font-black uppercase italic ${batchData.batch.isClosed ? 'text-emerald-600' : 'text-amber-600'}`}>
-                  {batchData.batch.isClosed ? 'Lote Fechado' : 'Aguardando Fechamento'}
+              <div className="p-5 bg-slate-50 rounded-2xl border-2 border-slate-200">
+                <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest block mb-1">Período de Cultivo</span>
+                <span className="text-xl font-black text-slate-900">
+                  {differenceInDays(new Date(), parseISO(batchData.batch.settlementDate))} dias
+                </span>
+              </div>
+              <div className="p-5 bg-slate-50 rounded-2xl border-2 border-slate-200">
+                <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest block mb-1">Status Final</span>
+                <span className={`text-xl font-black uppercase italic ${batchData.batch.isClosed ? 'text-emerald-600' : 'text-amber-600'}`}>
+                  {batchData.batch.isClosed ? 'CONCLUÍDO' : 'EM ABERTO'}
                 </span>
               </div>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 print-grid-3">
-            {/* Main Stats */}
+          {/* Main Stats */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 print-grid-3 print-container">
             <div className="lg:col-span-2 space-y-8">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 print-grid-2">
                 {/* Produção Summary */}
@@ -723,14 +759,14 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                 </h3>
 
                 <div className="space-y-6">
-                  <div className="p-4 bg-white/5 rounded-2xl border border-white/10 print:border-slate-200 print:bg-white">
+                  <div className="p-4 bg-white/5 rounded-2xl border border-white/10 print:border-slate-200 print:bg-white print:text-slate-900">
                     <div className="flex justify-between items-center mb-2">
-                      <span className="text-[10px] font-black text-white uppercase tracking-widest print-text-slate-600">Taxa de Assertividade do Lote</span>
-                      <span className="text-lg font-black text-indigo-400 italic print-text-blue">{formatNumber(batchData.accuracy, 1)}%</span>
+                      <span className="text-[10px] font-black text-white uppercase tracking-widest print:text-slate-500">Taxa de Assertividade do Lote</span>
+                      <span className="text-lg font-black text-indigo-400 italic print:text-blue-600">{formatNumber(batchData.accuracy, 1)}%</span>
                     </div>
                     <div className="w-full bg-white/10 h-1.5 rounded-full overflow-hidden print:bg-slate-100">
                       <div 
-                        className="h-full bg-indigo-500 transition-all duration-1000 print-bg-blue" 
+                        className="h-full bg-indigo-500 transition-all duration-1000 print:bg-blue-600" 
                         style={{ width: `${Math.min(100, batchData.accuracy)}%` }}
                       />
                     </div>
@@ -738,41 +774,41 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
 
                   <div className="grid grid-cols-2 gap-6 print-grid-2">
                     <div className="space-y-1">
-                      <span className="text-[10px] font-black text-white uppercase tracking-widest block print-text-slate-600">Sobrevivência Prevista</span>
-                      <span className="text-lg font-black italic text-emerald-400 print-text-emerald">{formatNumber(batchData.survivalRate, 1)}%</span>
+                      <span className="text-[10px] font-black text-white uppercase tracking-widest block print:text-slate-500">Sobrevivência Prevista</span>
+                      <span className="text-lg font-black italic text-emerald-400 print:text-emerald-600">{formatNumber(batchData.survivalRate, 1)}%</span>
                     </div>
                     <div className="space-y-1">
-                      <span className="text-[10px] font-black text-white uppercase tracking-widest block print-text-slate-600">Sobrevivência Real</span>
-                      <span className="text-lg font-black italic text-blue-400 print-text-blue">{formatNumber(batchData.survivalRateReal, 1)}%</span>
+                      <span className="text-[10px] font-black text-white uppercase tracking-widest block print:text-slate-500">Sobrevivência Real</span>
+                      <span className="text-lg font-black italic text-blue-400 print:text-blue-600">{formatNumber(batchData.survivalRateReal, 1)}%</span>
                     </div>
                     <div className="space-y-1">
-                      <span className="text-[10px] font-black text-white uppercase tracking-widest block print-text-slate-600">FCA Previsto</span>
-                      <span className="text-lg font-black italic text-indigo-400 print-text-blue">{formatNumber(batchData.fcaTheoretical, 2)}</span>
+                      <span className="text-[10px] font-black text-white uppercase tracking-widest block print:text-slate-500">FCA Previsto</span>
+                      <span className="text-lg font-black italic text-indigo-400 print:text-blue-600">{formatNumber(batchData.fcaTheoretical, 2)}</span>
                     </div>
                     <div className="space-y-1">
-                      <span className="text-[10px] font-black text-white uppercase tracking-widest block">FCA Real</span>
-                      <span className="text-lg font-black italic text-amber-400">{formatNumber(batchData.fcaReal, 2)}</span>
+                      <span className="text-[10px] font-black text-white uppercase tracking-widest block print:text-slate-500">FCA Real</span>
+                      <span className="text-lg font-black italic text-amber-400 print:text-amber-600">{formatNumber(batchData.fcaReal, 2)}</span>
                     </div>
                     <div className="space-y-1">
-                      <span className="text-[10px] font-black text-white uppercase tracking-widest block">Peixes Despescados</span>
-                      <span className="text-lg font-black italic text-cyan-400">{formatNumber(batchData.harvestedFish)} un</span>
+                      <span className="text-[10px] font-black text-white uppercase tracking-widest block print:text-slate-500">Peixes Despescados</span>
+                      <span className="text-lg font-black italic text-cyan-400 print:text-blue-600">{formatNumber(batchData.harvestedFish)} un</span>
                     </div>
                     <div className="space-y-1">
-                      <span className="text-[10px] font-black text-white uppercase tracking-widest block">Peso Total Deck</span>
-                      <span className="text-lg font-black italic text-cyan-400">{formatNumber(batchData.harvestedWeight, 1)}kg</span>
+                      <span className="text-[10px] font-black text-white uppercase tracking-widest block print:text-slate-500">Peso Total Deck</span>
+                      <span className="text-lg font-black italic text-cyan-400 print:text-blue-600">{formatNumber(batchData.harvestedWeight, 1)}kg</span>
                     </div>
                     <div className="space-y-1">
-                      <span className="text-[10px] font-black text-white uppercase tracking-widest block">Peixes Previstos</span>
-                      <span className="text-lg font-black italic text-blue-400">{formatNumber(batchData.expectedFish)} un</span>
+                      <span className="text-[10px] font-black text-white uppercase tracking-widest block print:text-slate-500">Peixes Previstos</span>
+                      <span className="text-lg font-black italic text-blue-400 print:text-blue-600">{formatNumber(batchData.expectedFish)} un</span>
                     </div>
                     <div className="space-y-1">
-                      <span className="text-[10px] font-black text-white uppercase tracking-widest block">Peso Previsto</span>
-                      <span className="text-lg font-black italic text-blue-400">{formatNumber(batchData.expectedWeight, 1)}kg</span>
+                      <span className="text-[10px] font-black text-white uppercase tracking-widest block print:text-slate-500">Peso Previsto</span>
+                      <span className="text-lg font-black italic text-blue-400 print:text-blue-600">{formatNumber(batchData.expectedWeight, 1)}kg</span>
                     </div>
 
-                    <div className="col-span-2 pt-4 border-t border-white/10 flex justify-between items-center">
-                      <span className="text-[10px] font-black text-white uppercase tracking-widest">GPD (Crescimento Diário)</span>
-                      <span className="text-lg font-black italic text-cyan-400">{formatNumber(batchData.gpd, 2)}g/dia</span>
+                    <div className="col-span-2 pt-4 border-t border-white/10 print:border-slate-200 flex justify-between items-center">
+                      <span className="text-[10px] font-black text-white uppercase tracking-widest print:text-slate-500">GPD (Crescimento Diário)</span>
+                      <span className="text-lg font-black italic text-cyan-400 print:text-blue-600">{formatNumber(batchData.gpd, 2)}g/dia</span>
                     </div>
                   </div>
                 </div>
@@ -1047,7 +1083,7 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                   Quadro de Lançamentos
                 </h3>
                 
-                <div className="flex flex-wrap items-center gap-3">
+                <div className="flex flex-wrap items-center gap-3 print:hidden">
                   <div className="flex items-center gap-2">
                     <span className="text-[10px] font-black text-slate-600 uppercase">Filtrar:</span>
                     <select 
@@ -1135,7 +1171,7 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
 
           {/* Detailed Logs Section (Only visible after closing or for audit) */}
           {batchData.batch.isClosed && (
-            <div className="space-y-8 animate-in slide-in-from-bottom-10 duration-700">
+            <div className="space-y-8 animate-in slide-in-from-bottom-10 duration-700 print-container">
               <div className="flex items-center gap-3 px-4">
                 <div className="p-3 bg-blue-50 rounded-2xl">
                   <FileText className="w-6 h-6 text-blue-600" />
@@ -1223,6 +1259,18 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
               </div>
             </div>
           )}
+          {/* Print Footer */}
+          <div className="hidden print:block mt-12 pt-8 border-t border-slate-200">
+            <div className="flex justify-between items-end">
+              <div className="space-y-1">
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">AquaGestão - Sistema de Gerenciamento Aquícola</p>
+                <p className="text-[8px] font-bold text-slate-300 uppercase tracking-widest">Este documento é um relatório gerencial gerado automaticamente.</p>
+              </div>
+              <div className="text-right">
+                <p className="text-[10px] font-black text-slate-900 uppercase tracking-widest">Página 1 de 1</p>
+              </div>
+            </div>
+          </div>
         </div>
       ) : (
         <div className="bg-white p-20 rounded-[3rem] border border-dashed border-slate-200 flex flex-col items-center text-center space-y-4">
