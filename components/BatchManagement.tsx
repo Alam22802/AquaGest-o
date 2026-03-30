@@ -688,9 +688,9 @@ const BatchManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
   }, [selectedPlanningCagesData]);
 
   return (
-    <div className="space-y-8 pb-20">
+    <div className="space-y-8 pb-20 print:p-0 print:pb-0 print:space-y-0">
       {/* Sub-tabs */}
-      <div className="flex items-center gap-2 bg-slate-100 p-1.5 rounded-2xl w-fit mx-auto md:mx-0">
+      <div className="flex items-center gap-2 bg-slate-100 p-1.5 rounded-2xl w-fit mx-auto md:mx-0 print:hidden">
         <button
           onClick={() => setActiveSubTab("inventory")}
           className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${activeSubTab === "inventory" ? "bg-white text-blue-600 shadow-sm" : "text-slate-400 hover:text-slate-600"}`}

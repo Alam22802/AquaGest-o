@@ -522,12 +522,8 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
             background: white !important;
             -webkit-print-color-adjust: exact !important;
             print-color-adjust: exact !important;
-          }
-          /* Hide everything except our report */
-          body > *:not(#root), 
-          #root > *:not(.print-container-parent),
-          nav, aside, header, footer, .print\\:hidden {
-            display: none !important;
+            overflow: visible !important;
+            height: auto !important;
           }
           
           .print-grid-4 {

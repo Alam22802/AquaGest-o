@@ -66,10 +66,10 @@ const Layout: React.FC<Props> = ({ children, activeTab, setActiveTab, currentUse
   };
 
   return (
-    <div className="h-screen overflow-hidden flex flex-col md:flex-row bg-slate-50">
+    <div className="h-screen overflow-hidden flex flex-col md:flex-row bg-slate-50 print:h-auto print:overflow-visible print:block">
       <aside className={`
         fixed inset-y-0 left-0 z-50 w-72 bg-[#344434] text-[#e4e4d4] transform transition-transform duration-300 ease-in-out flex flex-col shadow-2xl
-        md:relative md:translate-x-0 
+        md:relative md:translate-x-0 print:hidden
         ${isMenuOpen ? 'translate-x-0' : '-translate-x-full'}
       `}>
         <div 
@@ -118,9 +118,9 @@ const Layout: React.FC<Props> = ({ children, activeTab, setActiveTab, currentUse
         />
       )}
 
-      <div className="flex-1 flex flex-col overflow-hidden">
+      <div className="flex-1 flex flex-col overflow-hidden print:h-auto print:overflow-visible print:block">
         <header 
-          className="bg-white border-b border-slate-200 p-4 flex items-center justify-between md:hidden shrink-0"
+          className="bg-white border-b border-slate-200 p-4 flex items-center justify-between md:hidden shrink-0 print:hidden"
           style={{ paddingTop: 'calc(1rem + env(safe-area-inset-top, 0px))' }}
         >
           <div className="flex items-center gap-2">
@@ -149,7 +149,7 @@ const Layout: React.FC<Props> = ({ children, activeTab, setActiveTab, currentUse
           </div>
         </header>
 
-        <header className="hidden md:flex p-8 justify-between items-center shrink-0">
+        <header className="hidden md:flex p-8 justify-between items-center shrink-0 print:hidden">
           <div>
             <h2 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Piscicultura Inteligente • CostaFoods</h2>
             <h1 className="text-3xl font-black text-slate-800 uppercase tracking-tighter italic leading-none">Controle de Produção</h1>
@@ -171,7 +171,7 @@ const Layout: React.FC<Props> = ({ children, activeTab, setActiveTab, currentUse
           </div>
         </header>
 
-        <main className="flex-1 overflow-y-auto p-4 md:p-8 scroll-smooth pb-10">
+        <main className="flex-1 overflow-y-auto p-4 md:p-8 scroll-smooth pb-10 print:p-0 print:overflow-visible">
           {children}
         </main>
       </div>
