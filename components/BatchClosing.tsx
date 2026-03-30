@@ -536,13 +536,13 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
           }
           .print-grid-3 {
             display: grid !important;
-            grid-template-columns: ${printOrientation === 'landscape' ? 'repeat(3, 1fr)' : 'repeat(3, 1fr)'} !important;
+            grid-template-columns: ${printOrientation === 'landscape' ? 'repeat(3, 1fr)' : 'repeat(1, 1fr)'} !important;
             gap: 1rem !important;
             width: 100% !important;
           }
           .print-grid-2 {
             display: grid !important;
-            grid-template-columns: repeat(2, 1fr) !important;
+            grid-template-columns: ${printOrientation === 'landscape' ? 'repeat(2, 1fr)' : 'repeat(1, 1fr)'} !important;
             gap: 1rem !important;
             width: 100% !important;
           }
@@ -622,21 +622,24 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
         <div className="flex items-center gap-3">
           {batchData?.batch.isClosed && (
             <div className="flex items-center gap-3">
-              <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl border border-slate-200">
-                <button
-                  onClick={() => setPrintOrientation('portrait')}
-                  className={`px-3 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${printOrientation === 'portrait' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
-                  title="Orientação Retrato"
-                >
-                  Vertical
-                </button>
-                <button
-                  onClick={() => setPrintOrientation('landscape')}
-                  className={`px-3 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${printOrientation === 'landscape' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
-                  title="Orientação Paisagem"
-                >
-                  Horizontal
-                </button>
+              <div className="flex items-center gap-2 bg-slate-100 p-1.5 rounded-2xl border border-slate-200">
+                <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-2">Impressão:</span>
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => setPrintOrientation('portrait')}
+                    className={`px-3 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${printOrientation === 'portrait' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+                    title="Orientação Retrato"
+                  >
+                    Vertical
+                  </button>
+                  <button
+                    onClick={() => setPrintOrientation('landscape')}
+                    className={`px-3 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${printOrientation === 'landscape' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+                    title="Orientação Paisagem"
+                  >
+                    Horizontal
+                  </button>
+                </div>
               </div>
               
               <button 
@@ -707,9 +710,9 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
           </div>
 
           {/* Main Stats */}
-          <div className={`grid grid-cols-1 ${printOrientation === 'landscape' ? 'print:grid-cols-1' : 'lg:grid-cols-3 print-grid-3'} gap-8 print-container`}>
-            <div className={`${printOrientation === 'landscape' ? 'w-full' : 'lg:col-span-2'} space-y-8`}>
-              <div className={`grid grid-cols-1 ${printOrientation === 'landscape' ? 'print:grid-cols-2' : 'md:grid-cols-2'} gap-6 print-grid-2`}>
+          <div className="grid grid-cols-1 lg:grid-cols-3 print-grid-3 gap-8 print-container">
+            <div className="lg:col-span-2 space-y-8">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 print-grid-2">
                 {/* Produção Summary */}
                 <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-200 space-y-6 print-card print-no-break">
                   <div className="flex items-center justify-between">
@@ -797,7 +800,7 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
               <div className="bg-slate-900 p-8 rounded-[2.5rem] shadow-xl text-white space-y-6 print-card print-bg-slate print-text-blue print-no-break">
                 <h3 className="text-sm font-black text-white uppercase tracking-widest flex items-center gap-2 italic print-text-lg">
                   <CheckCircle2 className="w-4 h-4 text-indigo-400 print-text-blue" />
-                  Dados de Despesca vs Real
+                  DADOS DESPESCA VS REAL
                 </h3>
 
                 <div className="space-y-6">
@@ -859,7 +862,7 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
           </div>
 
           {/* Sidebar (Right Column) */}
-          <div className={`${printOrientation === 'landscape' ? 'w-full' : 'space-y-8'}`}>
+          <div className="space-y-8">
               {/* Cost Analysis Card */}
               <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-200 space-y-6 print-card print-no-break">
                 <h3 className="text-sm font-black text-black uppercase tracking-widest flex items-center gap-2 italic print-text-lg">
@@ -867,7 +870,7 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                   Análise de Custos
                 </h3>
 
-                <div className={`grid ${printOrientation === 'landscape' ? 'grid-cols-3 gap-6' : 'space-y-4'}`}>
+                <div className="grid space-y-4 print-grid-3">
                   <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 print:bg-slate-50">
                     <span className="text-[10px] font-black text-slate-600 uppercase tracking-widest block mb-1 print-text-xs">Peso Recepção Frigorífico (kg)</span>
                     <span className="text-2xl font-black text-slate-800 italic print-text-xl">{formatNumber(batchData.totalReceptionWeight, 1)} kg</span>

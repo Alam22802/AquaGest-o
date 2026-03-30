@@ -322,7 +322,11 @@ const SlaughterTable = React.memo(({ logs, users, hasPermission, onEdit, onDelet
   onDelete: (id: string) => void
 }) => {
   return (
-    <div className="bg-white border border-slate-200 rounded-[2.5rem] overflow-hidden shadow-sm overflow-x-auto">
+    <div className="bg-white border border-slate-200 rounded-[2.5rem] overflow-hidden shadow-sm overflow-x-auto print:border-none print:shadow-none">
+      <div className="hidden print:block mb-6 border-b-2 border-slate-900 pb-4">
+        <h2 className="text-2xl font-black uppercase italic tracking-tighter text-black">DADOS DESPESCA VS REAL</h2>
+        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mt-1">Relatório Detalhado de Abates</p>
+      </div>
       <table className="w-full text-left border-collapse min-w-[1000px]">
         <thead className="bg-slate-50 text-[10px] font-black text-slate-400 uppercase tracking-widest">
           <tr>
