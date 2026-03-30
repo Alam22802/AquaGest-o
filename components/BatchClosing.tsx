@@ -517,7 +517,7 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
         @media print {
           @page {
             size: A4 ${printOrientation};
-            margin: 10mm;
+            margin: 5mm;
           }
           body {
             background: white !important;
@@ -525,17 +525,18 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
             print-color-adjust: exact !important;
             overflow: visible !important;
             height: auto !important;
+            font-size: ${printOrientation === 'landscape' ? '12pt' : '11pt'} !important;
           }
           
           .print-grid-4 {
             display: grid !important;
             grid-template-columns: repeat(4, 1fr) !important;
-            gap: 1rem !important;
+            gap: 0.5rem !important;
             width: 100% !important;
           }
           .print-grid-3 {
             display: grid !important;
-            grid-template-columns: repeat(3, 1fr) !important;
+            grid-template-columns: ${printOrientation === 'landscape' ? 'repeat(3, 1fr)' : 'repeat(3, 1fr)'} !important;
             gap: 1rem !important;
             width: 100% !important;
           }
@@ -545,6 +546,31 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
             gap: 1rem !important;
             width: 100% !important;
           }
+          
+          /* Landscape specific overrides */
+          ${printOrientation === 'landscape' ? `
+            .print-card {
+              padding: 2rem !important;
+              margin-bottom: 1.5rem !important;
+              width: 100% !important;
+            }
+            .print-header {
+              margin-bottom: 2rem !important;
+            }
+            .print-text-2xl { font-size: 2.2rem !important; }
+            .print-text-xl { font-size: 1.8rem !important; }
+            .print-text-lg { font-size: 1.4rem !important; }
+            .print-text-base { font-size: 1.2rem !important; }
+            .print-text-sm { font-size: 1rem !important; }
+            .print-text-xs { font-size: 0.85rem !important; }
+            
+            /* Force full width for specific sections in landscape */
+            .print-full-width {
+              grid-column: span 1 / span 1 !important;
+              width: 100% !important;
+            }
+          ` : ''}
+
           .print-card {
             border: 1px solid #e2e8f0 !important;
             border-radius: 1rem !important;
@@ -681,13 +707,13 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
           </div>
 
           {/* Main Stats */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 print-grid-3 print-container">
-            <div className="lg:col-span-2 space-y-8">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 print-grid-2">
+          <div className={`grid grid-cols-1 ${printOrientation === 'landscape' ? 'print:grid-cols-1' : 'lg:grid-cols-3 print-grid-3'} gap-8 print-container`}>
+            <div className={`${printOrientation === 'landscape' ? 'w-full' : 'lg:col-span-2'} space-y-8`}>
+              <div className={`grid grid-cols-1 ${printOrientation === 'landscape' ? 'print:grid-cols-2' : 'md:grid-cols-2'} gap-6 print-grid-2`}>
                 {/* Produção Summary */}
                 <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-200 space-y-6 print-card print-no-break">
                   <div className="flex items-center justify-between">
-                    <h3 className="text-sm font-black text-black uppercase tracking-widest flex items-center gap-2 italic">
+                    <h3 className="text-sm font-black text-black uppercase tracking-widest flex items-center gap-2 italic print-text-lg">
                       <TrendingUp className="w-4 h-4 text-blue-600" />
                       Visão Geral do Lote
                     </h3>
@@ -703,32 +729,32 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                 
                   <div className="grid grid-cols-2 gap-6">
                     <div className="space-y-1">
-                      <span className="text-[10px] font-black text-slate-600 uppercase tracking-widest block">Peso Médio Inicial</span>
-                      <span className="text-xl font-black text-slate-700 italic">{formatNumber(batchData.batch.initialUnitWeight, 1)}g</span>
+                      <span className="text-[10px] font-black text-slate-600 uppercase tracking-widest block print-text-xs">Peso Médio Inicial</span>
+                      <span className="text-xl font-black text-slate-700 italic print-text-xl">{formatNumber(batchData.batch.initialUnitWeight, 1)}g</span>
                     </div>
                     <div className="space-y-1">
-                      <span className="text-[10px] font-black text-slate-600 uppercase tracking-widest block">Estoque Vivo Atual</span>
-                      <span className="text-xl font-black text-slate-800 italic">{formatNumber(batchData.liveFish)} un</span>
+                      <span className="text-[10px] font-black text-slate-600 uppercase tracking-widest block print-text-xs">Estoque Vivo Atual</span>
+                      <span className="text-xl font-black text-slate-800 italic print-text-xl">{formatNumber(batchData.liveFish)} un</span>
                     </div>
                     <div className="space-y-1">
-                      <span className="text-[10px] font-black text-slate-600 uppercase tracking-widest block">Mortalidade Atual</span>
-                      <span className="text-xl font-black text-red-600 italic">{formatNumber(batchData.mortality)} un</span>
+                      <span className="text-[10px] font-black text-slate-600 uppercase tracking-widest block print-text-xs">Mortalidade Atual</span>
+                      <span className="text-xl font-black text-red-600 italic print-text-xl">{formatNumber(batchData.mortality)} un</span>
                     </div>
                   <div className="space-y-1">
-                    <span className="text-[10px] font-black text-slate-600 uppercase tracking-widest block">Biomassa Atual</span>
-                    <span className="text-xl font-black text-blue-600 italic">{formatNumber(batchData.currentBiomassKg, 1)}kg</span>
+                    <span className="text-[10px] font-black text-slate-600 uppercase tracking-widest block print-text-xs">Biomassa Atual</span>
+                    <span className="text-xl font-black text-blue-600 italic print-text-xl">{formatNumber(batchData.currentBiomassKg, 1)}kg</span>
                   </div>
                   <div className="space-y-1">
-                    <span className="text-[10px] font-black text-slate-600 uppercase tracking-widest block">Ração Consumida Total</span>
-                    <span className="text-xl font-black text-amber-600 italic">{formatNumber(batchData.feeding / 1000, 1)}kg</span>
+                    <span className="text-[10px] font-black text-slate-600 uppercase tracking-widest block print-text-xs">Ração Consumida Total</span>
+                    <span className="text-xl font-black text-amber-600 italic print-text-xl">{formatNumber(batchData.feeding / 1000, 1)}kg</span>
                   </div>
                   <div className="space-y-1">
-                    <span className="text-[10px] font-black text-slate-600 uppercase tracking-widest block">FCA Previsto</span>
-                    <span className="text-xl font-black text-indigo-600 italic">{formatNumber(batchData.fcaTheoretical, 2)}</span>
+                    <span className="text-[10px] font-black text-slate-600 uppercase tracking-widest block print-text-xs">FCA Previsto</span>
+                    <span className="text-xl font-black text-indigo-600 italic print-text-xl">{formatNumber(batchData.fcaTheoretical, 2)}</span>
                   </div>
                   <div className="space-y-1">
-                    <span className="text-[10px] font-black text-slate-600 uppercase tracking-widest block">Biomassa Pré-Despesca</span>
-                    <span className="text-xl font-black text-emerald-600 italic">{formatNumber(batchData.biomassBeforeHarvest, 1)}kg</span>
+                    <span className="text-[10px] font-black text-slate-600 uppercase tracking-widest block print-text-xs">Biomassa Pré-Despesca</span>
+                    <span className="text-xl font-black text-emerald-600 italic print-text-xl">{formatNumber(batchData.biomassBeforeHarvest, 1)}kg</span>
                   </div>
                 </div>
 
@@ -769,7 +795,7 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
 
               {/* Slaughter Comparison */}
               <div className="bg-slate-900 p-8 rounded-[2.5rem] shadow-xl text-white space-y-6 print-card print-bg-slate print-text-blue print-no-break">
-                <h3 className="text-sm font-black text-white uppercase tracking-widest flex items-center gap-2 italic print-text-blue">
+                <h3 className="text-sm font-black text-white uppercase tracking-widest flex items-center gap-2 italic print-text-lg">
                   <CheckCircle2 className="w-4 h-4 text-indigo-400 print-text-blue" />
                   Dados de Despesca vs Real
                 </h3>
@@ -777,8 +803,8 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                 <div className="space-y-6">
                   <div className="p-4 bg-white/5 rounded-2xl border border-white/10 print:border-slate-200 print:bg-white print:text-slate-900">
                     <div className="flex justify-between items-center mb-2">
-                      <span className="text-[10px] font-black text-white uppercase tracking-widest print:text-slate-500">Taxa de Assertividade do Lote</span>
-                      <span className="text-lg font-black text-indigo-400 italic print:text-blue-600">{formatNumber(batchData.accuracy, 1)}%</span>
+                      <span className="text-[10px] font-black text-white uppercase tracking-widest print:text-slate-500 print-text-xs">Taxa de Assertividade do Lote</span>
+                      <span className="text-lg font-black text-indigo-400 italic print:text-blue-600 print-text-xl">{formatNumber(batchData.accuracy, 1)}%</span>
                     </div>
                     <div className="w-full bg-white/10 h-1.5 rounded-full overflow-hidden print:bg-slate-100">
                       <div 
@@ -790,41 +816,41 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
 
                   <div className="grid grid-cols-2 gap-6 print-grid-2">
                     <div className="space-y-1">
-                      <span className="text-[10px] font-black text-white uppercase tracking-widest block print:text-slate-500">Sobrevivência Prevista</span>
-                      <span className="text-lg font-black italic text-emerald-400 print:text-emerald-600">{formatNumber(batchData.survivalRate, 1)}%</span>
+                      <span className="text-[10px] font-black text-white uppercase tracking-widest block print:text-slate-500 print-text-xs">Sobrevivência Prevista</span>
+                      <span className="text-lg font-black italic text-emerald-400 print:text-emerald-600 print-text-xl">{formatNumber(batchData.survivalRate, 1)}%</span>
                     </div>
                     <div className="space-y-1">
-                      <span className="text-[10px] font-black text-white uppercase tracking-widest block print:text-slate-500">Sobrevivência Real</span>
-                      <span className="text-lg font-black italic text-blue-400 print:text-blue-600">{formatNumber(batchData.survivalRateReal, 1)}%</span>
+                      <span className="text-[10px] font-black text-white uppercase tracking-widest block print:text-slate-500 print-text-xs">Sobrevivência Real</span>
+                      <span className="text-lg font-black italic text-blue-400 print:text-blue-600 print-text-xl">{formatNumber(batchData.survivalRateReal, 1)}%</span>
                     </div>
                     <div className="space-y-1">
-                      <span className="text-[10px] font-black text-white uppercase tracking-widest block print:text-slate-500">FCA Previsto</span>
-                      <span className="text-lg font-black italic text-indigo-400 print:text-blue-600">{formatNumber(batchData.fcaTheoretical, 2)}</span>
+                      <span className="text-[10px] font-black text-white uppercase tracking-widest block print:text-slate-500 print-text-xs">FCA Previsto</span>
+                      <span className="text-lg font-black italic text-indigo-400 print:text-blue-600 print-text-xl">{formatNumber(batchData.fcaTheoretical, 2)}</span>
                     </div>
                     <div className="space-y-1">
-                      <span className="text-[10px] font-black text-white uppercase tracking-widest block print:text-slate-500">FCA Real</span>
-                      <span className="text-lg font-black italic text-amber-400 print:text-amber-600">{formatNumber(batchData.fcaReal, 2)}</span>
+                      <span className="text-[10px] font-black text-white uppercase tracking-widest block print:text-slate-500 print-text-xs">FCA Real</span>
+                      <span className="text-lg font-black italic text-amber-400 print:text-amber-600 print-text-xl">{formatNumber(batchData.fcaReal, 2)}</span>
                     </div>
                     <div className="space-y-1">
-                      <span className="text-[10px] font-black text-white uppercase tracking-widest block print:text-slate-500">Peixes Despescados</span>
-                      <span className="text-lg font-black italic text-cyan-400 print:text-blue-600">{formatNumber(batchData.harvestedFish)} un</span>
+                      <span className="text-[10px] font-black text-white uppercase tracking-widest block print:text-slate-500 print-text-xs">Peixes Despescados</span>
+                      <span className="text-lg font-black italic text-cyan-400 print:text-blue-600 print-text-xl">{formatNumber(batchData.harvestedFish)} un</span>
                     </div>
                     <div className="space-y-1">
-                      <span className="text-[10px] font-black text-white uppercase tracking-widest block print:text-slate-500">Peso Total Deck</span>
-                      <span className="text-lg font-black italic text-cyan-400 print:text-blue-600">{formatNumber(batchData.harvestedWeight, 1)}kg</span>
+                      <span className="text-[10px] font-black text-white uppercase tracking-widest block print:text-slate-500 print-text-xs">Peso Total Deck</span>
+                      <span className="text-lg font-black italic text-cyan-400 print:text-blue-600 print-text-xl">{formatNumber(batchData.harvestedWeight, 1)}kg</span>
                     </div>
                     <div className="space-y-1">
-                      <span className="text-[10px] font-black text-white uppercase tracking-widest block print:text-slate-500">Peixes Previstos</span>
-                      <span className="text-lg font-black italic text-blue-400 print:text-blue-600">{formatNumber(batchData.expectedFish)} un</span>
+                      <span className="text-[10px] font-black text-white uppercase tracking-widest block print:text-slate-500 print-text-xs">Peixes Previstos</span>
+                      <span className="text-lg font-black italic text-blue-400 print:text-blue-600 print-text-xl">{formatNumber(batchData.expectedFish)} un</span>
                     </div>
                     <div className="space-y-1">
-                      <span className="text-[10px] font-black text-white uppercase tracking-widest block print:text-slate-500">Peso Previsto</span>
-                      <span className="text-lg font-black italic text-blue-400 print:text-blue-600">{formatNumber(batchData.expectedWeight, 1)}kg</span>
+                      <span className="text-[10px] font-black text-white uppercase tracking-widest block print:text-slate-500 print-text-xs">Peso Previsto</span>
+                      <span className="text-lg font-black italic text-blue-400 print:text-blue-600 print-text-xl">{formatNumber(batchData.expectedWeight, 1)}kg</span>
                     </div>
 
                     <div className="col-span-2 pt-4 border-t border-white/10 print:border-slate-200 flex justify-between items-center">
-                      <span className="text-[10px] font-black text-white uppercase tracking-widest print:text-slate-500">GPD (Crescimento Diário)</span>
-                      <span className="text-lg font-black italic text-cyan-400 print:text-blue-600">{formatNumber(batchData.gpd, 2)}g/dia</span>
+                      <span className="text-[10px] font-black text-white uppercase tracking-widest print:text-slate-500 print-text-xs">GPD (Crescimento Diário)</span>
+                      <span className="text-lg font-black italic text-cyan-400 print:text-blue-600 print-text-xl">{formatNumber(batchData.gpd, 2)}g/dia</span>
                     </div>
                   </div>
                 </div>
@@ -833,28 +859,28 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
           </div>
 
           {/* Sidebar (Right Column) */}
-          <div className="space-y-8">
+          <div className={`${printOrientation === 'landscape' ? 'w-full' : 'space-y-8'}`}>
               {/* Cost Analysis Card */}
               <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-200 space-y-6 print-card print-no-break">
-                <h3 className="text-sm font-black text-black uppercase tracking-widest flex items-center gap-2 italic">
+                <h3 className="text-sm font-black text-black uppercase tracking-widest flex items-center gap-2 italic print-text-lg">
                   <DollarSign className="w-4 h-4 text-emerald-600" />
                   Análise de Custos
                 </h3>
 
-                <div className="space-y-4">
+                <div className={`grid ${printOrientation === 'landscape' ? 'grid-cols-3 gap-6' : 'space-y-4'}`}>
                   <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 print:bg-slate-50">
-                    <span className="text-[10px] font-black text-slate-600 uppercase tracking-widest block mb-1">Peso Recepção Frigorífico (kg)</span>
-                    <span className="text-2xl font-black text-slate-800 italic">{formatNumber(batchData.totalReceptionWeight, 1)} kg</span>
+                    <span className="text-[10px] font-black text-slate-600 uppercase tracking-widest block mb-1 print-text-xs">Peso Recepção Frigorífico (kg)</span>
+                    <span className="text-2xl font-black text-slate-800 italic print-text-xl">{formatNumber(batchData.totalReceptionWeight, 1)} kg</span>
                   </div>
 
                   <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 print:bg-slate-50">
-                    <span className="text-[10px] font-black text-slate-600 uppercase tracking-widest block mb-1">Custo Total Acumulado</span>
-                    <span className="text-2xl font-black text-slate-800 italic">{formatCurrency(batchData.totalExpenses)}</span>
+                    <span className="text-[10px] font-black text-slate-600 uppercase tracking-widest block mb-1 print-text-xs">Custo Total Acumulado</span>
+                    <span className="text-2xl font-black text-slate-800 italic print-text-xl">{formatCurrency(batchData.totalExpenses)}</span>
                   </div>
 
                   <div className="p-4 bg-emerald-50 rounded-2xl border border-emerald-100 print:bg-emerald-50">
-                    <span className="text-[10px] font-black text-emerald-700 uppercase tracking-widest block mb-1">Custo por KG</span>
-                    <span className="text-2xl font-black text-emerald-700 italic print-text-emerald">{formatCurrency(batchData.costPerKg)}</span>
+                    <span className="text-[10px] font-black text-emerald-700 uppercase tracking-widest block mb-1 print-text-xs">Custo por KG</span>
+                    <span className="text-2xl font-black text-emerald-700 italic print-text-xl">{formatCurrency(batchData.costPerKg)}</span>
                   </div>
                 </div>
 
@@ -1130,11 +1156,11 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                 <table className="w-full">
                   <thead>
                     <tr className="border-b border-slate-100">
-                      <th className="text-left py-4 text-[10px] font-black text-slate-600 uppercase tracking-widest">Data</th>
-                      <th className="text-left py-4 text-[10px] font-black text-slate-600 uppercase tracking-widest">Categoria</th>
-                      <th className="text-left py-4 text-[10px] font-black text-slate-600 uppercase tracking-widest">Lançamento (Item)</th>
-                      <th className="text-left py-4 text-[10px] font-black text-slate-600 uppercase tracking-widest">Usuário</th>
-                      <th className="text-right py-4 text-[10px] font-black text-slate-600 uppercase tracking-widest">Valor</th>
+                      <th className="text-left py-4 text-[10px] font-black text-slate-600 uppercase tracking-widest print-text-sm">Data</th>
+                      <th className="text-left py-4 text-[10px] font-black text-slate-600 uppercase tracking-widest print-text-sm">Categoria</th>
+                      <th className="text-left py-4 text-[10px] font-black text-slate-600 uppercase tracking-widest print-text-sm">Lançamento (Item)</th>
+                      <th className="text-left py-4 text-[10px] font-black text-slate-600 uppercase tracking-widest print-text-sm">Usuário</th>
+                      <th className="text-right py-4 text-[10px] font-black text-slate-600 uppercase tracking-widest print-text-sm">Valor</th>
                       <th className="w-20 print:hidden"></th>
                     </tr>
                   </thead>
@@ -1144,11 +1170,11 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                       const isRevenue = entry.type === 'revenue';
                       return (
                         <tr key={entry.id} className="group hover:bg-slate-50 transition-colors">
-                          <td className="py-4 text-xs font-bold text-slate-600">{safeDateFormat(entry.date, 'dd/MM/yyyy')}</td>
-                          <td className="py-4 text-xs font-black text-slate-600 uppercase italic">{entry.category}</td>
-                          <td className="py-4 text-xs font-black text-slate-800 uppercase italic">{entry.description}</td>
-                          <td className="py-4 text-xs font-bold text-slate-600 italic">{user?.name || '---'}</td>
-                          <td className={`py-4 text-right text-xs font-black ${isRevenue ? 'text-blue-600' : 'text-emerald-600'}`}>
+                          <td className="py-4 text-xs font-bold text-slate-600 print-text-sm">{safeDateFormat(entry.date, 'dd/MM/yyyy')}</td>
+                          <td className="py-4 text-xs font-black text-slate-600 uppercase italic print-text-sm">{entry.category}</td>
+                          <td className="py-4 text-xs font-black text-slate-800 uppercase italic print-text-sm">{entry.description}</td>
+                          <td className="py-4 text-xs font-bold text-slate-600 italic print-text-sm">{user?.name || '---'}</td>
+                          <td className={`py-4 text-right text-xs font-black ${isRevenue ? 'text-blue-600' : 'text-emerald-600'} print-text-sm`}>
                             {isRevenue ? '+' : ''}{formatCurrency(entry.value)}
                           </td>
                           <td className="py-4 text-right print:hidden">
@@ -1204,16 +1230,16 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                     <div className="bg-slate-100 px-8 py-6 border-b border-slate-100 flex items-center justify-between print:bg-slate-50">
                       <div className="flex items-center gap-3">
                         <Fish className="w-5 h-5 text-blue-600" />
-                        <h4 className="text-lg font-black text-black uppercase italic">{logs.cageName}</h4>
+                        <h4 className="text-lg font-black text-black uppercase italic print-text-xl">{logs.cageName}</h4>
                       </div>
                       <div className="flex gap-4">
                         <div className="text-right">
-                          <span className="text-[8px] font-black text-slate-600 uppercase block">Tratos</span>
-                          <span className="text-xs font-black text-slate-700">{logs.feeding.length}</span>
+                          <span className="text-[8px] font-black text-slate-600 uppercase block print-text-xs">Tratos</span>
+                          <span className="text-xs font-black text-slate-700 print-text-sm">{logs.feeding.length}</span>
                         </div>
                         <div className="text-right">
-                          <span className="text-[8px] font-black text-slate-600 uppercase block">Mortes</span>
-                          <span className="text-xs font-black text-red-600">{logs.mortality.reduce((acc, m) => acc + m.count, 0)}</span>
+                          <span className="text-[8px] font-black text-slate-600 uppercase block print-text-xs">Mortes</span>
+                          <span className="text-xs font-black text-red-600 print-text-sm">{logs.mortality.reduce((acc, m) => acc + m.count, 0)}</span>
                         </div>
                       </div>
                     </div>
