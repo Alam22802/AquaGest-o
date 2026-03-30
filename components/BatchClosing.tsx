@@ -68,6 +68,7 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
   const [editingRevenueId, setEditingRevenueId] = useState<string | null>(null);
   const [filterCategory, setFilterCategory] = useState('');
   const [filterItem, setFilterItem] = useState('');
+  const [printOrientation, setPrintOrientation] = useState<'portrait' | 'landscape'>('portrait');
 
   const hasPermission = currentUser.isMaster || currentUser.canEdit;
 
@@ -515,7 +516,7 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       <style dangerouslySetInnerHTML={{ __html: `
         @media print {
           @page {
-            size: A4 portrait;
+            size: A4 ${printOrientation};
             margin: 10mm;
           }
           body {
@@ -594,13 +595,32 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
 
         <div className="flex items-center gap-3">
           {batchData?.batch.isClosed && (
-            <button 
-              onClick={handlePrint}
-              className="px-6 py-3 bg-white border border-slate-200 rounded-2xl font-black text-xs outline-none hover:bg-slate-50 uppercase tracking-widest shadow-sm flex items-center gap-2"
-            >
-              <Printer className="w-4 h-4" />
-              Imprimir Relatório
-            </button>
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl border border-slate-200">
+                <button
+                  onClick={() => setPrintOrientation('portrait')}
+                  className={`px-3 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${printOrientation === 'portrait' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+                  title="Orientação Retrato"
+                >
+                  Vertical
+                </button>
+                <button
+                  onClick={() => setPrintOrientation('landscape')}
+                  className={`px-3 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${printOrientation === 'landscape' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+                  title="Orientação Paisagem"
+                >
+                  Horizontal
+                </button>
+              </div>
+              
+              <button 
+                onClick={handlePrint}
+                className="px-6 py-3 bg-white border border-slate-200 rounded-2xl font-black text-xs outline-none hover:bg-slate-50 uppercase tracking-widest shadow-sm flex items-center gap-2"
+              >
+                <Printer className="w-4 h-4" />
+                Imprimir
+              </button>
+            </div>
           )}
           
           <select 
