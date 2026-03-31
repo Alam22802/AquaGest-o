@@ -148,17 +148,27 @@ const SlaughterHR: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     const turnoverCount = monthEntries
       .filter(e => e.type.toLowerCase().includes('turnover'))
       .reduce((acc, e) => acc + e.employeeIds.length, 0);
-    const turnoverRate = activeCount > 0 ? (turnoverCount / activeCount) * 100 : 0;
+    
+    // Headcount for the specific filtered month (estimate)
+    const monthActiveCount = employees.filter(e => {
+      const admission = parseISO(e.admissionDate);
+      const monthEnd = new Date(filterYear, filterMonth, 0);
+      return admission <= monthEnd && e.status === 'Ativo';
+    }).length;
 
-    const absentDays = monthEntries
+    const turnoverRate = monthActiveCount > 0 ? (turnoverCount / monthActiveCount) * 100 : 0;
+
+    const filteredAbsentDays = filteredEntries
       .filter(e => e.type.toLowerCase().includes('atestado') || e.type.toLowerCase().includes('falta'))
-      .reduce((acc, e) => acc + ((e.days || 1) * e.employeeIds.length), 0);
-    const totalWorkDays = activeCount * 22;
-    const absenteeismRate = totalWorkDays > 0 ? (absentDays / totalWorkDays) * 100 : 0;
+      .reduce((acc, e) => acc + ((e.days || 1) * (filterEmployeeId === 'all' ? e.employeeIds.length : 1)), 0);
+    
+    const filteredActiveCount = filterEmployeeId === 'all' ? monthActiveCount : 1;
+    const totalWorkDays = filteredActiveCount * 22;
+    const absenteeismRate = totalWorkDays > 0 ? (filteredAbsentDays / totalWorkDays) * 100 : 0;
 
     // Chart data for absenteeism (last 6 months) - derived from entries
     const last6Months = Array.from({ length: 6 }, (_, i) => {
-      const d = new Date();
+      const d = new Date(filterYear, filterMonth - 1, 1);
       d.setMonth(d.getMonth() - i);
       return { month: d.getMonth() + 1, year: d.getFullYear() };
     }).reverse();
@@ -166,12 +176,23 @@ const SlaughterHR: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     const absenteeismData = last6Months.map(m => {
       const mEntries = entries.filter(e => {
         const [y, month] = e.date.split('-').map(Number);
-        return month === m.month && y === m.year;
+        const matchesDate = month === m.month && y === m.year;
+        const matchesEmployee = filterEmployeeId === 'all' || e.employeeIds.includes(filterEmployeeId);
+        return matchesDate && matchesEmployee;
       });
       const mAbsentDays = mEntries
         .filter(e => e.type.toLowerCase().includes('atestado') || e.type.toLowerCase().includes('falta'))
-        .reduce((acc, e) => acc + ((e.days || 1) * e.employeeIds.length), 0);
-      const mRate = (activeCount * 22) > 0 ? (mAbsentDays / (activeCount * 22)) * 100 : 0;
+        .reduce((acc, e) => acc + ((e.days || 1) * (filterEmployeeId === 'all' ? e.employeeIds.length : 1)), 0);
+      
+      const mActiveCount = filterEmployeeId === 'all' 
+        ? employees.filter(e => {
+            const admission = parseISO(e.admissionDate);
+            const monthEnd = new Date(m.year, m.month, 0);
+            return admission <= monthEnd && e.status === 'Ativo';
+          }).length
+        : 1;
+
+      const mRate = (mActiveCount * 22) > 0 ? (mAbsentDays / (mActiveCount * 22)) * 100 : 0;
       return {
         name: `${format(new Date(2000, m.month - 1), 'MMM', { locale: ptBR })}/${m.year}`,
         value: mRate
