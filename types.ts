@@ -176,6 +176,7 @@ export interface SlaughterHREntry {
   employeeIds: string[];
   type: string;
   date: string;
+  endDate?: string;
   days?: number;
   description?: string;
   userId: string;

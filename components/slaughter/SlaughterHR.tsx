@@ -81,19 +81,24 @@ const SlaughterHR: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
   });
 
   useEffect(() => {
-    if (entryForm.type === 'Falta' || entryForm.type === 'Atestado') {
+    const isAbsence = entryForm.type.toLowerCase().includes('falta') || entryForm.type.toLowerCase().includes('atestado');
+    if (isAbsence) {
       try {
         const start = parseISO(entryForm.date);
         const end = parseISO(entryForm.endDate);
         if (!isNaN(start.getTime()) && !isNaN(end.getTime())) {
           const diff = differenceInDays(end, start) + 1;
           if (diff > 0) {
-            setEntryForm(prev => ({ ...prev, days: diff.toString() }));
+            if (diff.toString() !== entryForm.days) {
+              setEntryForm(prev => ({ ...prev, days: diff.toString() }));
+            }
           } else if (diff <= 0 && entryForm.endDate < entryForm.date) {
              // If end date is before start date, sync them
              setEntryForm(prev => ({ ...prev, endDate: prev.date, days: '1' }));
           } else {
-            setEntryForm(prev => ({ ...prev, days: '1' }));
+            if (entryForm.days !== '1') {
+              setEntryForm(prev => ({ ...prev, days: '1' }));
+            }
           }
         }
       } catch (e) {
@@ -128,31 +133,50 @@ const SlaughterHR: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     // Filter indicators by month/year
     const filteredIndicator = indicators.find(ind => ind.month === filterMonth && ind.year === filterYear);
 
-    // Filter entries by month/year and employee
+    // Calculate metrics from entries for the current filtered month/year
+    const monthStart = new Date(filterYear, filterMonth - 1, 1);
+    const monthEnd = new Date(filterYear, filterMonth, 0);
+
+    const getDaysInMonth = (entryDate: string, entryEndDate: string | undefined, m: number, y: number) => {
+      const start = parseISO(entryDate);
+      const end = entryEndDate ? parseISO(entryEndDate) : start;
+      const mStart = new Date(y, m - 1, 1);
+      const mEnd = new Date(y, m, 0);
+      
+      const overlapStart = start > mStart ? start : mStart;
+      const overlapEnd = end < mEnd ? end : mEnd;
+      
+      if (overlapStart <= overlapEnd) {
+        return differenceInDays(overlapEnd, overlapStart) + 1;
+      }
+      return 0;
+    };
+
     const filteredEntries = entries.filter(entry => {
-      const [y, m] = entry.date.split('-').map(Number);
-      const matchesDate = m === filterMonth && y === filterYear;
+      const start = parseISO(entry.date);
+      const end = entry.endDate ? parseISO(entry.endDate) : start;
+      const matchesDate = (start <= monthEnd && end >= monthStart);
       const matchesEmployee = filterEmployeeId === 'all' || entry.employeeIds.includes(filterEmployeeId);
       return matchesDate && matchesEmployee;
     });
 
-    // Calculate metrics from entries for the current filtered month/year
-    const monthEntries = entries.filter(entry => {
-      const [y, m] = entry.date.split('-').map(Number);
-      return m === filterMonth && y === filterYear;
-    });
-
-    const accidentsCount = monthEntries
-      .filter(e => e.type.toLowerCase().includes('acidente'))
+    const accidentsCount = entries
+      .filter(e => {
+        const [y, m] = e.date.split('-').map(Number);
+        return m === filterMonth && y === filterYear && e.type.toLowerCase().includes('acidente');
+      })
       .reduce((acc, e) => acc + e.employeeIds.length, 0);
-    const turnoverCount = monthEntries
-      .filter(e => e.type.toLowerCase().includes('turnover'))
+
+    const turnoverCount = entries
+      .filter(e => {
+        const [y, m] = e.date.split('-').map(Number);
+        return m === filterMonth && y === filterYear && e.type.toLowerCase().includes('turnover');
+      })
       .reduce((acc, e) => acc + e.employeeIds.length, 0);
     
     // Headcount for the specific filtered month (estimate)
     const monthActiveCount = employees.filter(e => {
       const admission = parseISO(e.admissionDate);
-      const monthEnd = new Date(filterYear, filterMonth, 0);
       return admission <= monthEnd && e.status === 'Ativo';
     }).length;
 
@@ -160,7 +184,10 @@ const SlaughterHR: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
 
     const filteredAbsentDays = filteredEntries
       .filter(e => e.type.toLowerCase().includes('atestado') || e.type.toLowerCase().includes('falta'))
-      .reduce((acc, e) => acc + ((e.days || 1) * (filterEmployeeId === 'all' ? e.employeeIds.length : 1)), 0);
+      .reduce((acc, e) => {
+        const daysInMonth = getDaysInMonth(e.date, e.endDate, filterMonth, filterYear);
+        return acc + (daysInMonth * (filterEmployeeId === 'all' ? e.employeeIds.length : 1));
+      }, 0);
     
     const filteredActiveCount = filterEmployeeId === 'all' ? monthActiveCount : 1;
     const totalWorkDays = filteredActiveCount * 22;
@@ -174,15 +201,23 @@ const SlaughterHR: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     }).reverse();
 
     const absenteeismData = last6Months.map(m => {
+      const mStart = new Date(m.year, m.month - 1, 1);
+      const mEnd = new Date(m.year, m.month, 0);
+
       const mEntries = entries.filter(e => {
-        const [y, month] = e.date.split('-').map(Number);
-        const matchesDate = month === m.month && y === m.year;
+        const start = parseISO(e.date);
+        const end = e.endDate ? parseISO(e.endDate) : start;
+        const matchesDate = (start <= mEnd && end >= mStart);
         const matchesEmployee = filterEmployeeId === 'all' || e.employeeIds.includes(filterEmployeeId);
         return matchesDate && matchesEmployee;
       });
+
       const mAbsentDays = mEntries
         .filter(e => e.type.toLowerCase().includes('atestado') || e.type.toLowerCase().includes('falta'))
-        .reduce((acc, e) => acc + ((e.days || 1) * (filterEmployeeId === 'all' ? e.employeeIds.length : 1)), 0);
+        .reduce((acc, e) => {
+          const daysInMonth = getDaysInMonth(e.date, e.endDate, m.month, m.year);
+          return acc + (daysInMonth * (filterEmployeeId === 'all' ? e.employeeIds.length : 1));
+        }, 0);
       
       const mActiveCount = filterEmployeeId === 'all' 
         ? employees.filter(e => {
@@ -300,6 +335,7 @@ const SlaughterHR: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       employeeIds: entryForm.employeeIds,
       type: entryForm.type,
       date: entryForm.date,
+      endDate: (entryForm.type.toLowerCase().includes('falta') || entryForm.type.toLowerCase().includes('atestado')) ? entryForm.endDate : entryForm.date,
       days: entryForm.days ? Number(entryForm.days) : undefined,
       description: entryForm.description,
       userId: currentUser.id,
@@ -988,14 +1024,14 @@ const SlaughterHR: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            <div className="lg:col-span-1">
+          <div className="flex flex-col gap-8">
+            <div className="w-full">
               <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-200">
                 <h3 className="text-xl font-black text-slate-800 mb-8 uppercase tracking-tighter italic flex items-center gap-3">
                   <Briefcase className="w-6 h-6" />
                   {editingEntryId ? 'Editar Lançamento' : 'Novo Lançamento'}
                 </h3>
-                <form onSubmit={handleSaveEntry} className="space-y-6">
+                <form onSubmit={handleSaveEntry} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
                   <div className="space-y-1">
                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Colaboradores</label>
                     <div className="relative">
@@ -1045,7 +1081,7 @@ const SlaughterHR: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-4">
                     <div className="space-y-1">
                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Tipo</label>
                       <div className="flex gap-2">
@@ -1097,7 +1133,7 @@ const SlaughterHR: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                     </div>
                     <div className="space-y-1">
                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">
-                        {(entryForm.type === 'Falta' || entryForm.type === 'Atestado') ? 'Data Início' : 'Data'}
+                        {(entryForm.type.toLowerCase().includes('falta') || entryForm.type.toLowerCase().includes('atestado')) ? 'Data Início' : 'Data'}
                       </label>
                       <input 
                         type="date" required 
@@ -1106,7 +1142,10 @@ const SlaughterHR: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                         onChange={e => setEntryForm({...entryForm, date: e.target.value})}
                       />
                     </div>
-                    {(entryForm.type === 'Falta' || entryForm.type === 'Atestado') && (
+                  </div>
+
+                  <div className="space-y-4">
+                    {(entryForm.type.toLowerCase().includes('falta') || entryForm.type.toLowerCase().includes('atestado')) && (
                       <div className="space-y-1">
                         <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Data Fim</label>
                         <input 
@@ -1117,37 +1156,55 @@ const SlaughterHR: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                         />
                       </div>
                     )}
-                  </div>
 
+                    {(entryForm.type.toLowerCase().includes('falta') || entryForm.type.toLowerCase().includes('atestado')) && (
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Dias Totais</label>
+                        <input 
+                          type="number"
+                          className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none text-xs"
+                          value={entryForm.days}
+                          onChange={e => {
+                            const val = e.target.value;
+                            const days = parseInt(val);
+                            if (!isNaN(days) && days > 0) {
+                              const start = parseISO(entryForm.date);
+                              if (!isNaN(start.getTime())) {
+                                const newEnd = addDays(start, days - 1);
+                                setEntryForm(prev => ({ 
+                                  ...prev, 
+                                  days: val, 
+                                  endDate: format(newEnd, 'yyyy-MM-dd') 
+                                }));
+                              }
+                            } else {
+                              setEntryForm(prev => ({ ...prev, days: val }));
+                            }
+                          }}
+                        />
+                      </div>
+                    )}
 
-                  {(entryForm.type === 'Falta' || entryForm.type === 'Atestado') && (
                     <div className="space-y-1">
-                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Dias Totais</label>
-                      <input 
-                        type="number" readOnly
-                        className="w-full px-5 py-3.5 bg-slate-100 border border-slate-200 rounded-2xl font-bold outline-none text-xs text-slate-500 cursor-not-allowed"
-                        value={entryForm.days}
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Observação</label>
+                      <textarea 
+                        className="w-full px-5 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none text-xs h-20 resize-none"
+                        value={entryForm.description}
+                        onChange={e => setEntryForm({...entryForm, description: e.target.value})}
                       />
                     </div>
-                  )}
-
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Observação</label>
-                    <textarea 
-                      className="w-full px-5 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none text-xs h-20 resize-none"
-                      value={entryForm.description}
-                      onChange={e => setEntryForm({...entryForm, description: e.target.value})}
-                    />
                   </div>
 
-                  <button type="submit" className="w-full py-4 bg-[#344434] text-white rounded-2xl font-black uppercase tracking-widest text-xs shadow-lg hover:bg-[#2a382a] transition-all">
-                    {editingEntryId ? 'Salvar Alterações' : 'Lançar Evento'}
-                  </button>
+                  <div className="flex flex-col justify-end pb-1">
+                    <button type="submit" className="w-full py-4 bg-[#344434] text-white rounded-2xl font-black uppercase tracking-widest text-xs shadow-lg hover:bg-[#2a382a] transition-all">
+                      {editingEntryId ? 'Salvar Alterações' : 'Lançar Evento'}
+                    </button>
+                  </div>
                 </form>
               </div>
             </div>
 
-            <div className="lg:col-span-2">
+            <div className="w-full">
               <div className="bg-white border border-slate-200 rounded-[2.5rem] overflow-hidden shadow-sm">
                 <div className="p-6 border-b border-slate-100 flex justify-between items-center">
                   <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest">Lançamentos do Período</h3>
@@ -1164,7 +1221,14 @@ const SlaughterHR: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                   <tbody className="divide-y divide-slate-100">
                     {stats.filteredEntries.sort((a, b) => b.date.localeCompare(a.date)).map(ent => (
                       <tr key={ent.id} className="hover:bg-slate-50/50 transition-colors">
-                        <td className="px-8 py-6 text-xs font-bold text-slate-500">{format(parseISO(ent.date), 'dd/MM/yyyy')}</td>
+                        <td className="px-8 py-6 text-xs font-bold text-slate-500">
+                          {format(parseISO(ent.date), 'dd/MM/yyyy')}
+                          {ent.endDate && ent.endDate !== ent.date && (
+                            <span className="text-slate-400 font-normal ml-1">
+                              - {format(parseISO(ent.endDate), 'dd/MM/yyyy')}
+                            </span>
+                          )}
+                        </td>
                         <td className="px-8 py-6">
                           <div className="text-xs font-bold text-slate-800">
                             {ent.employeeIds.length === 1 || filterEmployeeId !== 'all'
@@ -1193,7 +1257,7 @@ const SlaughterHR: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                                 employeeIds: ent.employeeIds,
                                 type: ent.type,
                                 date: ent.date,
-                                endDate: ent.days ? format(addDays(parseISO(ent.date), ent.days - 1), 'yyyy-MM-dd') : ent.date,
+                                endDate: ent.endDate || ent.date,
                                 days: ent.days?.toString() || '1',
                                 description: ent.description || ''
                               });
