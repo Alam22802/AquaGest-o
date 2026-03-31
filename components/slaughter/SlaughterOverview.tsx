@@ -29,7 +29,6 @@ const SlaughterSummary = React.memo(({ stats, startDate, endDate, onStartDateCha
     laborPerKg: number;
     freightPerKgLive: number;
     totalSlaughterCondemnation: number;
-    totalFieldCondemnation: number;
     totalInvoiceValue: number;
     revenuePerKg: number;
     costPerKgProduced: number;
@@ -372,7 +371,6 @@ const SlaughterTable = React.memo(({ logs, users, hasPermission, onEdit, onDelet
                 <td className="px-8 py-6">
                   <div className="text-[10px] font-black text-red-500 uppercase">Frig: {formatNumber(log.slaughterCondemnation || 0)}kg</div>
                   <div className="text-[10px] font-black text-orange-500 uppercase">Transp: {formatNumber(log.transportCondemnation || 0)}kg</div>
-                  <div className="text-[10px] font-black text-amber-500 uppercase">Campo: {formatNumber(log.fieldCondemnation || 0)}kg</div>
                 </td>
                 <td className="px-8 py-6">
                   <div className="text-xs font-black text-amber-600">R$ {formatNumber(log.invoiceValue || 0, 2)}</div>
@@ -448,7 +446,6 @@ const SlaughterOverview: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
     freightValue: '',
     transportCondemnation: '',
     slaughterCondemnation: '',
-    fieldCondemnation: '',
     invoiceValue: ''
   });
 
@@ -520,7 +517,6 @@ const SlaughterOverview: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
 
     const totalSlaughterCondemnation = filteredLogs.reduce((acc, l) => acc + (l.slaughterCondemnation || 0), 0);
     const totalTransportCondemnation = filteredLogs.reduce((acc, l) => acc + (l.transportCondemnation || 0), 0);
-    const totalFieldCondemnation = filteredLogs.reduce((acc, l) => acc + (l.fieldCondemnation || 0), 0);
 
     const totalInvoiceValue = filteredLogs.reduce((acc, l) => acc + (l.invoiceValue || 0), 0);
     const revenuePerKg = totalPacked > 0 ? totalInvoiceValue / totalPacked : 0;
@@ -550,7 +546,6 @@ const SlaughterOverview: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
       laborPerKg,
       freightPerKgLive,
       totalSlaughterCondemnation,
-      totalFieldCondemnation,
       totalInvoiceValue,
       revenuePerKg,
       costPerKgProduced,
@@ -627,7 +622,6 @@ const SlaughterOverview: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
           freightValue: Number(formData.freightValue) || 0,
           transportCondemnation: Number(formData.transportCondemnation) || 0,
           slaughterCondemnation: Number(formData.slaughterCondemnation) || 0,
-          fieldCondemnation: Number(formData.fieldCondemnation) || 0,
           invoiceValue: Number(formData.invoiceValue) || 0,
           revenuePerKg: (Number(formData.packedQuantity) || 0) > 0 ? (Number(formData.invoiceValue) || 0) / (Number(formData.packedQuantity) || 0) : 0
         } : log
@@ -655,7 +649,6 @@ const SlaughterOverview: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
         freightValue: Number(formData.freightValue) || 0,
         transportCondemnation: Number(formData.transportCondemnation) || 0,
         slaughterCondemnation: Number(formData.slaughterCondemnation) || 0,
-        fieldCondemnation: Number(formData.fieldCondemnation) || 0,
         invoiceValue: Number(formData.invoiceValue) || 0,
         revenuePerKg: (Number(formData.packedQuantity) || 0) > 0 ? (Number(formData.invoiceValue) || 0) / (Number(formData.packedQuantity) || 0) : 0,
         userId: currentUser.id,
@@ -691,7 +684,6 @@ const SlaughterOverview: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
       freightValue: '',
       transportCondemnation: '',
       slaughterCondemnation: '',
-      fieldCondemnation: '',
       invoiceValue: ''
     });
   };
@@ -714,7 +706,6 @@ const SlaughterOverview: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
       freightValue: (log.freightValue || 0).toString(),
       transportCondemnation: (log.transportCondemnation || 0).toString(),
       slaughterCondemnation: (log.slaughterCondemnation || 0).toString(),
-      fieldCondemnation: (log.fieldCondemnation || 0).toString(),
       invoiceValue: (log.invoiceValue || 0).toString()
     });
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -889,10 +880,6 @@ const SlaughterOverview: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
                   <div className="space-y-1">
                     <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-widest">Cond. Transp. (kg)</label>
                     <input type="number" step="0.01" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none text-xs" value={formData.transportCondemnation} onChange={e => setFormData({...formData, transportCondemnation: e.target.value})} />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-widest">Cond. Campo (kg)</label>
-                    <input type="number" step="0.01" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none text-xs" value={formData.fieldCondemnation} onChange={e => setFormData({...formData, fieldCondemnation: e.target.value})} />
                   </div>
                 </div>
 
