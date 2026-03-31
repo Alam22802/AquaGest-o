@@ -167,6 +167,7 @@ export interface SlaughterEmployee {
   role: string;
   department: string;
   admissionDate: string;
+  birthDate?: string;
   status: 'Ativo' | 'Inativo';
   updatedAt?: number;
 }

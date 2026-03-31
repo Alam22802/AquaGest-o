@@ -522,12 +522,8 @@ const SlaughterOverview: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
     const totalInvoiceValue = filteredLogs.reduce((acc, l) => acc + (l.invoiceValue || 0), 0);
     const revenuePerKg = totalPacked > 0 ? totalInvoiceValue / totalPacked : 0;
     
-    // User requested: "para custo considere valor total das notas, frete/ kg vivo, mão de obra/ton produzido"
-    // And "leve a mesma logica para agua e energia"
-    // We use the total values for these components to calculate the cost per KG produced.
+    // Custo KG Produzido = (Total Invoices + Freight + Labor + Water + Energy) / Total Packed
     const totalCost = totalInvoiceValue + totalFreightValue + totalSalaryValue + totalWaterValue + totalEnergyValue;
-    
-    // Custo KG Produzido = Total Cost (Invoices + Freight + Labor + Water + Energy) / Total Packed
     const costPerKgProduced = totalPacked > 0 ? totalCost / totalPacked : 0;
 
     const uniqueSlaughterDays = new Set(filteredLogs.map(log => log.date)).size;

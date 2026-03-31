@@ -59,6 +59,7 @@ const SlaughterHR: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     role: '',
     department: '',
     admissionDate: new Date().toISOString().split('T')[0],
+    birthDate: '',
     status: 'Ativo' as SlaughterEmployee['status']
   });
 
@@ -245,6 +246,17 @@ const SlaughterHR: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       };
     });
 
+    // Birthdays of the month
+    const birthdays = employees.filter(e => {
+      if (!e.birthDate) return false;
+      const birthMonth = parseISO(e.birthDate).getMonth() + 1;
+      return birthMonth === filterMonth && e.status === 'Ativo';
+    }).map(e => ({
+      name: e.name,
+      day: parseISO(e.birthDate!).getDate(),
+      department: e.department
+    })).sort((a, b) => a.day - b.day);
+
     return { 
       active: activeCount, 
       totalVacanciesCount, 
@@ -256,7 +268,8 @@ const SlaughterHR: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       }, 
       filteredEntries, 
       absenteeismData, 
-      headcountData 
+      headcountData,
+      birthdays
     };
   }, [employees, entries, vacancies, filterMonth, filterYear, departments]);
 
@@ -293,12 +306,7 @@ const SlaughterHR: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
 
     const newEmployee: SlaughterEmployee = {
       id: editingEmployeeId || generateId(),
-      registrationNumber: employeeForm.registrationNumber,
-      name: employeeForm.name,
-      role: employeeForm.role,
-      department: employeeForm.department,
-      admissionDate: employeeForm.admissionDate,
-      status: employeeForm.status,
+      ...employeeForm,
       updatedAt: Date.now()
     };
 
@@ -314,6 +322,7 @@ const SlaughterHR: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       role: '',
       department: '',
       admissionDate: new Date().toISOString().split('T')[0],
+      birthDate: '',
       status: 'Ativo'
     });
   };
@@ -596,6 +605,15 @@ const SlaughterHR: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                       onChange={e => setEmployeeForm({...employeeForm, admissionDate: e.target.value})}
                     />
                   </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Data de Nascimento</label>
+                    <input 
+                      type="date"
+                      className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none text-xs"
+                      value={employeeForm.birthDate}
+                      onChange={e => setEmployeeForm({...employeeForm, birthDate: e.target.value})}
+                    />
+                  </div>
                 </div>
 
                 <button type="submit" className="w-full py-4 bg-[#344434] text-white rounded-2xl font-black uppercase tracking-widest text-xs shadow-lg hover:bg-[#2a382a] transition-all">
@@ -647,6 +665,7 @@ const SlaughterHR: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                               role: emp.role,
                               department: emp.department,
                               admissionDate: emp.admissionDate,
+                              birthDate: emp.birthDate || '',
                               status: emp.status
                             });
                           }} className="p-2 text-slate-300 hover:text-amber-500 transition-colors"><Edit3 className="w-4 h-4" /></button>
@@ -1321,7 +1340,7 @@ const SlaughterHR: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
               <BarChartIcon className="w-6 h-6 text-[#344434]" />
               Resumo de Indicadores (Calculado dos Lançamentos)
             </h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               <div className="bg-[#e4e4d4]/20 p-6 rounded-3xl border border-[#344434]/5">
                 <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Absenteísmo</div>
                 <div className="text-2xl font-black text-[#344434]">{formatNumber(stats.filteredIndicator.absenteeism, 1)}%</div>
@@ -1337,35 +1356,41 @@ const SlaughterHR: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                 <div className="text-2xl font-black text-[#344434]">{formatNumber(stats.filteredIndicator.accidents)}</div>
                 <div className="text-[10px] text-slate-400 mt-1">Total de acidentes no mês</div>
               </div>
+              <div className="bg-[#e4e4d4]/20 p-6 rounded-3xl border border-[#344434]/5">
+                <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Quadro de Vagas</div>
+                <div className="text-2xl font-black text-[#344434]">{formatNumber(stats.active)} / {formatNumber(stats.totalVacanciesCount)}</div>
+                <div className="text-[10px] text-slate-400 mt-1">{formatNumber(stats.occupancyRate, 1)}% de ocupação</div>
+              </div>
             </div>
           </div>
 
-          {/* 2. Mini-cards de Status */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-white p-6 rounded-[2rem] border border-slate-200 shadow-sm">
-            <div className="bg-[#e4e4d4]/30 p-4 rounded-2xl flex items-center gap-3 border border-[#344434]/5">
-              <Users className="w-4 h-4 text-[#344434]" />
-              <div>
-                <div className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Quadro de Vagas</div>
-                <div className="flex items-baseline gap-2">
-                  <div className="text-sm font-black text-slate-800">{formatNumber(stats.active)} / {formatNumber(stats.totalVacanciesCount)}</div>
-                  <div className="text-[10px] font-bold text-[#344434]">{formatNumber(stats.occupancyRate, 1)}%</div>
-                </div>
+          {/* Aniversariantes do Mês */}
+          <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-200">
+            <h3 className="text-xl font-black text-slate-800 mb-8 uppercase tracking-tighter italic flex items-center gap-3">
+              <Heart className="w-6 h-6 text-red-500" />
+              Aniversariantes do Mês
+            </h3>
+            {stats.birthdays.length > 0 ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                {stats.birthdays.map((b, i) => (
+                  <div key={i} className="bg-slate-50 p-4 rounded-2xl border border-slate-100 flex items-center gap-4">
+                    <div className="w-10 h-10 bg-white rounded-xl shadow-sm flex flex-col items-center justify-center border border-slate-100">
+                      <span className="text-[10px] font-black text-red-500 leading-none">{b.day}</span>
+                      <span className="text-[8px] font-black text-slate-400 uppercase tracking-tighter">{format(new Date(2000, filterMonth - 1), 'MMM', { locale: ptBR })}</span>
+                    </div>
+                    <div className="min-w-0">
+                      <div className="text-xs font-black text-slate-800 truncate">{b.name}</div>
+                      <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest truncate">{b.department}</div>
+                    </div>
+                  </div>
+                ))}
               </div>
-            </div>
-            <div className="bg-[#e4e4d4]/30 p-4 rounded-2xl flex items-center gap-3 border border-[#344434]/5">
-              <TrendingUp className="w-4 h-4 text-[#344434]" />
-              <div>
-                <div className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Turnover</div>
-                <div className="text-sm font-black text-slate-800">{formatNumber(stats.filteredIndicator?.turnover || 0, 1)}%</div>
+            ) : (
+              <div className="text-center py-10 bg-slate-50 rounded-3xl border border-dashed border-slate-200">
+                <Calendar className="w-8 h-8 text-slate-200 mx-auto mb-2" />
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Nenhum aniversariante neste mês.</p>
               </div>
-            </div>
-            <div className="bg-[#e4e4d4]/30 p-4 rounded-2xl flex items-center gap-3 border border-[#344434]/5">
-              <Heart className="w-4 h-4 text-[#344434]" />
-              <div>
-                <div className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Acidentes</div>
-                <div className="text-sm font-black text-slate-800">{formatNumber(stats.filteredIndicator?.accidents || 0)}</div>
-              </div>
-            </div>
+            )}
           </div>
 
           {/* 3. Gráficos Empilhados Verticalmente */}
