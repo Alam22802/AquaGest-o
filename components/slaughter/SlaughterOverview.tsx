@@ -121,7 +121,7 @@ const SlaughterSummary = React.memo(({ stats, startDate, endDate, onStartDateCha
           </div>
 
           {/* Linha 2: Condenações */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-8 mb-8 pb-8 border-b border-white/5">
+          <div className="grid grid-cols-2 lg:grid-cols-3 gap-8 mb-8 pb-8 border-b border-white/5">
              <div className="space-y-2 border-l-2 border-red-500/30 pl-6">
                 <div className="text-[9px] font-black opacity-40 uppercase tracking-widest">Condenações Frig.</div>
                 <div className="text-xl font-black text-red-400 flex items-baseline gap-1">
@@ -133,13 +133,6 @@ const SlaughterSummary = React.memo(({ stats, startDate, endDate, onStartDateCha
                 <div className="text-[9px] font-black opacity-40 uppercase tracking-widest">Condenações Transp.</div>
                 <div className="text-xl font-black text-orange-400 flex items-baseline gap-1">
                    {formatNumber(stats.totalTransportCondemnation)}
-                   <span className="text-[10px] opacity-40">kg</span>
-                </div>
-             </div>
-             <div className="space-y-2 border-l-2 border-amber-500/30 pl-6">
-                <div className="text-[9px] font-black opacity-40 uppercase tracking-widest">Condenações Campo</div>
-                <div className="text-xl font-black text-amber-400 flex items-baseline gap-1">
-                   {formatNumber(stats.totalFieldCondemnation)}
                    <span className="text-[10px] opacity-40">kg</span>
                 </div>
              </div>
@@ -159,13 +152,6 @@ const SlaughterSummary = React.memo(({ stats, startDate, endDate, onStartDateCha
                 <div className="text-xl font-black text-amber-100 flex items-baseline gap-1">
                    <span className="text-[10px] opacity-40">R$</span>
                    {formatNumber(stats.totalInvoiceValue, 2)}
-                </div>
-             </div>
-             <div className="space-y-2 border-l-2 border-emerald-500/50 pl-6 bg-emerald-500/5 rounded-r-xl py-2 -ml-2">
-                <div className="text-[9px] font-black text-emerald-300 uppercase tracking-widest">Receita / KG Produzido</div>
-                <div className="text-xl font-black text-emerald-200 flex items-baseline gap-1">
-                   <span className="text-[10px] opacity-40">R$</span>
-                   {formatNumber(stats.revenuePerKg, 2)}
                 </div>
              </div>
              <div className="space-y-2 border-l-2 border-indigo-500/50 pl-6 bg-indigo-500/5 rounded-r-xl py-2 -ml-2">

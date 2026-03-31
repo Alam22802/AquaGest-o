@@ -2,7 +2,7 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { AppState, SlaughterEmployee, SlaughterHRIndicator, SlaughterHREntry, SlaughterHRVacancy, User } from '../../types';
 import { Users, UserPlus, Trash2, Edit3, X, Calendar, Search, TrendingUp, Heart, AlertCircle, Briefcase, BarChart as BarChartIcon, CheckSquare, Square, Plus, Layout } from 'lucide-react';
-import { format, parseISO } from 'date-fns';
+import { format, parseISO, differenceInDays, addDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { formatNumber } from '../../utils/formatters';
@@ -75,9 +75,32 @@ const SlaughterHR: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     employeeIds: [] as string[],
     type: 'Falta',
     date: new Date().toISOString().split('T')[0],
-    days: '',
+    endDate: new Date().toISOString().split('T')[0],
+    days: '1',
     description: ''
   });
+
+  useEffect(() => {
+    if (entryForm.type === 'Falta' || entryForm.type === 'Atestado') {
+      try {
+        const start = parseISO(entryForm.date);
+        const end = parseISO(entryForm.endDate);
+        if (!isNaN(start.getTime()) && !isNaN(end.getTime())) {
+          const diff = differenceInDays(end, start) + 1;
+          if (diff > 0) {
+            setEntryForm(prev => ({ ...prev, days: diff.toString() }));
+          } else if (diff <= 0 && entryForm.endDate < entryForm.date) {
+             // If end date is before start date, sync them
+             setEntryForm(prev => ({ ...prev, endDate: prev.date, days: '1' }));
+          } else {
+            setEntryForm(prev => ({ ...prev, days: '1' }));
+          }
+        }
+      } catch (e) {
+        // Ignore parsing errors
+      }
+    }
+  }, [entryForm.date, entryForm.endDate, entryForm.type]);
   const [employeeSearch, setEmployeeSearch] = useState('');
 
   const employees = useMemo(() => state.slaughterEmployees || [], [state.slaughterEmployees]);
@@ -272,7 +295,8 @@ const SlaughterHR: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       employeeIds: [],
       type: 'Falta',
       date: new Date().toISOString().split('T')[0],
-      days: '',
+      endDate: new Date().toISOString().split('T')[0],
+      days: '1',
       description: ''
     });
     setEmployeeSearch('');
@@ -1051,7 +1075,9 @@ const SlaughterHR: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                       )}
                     </div>
                     <div className="space-y-1">
-                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Data</label>
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">
+                        {(entryForm.type === 'Falta' || entryForm.type === 'Atestado') ? 'Data Início' : 'Data'}
+                      </label>
                       <input 
                         type="date" required 
                         className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none text-xs"
@@ -1059,17 +1085,27 @@ const SlaughterHR: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                         onChange={e => setEntryForm({...entryForm, date: e.target.value})}
                       />
                     </div>
+                    {(entryForm.type === 'Falta' || entryForm.type === 'Atestado') && (
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Data Fim</label>
+                        <input 
+                          type="date" required 
+                          className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none text-xs"
+                          value={entryForm.endDate}
+                          onChange={e => setEntryForm({...entryForm, endDate: e.target.value})}
+                        />
+                      </div>
+                    )}
                   </div>
 
 
-                  {entryForm.type === 'Atestado' && (
+                  {(entryForm.type === 'Falta' || entryForm.type === 'Atestado') && (
                     <div className="space-y-1">
-                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Dias de Atestado</label>
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Dias Totais</label>
                       <input 
-                        type="number" required 
-                        className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none text-xs"
+                        type="number" readOnly
+                        className="w-full px-5 py-3.5 bg-slate-100 border border-slate-200 rounded-2xl font-bold outline-none text-xs text-slate-500 cursor-not-allowed"
                         value={entryForm.days}
-                        onChange={e => setEntryForm({...entryForm, days: e.target.value})}
                       />
                     </div>
                   )}
@@ -1136,7 +1172,8 @@ const SlaughterHR: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                                 employeeIds: ent.employeeIds,
                                 type: ent.type,
                                 date: ent.date,
-                                days: ent.days?.toString() || '',
+                                endDate: ent.days ? format(addDays(parseISO(ent.date), ent.days - 1), 'yyyy-MM-dd') : ent.date,
+                                days: ent.days?.toString() || '1',
                                 description: ent.description || ''
                               });
                             }} className="p-2 text-slate-300 hover:text-amber-500 transition-colors"><Edit3 className="w-4 h-4" /></button>
