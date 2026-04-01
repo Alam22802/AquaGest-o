@@ -439,6 +439,21 @@ const SlaughterOverview: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
 
   const [chartMonth, setChartMonth] = useState(new Date().getMonth());
   const [chartYear, setChartYear] = useState(new Date().getFullYear());
+  const [selectedBatches, setSelectedBatches] = useState<string[]>([]);
+
+  const allBatches = useMemo(() => {
+    const logs = Array.isArray(state.slaughterLogs) ? state.slaughterLogs : [];
+    const batches = Array.from(new Set(logs.map(l => l.slaughterBatch).filter(Boolean)));
+    return batches.sort((a, b) => b.localeCompare(a));
+  }, [state.slaughterLogs]);
+
+  const toggleBatch = (batch: string) => {
+    setSelectedBatches(prev => 
+      prev.includes(batch) 
+        ? prev.filter(b => b !== batch) 
+        : [...prev, batch]
+    );
+  };
 
   const [formData, setFormData] = useState({
     producer: '',
@@ -572,6 +587,7 @@ const SlaughterOverview: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
     const logsByDate = new Map<string, SlaughterLog[]>();
     logs.forEach(log => {
       if (!log.date) return;
+      if (selectedBatches.length > 0 && !selectedBatches.includes(log.slaughterBatch)) return;
       if (!logsByDate.has(log.date)) {
         logsByDate.set(log.date, []);
       }
@@ -744,6 +760,10 @@ const SlaughterOverview: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
       logs = logs.filter(log => 
         log.producer?.toLowerCase().includes(filterProducer.toLowerCase())
       );
+    }
+
+    if (selectedBatches.length > 0) {
+      logs = logs.filter(log => selectedBatches.includes(log.slaughterBatch));
     }
 
     return logs.sort((a, b) => {

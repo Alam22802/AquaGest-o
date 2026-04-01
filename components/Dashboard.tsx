@@ -6,7 +6,7 @@ import {
   BarChart, Bar, Cell
 } from 'recharts';
 import { formatNumber } from '../utils/formatters';
-import { Fish, Utensils, Scale, TrendingUp, FishOff, Calendar, Layers, Download, Info, AlertTriangle, PackageSearch, CloudSun, Droplets, Wind, CloudRain, Thermometer, Umbrella, Cloud, RefreshCw } from 'lucide-react';
+import { Fish, Utensils, Scale, TrendingUp, FishOff, Calendar, Layers, Download, Info, AlertTriangle, PackageSearch, CloudSun, Droplets, Wind, CloudRain, Thermometer, Umbrella, Cloud, RefreshCw, ChevronDown, ClipboardCheck } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { format, isWithinInterval, parseISO, startOfDay, endOfDay, subDays, differenceInDays, addDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -151,7 +151,8 @@ const WeatherWidget = () => {
 };
 
 const Dashboard: React.FC<Props> = ({ state }) => {
-  const [selectedBatchId, setSelectedBatchId] = useState<string>('');
+  const [selectedBatchIds, setSelectedBatchIds] = useState<string[]>([]);
+  const [showBatchSelector, setShowBatchSelector] = useState(false);
   const [reportStartDate, setReportStartDate] = useState<string>(format(subDays(new Date(), 30), 'yyyy-MM-dd'));
   const [reportEndDate, setReportEndDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'));
   const [showSupplierCurve, setShowSupplierCurve] = useState<boolean>(false);
@@ -165,6 +166,14 @@ const Dashboard: React.FC<Props> = ({ state }) => {
       return stockKg <= limitKg;
     });
   }, [state.feedTypes]);
+
+  const toggleBatch = (batchId: string) => {
+    setSelectedBatchIds(prev => 
+      prev.includes(batchId) 
+        ? prev.filter(id => id !== batchId) 
+        : [...prev, batchId]
+    );
+  };
 
   const batchStats = useMemo(() => {
     const cagesByBatch = new Map<string, typeof state.cages>();
@@ -348,128 +357,91 @@ const Dashboard: React.FC<Props> = ({ state }) => {
     return batchStats.filter(b => b.settlementBalance === 0);
   }, [batchStats]);
 
-  useEffect(() => {
-    if (filteredBatchStats && filteredBatchStats.length > 0) {
-      if (!selectedBatchId || !filteredBatchStats.some(b => b.id === selectedBatchId)) {
-        setSelectedBatchId('all');
-      }
-    } else if (state.batches && state.batches.length > 0) {
-      if (!selectedBatchId) setSelectedBatchId(state.batches[0].id);
-    }
-  }, [filteredBatchStats, state.batches]);
-
   const selectedBatchData = useMemo(() => {
-    if (selectedBatchId === 'all') {
-      const stats = filteredBatchStats.reduce((acc, curr) => {
-        acc.stock += curr.stock;
-        acc.harvested += curr.harvested;
-        acc.harvestedWeight += curr.harvestedWeight;
-        acc.mortality += curr.mortality;
-        acc.biomass += curr.biomass;
-        acc.feed += curr.feed;
-        
-        curr.feedBreakdown.forEach(fb => {
-          const existing = acc.feedBreakdown.find(f => f.name === fb.name);
-          if (existing) {
-            existing.amountKg += fb.amountKg;
-          } else {
-            acc.feedBreakdown.push({ ...fb });
-          }
-        });
-        
-        return acc;
-      }, { 
-        stock: 0, 
-        harvested: 0, 
-        harvestedWeight: 0,
-        mortality: 0, 
-        biomass: 0, 
-        feed: 0, 
-        feedBreakdown: [] as { name: string, amountKg: number }[] 
+    const batchesToProcess = selectedBatchIds.length > 0 
+      ? filteredBatchStats.filter(b => selectedBatchIds.includes(b.id))
+      : filteredBatchStats;
+
+    const stats = batchesToProcess.reduce((acc, curr) => {
+      acc.stock += curr.stock;
+      acc.harvested += curr.harvested;
+      acc.harvestedWeight += curr.harvestedWeight;
+      acc.mortality += curr.mortality;
+      acc.biomass += curr.biomass;
+      acc.feed += curr.feed;
+      
+      curr.feedBreakdown.forEach(fb => {
+        const existing = acc.feedBreakdown.find(f => f.name === fb.name);
+        if (existing) {
+          existing.amountKg += fb.amountKg;
+        } else {
+          acc.feedBreakdown.push({ ...fb });
+        }
       });
-
-      const totalProducedWeightKg = stats.biomass + stats.harvestedWeight;
-      const fcaValue = totalProducedWeightKg > 0 ? formatNumber(stats.feed / totalProducedWeightKg, 2) : '0,00';
-      const avgWeight = stats.stock > 0 ? (stats.biomass * 1000) / stats.stock : 0;
-
-      return {
-        ...stats,
-        fca: fcaValue,
-        avgWeight,
-        samplingInfo: `Total de ${filteredBatchStats.length} lotes`
-      };
-    }
-
-    return batchStats.find(b => b.id === selectedBatchId) || { 
+      
+      return acc;
+    }, { 
       stock: 0, 
       harvested: 0, 
       harvestedWeight: 0,
       mortality: 0, 
       biomass: 0, 
       feed: 0, 
-      fca: '0.00', 
-      feedBreakdown: [], 
-      avgWeight: 0, 
-      samplingInfo: 'Sem dados' 
-    };
-  }, [batchStats, filteredBatchStats, selectedBatchId]);
+      feedBreakdown: [] as { name: string, amountKg: number }[] 
+    });
 
-  const batch = selectedBatchId === 'all' ? (state.batches || []).find(b => b.id === (state.biometryLogs || []).find(l => l.batchId)?.batchId) : (state.batches || []).find(b => b.id === selectedBatchId);
+    const totalProducedWeightKg = stats.biomass + stats.harvestedWeight;
+    const fcaValue = totalProducedWeightKg > 0 ? formatNumber(stats.feed / totalProducedWeightKg, 2) : '0,00';
+    const avgWeight = stats.stock > 0 ? (stats.biomass * 1000) / stats.stock : 0;
+
+    return {
+      ...stats,
+      fca: fcaValue,
+      avgWeight,
+      samplingInfo: selectedBatchIds.length === 1 
+        ? batchStats.find(b => b.id === selectedBatchIds[0])?.samplingInfo || 'Sem dados'
+        : `Total de ${batchesToProcess.length} lotes`
+    };
+  }, [batchStats, filteredBatchStats, selectedBatchIds]);
+
+  const batch = selectedBatchIds.length === 1 
+    ? (state.batches || []).find(b => b.id === selectedBatchIds[0])
+    : (state.batches || []).find(b => b.id === (state.biometryLogs || []).find(l => l.batchId)?.batchId);
   const protocol = state.protocols.find(p => p.id === batch?.protocolId);
 
   const biometryEvolutionData = useMemo(() => {
-    if (!selectedBatchId) return [];
-    
     let logs: any[] = [];
     let initialWeights: number[] = [];
     let settlementDate = '';
     let expectedHarvestDate = '';
 
-    if (selectedBatchId === 'all') {
-      const filteredBatches = (state.batches || []).filter(b => {
-        const stats = batchStats.find(s => s.id === b.id);
-        return stats?.settlementBalance === 0;
-      });
-      
-      initialWeights = filteredBatches.map(b => b.initialUnitWeight);
-      if (filteredBatches.length > 0) {
-        settlementDate = filteredBatches[0].settlementDate;
-        expectedHarvestDate = filteredBatches[0].expectedHarvestDate || '';
-      }
-      
-      logs = (state.biometryLogs || []).filter(l => {
-        const batch = filteredBatches.find(b => b.id === l.batchId);
-        if (batch) return true;
-        
-        if (!l.batchId && l.cageId) {
-          const cage = state.cages.find(c => c.id === l.cageId);
-          const cageBatch = filteredBatches.find(b => b.id === cage?.batchId);
-          if (cageBatch && l.date >= cageBatch.settlementDate) return true;
-          
-          const harvest = (state.harvestLogs || []).find(h => h.cageId === l.cageId && h.date >= l.date);
-          return filteredBatches.some(b => b.id === harvest?.batchId);
-        }
-        return false;
-      });
-    } else {
-      const batch = (state.batches || []).find(b => b.id === selectedBatchId);
-      if (!batch) return [];
-      initialWeights = [batch.initialUnitWeight];
-      settlementDate = batch.settlementDate;
-      expectedHarvestDate = batch.expectedHarvestDate || '';
-      
-      logs = (state.biometryLogs || []).filter(l => {
-        if (l.batchId === selectedBatchId) return true;
-        if (!l.batchId && l.cageId) {
-          const cage = state.cages.find(c => c.id === l.cageId);
-          if (cage?.batchId === selectedBatchId && l.date >= batch.settlementDate) return true;
-          
-          const harvest = (state.harvestLogs || []).find(h => h.cageId === l.cageId && h.date >= l.date);
-          return harvest?.batchId === selectedBatchId;
-        }
-        return false;
-      });
+    const filteredBatches = (state.batches || []).filter(b => {
+      const stats = batchStats.find(s => s.id === b.id);
+      const isSettled = stats?.settlementBalance === 0;
+      const isSelected = selectedBatchIds.length === 0 || selectedBatchIds.includes(b.id);
+      return isSettled && isSelected;
+    });
+    
+    initialWeights = filteredBatches.map(b => b.initialUnitWeight);
+    if (filteredBatches.length > 0) {
+      settlementDate = filteredBatches[0].settlementDate;
+      expectedHarvestDate = filteredBatches[0].expectedHarvestDate || '';
     }
+    
+    logs = (state.biometryLogs || []).filter(l => {
+      const batch = filteredBatches.find(b => b.id === l.batchId);
+      if (batch) return true;
+      
+      if (!l.batchId && l.cageId) {
+        const cage = state.cages.find(c => c.id === l.cageId);
+        const cageBatch = filteredBatches.find(b => b.id === cage?.batchId);
+        if (cageBatch && l.date >= cageBatch.settlementDate) return true;
+        
+        const harvest = (state.harvestLogs || []).find(h => h.cageId === l.cageId && h.date >= l.date);
+        return filteredBatches.some(b => b.id === harvest?.batchId);
+      }
+      return false;
+    });
     
     const uniqueDates = Array.from(new Set(logs.map(l => l.date))).sort();
     
@@ -635,49 +607,32 @@ const Dashboard: React.FC<Props> = ({ state }) => {
     }
 
     return baseData;
-  }, [state.biometryLogs, state.batches, state.cages, state.harvestLogs, state.protocols, state.standardCurves, selectedBatchId, batchStats, showSupplierCurve, showStandardCurve, showContinueCurve]);
+  }, [state.biometryLogs, state.batches, state.cages, state.harvestLogs, state.protocols, state.standardCurves, selectedBatchIds, batchStats, showSupplierCurve, showStandardCurve, showContinueCurve]);
 
   const mortalityEvolutionData = useMemo(() => {
-    if (!selectedBatchId) return [];
-    
     let logs: any[] = [];
 
-    if (selectedBatchId === 'all') {
-      const filteredBatches = (state.batches || []).filter(b => {
-        const stats = batchStats.find(s => s.id === b.id);
-        return stats?.settlementBalance === 0;
-      });
+    const filteredBatches = (state.batches || []).filter(b => {
+      const stats = batchStats.find(s => s.id === b.id);
+      const isSettled = stats?.settlementBalance === 0;
+      const isSelected = selectedBatchIds.length === 0 || selectedBatchIds.includes(b.id);
+      return isSettled && isSelected;
+    });
 
-      logs = (state.mortalityLogs || []).filter(m => {
-        const batch = filteredBatches.find(b => b.id === m.batchId);
-        if (batch) return true;
+    logs = (state.mortalityLogs || []).filter(m => {
+      const batch = filteredBatches.find(b => b.id === m.batchId);
+      if (batch) return true;
 
-        if (!m.batchId && m.cageId) {
-          const cage = state.cages.find(c => c.id === m.cageId);
-          const cageBatch = filteredBatches.find(b => b.id === cage?.batchId);
-          if (cageBatch && m.date >= cageBatch.settlementDate) return true;
-          
-          const harvest = (state.harvestLogs || []).find(h => h.cageId === m.cageId && h.date >= m.date);
-          return filteredBatches.some(b => b.id === harvest?.batchId);
-        }
-        return false;
-      });
-    } else {
-      const batch = (state.batches || []).find(b => b.id === selectedBatchId);
-      if (!batch) return [];
-
-      logs = (state.mortalityLogs || []).filter(m => {
-        if (m.batchId === selectedBatchId) return true;
-        if (!m.batchId && m.cageId) {
-          const cage = state.cages.find(c => c.id === m.cageId);
-          if (cage?.batchId === selectedBatchId && m.date >= batch.settlementDate) return true;
-          
-          const harvest = (state.harvestLogs || []).find(h => h.cageId === m.cageId && h.date >= m.date);
-          return harvest?.batchId === selectedBatchId;
-        }
-        return false;
-      });
-    }
+      if (!m.batchId && m.cageId) {
+        const cage = state.cages.find(c => c.id === m.cageId);
+        const cageBatch = filteredBatches.find(b => b.id === cage?.batchId);
+        if (cageBatch && m.date >= cageBatch.settlementDate) return true;
+        
+        const harvest = (state.harvestLogs || []).find(h => h.cageId === m.cageId && h.date >= m.date);
+        return filteredBatches.some(b => b.id === harvest?.batchId);
+      }
+      return false;
+    });
 
     const grouped = logs.reduce((acc: any, log) => {
       if (!acc[log.date]) acc[log.date] = 0;
@@ -695,31 +650,23 @@ const Dashboard: React.FC<Props> = ({ state }) => {
         count: grouped[date] 
       };
     }).sort((a, b) => a.fullDate.localeCompare(b.fullDate));
-  }, [state.mortalityLogs, state.cages, state.batches, state.harvestLogs, selectedBatchId, batchStats]);
+  }, [state.mortalityLogs, state.cages, state.batches, state.harvestLogs, selectedBatchIds, batchStats]);
 
   const biomassEvolutionData = useMemo(() => {
-    if (!selectedBatchId) return [];
-    
     let relevantBatches: any[] = [];
     let settlementDate = '';
     let expectedHarvestDate = '';
 
-    if (selectedBatchId === 'all') {
-      relevantBatches = (state.batches || []).filter(b => {
-        const stats = batchStats.find(s => s.id === b.id);
-        return stats?.settlementBalance === 0;
-      });
-      if (relevantBatches.length > 0) {
-        settlementDate = relevantBatches[0].settlementDate;
-        expectedHarvestDate = relevantBatches[0].expectedHarvestDate || '';
-      }
-    } else {
-      const batch = (state.batches || []).find(b => b.id === selectedBatchId);
-      if (batch) {
-        relevantBatches = [batch];
-        settlementDate = batch.settlementDate;
-        expectedHarvestDate = batch.expectedHarvestDate || '';
-      }
+    relevantBatches = (state.batches || []).filter(b => {
+      const stats = batchStats.find(s => s.id === b.id);
+      const isSettled = stats?.settlementBalance === 0;
+      const isSelected = selectedBatchIds.length === 0 || selectedBatchIds.includes(b.id);
+      return isSettled && isSelected;
+    });
+
+    if (relevantBatches.length > 0) {
+      settlementDate = relevantBatches[0].settlementDate;
+      expectedHarvestDate = relevantBatches[0].expectedHarvestDate || '';
     }
 
     if (relevantBatches.length === 0) return [];
@@ -989,7 +936,7 @@ const Dashboard: React.FC<Props> = ({ state }) => {
     }
 
     return baseData;
-  }, [state, selectedBatchId, batchStats, showSupplierCurve, showStandardCurve, showContinueCurve]);
+  }, [state.biometryLogs, state.mortalityLogs, state.cages, state.batches, state.harvestLogs, selectedBatchIds, batchStats, showSupplierCurve, showStandardCurve, showContinueCurve]);
 
   const totalMortalityInChart = useMemo(() => {
     return mortalityEvolutionData.reduce((acc, curr) => acc + curr.count, 0);
@@ -1247,19 +1194,53 @@ const Dashboard: React.FC<Props> = ({ state }) => {
         <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
           <div className="flex items-center gap-4">
             <div className="p-3 bg-blue-50 text-blue-600 rounded-xl shadow-sm"><Layers className="w-6 h-6" /></div>
-            <div>
-              <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Lote Selecionado</h3>
-              <select 
-                value={selectedBatchId} 
-                onChange={e => setSelectedBatchId(e.target.value)}
-                className="text-lg font-black text-slate-800 bg-transparent border-none outline-none focus:ring-0 p-0 cursor-pointer"
+            <div className="relative">
+              <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Lotes Selecionados</h3>
+              <button 
+                onClick={() => setShowBatchSelector(!showBatchSelector)}
+                className="flex items-center gap-2 text-lg font-black text-slate-800 hover:text-slate-600 transition-colors"
               >
-                {filteredBatchStats.length > 0 && (
-                  <option value="all">Todos os Lotes</option>
-                )}
-                {filteredBatchStats.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
-                {filteredBatchStats.length === 0 && <option value="">Nenhum lote povoado</option>}
-              </select>
+                {selectedBatchIds.length === 0 ? 'Todos os Lotes' : `${selectedBatchIds.length} Selecionados`}
+                <ChevronDown className={`w-5 h-5 transition-transform ${showBatchSelector ? 'rotate-180' : ''}`} />
+              </button>
+
+              {showBatchSelector && (
+                <div className="absolute top-full mt-2 left-0 w-64 bg-white rounded-2xl shadow-2xl border border-slate-200 z-50 p-4 max-h-80 overflow-y-auto">
+                  <div className="flex justify-between items-center mb-4 pb-2 border-b border-slate-100">
+                    <span className="text-[10px] font-black uppercase text-slate-400">Selecionar Lotes</span>
+                    <div className="flex items-center gap-3">
+                      <button 
+                        onClick={() => setSelectedBatchIds(filteredBatchStats.map(b => b.id))} 
+                        className="text-[9px] font-black uppercase text-blue-600 hover:text-blue-700"
+                      >
+                        Selecionar Todos
+                      </button>
+                      <button 
+                        onClick={() => setSelectedBatchIds([])} 
+                        className="text-[9px] font-black uppercase text-red-500 hover:text-red-600"
+                      >
+                        Limpar
+                      </button>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    {filteredBatchStats.map(batch => (
+                      <label key={batch.id} className="flex items-center gap-3 p-2 hover:bg-slate-50 rounded-xl cursor-pointer transition-colors">
+                        <input 
+                          type="checkbox" 
+                          checked={selectedBatchIds.includes(batch.id)}
+                          onChange={() => toggleBatch(batch.id)}
+                          className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                        />
+                        <span className="text-xs font-bold text-slate-700 uppercase">{batch.name}</span>
+                      </label>
+                    ))}
+                    {filteredBatchStats.length === 0 && (
+                      <div className="text-center py-4 text-[10px] font-bold text-slate-400 uppercase">Nenhum lote encontrado</div>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
