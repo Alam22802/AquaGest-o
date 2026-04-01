@@ -23,19 +23,18 @@ const Layout: React.FC<Props> = ({ children, activeTab, setActiveTab, currentUse
 
   const menuItems = [
     { id: 'dashboard', label: 'Visão Geral', icon: <LayoutDashboard className="w-5 h-5" /> },
-    { id: 'capex', label: 'Investimentos CAPEX', icon: <DollarSign className="w-5 h-5" /> },
+    { id: 'biometry', label: 'Biometria', icon: <Scale className="w-5 h-5" /> },
     { id: 'inventory', label: 'Cadastro Gaiolas', icon: <Box className="w-5 h-5" /> },
+    { id: 'feed', label: 'Estoque Ração', icon: <Package className="w-5 h-5" /> },
+    { id: 'slaughter', label: 'Frigorífico', icon: <Factory className="w-5 h-5" /> },
+    { id: 'capex', label: 'Investimentos CAPEX', icon: <DollarSign className="w-5 h-5" /> },
+    { id: 'lines', label: 'Linhas/Setores', icon: <Layers className="w-5 h-5" /> },
+    { id: 'batches', label: 'Lotes (Estoque)', icon: <Tag className="w-5 h-5" /> },
     { id: 'maintenance', label: 'Manutenção', icon: <Settings className="w-5 h-5" /> },
     { id: 'protocols', label: 'Modelos de Produção', icon: <BookOpen className="w-5 h-5" /> },
-    { id: 'batches', label: 'Lotes (Estoque)', icon: <Tag className="w-5 h-5" /> },
-    { id: 'lines', label: 'Linhas/Setores', icon: <Layers className="w-5 h-5" /> },
-    { id: 'cages', label: 'Povoamento', icon: <ClipboardList className="w-5 h-5" /> },
-    { id: 'feed', label: 'Estoque Ração', icon: <Package className="w-5 h-5" /> },
-    { id: 'feeding', label: 'Trato Diário', icon: <Utensils className="w-5 h-5" /> },
-    { id: 'biometry', label: 'Biometria', icon: <Scale className="w-5 h-5" /> },
     { id: 'mortality', label: 'Mortalidade', icon: <FishOff className="w-5 h-5" /> },
-    { id: 'slaughter', label: 'Frigorífico', icon: <Factory className="w-5 h-5" /> },
-    { id: 'cloud', label: 'Backup/Nuvem', icon: <Cloud className="w-5 h-5" /> },
+    { id: 'cages', label: 'Povoamento', icon: <ClipboardList className="w-5 h-5" /> },
+    { id: 'feeding', label: 'Trato Diário', icon: <Utensils className="w-5 h-5" /> },
     { 
       id: 'users', 
       label: 'Usuários', 
@@ -51,6 +50,7 @@ const Layout: React.FC<Props> = ({ children, activeTab, setActiveTab, currentUse
       ), 
       masterOnly: true 
     },
+    { id: 'cloud', label: 'Backup/Nuvem', icon: <Cloud className="w-5 h-5" /> },
   ];
 
   const filteredMenuItems = menuItems.filter(item => {
