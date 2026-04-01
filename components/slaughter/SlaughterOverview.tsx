@@ -153,44 +153,51 @@ const SlaughterSummary = React.memo(({ stats, startDate, endDate, onStartDateCha
           </div>
 
           {/* Linha 3: Financeiro */}
-          <div className="grid grid-cols-2 lg:grid-cols-6 gap-8">
+          <div className="grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-8">
              <div className="space-y-2 border-l-2 border-amber-500/30 pl-6">
-                <div className="text-[9px] font-black opacity-40 uppercase tracking-widest">Valor Total Notas</div>
+                <div className="text-[9px] font-black opacity-40 uppercase tracking-widest">VALOR TOTAL MP PEIXE VIVO</div>
                 <div className="text-xl font-black text-amber-100 flex items-baseline gap-1">
                    <span className="text-[10px] opacity-40">R$</span>
                    {formatNumber(stats.totalInvoiceValue, 2)}
                 </div>
              </div>
-             <div className="space-y-2 border-l-2 border-indigo-500/50 pl-6 bg-indigo-500/5 rounded-r-xl py-2 -ml-2">
-                <div className="text-[9px] font-black text-indigo-300 uppercase tracking-widest">Custo KG Produzido</div>
-                <div className="text-xl font-black text-indigo-200 flex items-baseline gap-1">
+             <div className="space-y-2 border-l-2 border-amber-500/30 pl-6">
+                <div className="text-[9px] font-black opacity-40 uppercase tracking-widest">kilo MP PEIXE VIVO</div>
+                <div className="text-xl font-black text-amber-100 flex items-baseline gap-1">
                    <span className="text-[10px] opacity-40">R$</span>
-                   {formatNumber(stats.costPerKgProduced, 2)}
+                   {formatNumber(stats.totalRecep > 0 ? stats.totalInvoiceValue / stats.totalRecep : 0, 2)}
                 </div>
              </div>
              <div className="space-y-2 border-l-2 border-white/20 pl-6">
-                <div className="text-[9px] font-black opacity-40 uppercase tracking-widest">Frete / kg Vivo</div>
+                <div className="text-[9px] font-black opacity-40 uppercase tracking-widest">FRETE KG VIVO</div>
                 <div className="text-xl font-black text-white/90 flex items-baseline gap-1">
                    <span className="text-[10px] opacity-40">R$</span>
                    {formatNumber(stats.freightPerKgLive, 2)}
                 </div>
              </div>
              <div className="space-y-2 border-l-2 border-white/20 pl-6">
-                <div className="text-[9px] font-black opacity-40 uppercase tracking-widest">Mão De Obra/KG</div>
+                <div className="text-[9px] font-black opacity-40 uppercase tracking-widest">MÃO DE OBRA/KG</div>
                 <div className="text-xl font-black text-white/90 flex items-baseline gap-1">
                    <span className="text-[10px] opacity-40">R$</span>
                    {formatNumber(stats.laborPerKg, 2)}
                 </div>
              </div>
+             <div className="space-y-2 border-l-2 border-indigo-500/50 pl-6 bg-indigo-500/5 rounded-r-xl py-2 -ml-2">
+                <div className="text-[9px] font-black text-indigo-300 uppercase tracking-widest">CUSTO KG PRODUZIDO</div>
+                <div className="text-xl font-black text-indigo-200 flex items-baseline gap-1">
+                   <span className="text-[10px] opacity-40">R$</span>
+                   {formatNumber(stats.costPerKgProduced, 2)}
+                </div>
+             </div>
              <div className="space-y-2 border-l-2 border-white/20 pl-6">
-                <div className="text-[9px] font-black opacity-40 uppercase tracking-widest">Consumo Água/KG</div>
+                <div className="text-[9px] font-black opacity-40 uppercase tracking-widest">CONSUMO AGUA/KG</div>
                 <div className="text-xl font-black text-white/90 flex items-baseline gap-1">
                    {formatNumber(stats.waterConsumptionPerKg, 2)}
                    <span className="text-[10px] opacity-40">L/kg</span>
                 </div>
              </div>
              <div className="space-y-2 border-l-2 border-white/20 pl-6">
-                <div className="text-[9px] font-black opacity-40 uppercase tracking-widest">Custo Energia/KG</div>
+                <div className="text-[9px] font-black opacity-40 uppercase tracking-widest">CUSTO ENERGIA/KG</div>
                 <div className="text-xl font-black text-white/90 flex items-baseline gap-1">
                    <span className="text-[10px] opacity-40">R$</span>
                    {formatNumber(stats.energyCostPerKg, 2)}
