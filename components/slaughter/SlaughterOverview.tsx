@@ -33,6 +33,7 @@ const SlaughterSummary = React.memo(({ stats, startDate, endDate, onStartDateCha
     revenuePerKg: number;
     costPerKgProduced: number;
     totalTransportCondemnation: number;
+    renderingYield: number;
     avgSlaughterPerDay: number;
     avgFinishedProductPerDay: number;
   }, 
@@ -120,7 +121,7 @@ const SlaughterSummary = React.memo(({ stats, startDate, endDate, onStartDateCha
           </div>
 
           {/* Linha 2: Condenações */}
-          <div className="grid grid-cols-2 lg:grid-cols-3 gap-8 mb-8 pb-8 border-b border-white/5">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-8 mb-8 pb-8 border-b border-white/5">
              <div className="space-y-2 border-l-2 border-red-500/30 pl-6">
                 <div className="text-[9px] font-black opacity-40 uppercase tracking-widest">Condenações Frig.</div>
                 <div className="text-xl font-black text-red-400 flex items-baseline gap-1">
@@ -140,6 +141,13 @@ const SlaughterSummary = React.memo(({ stats, startDate, endDate, onStartDateCha
                 <div className="text-xl font-black text-amber-400 flex items-baseline gap-1">
                    {formatNumber(stats.totalRendering, 0)}
                    <span className="text-[10px] opacity-40">kg</span>
+                </div>
+             </div>
+             <div className="space-y-2 border-l-2 border-amber-500/30 pl-6">
+                <div className="text-[9px] font-black opacity-40 uppercase tracking-widest">Rendimento Graxaria</div>
+                <div className="text-xl font-black text-amber-200 flex items-baseline gap-1">
+                   {formatNumber(stats.renderingYield, 1)}
+                   <span className="text-[10px] opacity-40">%</span>
                 </div>
              </div>
           </div>
@@ -518,6 +526,7 @@ const SlaughterOverview: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
 
     const totalSlaughterCondemnation = filteredLogs.reduce((acc, l) => acc + (l.slaughterCondemnation || 0), 0);
     const totalTransportCondemnation = filteredLogs.reduce((acc, l) => acc + (l.transportCondemnation || 0), 0);
+    const renderingYield = totalRecep > 0 ? (totalRendering / totalRecep) * 100 : 0;
 
     const totalInvoiceValue = filteredLogs.reduce((acc, l) => acc + (l.invoiceValue || 0), 0);
     const revenuePerKg = totalPacked > 0 ? totalInvoiceValue / totalPacked : 0;
@@ -547,6 +556,7 @@ const SlaughterOverview: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
       revenuePerKg,
       costPerKgProduced,
       totalTransportCondemnation,
+      renderingYield,
       avgSlaughterPerDay,
       avgFinishedProductPerDay
     };
