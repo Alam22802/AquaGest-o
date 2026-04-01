@@ -1043,14 +1043,14 @@ const SlaughterHR: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
             </div>
           </div>
 
-          <div className="flex flex-col gap-8">
-            <div className="w-full sticky top-0 z-10 bg-slate-50/50 backdrop-blur-sm -mx-4 px-4 py-4">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div className="lg:col-span-1 lg:sticky lg:top-8 h-fit z-10">
               <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-200">
                 <h3 className="text-xl font-black text-slate-800 mb-8 uppercase tracking-tighter italic flex items-center gap-3">
                   <Briefcase className="w-6 h-6" />
                   {editingEntryId ? 'Editar Lançamento' : 'Novo Lançamento'}
                 </h3>
-                <form onSubmit={handleSaveEntry} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+                <form onSubmit={handleSaveEntry} className="space-y-6">
                   <div className="space-y-1">
                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Colaboradores</label>
                     <div className="relative">
@@ -1223,7 +1223,7 @@ const SlaughterHR: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
               </div>
             </div>
 
-            <div className="w-full">
+            <div className="lg:col-span-2">
               <div className="bg-white border border-slate-200 rounded-[2.5rem] overflow-hidden shadow-sm">
                 <div className="p-6 border-b border-slate-100 flex justify-between items-center">
                   <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest">Lançamentos do Período</h3>
