@@ -300,6 +300,18 @@ export interface InvestmentPortfolio {
   updatedAt?: number;
 }
 
+export interface CapexStage {
+  id: string;
+  name: string;
+  startDate: string;
+  endDate: string;
+  responsible: string;
+  plannedValue: number;
+  progress: number;
+  actualStartDate?: string;
+  actualEndDate?: string;
+}
+
 export interface CapexProject {
   id: string;
   portfolioId: string;
@@ -310,6 +322,7 @@ export interface CapexProject {
   endDate: string;
   responsible: string;
   investmentArea: string;
+  stages?: CapexStage[];
   userId?: string;
   updatedAt?: number;
 }

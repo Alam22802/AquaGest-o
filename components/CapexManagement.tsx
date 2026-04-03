@@ -51,7 +51,8 @@ const CapexManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     startDate: new Date().toISOString().split('T')[0],
     endDate: '',
     responsible: '',
-    investmentArea: ''
+    investmentArea: '',
+    stages: [] as CapexStage[]
   });
 
   const [invoiceForm, setInvoiceForm] = useState({
@@ -152,9 +153,10 @@ const CapexManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
 
     const newValue = Number(projectForm.plannedValue);
 
-    // Verificar se há saldo na carteira
-    if (newValue > availableBalance) {
-      alert(`Saldo insuficiente na carteira! Saldo disponível: R$ ${formatNumber(availableBalance)}`);
+    // Validar soma das etapas
+    const stagesTotal = projectForm.stages.reduce((acc, curr) => acc + curr.plannedValue, 0);
+    if (stagesTotal > newValue) {
+      alert(`A soma dos valores das etapas (R$ ${formatNumber(stagesTotal)}) não pode ultrapassar o valor total do projeto (R$ ${formatNumber(newValue)})!`);
       return;
     }
 
@@ -168,6 +170,7 @@ const CapexManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       endDate: projectForm.endDate,
       responsible: projectForm.responsible,
       investmentArea: projectForm.investmentArea,
+      stages: projectForm.stages,
       userId: currentUser.id,
       updatedAt: Date.now()
     };
@@ -178,7 +181,17 @@ const CapexManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
 
     onUpdate({ ...state, capexProjects: updatedProjects });
     setEditingProjectId(null);
-    setProjectForm({ portfolioId: '', name: '', costCenter: '', plannedValue: '', startDate: new Date().toISOString().split('T')[0], endDate: '', responsible: '', investmentArea: '' });
+    setProjectForm({ 
+      portfolioId: '', 
+      name: '', 
+      costCenter: '', 
+      plannedValue: '', 
+      startDate: new Date().toISOString().split('T')[0], 
+      endDate: '', 
+      responsible: '', 
+      investmentArea: '',
+      stages: []
+    });
   };
 
   const handleSaveInvoice = (e: React.FormEvent) => {
@@ -238,6 +251,22 @@ const CapexManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       deliveryDate: new Date().toISOString().split('T')[0], 
       description: '' 
     });
+  };
+
+  const handleUpdateStageDates = (projectId: string, stageId: string, actualStartDate?: string, actualEndDate?: string) => {
+    const updatedProjects = (state.capexProjects || []).map(p => {
+      if (p.id === projectId) {
+        const updatedStages = (p.stages || []).map(s => {
+          if (s.id === stageId) {
+            return { ...s, actualStartDate, actualEndDate };
+          }
+          return s;
+        });
+        return { ...p, stages: updatedStages, updatedAt: Date.now() };
+      }
+      return p;
+    });
+    onUpdate({ ...state, capexProjects: updatedProjects });
   };
 
   const removePortfolio = (id: string) => {
@@ -428,6 +457,102 @@ const CapexManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                           </div>
                         </div>
                         <Layers className="absolute -right-10 -bottom-10 w-64 h-64 text-slate-50 opacity-[0.03] pointer-events-none" />
+                      </div>
+
+                      {/* Etapas do Projeto */}
+                      <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm">
+                        <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest mb-6 flex items-center gap-2 italic">
+                           <Layers className="w-5 h-5 text-emerald-500" /> Cronograma de Etapas
+                        </h3>
+                        <div className="space-y-4">
+                          {(project.stages || []).map(stage => {
+                            const isLateStage = stage.actualEndDate && stage.endDate && new Date(stage.actualEndDate) > new Date(stage.endDate);
+                            const isStarted = !!stage.actualStartDate;
+                            const isFinished = !!stage.actualEndDate;
+
+                            return (
+                              <div key={stage.id} className="p-5 bg-slate-50 rounded-3xl border border-slate-100 hover:border-emerald-200 transition-all group">
+                                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                                  <div className="flex-1">
+                                    <div className="flex items-center gap-2 mb-1">
+                                      <h4 className="font-black text-slate-800 uppercase tracking-tight">{stage.name}</h4>
+                                      {isFinished ? (
+                                        <span className={`text-[8px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest ${isLateStage ? 'bg-red-100 text-red-600' : 'bg-emerald-100 text-emerald-600'}`}>
+                                          {isLateStage ? 'Concluído com Atraso' : 'Concluído no Prazo'}
+                                        </span>
+                                      ) : isStarted ? (
+                                        <span className="text-[8px] font-black bg-blue-100 text-blue-600 px-2 py-0.5 rounded-full uppercase tracking-widest">
+                                          Em Andamento
+                                        </span>
+                                      ) : (
+                                        <span className="text-[8px] font-black bg-slate-200 text-slate-500 px-2 py-0.5 rounded-full uppercase tracking-widest">
+                                          Aguardando
+                                        </span>
+                                      )}
+                                    </div>
+                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-3">
+                                      <div>
+                                        <span className="text-[8px] font-black text-slate-400 uppercase block mb-1">Previsto</span>
+                                        <div className="text-[10px] font-bold text-slate-600">
+                                          {format(parseISO(stage.startDate), 'dd/MM/yy')} - {format(parseISO(stage.endDate), 'dd/MM/yy')}
+                                        </div>
+                                      </div>
+                                      <div>
+                                        <span className="text-[8px] font-black text-slate-400 uppercase block mb-1">Responsável</span>
+                                        <div className="text-[10px] font-bold text-slate-600 uppercase">{stage.responsible}</div>
+                                      </div>
+                                      {currentUser.isMaster && (
+                                        <>
+                                          <div>
+                                            <span className="text-[8px] font-black text-slate-400 uppercase block mb-1">Valor Previsto</span>
+                                            <div className="text-[10px] font-bold text-emerald-600">R$ {formatNumber(stage.plannedValue)}</div>
+                                          </div>
+                                          <div>
+                                            <span className="text-[8px] font-black text-slate-400 uppercase block mb-1">Progresso</span>
+                                            <div className="flex items-center gap-2">
+                                              <div className="flex-1 h-1.5 bg-slate-200 rounded-full overflow-hidden">
+                                                <div className="h-full bg-emerald-500" style={{ width: `${stage.progress}%` }} />
+                                              </div>
+                                              <span className="text-[10px] font-black text-emerald-600">{stage.progress}%</span>
+                                            </div>
+                                          </div>
+                                        </>
+                                      )}
+                                    </div>
+                                  </div>
+
+                                  <div className="flex flex-col gap-2 min-w-[200px]">
+                                    <div className="grid grid-cols-2 gap-2">
+                                      <div>
+                                        <label className="text-[8px] font-black text-slate-400 uppercase block mb-1">Início Real</label>
+                                        <input 
+                                          type="date" 
+                                          className="w-full px-2 py-1.5 bg-white border border-slate-200 rounded-lg text-[10px] font-bold outline-none focus:ring-1 focus:ring-emerald-500"
+                                          value={stage.actualStartDate || ''}
+                                          onChange={e => handleUpdateStageDates(project.id, stage.id, e.target.value, stage.actualEndDate)}
+                                        />
+                                      </div>
+                                      <div>
+                                        <label className="text-[8px] font-black text-slate-400 uppercase block mb-1">Fim Real</label>
+                                        <input 
+                                          type="date" 
+                                          className="w-full px-2 py-1.5 bg-white border border-slate-200 rounded-lg text-[10px] font-bold outline-none focus:ring-1 focus:ring-emerald-500"
+                                          value={stage.actualEndDate || ''}
+                                          onChange={e => handleUpdateStageDates(project.id, stage.id, stage.actualStartDate, e.target.value)}
+                                        />
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                          {(project.stages || []).length === 0 && (
+                            <div className="text-center py-10 text-slate-400 font-bold uppercase text-[10px] tracking-widest italic border border-dashed border-slate-200 rounded-3xl">
+                              Nenhuma etapa cadastrada para este projeto.
+                            </div>
+                          )}
+                        </div>
                       </div>
 
                       {/* Tabela de Notas Recentes do Projeto */}
@@ -802,6 +927,146 @@ const CapexManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                   <label className="block text-[10px] font-black text-slate-400 uppercase mb-1">Data Fim</label>
                   <input type="date" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none focus:ring-2 focus:ring-emerald-500" value={projectForm.endDate} onChange={e => setProjectForm({...projectForm, endDate: e.target.value})} />
                 </div>
+
+                {/* Gestão de Etapas (Admin Only) */}
+                <div className="col-span-2 space-y-4 pt-4 border-t border-slate-100">
+                  <div className="flex justify-between items-center">
+                    <h4 className="text-xs font-black text-slate-800 uppercase tracking-widest flex items-center gap-2">
+                      <Layers className="w-4 h-4 text-emerald-500" /> Etapas do Projeto
+                    </h4>
+                    <button 
+                      type="button"
+                      onClick={() => setProjectForm({
+                        ...projectForm, 
+                        stages: [...projectForm.stages, { 
+                          id: generateId(), 
+                          name: '', 
+                          startDate: projectForm.startDate, 
+                          endDate: projectForm.endDate, 
+                          responsible: projectForm.responsible, 
+                          plannedValue: 0, 
+                          progress: 0 
+                        }]
+                      })}
+                      className="text-[10px] font-black text-emerald-600 uppercase tracking-widest flex items-center gap-1 hover:bg-emerald-50 px-3 py-1.5 rounded-lg transition-all"
+                    >
+                      <Plus className="w-3 h-3" /> Adicionar Etapa
+                    </button>
+                  </div>
+
+                  <div className="space-y-3">
+                    {projectForm.stages.map((stage, index) => (
+                      <div key={stage.id} className="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-3">
+                        <div className="flex justify-between items-start">
+                          <div className="flex-1">
+                            <label className="block text-[8px] font-black text-slate-400 uppercase mb-1">Nome da Etapa</label>
+                            <input 
+                              type="text" 
+                              required 
+                              className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl font-bold text-xs outline-none focus:ring-2 focus:ring-emerald-500" 
+                              placeholder="Ex: Fundação, Alvenaria..."
+                              value={stage.name} 
+                              onChange={e => {
+                                const newStages = [...projectForm.stages];
+                                newStages[index].name = e.target.value;
+                                setProjectForm({...projectForm, stages: newStages});
+                              }} 
+                            />
+                          </div>
+                          <button 
+                            type="button"
+                            onClick={() => {
+                              const newStages = projectForm.stages.filter((_, i) => i !== index);
+                              setProjectForm({...projectForm, stages: newStages});
+                            }}
+                            className="p-2 text-slate-300 hover:text-red-500 transition-colors"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                          <div>
+                            <label className="block text-[8px] font-black text-slate-400 uppercase mb-1">Início</label>
+                            <input 
+                              type="date" 
+                              required 
+                              className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl font-bold text-xs outline-none focus:ring-2 focus:ring-emerald-500" 
+                              value={stage.startDate} 
+                              onChange={e => {
+                                const newStages = [...projectForm.stages];
+                                newStages[index].startDate = e.target.value;
+                                setProjectForm({...projectForm, stages: newStages});
+                              }} 
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[8px] font-black text-slate-400 uppercase mb-1">Fim</label>
+                            <input 
+                              type="date" 
+                              required 
+                              className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl font-bold text-xs outline-none focus:ring-2 focus:ring-emerald-500" 
+                              value={stage.endDate} 
+                              onChange={e => {
+                                const newStages = [...projectForm.stages];
+                                newStages[index].endDate = e.target.value;
+                                setProjectForm({...projectForm, stages: newStages});
+                              }} 
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[8px] font-black text-slate-400 uppercase mb-1">Responsável</label>
+                            <input 
+                              type="text" 
+                              required 
+                              className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl font-bold text-xs outline-none focus:ring-2 focus:ring-emerald-500" 
+                              value={stage.responsible} 
+                              onChange={e => {
+                                const newStages = [...projectForm.stages];
+                                newStages[index].responsible = e.target.value;
+                                setProjectForm({...projectForm, stages: newStages});
+                              }} 
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[8px] font-black text-slate-400 uppercase mb-1">Valor (R$)</label>
+                            <input 
+                              type="number" 
+                              required 
+                              className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl font-bold text-xs outline-none focus:ring-2 focus:ring-emerald-500" 
+                              value={stage.plannedValue} 
+                              onChange={e => {
+                                const newStages = [...projectForm.stages];
+                                newStages[index].plannedValue = Number(e.target.value);
+                                setProjectForm({...projectForm, stages: newStages});
+                              }} 
+                            />
+                          </div>
+                        </div>
+                        <div>
+                          <label className="block text-[8px] font-black text-slate-400 uppercase mb-1">Andamento ({stage.progress}%)</label>
+                          <input 
+                            type="range" 
+                            min="0" 
+                            max="100"
+                            className="w-full h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-emerald-500" 
+                            value={stage.progress} 
+                            onChange={e => {
+                              const newStages = [...projectForm.stages];
+                              newStages[index].progress = Number(e.target.value);
+                              setProjectForm({...projectForm, stages: newStages});
+                            }} 
+                          />
+                        </div>
+                      </div>
+                    ))}
+                    {projectForm.stages.length === 0 && (
+                      <div className="text-center py-6 text-slate-400 font-bold uppercase text-[9px] tracking-widest italic border border-dashed border-slate-200 rounded-2xl">
+                        Nenhuma etapa cadastrada.
+                      </div>
+                    )}
+                  </div>
+                </div>
+
                 <button type="submit" className="col-span-2 py-4 bg-emerald-600 text-white rounded-2xl font-black uppercase tracking-widest text-xs shadow-xl shadow-emerald-600/20 active:scale-95 transition-all">
                   {editingProjectId ? 'Salvar Projeto' : 'Cadastrar Projeto'}
                 </button>
@@ -823,7 +1088,20 @@ const CapexManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                         <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest">Carteira: {portfolio?.name || '---'}</p>
                       </div>
                       <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button onClick={() => { setEditingProjectId(proj.id); setProjectForm({portfolioId: proj.portfolioId, name: proj.name, costCenter: proj.costCenter, plannedValue: proj.plannedValue.toString(), startDate: proj.startDate, endDate: proj.endDate || '', responsible: proj.responsible, investmentArea: proj.investmentArea}); }} className="p-2 text-slate-300 hover:text-emerald-500 transition-colors"><Edit className="w-4 h-4" /></button>
+                        <button onClick={() => { 
+                          setEditingProjectId(proj.id); 
+                          setProjectForm({
+                            portfolioId: proj.portfolioId, 
+                            name: proj.name, 
+                            costCenter: proj.costCenter, 
+                            plannedValue: proj.plannedValue.toString(), 
+                            startDate: proj.startDate, 
+                            endDate: proj.endDate || '', 
+                            responsible: proj.responsible, 
+                            investmentArea: proj.investmentArea,
+                            stages: proj.stages || []
+                          }); 
+                        }} className="p-2 text-slate-300 hover:text-emerald-500 transition-colors"><Edit className="w-4 h-4" /></button>
                         <button onClick={() => removeProject(proj.id)} className="p-2 text-slate-300 hover:text-red-500 transition-colors"><Trash2 className="w-4 h-4" /></button>
                       </div>
                     </div>
