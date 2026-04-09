@@ -136,7 +136,7 @@ const Maintenance: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
 
     return state.batches.filter(b => 
       !b.isClosed && (activeBatchIds.has(b.id) || batchesWithAvailableHarvestedCages.has(b.id))
-    );
+    ).sort((a, b) => a.name.localeCompare(b.name));
   }, [state.batches, state.cages, state.harvestLogs]);
 
   return (

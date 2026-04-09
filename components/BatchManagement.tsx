@@ -560,7 +560,7 @@ const BatchManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
         accuracy,
         isFinalized,
       };
-    });
+    }).sort((a, b) => a.name.localeCompare(b.name));
   }, [
     state.batches,
     state.cages,

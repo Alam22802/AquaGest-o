@@ -94,7 +94,7 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
         const batchCages = cagesByBatch.get(batch.id) || [];
         return harvestedFish > 0 && batchCages.length === 0;
       })
-      .sort((a, b) => b.settlementDate.localeCompare(a.settlementDate));
+      .sort((a, b) => a.name.localeCompare(b.name));
   }, [state.batches, state.cages, state.harvestLogs]);
 
   const batchData = useMemo(() => {

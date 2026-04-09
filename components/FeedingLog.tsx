@@ -272,7 +272,7 @@ const FeedingLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
             <form onSubmit={handleSave} className="space-y-4">
               <select required className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none" value={formBatchId} onChange={e => setFormBatchId(e.target.value)}>
                 <option value="">Escolher Lote...</option>
-                {(state.batches || []).map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                {(state.batches || []).sort((a, b) => a.name.localeCompare(b.name)).map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
               </select>
               <select required disabled={!formBatchId} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none" value={selectedLineId} onChange={e => setSelectedLineId(e.target.value)}>
                 <option value="">Escolher Linha...</option>
@@ -337,7 +337,7 @@ const FeedingLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
               }}
             >
               <option value="">Todos os Lotes</option>
-              {(state.batches || []).map(b => (
+              {(state.batches || []).sort((a, b) => a.name.localeCompare(b.name)).map(b => (
                 <option key={b.id} value={b.id}>{b.name}</option>
               ))}
             </select>

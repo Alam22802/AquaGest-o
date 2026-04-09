@@ -26,7 +26,8 @@ const CageManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
   const [bulkData, setBulkData] = useState({
     settlementDate: '',
     harvestDate: '',
-    lineId: ''
+    lineId: '',
+    initialFishCount: ''
   });
   const [formData, setFormData] = useState({
     cageId: '',
@@ -160,7 +161,7 @@ const CageManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
 
   const handleBulkUpdate = () => {
     if (!hasPermission || selectedCages.length === 0) return;
-    if (!bulkData.settlementDate && !bulkData.harvestDate && !bulkData.lineId) return;
+    if (!bulkData.settlementDate && !bulkData.harvestDate && !bulkData.lineId && !bulkData.initialFishCount) return;
 
     if (!confirm(`Deseja aplicar as alterações em ${selectedCages.length} gaiolas?`)) return;
 
@@ -171,6 +172,7 @@ const CageManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
           settlementDate: bulkData.settlementDate || c.settlementDate,
           harvestDate: bulkData.harvestDate || c.harvestDate,
           lineId: bulkData.lineId || c.lineId,
+          initialFishCount: bulkData.initialFishCount ? Number(bulkData.initialFishCount) : c.initialFishCount,
           updatedAt: Date.now()
         };
       }
@@ -180,7 +182,7 @@ const CageManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     onUpdate({ ...state, cages: updatedCages });
     setShowBulkEdit(false);
     setSelectedCages([]);
-    setBulkData({ settlementDate: '', harvestDate: '', lineId: '' });
+    setBulkData({ settlementDate: '', harvestDate: '', lineId: '', initialFishCount: '' });
   };
 
   return (
@@ -226,7 +228,7 @@ const CageManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
               <label className="block text-xs font-black text-slate-400 uppercase mb-1">Vincular ao Lote</label>
               <select required className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 font-bold" value={formData.batchId} onChange={(e) => setFormData({...formData, batchId: e.target.value})}>
                 <option value="">Selecione o lote...</option>
-                {(state.batches || []).map(b => {
+                {(state.batches || []).sort((a, b) => a.name.localeCompare(b.name)).map(b => {
                   const used = (state.cages || []).filter(c => c.batchId === b.id && c.id !== editingId).reduce((x, y) => x + (y.initialFishCount || 0), 0);
                   return <option key={b.id} value={b.id}>{b.name} (Saldo: {(b.initialQuantity - used).toLocaleString('pt-BR')})</option>;
                 })}
@@ -302,9 +304,12 @@ const CageManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
               }}
             >
               <option value="all">Todos os Lotes Ativos</option>
-              {(state.batches || []).filter(b => !b.isClosed).map(b => (
-                <option key={b.id} value={b.id}>{b.name}</option>
-              ))}
+              {(state.batches || [])
+                .filter(b => !b.isClosed && (state.cages || []).some(c => c.batchId === b.id))
+                .sort((a, b) => a.name.localeCompare(b.name))
+                .map(b => (
+                  <option key={b.id} value={b.id}>{b.name}</option>
+                ))}
             </select>
           </div>
         </div>
@@ -375,6 +380,16 @@ const CageManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                       <option key={line.id} value={line.id}>{line.name}</option>
                     ))}
                   </select>
+                </div>
+                <div>
+                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Quantidade de Peixes (Saldo Inicial)</label>
+                  <input 
+                    type="number" 
+                    placeholder="Manter atual..."
+                    className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 font-bold text-slate-700"
+                    value={bulkData.initialFishCount}
+                    onChange={(e) => setBulkData({...bulkData, initialFishCount: e.target.value})}
+                  />
                 </div>
               </div>
 

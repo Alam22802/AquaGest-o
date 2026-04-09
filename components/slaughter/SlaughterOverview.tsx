@@ -451,7 +451,7 @@ const SlaughterOverview: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
   const allBatches = useMemo(() => {
     const logs = Array.isArray(state.slaughterLogs) ? state.slaughterLogs : [];
     const batches = Array.from(new Set(logs.map(l => l.slaughterBatch).filter(Boolean)));
-    return batches.sort((a, b) => b.localeCompare(a));
+    return batches.sort((a, b) => a.localeCompare(b));
   }, [state.slaughterLogs]);
 
   const toggleBatch = (batch: string) => {

@@ -32,7 +32,7 @@ const HarvestManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
 
   const hasPermission = currentUser.isMaster || currentUser.canEdit;
 
-  const batches = useMemo(() => state.batches || [], [state.batches]);
+  const batches = useMemo(() => [...(state.batches || [])].sort((a, b) => a.name.localeCompare(b.name)), [state.batches]);
   
   const selectedBatch = useMemo(() => 
     batches.find(b => b.id === selectedBatchId),

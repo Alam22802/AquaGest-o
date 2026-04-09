@@ -385,7 +385,7 @@ const Dashboard: React.FC<Props> = ({ state }) => {
         samplingInfo,
         settlementBalance
       };
-    });
+    }).sort((a, b) => a.name.localeCompare(b.name));
   }, [state.batches, state.cages, state.mortalityLogs, state.biometryLogs, state.feedingLogs, state.feedTypes, state.harvestLogs]);
 
   const filteredBatchStats = useMemo(() => {
