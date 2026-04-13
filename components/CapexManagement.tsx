@@ -444,7 +444,7 @@ const CapexManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
           </div>
 
           {selectedProjectId ? (
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div className="space-y-8">
               {/* Card de Resumo do Projeto */}
               {(() => {
                 const project = projectStats.find(p => p.id === selectedProjectId);
@@ -462,7 +462,7 @@ const CapexManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
 
                 return (
                   <>
-                    <div className="lg:col-span-2 space-y-6">
+                    <div className="space-y-8">
                       <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm relative overflow-hidden">
                         <div className="relative z-10">
                           <div className="flex justify-between items-start mb-8">
@@ -680,18 +680,16 @@ const CapexManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                           )}
                         </div>
                       </div>
-                    </div>
 
-                    <div className="space-y-6">
-                      {/* Tabela de Notas Recentes do Projeto (Moved to sidebar) */}
+                      {/* Tabela de Notas Recentes do Projeto (Horizontal Layout) */}
                       <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm">
                         <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-6 flex items-center gap-2">
-                           <ClipboardList className="w-4 h-4 text-amber-500" /> Últimos Lançamentos
+                           <ClipboardList className="w-4 h-4 text-amber-500" /> Últimos Lançamentos do Projeto
                         </h3>
-                        <div className="space-y-3">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                           {invoices.slice(0, 8).map(inv => (
-                            <div key={inv.id} className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-100 hover:border-amber-200 transition-all">
-                              <div className="flex items-center gap-3">
+                            <div key={inv.id} className="flex flex-col justify-between p-4 bg-slate-50 rounded-2xl border border-slate-100 hover:border-amber-200 transition-all">
+                              <div className="flex items-center gap-3 mb-3">
                                 <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center shadow-sm border border-slate-100">
                                   <FileText className="w-4 h-4 text-slate-400" />
                                 </div>
@@ -700,14 +698,14 @@ const CapexManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                                   <div className="text-[8px] font-bold text-slate-400 uppercase">{format(parseISO(inv.date), 'dd/MM/yy')}</div>
                                 </div>
                               </div>
-                              <div className="text-right">
-                                <div className="text-xs font-black text-slate-800">R$ {formatNumber(inv.value)}</div>
+                              <div className="flex justify-between items-end">
                                 <div className="text-[7px] font-black text-amber-600 uppercase tracking-widest bg-amber-50 px-1.5 py-0.5 rounded-full">{inv.type}</div>
+                                <div className="text-xs font-black text-slate-800">R$ {formatNumber(inv.value)}</div>
                               </div>
                             </div>
                           ))}
                           {invoices.length === 0 && (
-                            <div className="text-center py-10 text-slate-400 font-bold uppercase text-[10px] tracking-widest italic">Nenhum lançamento.</div>
+                            <div className="col-span-full text-center py-10 text-slate-400 font-bold uppercase text-[10px] tracking-widest italic">Nenhum lançamento.</div>
                           )}
                         </div>
                       </div>
