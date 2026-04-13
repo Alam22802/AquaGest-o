@@ -320,12 +320,14 @@ const CapexManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
         >
           <TrendingDown className="w-4 h-4" /> Visão Geral
         </button>
-        <button 
-          onClick={() => setActiveSubTab('planning')}
-          className={`px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all flex items-center gap-2 ${activeSubTab === 'planning' ? 'bg-[#344434] text-white shadow-lg' : 'text-slate-500 hover:bg-slate-200'}`}
-        >
-          <Layers className="w-4 h-4" /> Planejamento
-        </button>
+        {currentUser.isMaster && (
+          <button 
+            onClick={() => setActiveSubTab('planning')}
+            className={`px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all flex items-center gap-2 ${activeSubTab === 'planning' ? 'bg-[#344434] text-white shadow-lg' : 'text-slate-500 hover:bg-slate-200'}`}
+          >
+            <Layers className="w-4 h-4" /> Planejamento
+          </button>
+        )}
         <button 
           onClick={() => setActiveSubTab('execution')}
           className={`px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all flex items-center gap-2 ${activeSubTab === 'execution' ? 'bg-[#344434] text-white shadow-lg' : 'text-slate-500 hover:bg-slate-200'}`}
@@ -840,7 +842,7 @@ const CapexManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
             </div>
           )}
         </div>
-      ) : (activeSubTab === 'planning') ? (
+      ) : (activeSubTab === 'planning' && currentUser.isMaster) ? (
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
           {/* Carteiras de Investimento */}
           <div className="space-y-6">
