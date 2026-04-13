@@ -691,33 +691,6 @@ const CapexManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                     </div>
 
                     <div className="space-y-6">
-                      {/* KPIs de Eficiência */}
-                      <div className="bg-[#344434] p-8 rounded-[2.5rem] shadow-xl text-[#e4e4d4]">
-                        <h3 className="text-xs font-black uppercase tracking-[0.2em] mb-6 opacity-60">Indicadores de Eficiência</h3>
-                        <div className="space-y-8">
-                          <div>
-                            <div className="text-3xl font-black italic tracking-tighter mb-1">
-                              {invoices.length}
-                            </div>
-                            <div className="text-[9px] font-black uppercase tracking-widest opacity-50">Total de Notas Lançadas</div>
-                          </div>
-                          <div className="h-px bg-white/10" />
-                          <div>
-                            <div className="text-3xl font-black italic tracking-tighter mb-1">
-                              R$ {invoices.length > 0 ? formatNumber(project.executedValue / invoices.length, 0) : '0'}
-                            </div>
-                            <div className="text-[9px] font-black uppercase tracking-widest opacity-50">Ticket Médio por Nota</div>
-                          </div>
-                          <div className="h-px bg-white/10" />
-                          <div>
-                            <div className="text-3xl font-black italic tracking-tighter mb-1">
-                              {project.executionPercentage > 90 ? 'Crítico' : (project.executionPercentage > 70 ? 'Alerta' : 'Saudável')}
-                            </div>
-                            <div className="text-[9px] font-black uppercase tracking-widest opacity-50">Saúde Orçamentária</div>
-                          </div>
-                        </div>
-                      </div>
-
                       {/* Informações de Entrega */}
                       <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm">
                         <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-6">Próximas Entregas / Prazos</h3>
