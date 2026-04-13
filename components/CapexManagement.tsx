@@ -34,6 +34,20 @@ const CapexManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
 
   const hasPermission = currentUser.isMaster || currentUser.canEdit;
 
+  const calculateDateProgress = (startDate: string, endDate: string) => {
+    const now = new Date();
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    
+    if (now < start) return 0;
+    if (now > end) return 100;
+    
+    const total = end.getTime() - start.getTime();
+    const elapsed = now.getTime() - start.getTime();
+    
+    return Math.min(100, Math.max(0, Math.round((elapsed / total) * 100)));
+  };
+
   // Form States
   const [portfolioForm, setPortfolioForm] = useState({
     name: '',
@@ -306,14 +320,12 @@ const CapexManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
         >
           <TrendingDown className="w-4 h-4" /> Visão Geral
         </button>
-        {currentUser.isMaster && (
-          <button 
-            onClick={() => setActiveSubTab('planning')}
-            className={`px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all flex items-center gap-2 ${activeSubTab === 'planning' ? 'bg-[#344434] text-white shadow-lg' : 'text-slate-500 hover:bg-slate-200'}`}
-          >
-            <Layers className="w-4 h-4" /> Planejamento
-          </button>
-        )}
+        <button 
+          onClick={() => setActiveSubTab('planning')}
+          className={`px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all flex items-center gap-2 ${activeSubTab === 'planning' ? 'bg-[#344434] text-white shadow-lg' : 'text-slate-500 hover:bg-slate-200'}`}
+        >
+          <Layers className="w-4 h-4" /> Planejamento
+        </button>
         <button 
           onClick={() => setActiveSubTab('execution')}
           className={`px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all flex items-center gap-2 ${activeSubTab === 'execution' ? 'bg-[#344434] text-white shadow-lg' : 'text-slate-500 hover:bg-slate-200'}`}
@@ -501,48 +513,64 @@ const CapexManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                                         <span className="text-[8px] font-black text-slate-400 uppercase block mb-1">Responsável</span>
                                         <div className="text-[10px] font-bold text-slate-600 uppercase">{stage.responsible}</div>
                                       </div>
-                                      {currentUser.isMaster && (
-                                        <>
-                                          <div>
-                                            <span className="text-[8px] font-black text-slate-400 uppercase block mb-1">Valor Previsto</span>
-                                            <div className="text-[10px] font-bold text-emerald-600">R$ {formatNumber(stage.plannedValue)}</div>
+                                      <div>
+                                        <span className="text-[8px] font-black text-slate-400 uppercase block mb-1">Valor Previsto</span>
+                                        <div className="text-[10px] font-bold text-emerald-600">R$ {formatNumber(stage.plannedValue)}</div>
+                                      </div>
+                                      <div>
+                                        <span className="text-[8px] font-black text-slate-400 uppercase block mb-1">
+                                          {currentUser.isMaster ? 'Progresso' : 'Andamento (Data)'}
+                                        </span>
+                                        <div className="flex items-center gap-2">
+                                          <div className="flex-1 h-1.5 bg-slate-200 rounded-full overflow-hidden">
+                                            <div 
+                                              className={`h-full transition-all duration-500 ${currentUser.isMaster ? 'bg-emerald-500' : 'bg-blue-500'}`} 
+                                              style={{ width: `${currentUser.isMaster ? stage.progress : calculateDateProgress(stage.startDate, stage.endDate)}%` }} 
+                                            />
                                           </div>
-                                          <div>
-                                            <span className="text-[8px] font-black text-slate-400 uppercase block mb-1">Progresso</span>
-                                            <div className="flex items-center gap-2">
-                                              <div className="flex-1 h-1.5 bg-slate-200 rounded-full overflow-hidden">
-                                                <div className="h-full bg-emerald-500" style={{ width: `${stage.progress}%` }} />
-                                              </div>
-                                              <span className="text-[10px] font-black text-emerald-600">{stage.progress}%</span>
-                                            </div>
-                                          </div>
-                                        </>
-                                      )}
+                                          <span className={`text-[10px] font-black ${currentUser.isMaster ? 'text-emerald-600' : 'text-blue-600'}`}>
+                                            {currentUser.isMaster ? stage.progress : calculateDateProgress(stage.startDate, stage.endDate)}%
+                                          </span>
+                                        </div>
+                                      </div>
                                     </div>
                                   </div>
 
-                                  <div className="flex flex-col gap-2 min-w-[200px]">
-                                    <div className="grid grid-cols-2 gap-2">
-                                      <div>
-                                        <label className="text-[8px] font-black text-slate-400 uppercase block mb-1">Início Real</label>
-                                        <input 
-                                          type="date" 
-                                          className="w-full px-2 py-1.5 bg-white border border-slate-200 rounded-lg text-[10px] font-bold outline-none focus:ring-1 focus:ring-emerald-500"
-                                          value={stage.actualStartDate || ''}
-                                          onChange={e => handleUpdateStageDates(project.id, stage.id, e.target.value, stage.actualEndDate)}
-                                        />
-                                      </div>
-                                      <div>
-                                        <label className="text-[8px] font-black text-slate-400 uppercase block mb-1">Fim Real</label>
-                                        <input 
-                                          type="date" 
-                                          className="w-full px-2 py-1.5 bg-white border border-slate-200 rounded-lg text-[10px] font-bold outline-none focus:ring-1 focus:ring-emerald-500"
-                                          value={stage.actualEndDate || ''}
-                                          onChange={e => handleUpdateStageDates(project.id, stage.id, stage.actualStartDate, e.target.value)}
-                                        />
+                                  {currentUser.isMaster ? (
+                                    <div className="flex flex-col gap-2 min-w-[200px]">
+                                      <div className="grid grid-cols-2 gap-2">
+                                        <div>
+                                          <label className="text-[8px] font-black text-slate-400 uppercase block mb-1">Início Real</label>
+                                          <input 
+                                            type="date" 
+                                            className="w-full px-2 py-1.5 bg-white border border-slate-200 rounded-lg text-[10px] font-bold outline-none focus:ring-1 focus:ring-emerald-500"
+                                            value={stage.actualStartDate || ''}
+                                            onChange={e => handleUpdateStageDates(project.id, stage.id, e.target.value, stage.actualEndDate)}
+                                          />
+                                        </div>
+                                        <div>
+                                          <label className="text-[8px] font-black text-slate-400 uppercase block mb-1">Fim Real</label>
+                                          <input 
+                                            type="date" 
+                                            className="w-full px-2 py-1.5 bg-white border border-slate-200 rounded-lg text-[10px] font-bold outline-none focus:ring-1 focus:ring-emerald-500"
+                                            value={stage.actualEndDate || ''}
+                                            onChange={e => handleUpdateStageDates(project.id, stage.id, stage.actualStartDate, e.target.value)}
+                                          />
+                                        </div>
                                       </div>
                                     </div>
-                                  </div>
+                                  ) : (
+                                    <div className="flex flex-col gap-1 min-w-[200px] bg-white p-3 rounded-2xl border border-slate-100">
+                                      <div className="flex flex-col">
+                                        <span className="text-[8px] font-black text-slate-400 uppercase">Início Real</span>
+                                        <span className="text-[10px] font-bold text-slate-600">{stage.actualStartDate ? format(parseISO(stage.actualStartDate), 'dd/MM/yyyy') : 'Não iniciado'}</span>
+                                      </div>
+                                      <div className="flex flex-col">
+                                        <span className="text-[8px] font-black text-slate-400 uppercase">Fim Real</span>
+                                        <span className="text-[10px] font-bold text-slate-600">{stage.actualEndDate ? format(parseISO(stage.actualEndDate), 'dd/MM/yyyy') : 'Não concluído'}</span>
+                                      </div>
+                                    </div>
+                                  )}
                                 </div>
                               </div>
                             );
@@ -812,41 +840,43 @@ const CapexManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
             </div>
           )}
         </div>
-      ) : (activeSubTab === 'planning' && currentUser.isMaster) ? (
+      ) : (activeSubTab === 'planning') ? (
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
           {/* Carteiras de Investimento */}
           <div className="space-y-6">
-            <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200">
-              <h3 className="text-lg font-black text-slate-800 mb-6 flex items-center gap-2 uppercase tracking-tighter italic">
-                <Wallet className="w-5 h-5 text-blue-500" />
-                {editingPortfolioId ? 'Editar Carteira' : 'Nova Carteira de Investimento'}
-              </h3>
-              <form onSubmit={handleSavePortfolio} className="grid grid-cols-2 gap-4">
-                <div className="col-span-2">
-                  <label className="block text-[10px] font-black text-slate-400 uppercase mb-1">Nome do Pacote</label>
-                  <input type="text" required className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none focus:ring-2 focus:ring-blue-500" value={portfolioForm.name} onChange={e => setPortfolioForm({...portfolioForm, name: e.target.value})} />
-                </div>
-                <div>
-                  <label className="block text-[10px] font-black text-slate-400 uppercase mb-1">Orçamento Inicial (R$)</label>
-                  <input type="number" required className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none focus:ring-2 focus:ring-blue-500" value={portfolioForm.totalValue} onChange={e => setPortfolioForm({...portfolioForm, totalValue: e.target.value})} />
-                </div>
-                <div>
-                  <label className="block text-[10px] font-black text-slate-400 uppercase mb-1">Gestor Responsável</label>
-                  <input type="text" required className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none focus:ring-2 focus:ring-blue-500" value={portfolioForm.manager} onChange={e => setPortfolioForm({...portfolioForm, manager: e.target.value})} />
-                </div>
-                <div>
-                  <label className="block text-[10px] font-black text-slate-400 uppercase mb-1">Data Início</label>
-                  <input type="date" required className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none focus:ring-2 focus:ring-blue-500" value={portfolioForm.startDate} onChange={e => setPortfolioForm({...portfolioForm, startDate: e.target.value})} />
-                </div>
-                <div>
-                  <label className="block text-[10px] font-black text-slate-400 uppercase mb-1">Data Fim</label>
-                  <input type="date" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none focus:ring-2 focus:ring-blue-500" value={portfolioForm.endDate} onChange={e => setPortfolioForm({...portfolioForm, endDate: e.target.value})} />
-                </div>
-                <button type="submit" className="col-span-2 py-4 bg-blue-600 text-white rounded-2xl font-black uppercase tracking-widest text-xs shadow-xl shadow-blue-600/20 active:scale-95 transition-all">
-                  {editingPortfolioId ? 'Salvar Alterações' : 'Cadastrar Carteira'}
-                </button>
-              </form>
-            </div>
+            {currentUser.isMaster && (
+              <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200">
+                <h3 className="text-lg font-black text-slate-800 mb-6 flex items-center gap-2 uppercase tracking-tighter italic">
+                  <Wallet className="w-5 h-5 text-blue-500" />
+                  {editingPortfolioId ? 'Editar Carteira' : 'Nova Carteira de Investimento'}
+                </h3>
+                <form onSubmit={handleSavePortfolio} className="grid grid-cols-2 gap-4">
+                  <div className="col-span-2">
+                    <label className="block text-[10px] font-black text-slate-400 uppercase mb-1">Nome do Pacote</label>
+                    <input type="text" required className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none focus:ring-2 focus:ring-blue-500" value={portfolioForm.name} onChange={e => setPortfolioForm({...portfolioForm, name: e.target.value})} />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-black text-slate-400 uppercase mb-1">Orçamento Inicial (R$)</label>
+                    <input type="number" required className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none focus:ring-2 focus:ring-blue-500" value={portfolioForm.totalValue} onChange={e => setPortfolioForm({...portfolioForm, totalValue: e.target.value})} />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-black text-slate-400 uppercase mb-1">Gestor Responsável</label>
+                    <input type="text" required className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none focus:ring-2 focus:ring-blue-500" value={portfolioForm.manager} onChange={e => setPortfolioForm({...portfolioForm, manager: e.target.value})} />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-black text-slate-400 uppercase mb-1">Data Início</label>
+                    <input type="date" required className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none focus:ring-2 focus:ring-blue-500" value={portfolioForm.startDate} onChange={e => setPortfolioForm({...portfolioForm, startDate: e.target.value})} />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-black text-slate-400 uppercase mb-1">Data Fim</label>
+                    <input type="date" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none focus:ring-2 focus:ring-blue-500" value={portfolioForm.endDate} onChange={e => setPortfolioForm({...portfolioForm, endDate: e.target.value})} />
+                  </div>
+                  <button type="submit" className="col-span-2 py-4 bg-blue-600 text-white rounded-2xl font-black uppercase tracking-widest text-xs shadow-xl shadow-blue-600/20 active:scale-95 transition-all">
+                    {editingPortfolioId ? 'Salvar Alterações' : 'Cadastrar Carteira'}
+                  </button>
+                </form>
+              </div>
+            )}
 
             <div className="space-y-4">
               <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] px-2">Carteiras Ativas</h4>
@@ -886,7 +916,8 @@ const CapexManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
 
           {/* Cadastro de Projetos */}
           <div className="space-y-6">
-            <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200">
+            {currentUser.isMaster && (
+              <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200">
               <h3 className="text-lg font-black text-slate-800 mb-6 flex items-center gap-2 uppercase tracking-tighter italic">
                 <Briefcase className="w-5 h-5 text-emerald-500" />
                 {editingProjectId ? 'Editar Projeto' : 'Novo Projeto CAPEX'}
@@ -1072,6 +1103,7 @@ const CapexManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                 </button>
               </form>
             </div>
+          )}
 
             <div className="space-y-4">
               <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] px-2">Projetos em Andamento</h4>
@@ -1087,23 +1119,25 @@ const CapexManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                         </div>
                         <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest">Carteira: {portfolio?.name || '---'}</p>
                       </div>
-                      <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button onClick={() => { 
-                          setEditingProjectId(proj.id); 
-                          setProjectForm({
-                            portfolioId: proj.portfolioId, 
-                            name: proj.name, 
-                            costCenter: proj.costCenter, 
-                            plannedValue: proj.plannedValue.toString(), 
-                            startDate: proj.startDate, 
-                            endDate: proj.endDate || '', 
-                            responsible: proj.responsible, 
-                            investmentArea: proj.investmentArea,
-                            stages: proj.stages || []
-                          }); 
-                        }} className="p-2 text-slate-300 hover:text-emerald-500 transition-colors"><Edit className="w-4 h-4" /></button>
-                        <button onClick={() => removeProject(proj.id)} className="p-2 text-slate-300 hover:text-red-500 transition-colors"><Trash2 className="w-4 h-4" /></button>
-                      </div>
+                      {currentUser.isMaster && (
+                        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button onClick={() => { 
+                            setEditingProjectId(proj.id); 
+                            setProjectForm({
+                              portfolioId: proj.portfolioId, 
+                              name: proj.name, 
+                              costCenter: proj.costCenter, 
+                              plannedValue: proj.plannedValue.toString(), 
+                              startDate: proj.startDate, 
+                              endDate: proj.endDate || '', 
+                              responsible: proj.responsible, 
+                              investmentArea: proj.investmentArea,
+                              stages: proj.stages || []
+                            }); 
+                          }} className="p-2 text-slate-300 hover:text-emerald-500 transition-colors"><Edit className="w-4 h-4" /></button>
+                          <button onClick={() => removeProject(proj.id)} className="p-2 text-slate-300 hover:text-red-500 transition-colors"><Trash2 className="w-4 h-4" /></button>
+                        </div>
+                      )}
                     </div>
                     <div className="grid grid-cols-2 gap-4 mb-4">
                       <div className="bg-slate-50 p-3 rounded-2xl border border-slate-100">
@@ -1121,6 +1155,30 @@ const CapexManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                     <div className="flex justify-between items-center mt-2">
                       <span className="text-[9px] font-black text-slate-400 uppercase">Resp: {proj.responsible}</span>
                       <span className="text-[9px] font-black text-emerald-600 uppercase">{formatNumber(proj.executionPercentage, 1)}% Utilizado</span>
+                    </div>
+
+                    {/* Stages view for everyone in Planning tab */}
+                    <div className="mt-6 pt-6 border-t border-slate-100 space-y-3">
+                      <h6 className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-2">Etapas do Projeto</h6>
+                      {(proj.stages || []).map(stage => (
+                        <div key={stage.id} className="bg-slate-50 p-3 rounded-2xl border border-slate-100">
+                          <div className="flex justify-between items-center mb-2">
+                            <span className="text-[9px] font-black text-slate-700 uppercase">{stage.name}</span>
+                            <span className="text-[8px] font-bold text-slate-500">{format(parseISO(stage.startDate), 'dd/MM/yy')} - {format(parseISO(stage.endDate), 'dd/MM/yy')}</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <div className="flex-1 h-1 bg-slate-200 rounded-full overflow-hidden">
+                              <div 
+                                className={`h-full transition-all duration-500 ${currentUser.isMaster ? 'bg-emerald-500' : 'bg-blue-500'}`} 
+                                style={{ width: `${currentUser.isMaster ? stage.progress : calculateDateProgress(stage.startDate, stage.endDate)}%` }} 
+                              />
+                            </div>
+                            <span className={`text-[9px] font-black ${currentUser.isMaster ? 'text-emerald-600' : 'text-blue-600'}`}>
+                              {currentUser.isMaster ? stage.progress : calculateDateProgress(stage.startDate, stage.endDate)}%
+                            </span>
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 );
