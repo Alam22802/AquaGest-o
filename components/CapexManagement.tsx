@@ -1,11 +1,12 @@
 
 import React, { useState, useMemo } from 'react';
-import { AppState, User, InvestmentPortfolio, CapexProject, CapexInvoice } from '../types';
+import { AppState, User, InvestmentPortfolio, CapexProject, CapexInvoice, CapexStage } from '../types';
 import { 
   Wallet, Briefcase, FileText, Plus, Edit, Trash2, X, 
   Calendar, User as UserIcon, DollarSign, Layers, 
   ArrowRight, TrendingDown, CheckCircle2, AlertCircle,
-  Search, Filter, ChevronRight, Truck, ClipboardList, Building2, TrendingUp
+  Search, Filter, ChevronRight, Truck, ClipboardList, Building2, TrendingUp,
+  ChevronUp, ChevronDown, CheckSquare, Square, Save
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { formatNumber } from '../utils/formatters';
@@ -68,6 +69,16 @@ const CapexManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     investmentArea: '',
     stages: [] as CapexStage[]
   });
+
+  const [newStage, setNewStage] = useState<Partial<CapexStage>>({
+    name: '',
+    startDate: '',
+    endDate: '',
+    responsible: '',
+    plannedValue: 0,
+    progress: 0
+  });
+  const [selectedStages, setSelectedStages] = useState<string[]>([]);
 
   const [invoiceForm, setInvoiceForm] = useState({
     portfolioId: '',
@@ -206,6 +217,70 @@ const CapexManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       investmentArea: '',
       stages: []
     });
+    setNewStage({
+      name: '',
+      startDate: new Date().toISOString().split('T')[0],
+      endDate: '',
+      responsible: '',
+      plannedValue: 0,
+      progress: 0
+    });
+    setSelectedStages([]);
+  };
+
+  const handleAddStage = () => {
+    if (!newStage.name) return;
+    
+    const stage: CapexStage = {
+      id: generateId(),
+      name: newStage.name || '',
+      startDate: newStage.startDate || projectForm.startDate,
+      endDate: newStage.endDate || projectForm.endDate,
+      responsible: newStage.responsible || projectForm.responsible,
+      plannedValue: Number(newStage.plannedValue) || 0,
+      progress: Number(newStage.progress) || 0
+    };
+    
+    setProjectForm({
+      ...projectForm,
+      stages: [...projectForm.stages, stage]
+    });
+    
+    setNewStage({
+      name: '',
+      startDate: projectForm.startDate,
+      endDate: projectForm.endDate,
+      responsible: projectForm.responsible,
+      plannedValue: 0,
+      progress: 0
+    });
+  };
+
+  const moveStage = (index: number, direction: 'up' | 'down') => {
+    const newStages = [...projectForm.stages];
+    const newIndex = direction === 'up' ? index - 1 : index + 1;
+    if (newIndex < 0 || newIndex >= newStages.length) return;
+    
+    const temp = newStages[index];
+    newStages[index] = newStages[newIndex];
+    newStages[newIndex] = temp;
+    
+    setProjectForm({ ...projectForm, stages: newStages });
+  };
+
+  const toggleStageSelection = (id: string) => {
+    setSelectedStages(prev => 
+      prev.includes(id) ? prev.filter(sid => sid !== id) : [...prev, id]
+    );
+  };
+
+  const removeSelectedStages = () => {
+    if (selectedStages.length === 0) return;
+    if (!confirm(`Excluir ${selectedStages.length} etapa(s) selecionada(s)?`)) return;
+    
+    const newStages = projectForm.stages.filter(s => !selectedStages.includes(s.id));
+    setProjectForm({ ...projectForm, stages: newStages });
+    setSelectedStages([]);
   };
 
   const handleSaveInvoice = (e: React.FormEvent) => {
@@ -962,147 +1037,300 @@ const CapexManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                 </div>
 
                 {/* Gestão de Etapas (Admin Only) */}
-                <div className="col-span-2 space-y-4 pt-4 border-t border-slate-100">
+                <div className="col-span-2 space-y-6 pt-6 border-t border-slate-100">
                   <div className="flex justify-between items-center">
-                    <h4 className="text-xs font-black text-slate-800 uppercase tracking-widest flex items-center gap-2">
-                      <Layers className="w-4 h-4 text-emerald-500" /> Etapas do Projeto
-                    </h4>
+                    <div className="flex items-center gap-3">
+                      <h4 className="text-xs font-black text-slate-800 uppercase tracking-widest flex items-center gap-2">
+                        <Layers className="w-4 h-4 text-emerald-500" /> Gestão de Etapas
+                      </h4>
+                      {projectForm.stages.length > 0 && (
+                        <button 
+                          type="button"
+                          onClick={() => {
+                            if (selectedStages.length === projectForm.stages.length) {
+                              setSelectedStages([]);
+                            } else {
+                              setSelectedStages(projectForm.stages.map(s => s.id));
+                            }
+                          }}
+                          className="text-[9px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1 hover:text-emerald-600 transition-colors"
+                        >
+                          {selectedStages.length === projectForm.stages.length ? <CheckSquare className="w-3.5 h-3.5" /> : <Square className="w-3.5 h-3.5" />}
+                          {selectedStages.length === projectForm.stages.length ? 'Desmarcar Todos' : 'Selecionar Todos'}
+                        </button>
+                      )}
+                    </div>
+                    {selectedStages.length > 0 && (
+                      <button 
+                        type="button"
+                        onClick={removeSelectedStages}
+                        className="text-[10px] font-black text-red-600 uppercase tracking-widest flex items-center gap-1 bg-red-50 px-3 py-1.5 rounded-lg transition-all hover:bg-red-100"
+                      >
+                        <Trash2 className="w-3 h-3" /> Excluir Selecionados ({selectedStages.length})
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Caixa de Entrada de Nova Etapa */}
+                  <div className="bg-emerald-50/50 p-5 rounded-3xl border border-emerald-100 space-y-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <div className="w-6 h-6 bg-emerald-500 rounded-lg flex items-center justify-center">
+                        <Plus className="w-3.5 h-3.5 text-white" />
+                      </div>
+                      <span className="text-[10px] font-black text-emerald-700 uppercase tracking-widest">Nova Etapa</span>
+                    </div>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="md:col-span-2">
+                        <label className="block text-[8px] font-black text-slate-400 uppercase mb-1">Nome da Etapa</label>
+                        <input 
+                          type="text" 
+                          className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl font-bold text-xs outline-none focus:ring-2 focus:ring-emerald-500" 
+                          placeholder="Ex: Fundação, Alvenaria, Pintura..."
+                          value={newStage.name} 
+                          onChange={e => setNewStage({...newStage, name: e.target.value})} 
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[8px] font-black text-slate-400 uppercase mb-1">Início</label>
+                        <input 
+                          type="date" 
+                          className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl font-bold text-xs outline-none focus:ring-2 focus:ring-emerald-500" 
+                          value={newStage.startDate || projectForm.startDate} 
+                          onChange={e => setNewStage({...newStage, startDate: e.target.value})} 
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[8px] font-black text-slate-400 uppercase mb-1">Fim</label>
+                        <input 
+                          type="date" 
+                          className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl font-bold text-xs outline-none focus:ring-2 focus:ring-emerald-500" 
+                          value={newStage.endDate || projectForm.endDate} 
+                          onChange={e => setNewStage({...newStage, endDate: e.target.value})} 
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[8px] font-black text-slate-400 uppercase mb-1">Responsável</label>
+                        <input 
+                          type="text" 
+                          className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl font-bold text-xs outline-none focus:ring-2 focus:ring-emerald-500" 
+                          value={newStage.responsible || projectForm.responsible} 
+                          onChange={e => setNewStage({...newStage, responsible: e.target.value})} 
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[8px] font-black text-slate-400 uppercase mb-1">Valor Previsto (R$)</label>
+                        <input 
+                          type="number" 
+                          className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl font-bold text-xs outline-none focus:ring-2 focus:ring-emerald-500" 
+                          value={newStage.plannedValue} 
+                          onChange={e => setNewStage({...newStage, plannedValue: Number(e.target.value)})} 
+                        />
+                      </div>
+                    </div>
+                    
                     <button 
                       type="button"
-                      onClick={() => setProjectForm({
-                        ...projectForm, 
-                        stages: [...projectForm.stages, { 
-                          id: generateId(), 
-                          name: '', 
-                          startDate: projectForm.startDate, 
-                          endDate: projectForm.endDate, 
-                          responsible: projectForm.responsible, 
-                          plannedValue: 0, 
-                          progress: 0 
-                        }]
-                      })}
-                      className="text-[10px] font-black text-emerald-600 uppercase tracking-widest flex items-center gap-1 hover:bg-emerald-50 px-3 py-1.5 rounded-lg transition-all"
+                      onClick={handleAddStage}
+                      disabled={!newStage.name}
+                      className="w-full py-3 bg-emerald-500 text-white rounded-xl font-black uppercase tracking-widest text-[10px] shadow-lg shadow-emerald-500/20 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                     >
-                      <Plus className="w-3 h-3" /> Adicionar Etapa
+                      <Save className="w-3.5 h-3.5" /> Salvar Etapa e Adicionar Próxima
                     </button>
                   </div>
 
+                  {/* Lista de Etapas Lançadas */}
                   <div className="space-y-3">
                     {projectForm.stages.map((stage, index) => (
-                      <div key={stage.id} className="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-3">
-                        <div className="flex justify-between items-start">
-                          <div className="flex-1">
-                            <label className="block text-[8px] font-black text-slate-400 uppercase mb-1">Nome da Etapa</label>
-                            <input 
-                              type="text" 
-                              required 
-                              className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl font-bold text-xs outline-none focus:ring-2 focus:ring-emerald-500" 
-                              placeholder="Ex: Fundação, Alvenaria..."
-                              value={stage.name} 
-                              onChange={e => {
-                                const newStages = [...projectForm.stages];
-                                newStages[index].name = e.target.value;
-                                setProjectForm({...projectForm, stages: newStages});
-                              }} 
-                            />
+                      <div key={stage.id} className={`group bg-white p-4 rounded-3xl border transition-all ${selectedStages.includes(stage.id) ? 'border-emerald-500 ring-1 ring-emerald-500 shadow-md' : 'border-slate-200 shadow-sm'}`}>
+                        <div className="flex items-start gap-4">
+                          {/* Seleção e Reordenação */}
+                          <div className="flex flex-col gap-2 pt-1">
+                            <button 
+                              type="button"
+                              onClick={() => toggleStageSelection(stage.id)}
+                              className={`p-1 rounded-md transition-colors ${selectedStages.includes(stage.id) ? 'text-emerald-500' : 'text-slate-300 hover:text-slate-400'}`}
+                            >
+                              {selectedStages.includes(stage.id) ? <CheckSquare className="w-5 h-5" /> : <Square className="w-5 h-5" />}
+                            </button>
+                            <div className="flex flex-col gap-0.5">
+                              <button 
+                                type="button"
+                                onClick={() => moveStage(index, 'up')}
+                                disabled={index === 0}
+                                className="p-1 text-slate-300 hover:text-emerald-500 disabled:opacity-0 transition-all"
+                              >
+                                <ChevronUp className="w-4 h-4" />
+                              </button>
+                              <button 
+                                type="button"
+                                onClick={() => moveStage(index, 'down')}
+                                disabled={index === projectForm.stages.length - 1}
+                                className="p-1 text-slate-300 hover:text-emerald-500 disabled:opacity-0 transition-all"
+                              >
+                                <ChevronDown className="w-4 h-4" />
+                              </button>
+                            </div>
                           </div>
-                          <button 
-                            type="button"
-                            onClick={() => {
-                              const newStages = projectForm.stages.filter((_, i) => i !== index);
-                              setProjectForm({...projectForm, stages: newStages});
-                            }}
-                            className="p-2 text-slate-300 hover:text-red-500 transition-colors"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                          <div>
-                            <label className="block text-[8px] font-black text-slate-400 uppercase mb-1">Início</label>
-                            <input 
-                              type="date" 
-                              required 
-                              className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl font-bold text-xs outline-none focus:ring-2 focus:ring-emerald-500" 
-                              value={stage.startDate} 
-                              onChange={e => {
-                                const newStages = [...projectForm.stages];
-                                newStages[index].startDate = e.target.value;
-                                setProjectForm({...projectForm, stages: newStages});
-                              }} 
-                            />
+
+                          {/* Conteúdo da Etapa */}
+                          <div className="flex-1 space-y-4">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              <div className="md:col-span-2">
+                                <label className="block text-[8px] font-black text-slate-400 uppercase mb-1">Nome da Etapa</label>
+                                <input 
+                                  type="text" 
+                                  className="w-full px-3 py-2 bg-slate-50 border border-slate-100 rounded-xl font-bold text-xs outline-none focus:ring-2 focus:ring-emerald-500" 
+                                  value={stage.name} 
+                                  onChange={e => {
+                                    const newStages = [...projectForm.stages];
+                                    newStages[index].name = e.target.value;
+                                    setProjectForm({...projectForm, stages: newStages});
+                                  }} 
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-[8px] font-black text-slate-400 uppercase mb-1">Início</label>
+                                <input 
+                                  type="date" 
+                                  className="w-full px-3 py-2 bg-slate-50 border border-slate-100 rounded-xl font-bold text-xs outline-none focus:ring-2 focus:ring-emerald-500" 
+                                  value={stage.startDate} 
+                                  onChange={e => {
+                                    const newStages = [...projectForm.stages];
+                                    newStages[index].startDate = e.target.value;
+                                    setProjectForm({...projectForm, stages: newStages});
+                                  }} 
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-[8px] font-black text-slate-400 uppercase mb-1">Fim</label>
+                                <input 
+                                  type="date" 
+                                  className="w-full px-3 py-2 bg-slate-50 border border-slate-100 rounded-xl font-bold text-xs outline-none focus:ring-2 focus:ring-emerald-500" 
+                                  value={stage.endDate} 
+                                  onChange={e => {
+                                    const newStages = [...projectForm.stages];
+                                    newStages[index].endDate = e.target.value;
+                                    setProjectForm({...projectForm, stages: newStages});
+                                  }} 
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-[8px] font-black text-slate-400 uppercase mb-1">Responsável</label>
+                                <input 
+                                  type="text" 
+                                  className="w-full px-3 py-2 bg-slate-50 border border-slate-100 rounded-xl font-bold text-xs outline-none focus:ring-2 focus:ring-emerald-500" 
+                                  value={stage.responsible} 
+                                  onChange={e => {
+                                    const newStages = [...projectForm.stages];
+                                    newStages[index].responsible = e.target.value;
+                                    setProjectForm({...projectForm, stages: newStages});
+                                  }} 
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-[8px] font-black text-slate-400 uppercase mb-1">Valor (R$)</label>
+                                <input 
+                                  type="number" 
+                                  className="w-full px-3 py-2 bg-slate-50 border border-slate-100 rounded-xl font-bold text-xs outline-none focus:ring-2 focus:ring-emerald-500" 
+                                  value={stage.plannedValue} 
+                                  onChange={e => {
+                                    const newStages = [...projectForm.stages];
+                                    newStages[index].plannedValue = Number(e.target.value);
+                                    setProjectForm({...projectForm, stages: newStages});
+                                  }} 
+                                />
+                              </div>
+                            </div>
+                            <div>
+                              <div className="flex justify-between items-center mb-1.5">
+                                <label className="block text-[8px] font-black text-slate-400 uppercase">Andamento</label>
+                                <span className="text-[9px] font-black text-emerald-600">{stage.progress}%</span>
+                              </div>
+                              <input 
+                                type="range" 
+                                min="0" 
+                                max="100"
+                                className="w-full h-1.5 bg-slate-100 rounded-lg appearance-none cursor-pointer accent-emerald-500" 
+                                value={stage.progress} 
+                                onChange={e => {
+                                  const newStages = [...projectForm.stages];
+                                  newStages[index].progress = Number(e.target.value);
+                                  setProjectForm({...projectForm, stages: newStages});
+                                }} 
+                              />
+                            </div>
                           </div>
-                          <div>
-                            <label className="block text-[8px] font-black text-slate-400 uppercase mb-1">Fim</label>
-                            <input 
-                              type="date" 
-                              required 
-                              className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl font-bold text-xs outline-none focus:ring-2 focus:ring-emerald-500" 
-                              value={stage.endDate} 
-                              onChange={e => {
-                                const newStages = [...projectForm.stages];
-                                newStages[index].endDate = e.target.value;
+
+                          {/* Ações Individuais */}
+                          <div className="flex flex-col gap-1 pt-1">
+                            <button 
+                              type="button"
+                              className="p-2 text-emerald-500 hover:bg-emerald-50 rounded-xl transition-all"
+                              title="Salvar Alterações"
+                            >
+                              <Save className="w-4 h-4" />
+                            </button>
+                            <button 
+                              type="button"
+                              onClick={() => {
+                                const newStages = projectForm.stages.filter((_, i) => i !== index);
                                 setProjectForm({...projectForm, stages: newStages});
-                              }} 
-                            />
+                              }}
+                              className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"
+                              title="Excluir Etapa"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
                           </div>
-                          <div>
-                            <label className="block text-[8px] font-black text-slate-400 uppercase mb-1">Responsável</label>
-                            <input 
-                              type="text" 
-                              required 
-                              className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl font-bold text-xs outline-none focus:ring-2 focus:ring-emerald-500" 
-                              value={stage.responsible} 
-                              onChange={e => {
-                                const newStages = [...projectForm.stages];
-                                newStages[index].responsible = e.target.value;
-                                setProjectForm({...projectForm, stages: newStages});
-                              }} 
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-[8px] font-black text-slate-400 uppercase mb-1">Valor (R$)</label>
-                            <input 
-                              type="number" 
-                              required 
-                              className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl font-bold text-xs outline-none focus:ring-2 focus:ring-emerald-500" 
-                              value={stage.plannedValue} 
-                              onChange={e => {
-                                const newStages = [...projectForm.stages];
-                                newStages[index].plannedValue = Number(e.target.value);
-                                setProjectForm({...projectForm, stages: newStages});
-                              }} 
-                            />
-                          </div>
-                        </div>
-                        <div>
-                          <label className="block text-[8px] font-black text-slate-400 uppercase mb-1">Andamento ({stage.progress}%)</label>
-                          <input 
-                            type="range" 
-                            min="0" 
-                            max="100"
-                            className="w-full h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-emerald-500" 
-                            value={stage.progress} 
-                            onChange={e => {
-                              const newStages = [...projectForm.stages];
-                              newStages[index].progress = Number(e.target.value);
-                              setProjectForm({...projectForm, stages: newStages});
-                            }} 
-                          />
                         </div>
                       </div>
                     ))}
+                    
                     {projectForm.stages.length === 0 && (
-                      <div className="text-center py-6 text-slate-400 font-bold uppercase text-[9px] tracking-widest italic border border-dashed border-slate-200 rounded-2xl">
-                        Nenhuma etapa cadastrada.
+                      <div className="text-center py-10 text-slate-400 font-bold uppercase text-[10px] tracking-widest italic border border-dashed border-slate-200 rounded-3xl bg-slate-50/50">
+                        Nenhuma etapa lançada. Utilize a caixa acima para adicionar.
                       </div>
                     )}
                   </div>
                 </div>
 
-                <button type="submit" className="col-span-2 py-4 bg-emerald-600 text-white rounded-2xl font-black uppercase tracking-widest text-xs shadow-xl shadow-emerald-600/20 active:scale-95 transition-all">
-                  {editingProjectId ? 'Salvar Projeto' : 'Cadastrar Projeto'}
-                </button>
+                <div className="col-span-2 flex gap-3">
+                  <button type="submit" className="flex-1 py-4 bg-emerald-600 text-white rounded-2xl font-black uppercase tracking-widest text-xs shadow-xl shadow-emerald-600/20 active:scale-95 transition-all">
+                    {editingProjectId ? 'Salvar Projeto' : 'Cadastrar Projeto'}
+                  </button>
+                  {editingProjectId && (
+                    <button 
+                      type="button" 
+                      onClick={() => {
+                        setEditingProjectId(null);
+                        setProjectForm({ 
+                          portfolioId: '', 
+                          name: '', 
+                          costCenter: '', 
+                          plannedValue: '', 
+                          startDate: new Date().toISOString().split('T')[0], 
+                          endDate: '', 
+                          responsible: '', 
+                          investmentArea: '',
+                          stages: []
+                        });
+                        setNewStage({
+                          name: '',
+                          startDate: new Date().toISOString().split('T')[0],
+                          endDate: '',
+                          responsible: '',
+                          plannedValue: 0,
+                          progress: 0
+                        });
+                        setSelectedStages([]);
+                      }}
+                      className="px-6 py-4 bg-slate-100 text-slate-500 rounded-2xl font-black uppercase tracking-widest text-xs hover:bg-slate-200 transition-all"
+                    >
+                      Cancelar
+                    </button>
+                  )}
+                </div>
               </form>
             </div>
           )}
@@ -1136,6 +1364,14 @@ const CapexManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                               investmentArea: proj.investmentArea,
                               stages: proj.stages || []
                             }); 
+                            setNewStage({
+                              name: '',
+                              startDate: proj.startDate,
+                              endDate: proj.endDate || '',
+                              responsible: proj.responsible,
+                              plannedValue: 0,
+                              progress: 0
+                            });
                           }} className="p-2 text-slate-300 hover:text-emerald-500 transition-colors"><Edit className="w-4 h-4" /></button>
                           <button onClick={() => removeProject(proj.id)} className="p-2 text-slate-300 hover:text-red-500 transition-colors"><Trash2 className="w-4 h-4" /></button>
                         </div>
