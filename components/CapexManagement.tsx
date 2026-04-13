@@ -472,6 +472,27 @@ const CapexManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                               </span>
                               <h2 className="text-3xl font-black text-slate-800 uppercase tracking-tighter italic leading-none">{project.name}</h2>
                               <p className="text-xs font-bold text-slate-400 uppercase mt-2">Centro de Custo: {project.costCenter} • Responsável: {project.responsible}</p>
+                              
+                              <div className="flex flex-wrap gap-6 mt-4 pt-4 border-t border-slate-100">
+                                <div className="flex items-center gap-2">
+                                  <div className="w-8 h-8 bg-emerald-50 rounded-lg flex items-center justify-center text-emerald-500">
+                                    <CheckCircle2 className="w-4 h-4" />
+                                  </div>
+                                  <div>
+                                    <div className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Início Realizado</div>
+                                    <div className="text-[10px] font-black text-slate-700">{format(parseISO(project.startDate), 'dd/MM/yyyy')}</div>
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <div className="w-8 h-8 bg-blue-50 rounded-lg flex items-center justify-center text-blue-500">
+                                    <Truck className="w-4 h-4" />
+                                  </div>
+                                  <div>
+                                    <div className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Previsão Conclusão</div>
+                                    <div className="text-[10px] font-black text-slate-700">{project.endDate ? format(parseISO(project.endDate), 'dd/MM/yyyy') : 'Não Definida'}</div>
+                                  </div>
+                                </div>
+                              </div>
                             </div>
                             <div className="text-right">
                               <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Status do Projeto</p>
@@ -659,60 +680,35 @@ const CapexManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                           )}
                         </div>
                       </div>
+                    </div>
 
-                      {/* Tabela de Notas Recentes do Projeto */}
+                    <div className="space-y-6">
+                      {/* Tabela de Notas Recentes do Projeto (Moved to sidebar) */}
                       <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm">
-                        <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest mb-6 flex items-center gap-2 italic">
-                           <ClipboardList className="w-5 h-5 text-amber-500" /> Últimos Lançamentos do Projeto
+                        <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-6 flex items-center gap-2">
+                           <ClipboardList className="w-4 h-4 text-amber-500" /> Últimos Lançamentos
                         </h3>
                         <div className="space-y-3">
-                          {invoices.slice(0, 5).map(inv => (
+                          {invoices.slice(0, 8).map(inv => (
                             <div key={inv.id} className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-100 hover:border-amber-200 transition-all">
-                              <div className="flex items-center gap-4">
-                                <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center shadow-sm border border-slate-100">
-                                  <FileText className="w-5 h-5 text-slate-400" />
+                              <div className="flex items-center gap-3">
+                                <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center shadow-sm border border-slate-100">
+                                  <FileText className="w-4 h-4 text-slate-400" />
                                 </div>
                                 <div>
-                                  <div className="text-xs font-black text-slate-800 uppercase tracking-tight">NF {inv.invoiceNumber}</div>
-                                  <div className="text-[9px] font-bold text-slate-400 uppercase">{inv.supplier} • {format(parseISO(inv.date), 'dd/MM/yyyy')}</div>
+                                  <div className="text-[10px] font-black text-slate-800 uppercase tracking-tight">NF {inv.invoiceNumber}</div>
+                                  <div className="text-[8px] font-bold text-slate-400 uppercase">{format(parseISO(inv.date), 'dd/MM/yy')}</div>
                                 </div>
                               </div>
                               <div className="text-right">
-                                <div className="text-sm font-black text-slate-800">R$ {inv.value.toLocaleString()}</div>
-                                <div className="text-[8px] font-black text-amber-600 uppercase tracking-widest bg-amber-50 px-2 py-0.5 rounded-full">{inv.type}</div>
+                                <div className="text-xs font-black text-slate-800">R$ {formatNumber(inv.value)}</div>
+                                <div className="text-[7px] font-black text-amber-600 uppercase tracking-widest bg-amber-50 px-1.5 py-0.5 rounded-full">{inv.type}</div>
                               </div>
                             </div>
                           ))}
                           {invoices.length === 0 && (
-                            <div className="text-center py-10 text-slate-400 font-bold uppercase text-[10px] tracking-widest italic">Nenhum lançamento vinculado a este projeto.</div>
+                            <div className="text-center py-10 text-slate-400 font-bold uppercase text-[10px] tracking-widest italic">Nenhum lançamento.</div>
                           )}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="space-y-6">
-                      {/* Informações de Entrega */}
-                      <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm">
-                        <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-6">Próximas Entregas / Prazos</h3>
-                        <div className="space-y-4">
-                          <div className="flex items-center gap-4">
-                            <div className="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center text-blue-500">
-                              <Truck className="w-5 h-5" />
-                            </div>
-                            <div>
-                              <div className="text-[10px] font-black text-slate-400 uppercase">Previsão Conclusão</div>
-                              <div className="text-sm font-black text-slate-800">{project.endDate ? format(parseISO(project.endDate), 'dd/MM/yyyy') : 'Não Definida'}</div>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-4">
-                            <div className="w-10 h-10 bg-emerald-50 rounded-xl flex items-center justify-center text-emerald-500">
-                              <CheckCircle2 className="w-5 h-5" />
-                            </div>
-                            <div>
-                              <div className="text-[10px] font-black text-slate-400 uppercase">Início Realizado</div>
-                              <div className="text-sm font-black text-slate-800">{format(parseISO(project.startDate), 'dd/MM/yyyy')}</div>
-                            </div>
-                          </div>
                         </div>
                       </div>
                     </div>
