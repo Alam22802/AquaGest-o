@@ -72,10 +72,27 @@ const MortalityLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     let filtered = logs;
     
     if (selectedBatchId || startDate || endDate) {
+      const sortedHarvestLogs = [...(state.harvestLogs || [])].sort((a, b) => a.date.localeCompare(b.date));
+      
       filtered = logs.filter(log => {
         if (selectedBatchId) {
-          const cage = cageMap.get(log.cageId);
-          if (cage?.batchId !== selectedBatchId) return false;
+          let bId = log.batchId;
+          if (!bId && log.cageId) {
+            const mDate = log.date;
+            const harvest = sortedHarvestLogs.find(h => h.cageId === log.cageId && h.date >= mDate);
+            if (harvest) {
+              bId = harvest.batchId;
+            } else {
+              const cage = cageMap.get(log.cageId);
+              if (cage?.batchId) {
+                const batch = (state.batches || []).find(b => b.id === cage.batchId);
+                if (batch && mDate >= batch.settlementDate) {
+                  bId = cage.batchId;
+                }
+              }
+            }
+          }
+          if (bId !== selectedBatchId) return false;
         }
         if (startDate && log.date < startDate) return false;
         if (endDate && log.date > endDate) return false;
@@ -88,7 +105,7 @@ const MortalityLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
         ? b.date.localeCompare(a.date) 
         : a.date.localeCompare(b.date);
     });
-  }, [state.mortalityLogs, sortOrder, selectedBatchId, startDate, endDate, cageMap]);
+  }, [state.mortalityLogs, sortOrder, selectedBatchId, startDate, endDate, cageMap, state.harvestLogs, state.batches]);
 
   const paginatedLogs = useMemo(() => {
     const startIndex = (currentPage - 1) * itemsPerPage;
@@ -162,8 +179,22 @@ const MortalityLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
 
   const startEdit = (log: IMortalityLog) => {
     if (!hasPermission) return;
+    
+    let bId = log.batchId;
     const cage = cageMap.get(log.cageId);
-    setFormBatchId(log.batchId || cage?.batchId || '');
+    
+    if (!bId && cage) {
+      const sortedHarvestLogs = [...(state.harvestLogs || [])].sort((a, b) => a.date.localeCompare(b.date));
+      const mDate = log.date;
+      const harvest = sortedHarvestLogs.find(h => h.cageId === log.cageId && h.date >= mDate);
+      if (harvest) {
+        bId = harvest.batchId;
+      } else {
+        bId = cage.batchId || '';
+      }
+    }
+
+    setFormBatchId(bId || '');
     if (cage) {
       setSelectedLineId(cage.lineId || '');
     }

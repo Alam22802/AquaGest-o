@@ -221,20 +221,23 @@ const Dashboard: React.FC<Props> = ({ state }) => {
       }
     });
 
+    const sortedHarvestLogs = [...(state.harvestLogs || [])].sort((a, b) => a.date.localeCompare(b.date));
+
     const mortalityByBatch = new Map<string, number>();
     (state.mortalityLogs || []).forEach(m => {
       let bId = m.batchId;
       if (!bId && m.cageId) {
-        // 1. Check if there's a harvest for this cage/batch that happened after this mortality
-        const harvest = (state.harvestLogs || []).find(h => h.cageId === m.cageId && h.date >= m.date);
+        const mDate = m.date;
+        // 1. Check harvest logs first (historical data) - find the first harvest after the log date
+        const harvest = sortedHarvestLogs.find(h => h.cageId === m.cageId && h.date >= mDate);
         if (harvest) {
           bId = harvest.batchId;
         } else {
-          // 2. Check if it belongs to the current batch of the cage
+          // 2. Check current cage assignment
           const cage = (state.cages || []).find(c => c.id === m.cageId);
           if (cage?.batchId) {
             const batch = (state.batches || []).find(b => b.id === cage.batchId);
-            if (batch && m.date >= batch.settlementDate) {
+            if (batch && mDate >= batch.settlementDate) {
               bId = cage.batchId;
             }
           }
@@ -253,7 +256,7 @@ const Dashboard: React.FC<Props> = ({ state }) => {
       if (!bId && f.cageId) {
         const fDate = (f.timestamp || '').split('T')[0];
         // 1. Check harvest logs first (historical data)
-        const harvest = (state.harvestLogs || []).find(h => h.cageId === f.cageId && h.date >= fDate);
+        const harvest = sortedHarvestLogs.find(h => h.cageId === f.cageId && h.date >= fDate);
         if (harvest) {
           bId = harvest.batchId;
         } else {
@@ -332,10 +335,14 @@ const Dashboard: React.FC<Props> = ({ state }) => {
         if (b.batchId) return b.batchId === batch.id;
         // Fallback: check if cage is currently in this batch and date is after settlement
         const cage = (state.cages || []).find(c => c.id === b.cageId);
-        if (cage?.batchId === batch.id && b.date >= batch.settlementDate) return true;
+        if (cage?.batchId === batch.id && b.date >= batch.settlementDate) {
+          // Ensure there isn't a harvest for this cage between settlement and biometry
+          const harvestBeforeBiometry = sortedHarvestLogs.find(h => h.cageId === b.cageId && h.date >= batch.settlementDate && h.date < b.date);
+          if (!harvestBeforeBiometry) return true;
+        }
         
         // Fallback for harvested cages
-        const harvest = (state.harvestLogs || []).find(h => h.cageId === b.cageId && h.date >= b.date);
+        const harvest = sortedHarvestLogs.find(h => h.cageId === b.cageId && h.date >= b.date);
         return harvest?.batchId === batch.id;
       });
 
@@ -992,7 +999,7 @@ const Dashboard: React.FC<Props> = ({ state }) => {
       let bId = f.batchId;
       if (!bId && f.cageId) {
         const fDate = (f.timestamp || '').split('T')[0];
-        const harvest = (state.harvestLogs || []).find(h => h.cageId === f.cageId && h.date >= fDate);
+        const harvest = sortedHarvestLogs.find(h => h.cageId === f.cageId && h.date >= fDate);
         if (harvest) {
           bId = harvest.batchId;
         } else {
