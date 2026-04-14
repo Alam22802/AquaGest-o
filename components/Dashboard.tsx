@@ -988,13 +988,33 @@ const Dashboard: React.FC<Props> = ({ state }) => {
 
     // 5. ABA: TRATOS (ALIMENTAÇÃO) - FILTRADO
     const filteredFeedingLogs = (state.feedingLogs || []).filter(f => filterByDate(f.timestamp));
-    const wsFeeding = XLSX.utils.json_to_sheet(filteredFeedingLogs.map(f => ({
-      "Data/Hora": f.timestamp,
-      "Gaiola": cageMap.get(f.cageId) || f.cageId,
-      "Ração": feedMap.get(f.feedTypeId) || f.feedTypeId,
-      "Quantidade (g)": f.amount,
-      "Lançado por": userMap.get(f.userId) || f.userId
-    })));
+    const wsFeeding = XLSX.utils.json_to_sheet(filteredFeedingLogs.map(f => {
+      let bId = f.batchId;
+      if (!bId && f.cageId) {
+        const fDate = (f.timestamp || '').split('T')[0];
+        const harvest = (state.harvestLogs || []).find(h => h.cageId === f.cageId && h.date >= fDate);
+        if (harvest) {
+          bId = harvest.batchId;
+        } else {
+          const cage = (state.cages || []).find(c => c.id === f.cageId);
+          if (cage?.batchId) {
+            const batch = (state.batches || []).find(b => b.id === cage.batchId);
+            if (batch && fDate >= batch.settlementDate) {
+              bId = cage.batchId;
+            }
+          }
+        }
+      }
+
+      return {
+        "Data/Hora": f.timestamp,
+        "Lote": batchMap.get(bId || '') || "N/A",
+        "Gaiola": cageMap.get(f.cageId) || f.cageId,
+        "Ração": feedMap.get(f.feedTypeId) || f.feedTypeId,
+        "Quantidade (g)": f.amount,
+        "Lançado por": userMap.get(f.userId) || f.userId
+      };
+    }));
     XLSX.utils.book_append_sheet(wb, wsFeeding, "Tratos Alimentares");
 
     // 6. ABA: MORTALIDADE - FILTRADO
