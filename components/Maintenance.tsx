@@ -15,7 +15,13 @@ const Maintenance: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
   const [activeTab, setActiveTab] = useState<'cages' | 'slaughterhouse'>('cages');
   const [selectedCageIds, setSelectedCageIds] = useState<string[]>([]);
   const [filterBatchId, setFilterBatchId] = useState('');
+  const [filterModel, setFilterModel] = useState('');
   const hasPermission = currentUser.isMaster || currentUser.canEdit;
+
+  const uniqueModels = useMemo(() => {
+    const models = new Set(state.cages.map(c => c.model).filter(Boolean));
+    return Array.from(models).sort();
+  }, [state.cages]);
 
   const [formData, setFormData] = useState({
     cageId: '',
@@ -31,10 +37,14 @@ const Maintenance: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
   };
 
   const selectAllCages = () => {
-    if (selectedCageIds.length === state.cages.length) {
-      setSelectedCageIds([]);
+    const visibleCages = state.cages.filter(c => !filterModel || c.model === filterModel);
+    const visibleIds = visibleCages.map(c => c.id);
+    const allVisibleSelected = visibleIds.length > 0 && visibleIds.every(id => selectedCageIds.includes(id));
+
+    if (allVisibleSelected) {
+      setSelectedCageIds(prev => prev.filter(id => !visibleIds.includes(id)));
     } else {
-      setSelectedCageIds(state.cages.map(c => c.id));
+      setSelectedCageIds(prev => Array.from(new Set([...prev, ...visibleIds])));
     }
   };
 
@@ -267,16 +277,35 @@ const Maintenance: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
         </div>
 
           <div className="lg:col-span-2 space-y-6">
-            <div className="flex justify-end">
+            <div className="flex justify-end items-center gap-3">
+              <select 
+                className="px-4 py-2 bg-slate-100 text-slate-600 rounded-xl text-[10px] font-black uppercase tracking-widest outline-none border-none"
+                value={filterModel}
+                onChange={(e) => {
+                  setFilterModel(e.target.value);
+                  setSelectedCageIds([]); // Clear selection when changing filter to avoid confusion
+                }}
+              >
+                <option value="">Todos os Modelos</option>
+                {uniqueModels.map(model => (
+                  <option key={model} value={model}>Modelo {model}</option>
+                ))}
+              </select>
               <button 
                 onClick={selectAllCages}
                 className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all"
               >
-                {selectedCageIds.length === state.cages.length ? 'Desmarcar Tudo' : 'Selecionar Tudo'}
+                {(() => {
+                  const visibleIds = state.cages.filter(c => !filterModel || c.model === filterModel).map(c => c.id);
+                  const allVisibleSelected = visibleIds.length > 0 && visibleIds.every(id => selectedCageIds.includes(id));
+                  return allVisibleSelected ? 'Desmarcar Visíveis' : 'Selecionar Visíveis';
+                })()}
               </button>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {state.cages.map(cage => (
+              {state.cages
+                .filter(c => !filterModel || c.model === filterModel)
+                .map(cage => (
                 <div 
                   key={cage.id} 
                   onClick={() => hasPermission && toggleCageSelection(cage.id)}

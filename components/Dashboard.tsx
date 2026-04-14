@@ -65,22 +65,27 @@ const MiniStat = ({ label, value, icon, color, subtext }: any) => (
 const WeatherWidget = () => {
   const [weather, setWeather] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchWeather = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      // Fetch weather for Araguari-MG using Open-Meteo (Free, no key required)
+      // Coordinates: -18.6475, -48.1872
+      const response = await fetch('https://api.open-meteo.com/v1/forecast?latitude=-18.6475&longitude=-48.1872&current_weather=true&daily=weathercode,temperature_2m_max,temperature_2m_min,precipitation_probability_max,precipitation_sum&timezone=auto');
+      if (!response.ok) throw new Error('Weather fetch failed');
+      const data = await response.json();
+      setWeather(data);
+    } catch (err: any) {
+      console.error('Error fetching weather:', err);
+      setError(err.message || 'Failed to fetch');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const fetchWeather = async () => {
-      try {
-        // Fetch weather for Araguari-MG using Open-Meteo (Free, no key required)
-        // Coordinates: -18.6475, -48.1872
-        const response = await fetch('https://api.open-meteo.com/v1/forecast?latitude=-18.6475&longitude=-48.1872&current_weather=true&daily=weathercode,temperature_2m_max,temperature_2m_min,precipitation_probability_max,precipitation_sum&timezone=auto');
-        if (!response.ok) throw new Error('Weather fetch failed');
-        const data = await response.json();
-        setWeather(data);
-      } catch (error) {
-        console.error('Error fetching weather:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
     fetchWeather();
   }, []);
 
@@ -109,6 +114,26 @@ const WeatherWidget = () => {
         <div className="grid grid-cols-5 gap-2">
           {[1, 2, 3, 4, 5].map(i => <div key={i} className="h-20 bg-slate-50 rounded-xl" />)}
         </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="bg-red-50 p-4 rounded-2xl border border-red-100 flex items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <AlertTriangle className="w-5 h-5 text-red-500" />
+          <div>
+            <div className="text-[10px] font-black text-red-400 uppercase tracking-widest mb-0.5">Erro de Conexão</div>
+            <div className="text-xs font-bold text-red-700 uppercase tracking-tight">Não foi possível carregar o clima</div>
+          </div>
+        </div>
+        <button 
+          onClick={fetchWeather}
+          className="px-4 py-2 bg-white border border-red-200 text-red-600 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-red-50 transition-all shadow-sm active:scale-95"
+        >
+          Tentar Novamente
+        </button>
       </div>
     );
   }
