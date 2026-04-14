@@ -1161,7 +1161,7 @@ const Dashboard: React.FC<Props> = ({ state }) => {
           "Hora": l.time,
           "Tipo": "Câmara Fria",
           "Local/Medição": chamber?.name || '---',
-          "Valor/Temp": `${l.temperature}°C`,
+          "Valor/Temp": !isNaN(Number(l.temperature)) ? `${l.temperature}°C` : l.temperature,
           "Lançado por": userMap.get(l.userId) || l.userId
         };
       }),

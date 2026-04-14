@@ -65,7 +65,7 @@ const SlaughterhouseMaintenance: React.FC<Props> = ({ state, onUpdate, currentUs
       date: tempData.date,
       time: tempData.time,
       chamberId: tempData.chamberId,
-      temperature: Number(tempData.temperature),
+      temperature: tempData.temperature,
       userId: currentUser.id,
       timestamp: new Date().toISOString(),
       updatedAt: Date.now()
@@ -301,12 +301,11 @@ const SlaughterhouseMaintenance: React.FC<Props> = ({ state, onUpdate, currentUs
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-widest">Temperatura (°C) *</label>
+                  <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-widest">Temperatura / Status *</label>
                   <input 
-                    type="number" 
-                    step="0.1"
+                    type="text" 
                     required
-                    placeholder="-18.0"
+                    placeholder="Ex: -18.0 ou Desligado"
                     className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none focus:ring-2 focus:ring-blue-500/10 text-sm"
                     value={tempData.temperature}
                     onChange={e => setTempData({ ...tempData, temperature: e.target.value })}
@@ -526,8 +525,11 @@ const SlaughterhouseMaintenance: React.FC<Props> = ({ state, onUpdate, currentUs
                             <span className="text-xs font-black text-slate-800 uppercase italic">{chamber?.name || '---'}</span>
                           </td>
                           <td className="px-6 py-4 text-right">
-                            <span className={`text-xs font-black ${log.temperature > 0 ? 'text-red-600' : 'text-blue-600'}`}>
-                              {log.temperature.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} °C
+                            <span className={`text-xs font-black ${!isNaN(Number(log.temperature)) && Number(log.temperature) > 0 ? 'text-red-600' : 'text-blue-600'}`}>
+                              {!isNaN(Number(log.temperature)) 
+                                ? `${Number(log.temperature).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} °C`
+                                : log.temperature
+                              }
                             </span>
                           </td>
                           <td className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase">

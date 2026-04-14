@@ -363,7 +363,7 @@ export interface ColdStorageLog {
   date: string;
   time: string;
   chamberId: string;
-  temperature: number;
+  temperature: string;
   userId: string;
   timestamp: string;
   updatedAt: number;
