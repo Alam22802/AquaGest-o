@@ -25,7 +25,7 @@ const CageInventory: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
   const [filterStatus, setFilterStatus] = useState<CageStatus | 'Todos'>('Todos');
   const [formData, setFormData] = useState({
     name: '',
-    model: '6x6' as Cage['model'],
+    model: '4x4x4' as Cage['model'],
     length: '',
     width: '',
     depth: '',
@@ -82,13 +82,13 @@ const CageInventory: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     const match = formData.name.match(rangeRegex);
 
     // Inferred model based on dimensions
-    const getInferredModel = (l: number, w: number): Cage['model'] => {
-      const dimKey = `${l}x${w}`;
-      if (dimKey === '4x4') return '4x4';
-      if (dimKey === '6x6') return '6x6';
-      if (dimKey === '8x8') return '8x8';
-      if (dimKey === '12x12') return '12x12';
-      return '6x6'; // Default
+    const getInferredModel = (l: number, w: number, d: number): Cage['model'] => {
+      const dimKey = `${l}x${w}x${d}`;
+      if (dimKey === '2x2x2') return '2x2x2';
+      if (dimKey === '3x2x2.5') return '3x2x2,5';
+      if (dimKey === '3x3x3') return '3x3x3';
+      if (dimKey === '4x4x4') return '4x4x4';
+      return '4x4x4'; // Default
     };
 
     if (!editingId && match) {
@@ -111,7 +111,7 @@ const CageInventory: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
           newCages.push({
             id: generateId(),
             name: sequentialName,
-            model: getInferredModel(Number(formData.length), Number(formData.width)),
+            model: getInferredModel(Number(formData.length), Number(formData.width), Number(formData.depth)),
             dimensions: {
               length: Number(formData.length),
               width: Number(formData.width),
@@ -136,7 +136,7 @@ const CageInventory: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
         c.id === editingId ? {
           ...c,
           name: formData.name,
-          model: getInferredModel(Number(formData.length), Number(formData.width)),
+          model: getInferredModel(Number(formData.length), Number(formData.width), Number(formData.depth)),
           dimensions: {
             length: Number(formData.length),
             width: Number(formData.width),
@@ -153,7 +153,7 @@ const CageInventory: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       const newCage: Cage = {
         id: generateId(),
         name: formData.name,
-        model: getInferredModel(Number(formData.length), Number(formData.width)),
+        model: getInferredModel(Number(formData.length), Number(formData.width), Number(formData.depth)),
         dimensions: {
           length: Number(formData.length),
           width: Number(formData.width),
@@ -174,7 +174,7 @@ const CageInventory: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     setEditingId(null);
     setSelectedIds([]);
     setFormData({
-      name: '', model: '6x6', length: '', width: '', depth: '',
+      name: '', model: '4x4x4', length: '', width: '', depth: '',
       stockingDensity: '', stockingCapacity: ''
     });
   };
@@ -184,7 +184,7 @@ const CageInventory: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     setEditingId(cage.id);
     setFormData({
       name: cage.name,
-      model: cage.model || '6x6',
+      model: cage.model || '4x4x4',
       length: cage.dimensions.length.toString(),
       width: cage.dimensions.width.toString(),
       depth: cage.dimensions.depth.toString(),

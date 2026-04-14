@@ -65,7 +65,7 @@ export interface Cage {
   id: string;
   lineId?: string;
   name: string;
-  model: '4x4' | '6x6' | '8x8' | '12x12' | 'Circular';
+  model: '2x2x2' | '3x2x2,5' | '3x3x3' | '4x4x4' | 'Circular';
   dimensions: {
     length: number;
     width: number;

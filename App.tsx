@@ -43,12 +43,31 @@ const App: React.FC = () => {
       
       // Migration: Inject missing timestamps to ensure sync works for old data
       const inject = (arr: any[]) => (arr || []).map(i => i.updatedAt ? i : { ...i, updatedAt: Date.now() });
+      // Migration: Update cage models to new definitions
+      const migrateCages = (cages: any[]) => (cages || []).map(c => {
+        const { length: l, width: w, depth: d } = c.dimensions || {};
+        const dimKey = `${l}x${w}x${d}`;
+        let newModel = c.model;
+        
+        if (dimKey === '2x2x2') newModel = '2x2x2';
+        else if (dimKey === '3x2x2.5') newModel = '3x2x2,5';
+        else if (dimKey === '3x3x3') newModel = '3x3x3';
+        else if (dimKey === '4x4x4') newModel = '4x4x4';
+        else if (c.model === '4x4') newModel = '4x4x4'; // Fallback for old 4x4
+        else if (c.model === '6x6') newModel = '4x4x4'; // Fallback for old 6x6 (as requested it doesn't exist)
+        
+        if (newModel !== c.model) {
+          return { ...c, model: newModel, updatedAt: Date.now() };
+        }
+        return c;
+      });
+
       data = {
         ...data,
         users: inject(data.users),
         lines: inject(data.lines),
         batches: inject(data.batches),
-        cages: inject(data.cages),
+        cages: migrateCages(inject(data.cages)),
         feedTypes: inject(data.feedTypes),
         feedingLogs: inject(data.feedingLogs),
         feedStockLogs: inject(data.feedStockLogs),
