@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo } from 'react';
-import { AppState, User, ColdStorageLog, UtilityLog } from '../types';
-import { Thermometer, Droplets, Zap, Plus, Trash2, Calendar, Info, CheckCircle2, AlertTriangle, History, Search } from 'lucide-react';
+import { AppState, User, ColdStorageLog, UtilityLog, ColdChamber } from '../types';
+import { Thermometer, Droplets, Zap, Plus, Trash2, Calendar, Info, CheckCircle2, AlertTriangle, History, Search, Warehouse, Clock, Edit, X } from 'lucide-react';
 import { format } from 'date-fns';
 
 interface Props {
@@ -19,14 +19,22 @@ const generateId = () => {
 };
 
 const SlaughterhouseMaintenance: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
-  const [activeSubTab, setActiveSubTab] = useState<'temperature' | 'utilities'>('temperature');
+  const [activeSubTab, setActiveSubTab] = useState<'temperature' | 'utilities' | 'chambers'>('temperature');
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+
+  // Chamber Form State
+  const [chamberData, setChamberData] = useState({
+    name: '',
+    description: ''
+  });
+  const [editingChamberId, setEditingChamberId] = useState<string | null>(null);
 
   // Temperature Form State
   const [tempData, setTempData] = useState({
     date: new Date().toISOString().split('T')[0],
-    chamberName: '',
+    time: format(new Date(), 'HH:mm'),
+    chamberId: '',
     temperature: ''
   });
 
@@ -50,12 +58,13 @@ const SlaughterhouseMaintenance: React.FC<Props> = ({ state, onUpdate, currentUs
   const handleSaveTemp = (e: React.FormEvent) => {
     e.preventDefault();
     if (!hasPermission) return;
-    if (!tempData.chamberName || !tempData.temperature) return;
+    if (!tempData.chamberId || !tempData.temperature) return;
 
     const newLog: ColdStorageLog = {
       id: generateId(),
       date: tempData.date,
-      chamberName: tempData.chamberName,
+      time: tempData.time,
+      chamberId: tempData.chamberId,
       temperature: Number(tempData.temperature),
       userId: currentUser.id,
       timestamp: new Date().toISOString(),
@@ -67,9 +76,54 @@ const SlaughterhouseMaintenance: React.FC<Props> = ({ state, onUpdate, currentUs
       coldStorageLogs: [newLog, ...(state.coldStorageLogs || [])]
     });
 
-    setTempData({ ...tempData, chamberName: '', temperature: '' });
+    setTempData({ ...tempData, temperature: '', time: format(new Date(), 'HH:mm') });
     setSaveSuccess(true);
     setTimeout(() => setSaveSuccess(false), 3000);
+  };
+
+  const handleSaveChamber = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!hasPermission) return;
+    if (!chamberData.name) return;
+
+    if (editingChamberId) {
+      const updatedChambers = (state.coldChambers || []).map(c => 
+        c.id === editingChamberId ? { ...c, ...chamberData, updatedAt: Date.now() } : c
+      );
+      onUpdate({ ...state, coldChambers: updatedChambers });
+      setEditingChamberId(null);
+    } else {
+      const newChamber: ColdChamber = {
+        id: generateId(),
+        name: chamberData.name,
+        description: chamberData.description,
+        userId: currentUser.id,
+        updatedAt: Date.now()
+      };
+      onUpdate({
+        ...state,
+        coldChambers: [...(state.coldChambers || []), newChamber]
+      });
+    }
+
+    setChamberData({ name: '', description: '' });
+    setSaveSuccess(true);
+    setTimeout(() => setSaveSuccess(false), 3000);
+  };
+
+  const removeChamber = (id: string) => {
+    if (!hasPermission) return;
+    const hasLogs = (state.coldStorageLogs || []).some(l => l.chamberId === id);
+    if (hasLogs) {
+      alert('Não é possível excluir uma câmara que possui registros de temperatura.');
+      return;
+    }
+    if (!confirm('Deseja excluir esta câmara fria?')) return;
+    onUpdate({
+      ...state,
+      coldChambers: (state.coldChambers || []).filter(c => c.id !== id),
+      deletedIds: [...(state.deletedIds || []), id]
+    });
   };
 
   const handleSaveUtility = (e: React.FormEvent) => {
@@ -121,9 +175,12 @@ const SlaughterhouseMaintenance: React.FC<Props> = ({ state, onUpdate, currentUs
   const filteredTempLogs = useMemo(() => {
     const logs = [...(state.coldStorageLogs || [])];
     return logs
-      .filter(l => l.chamberName.toLowerCase().includes(searchTerm.toLowerCase()))
-      .sort((a, b) => b.date.localeCompare(a.date) || b.timestamp.localeCompare(a.timestamp));
-  }, [state.coldStorageLogs, searchTerm]);
+      .filter(l => {
+        const chamber = (state.coldChambers || []).find(c => c.id === l.chamberId);
+        return !searchTerm || (chamber?.name || '').toLowerCase().includes(searchTerm.toLowerCase());
+      })
+      .sort((a, b) => b.date.localeCompare(a.date) || b.time.localeCompare(a.time) || b.timestamp.localeCompare(a.timestamp));
+  }, [state.coldStorageLogs, state.coldChambers, searchTerm]);
 
   const filteredUtilityLogs = useMemo(() => {
     let logs = [...(state.utilityLogs || [])];
@@ -174,6 +231,13 @@ const SlaughterhouseMaintenance: React.FC<Props> = ({ state, onUpdate, currentUs
           <Droplets className="w-4 h-4" />
           Consumo Água/Energia
         </button>
+        <button 
+          onClick={() => setActiveSubTab('chambers')}
+          className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${activeSubTab === 'chambers' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+        >
+          <Warehouse className="w-4 h-4" />
+          Câmaras Frias
+        </button>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
@@ -192,14 +256,48 @@ const SlaughterhouseMaintenance: React.FC<Props> = ({ state, onUpdate, currentUs
               <form onSubmit={handleSaveTemp} className="space-y-4">
                 <div className="space-y-1">
                   <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-widest">Câmara Fria *</label>
-                  <input 
-                    type="text" 
+                  <select 
                     required
-                    placeholder="Ex: Câmara 01 - Estocagem"
                     className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none focus:ring-2 focus:ring-blue-500/10 text-sm"
-                    value={tempData.chamberName}
-                    onChange={e => setTempData({ ...tempData, chamberName: e.target.value })}
-                  />
+                    value={tempData.chamberId}
+                    onChange={e => setTempData({ ...tempData, chamberId: e.target.value })}
+                  >
+                    <option value="">Selecione a câmara...</option>
+                    {(state.coldChambers || []).map(c => (
+                      <option key={c.id} value={c.id}>{c.name}</option>
+                    ))}
+                  </select>
+                  {(state.coldChambers || []).length === 0 && (
+                    <p className="text-[9px] text-amber-600 font-bold uppercase mt-1">
+                      Nenhuma câmara cadastrada. Vá na aba "Câmaras Frias".
+                    </p>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-widest">Data</label>
+                    <input 
+                      type="date" 
+                      required
+                      className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none text-sm"
+                      value={tempData.date}
+                      onChange={e => setTempData({ ...tempData, date: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-widest">Horário</label>
+                    <div className="relative">
+                      <Clock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                      <input 
+                        type="time" 
+                        required
+                        className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none text-sm"
+                        value={tempData.time}
+                        onChange={e => setTempData({ ...tempData, time: e.target.value })}
+                      />
+                    </div>
+                  </div>
                 </div>
 
                 <div className="space-y-1">
@@ -215,14 +313,35 @@ const SlaughterhouseMaintenance: React.FC<Props> = ({ state, onUpdate, currentUs
                   />
                 </div>
 
+                <button 
+                  type="submit"
+                  disabled={!hasPermission || (state.coldChambers || []).length === 0}
+                  className="w-full py-4 bg-blue-600 text-white rounded-2xl font-black uppercase tracking-widest text-xs shadow-xl shadow-blue-600/20 hover:bg-blue-700 transition-all active:scale-95 disabled:opacity-50"
+                >
+                  Salvar Temperatura
+                </button>
+              </form>
+            ) : activeSubTab === 'chambers' ? (
+              <form onSubmit={handleSaveChamber} className="space-y-4">
                 <div className="space-y-1">
-                  <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-widest">Data</label>
+                  <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-widest">Nome da Câmara *</label>
                   <input 
-                    type="date" 
+                    type="text" 
                     required
-                    className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none text-sm"
-                    value={tempData.date}
-                    onChange={e => setTempData({ ...tempData, date: e.target.value })}
+                    placeholder="Ex: Câmara 01 - Estocagem"
+                    className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none focus:ring-2 focus:ring-blue-500/10 text-sm"
+                    value={chamberData.name}
+                    onChange={e => setChamberData({ ...chamberData, name: e.target.value })}
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-widest">Descrição / Observações</label>
+                  <textarea 
+                    placeholder="Opcional..."
+                    className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none focus:ring-2 focus:ring-blue-500/10 text-sm min-h-[100px]"
+                    value={chamberData.description}
+                    onChange={e => setChamberData({ ...chamberData, description: e.target.value })}
                   />
                 </div>
 
@@ -231,7 +350,7 @@ const SlaughterhouseMaintenance: React.FC<Props> = ({ state, onUpdate, currentUs
                   disabled={!hasPermission}
                   className="w-full py-4 bg-blue-600 text-white rounded-2xl font-black uppercase tracking-widest text-xs shadow-xl shadow-blue-600/20 hover:bg-blue-700 transition-all active:scale-95 disabled:opacity-50"
                 >
-                  Salvar Temperatura
+                  {editingChamberId ? 'Salvar Alterações' : 'Cadastrar Câmara'}
                 </button>
               </form>
             ) : (
@@ -322,7 +441,7 @@ const SlaughterhouseMaintenance: React.FC<Props> = ({ state, onUpdate, currentUs
               <div className="flex items-center gap-4">
                 <h3 className="text-sm font-black text-slate-800 uppercase tracking-tighter italic flex items-center gap-2">
                   <History className="w-4 h-4 text-slate-400" />
-                  Histórico de {activeSubTab === 'temperature' ? 'Temperaturas' : 'Consumo'}
+                  Histórico de {activeSubTab === 'temperature' ? 'Temperaturas' : activeSubTab === 'chambers' ? 'Câmaras Frias' : 'Consumo'}
                 </h3>
               </div>
               
@@ -391,30 +510,79 @@ const SlaughterhouseMaintenance: React.FC<Props> = ({ state, onUpdate, currentUs
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {activeSubTab === 'temperature' ? (
-                    filteredTempLogs.map(log => (
-                      <tr key={log.id} className="hover:bg-slate-50/50 transition-colors">
-                        <td className="px-6 py-4 text-xs font-bold text-slate-600">
-                          {format(new Date(log.date + 'T12:00:00'), 'dd/MM/yyyy')}
-                        </td>
-                        <td className="px-6 py-4">
-                          <span className="text-xs font-black text-slate-800 uppercase italic">{log.chamberName}</span>
+                    filteredTempLogs.map(log => {
+                      const chamber = (state.coldChambers || []).find(c => c.id === log.chamberId);
+                      return (
+                        <tr key={log.id} className="hover:bg-slate-50/50 transition-colors">
+                          <td className="px-6 py-4 text-xs font-bold text-slate-600">
+                            <div className="flex flex-col">
+                              <span>{format(new Date(log.date + 'T12:00:00'), 'dd/MM/yyyy')}</span>
+                              <span className="text-[9px] font-black text-slate-400 flex items-center gap-1">
+                                <Clock className="w-2.5 h-2.5" /> {log.time}
+                              </span>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4">
+                            <span className="text-xs font-black text-slate-800 uppercase italic">{chamber?.name || '---'}</span>
+                          </td>
+                          <td className="px-6 py-4 text-right">
+                            <span className={`text-xs font-black ${log.temperature > 0 ? 'text-red-600' : 'text-blue-600'}`}>
+                              {log.temperature.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} °C
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase">
+                            {state.users.find(u => u.id === log.userId)?.name || '---'}
+                          </td>
+                          <td className="px-6 py-4 text-center">
+                            {hasPermission && (
+                              <button 
+                                onClick={() => removeTempLog(log.id)}
+                                className="p-2 text-slate-300 hover:text-red-500 transition-colors"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })
+                  ) : activeSubTab === 'chambers' ? (
+                    (state.coldChambers || []).map(chamber => (
+                      <tr key={chamber.id} className="hover:bg-slate-50/50 transition-colors">
+                        <td className="px-6 py-4 text-xs font-bold text-slate-600" colSpan={2}>
+                          <div className="flex flex-col">
+                            <span className="text-xs font-black text-slate-800 uppercase italic">{chamber.name}</span>
+                            {chamber.description && <span className="text-[10px] text-slate-400 font-bold">{chamber.description}</span>}
+                          </div>
                         </td>
                         <td className="px-6 py-4 text-right">
-                          <span className={`text-xs font-black ${log.temperature > 0 ? 'text-red-600' : 'text-blue-600'}`}>
-                            {log.temperature.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} °C
+                          <span className="text-[10px] font-bold text-slate-400 uppercase">
+                            {(state.coldStorageLogs || []).filter(l => l.chamberId === chamber.id).length} registros
                           </span>
                         </td>
                         <td className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase">
-                          {state.users.find(u => u.id === log.userId)?.name || '---'}
+                          {state.users.find(u => u.id === chamber.userId)?.name || '---'}
                         </td>
                         <td className="px-6 py-4 text-center">
                           {hasPermission && (
-                            <button 
-                              onClick={() => removeTempLog(log.id)}
-                              className="p-2 text-slate-300 hover:text-red-500 transition-colors"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
+                            <div className="flex items-center justify-center gap-1">
+                              <button 
+                                onClick={() => {
+                                  setEditingChamberId(chamber.id);
+                                  setChamberData({ name: chamber.name, description: chamber.description || '' });
+                                  setActiveSubTab('chambers');
+                                }}
+                                className="p-2 text-slate-300 hover:text-blue-600 transition-colors"
+                              >
+                                <Edit className="w-4 h-4" />
+                              </button>
+                              <button 
+                                onClick={() => removeChamber(chamber.id)}
+                                className="p-2 text-slate-300 hover:text-red-500 transition-colors"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
                           )}
                         </td>
                       </tr>

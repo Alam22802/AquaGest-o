@@ -361,11 +361,20 @@ export interface HarvestSchedule {
 export interface ColdStorageLog {
   id: string;
   date: string;
-  chamberName: string;
+  time: string;
+  chamberId: string;
   temperature: number;
   userId: string;
   timestamp: string;
   updatedAt: number;
+}
+
+export interface ColdChamber {
+  id: string;
+  name: string;
+  description?: string;
+  userId?: string;
+  updatedAt?: number;
 }
 
 export interface UtilityLog {
@@ -468,6 +477,7 @@ export interface AppState {
   batchRevenues?: BatchRevenue[];
   coldStorageLogs?: ColdStorageLog[];
   utilityLogs?: UtilityLog[];
+  coldChambers?: ColdChamber[];
   protocols: ProductionProtocol[];
   standardCurves?: StandardCurve[];
   portfolios: InvestmentPortfolio[];

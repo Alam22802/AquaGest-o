@@ -1154,21 +1154,26 @@ const Dashboard: React.FC<Props> = ({ state }) => {
     const filteredUtilities = (state.utilityLogs || []).filter(l => filterByDate(l.date));
     
     const utilityData = [
-      ...filteredColdStorage.map(l => ({
-        "Data": l.date,
-        "Tipo": "Câmara Fria",
-        "Local/Medição": l.chamberName,
-        "Valor/Temp": `${l.temperature}°C`,
-        "Lançado por": userMap.get(l.userId) || l.userId
-      })),
+      ...filteredColdStorage.map(l => {
+        const chamber = (state.coldChambers || []).find(c => c.id === l.chamberId);
+        return {
+          "Data": l.date,
+          "Hora": l.time,
+          "Tipo": "Câmara Fria",
+          "Local/Medição": chamber?.name || '---',
+          "Valor/Temp": `${l.temperature}°C`,
+          "Lançado por": userMap.get(l.userId) || l.userId
+        };
+      }),
       ...filteredUtilities.map(l => ({
         "Data": l.date,
+        "Hora": "---",
         "Tipo": l.type === 'water' ? 'Água' : 'Energia',
         "Local/Medição": "Leitura Geral",
         "Valor/Temp": l.reading,
         "Lançado por": userMap.get(l.userId) || l.userId
       }))
-    ].sort((a, b) => b.Data.localeCompare(a.Data));
+    ].sort((a, b) => b.Data.localeCompare(a.Data) || b.Hora.localeCompare(a.Hora));
 
     const wsUtilities = XLSX.utils.json_to_sheet(utilityData);
     XLSX.utils.book_append_sheet(wb, wsUtilities, "Utilidades e Frio");

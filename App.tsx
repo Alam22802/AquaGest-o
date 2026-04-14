@@ -62,6 +62,27 @@ const App: React.FC = () => {
         return c;
       });
 
+      // Migration: Create cold chambers from existing logs if they don't exist
+      const initialChambers = data.coldChambers || [];
+      const initialLogs = data.coldStorageLogs || [];
+      const migratedChambers = [...initialChambers];
+      
+      const migratedLogs = initialLogs.map(l => {
+        if (l.chamberName && !l.chamberId) {
+          let chamber = migratedChambers.find(c => c.name === l.chamberName);
+          if (!chamber) {
+            chamber = {
+              id: Math.random().toString(36).substring(2, 15),
+              name: l.chamberName,
+              updatedAt: Date.now()
+            };
+            migratedChambers.push(chamber);
+          }
+          return { ...l, chamberId: chamber.id, time: l.time || '12:00', updatedAt: Date.now() };
+        }
+        return l;
+      });
+
       data = {
         ...data,
         users: inject(data.users),
@@ -88,8 +109,9 @@ const App: React.FC = () => {
         harvestSchedules: inject(data.harvestSchedules || []),
         batchExpenses: inject(data.batchExpenses || []),
         batchRevenues: inject(data.batchRevenues || []),
-        coldStorageLogs: inject(data.coldStorageLogs || []),
+        coldStorageLogs: inject(migratedLogs),
         utilityLogs: inject(data.utilityLogs || []),
+        coldChambers: inject(migratedChambers),
         protocols: inject(data.protocols),
         standardCurves: inject(data.standardCurves || []),
         feedingTables: inject(data.feedingTables || []),
@@ -318,6 +340,7 @@ const App: React.FC = () => {
         batchRevenues: injectTimestamps(prev.batchRevenues || [], newState.batchRevenues || []),
         coldStorageLogs: injectTimestamps(prev.coldStorageLogs || [], newState.coldStorageLogs || []),
         utilityLogs: injectTimestamps(prev.utilityLogs || [], newState.utilityLogs || []),
+        coldChambers: injectTimestamps(prev.coldChambers || [], newState.coldChambers || []),
         protocols: injectTimestamps(prev.protocols, newState.protocols),
         standardCurves: injectTimestamps(prev.standardCurves || [], newState.standardCurves || []),
         feedingTables: injectTimestamps(prev.feedingTables || [], newState.feedingTables || []),
@@ -364,6 +387,7 @@ const App: React.FC = () => {
         ...findDeleted(prev.batchRevenues || [], stateWithTimestamps.batchRevenues || []),
         ...findDeleted(prev.coldStorageLogs || [], stateWithTimestamps.coldStorageLogs || []),
         ...findDeleted(prev.utilityLogs || [], stateWithTimestamps.utilityLogs || []),
+        ...findDeleted(prev.coldChambers || [], stateWithTimestamps.coldChambers || []),
         ...findDeleted(prev.protocols, stateWithTimestamps.protocols),
         ...findDeleted(prev.standardCurves || [], stateWithTimestamps.standardCurves || []),
         ...findDeleted(prev.feedingTables || [], stateWithTimestamps.feedingTables || []),
