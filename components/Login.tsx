@@ -148,36 +148,47 @@ const Login: React.FC<Props> = ({ state, onLogin, onRegister, onUpdateState }) =
     }
   };
 
-  const handleRegister = (e: React.FormEvent) => {
+  const [isRegisteringLoading, setIsRegisteringLoading] = useState(false);
+
+  const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setIsRegisteringLoading(true);
 
-    if (regData.password !== regData.confirmPassword) {
-      setError('As senhas não conferem.');
-      return;
+    try {
+      if (regData.password !== regData.confirmPassword) {
+        setError('As senhas não conferem.');
+        setIsRegisteringLoading(false);
+        return;
+      }
+
+      if (state.users.some(u => u.username.toLowerCase() === regData.username.toLowerCase())) {
+        setError('Este nome de usuário já está em uso.');
+        setIsRegisteringLoading(false);
+        return;
+      }
+
+      const newUser: User = {
+        id: crypto.randomUUID(),
+        name: regData.name,
+        username: regData.username.toLowerCase(),
+        phone: regData.phone,
+        email: regData.email,
+        password: regData.password,
+        isApproved: false, 
+        canEdit: true,
+        receiveNotifications: regData.receiveNotifications,
+        updatedAt: Date.now()
+      };
+
+      await onRegister(newUser);
+      setSuccessMessage('Solicitação enviada com sucesso! Aguarde aprovação do administrador.');
+      setIsRegistering(false);
+    } catch (err) {
+      setError('Erro ao enviar solicitação. Tente novamente.');
+    } finally {
+      setIsRegisteringLoading(false);
     }
-
-    if (state.users.some(u => u.username.toLowerCase() === regData.username.toLowerCase())) {
-      setError('Este nome de usuário já está em uso.');
-      return;
-    }
-
-    const newUser: User = {
-      id: crypto.randomUUID(),
-      name: regData.name,
-      username: regData.username.toLowerCase(),
-      phone: regData.phone,
-      email: regData.email,
-      password: regData.password,
-      isApproved: false, 
-      canEdit: true,
-      receiveNotifications: regData.receiveNotifications,
-      updatedAt: Date.now()
-    };
-
-    onRegister(newUser);
-    setSuccessMessage('Solicitação enviada com sucesso! Aguarde aprovação.');
-    setIsRegistering(false);
   };
 
   return (
@@ -330,7 +341,20 @@ const Login: React.FC<Props> = ({ state, onLogin, onRegister, onUpdateState }) =
                 <input type="password" required placeholder="Senha" className="w-full px-5 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none font-bold text-sm" value={regData.password} onChange={e => setRegData({...regData, password: e.target.value})} />
                 <input type="password" required placeholder="Repetir" className="w-full px-5 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none font-bold text-sm" value={regData.confirmPassword} onChange={e => setRegData({...regData, confirmPassword: e.target.value})} />
               </div>
-              <button type="submit" className="w-full bg-[#344434] text-[#e4e4d4] py-5 rounded-2xl font-black text-sm uppercase tracking-widest mt-4">Enviar Cadastro</button>
+              <button 
+                type="submit" 
+                disabled={isRegisteringLoading}
+                className="w-full bg-[#344434] text-[#e4e4d4] py-5 rounded-2xl font-black text-sm uppercase tracking-widest mt-4 flex items-center justify-center gap-3 disabled:opacity-50"
+              >
+                {isRegisteringLoading ? (
+                  <>
+                    <RefreshCw className="w-5 h-5 animate-spin" />
+                    Enviando...
+                  </>
+                ) : (
+                  'Enviar Cadastro'
+                )}
+              </button>
             </form>
           )}
         </div>

@@ -418,11 +418,34 @@ const App: React.FC = () => {
     setActiveTab('dashboard');
   };
 
-  const handleRegister = async (u: User) => {
-    if (!state) return;
-    const newState = { ...state, users: [...state.users, u] };
-    handleStateUpdate(newState);
-  };
+  const handleRegister = useCallback(async (u: User) => {
+    // Update local state immediately
+    setState(prev => {
+      if (!prev) return prev;
+      const newState = { ...prev, users: [...prev.users, u] };
+      // Manually inject timestamp for the new user
+      const usersWithTimestamp = newState.users.map(user => 
+        user.id === u.id ? { ...user, updatedAt: Date.now() } : user
+      );
+      return { ...newState, users: usersWithTimestamp };
+    });
+
+    // Force an immediate save to Supabase
+    // We fetch the latest state from the ref if possible, or just use what we have
+    // Actually, saveState already fetches remote and merges, so it's safe.
+    const configToUse = state?.supabaseConfig || currentUser?.supabaseConfig;
+    if (configToUse) {
+      try {
+        // We need the full state to save. 
+        // Since setState is async, we'll construct the state to save manually
+        const stateToSave = { ...state!, users: [...state!.users, u] };
+        await saveState(stateToSave, configToUse);
+        console.log('Registro salvo na nuvem com sucesso');
+      } catch (err) {
+        console.error('Erro ao salvar registro na nuvem:', err);
+      }
+    }
+  }, [state, currentUser]);
 
   useEffect(() => {
     if (state && currentUser?.isMaster) {
