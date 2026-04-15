@@ -58,6 +58,7 @@ const initialState: AppState = {
   batchRevenues: [],
   coldStorageLogs: [],
   utilityLogs: [],
+  coldChambers: [],
   protocols: [],
   standardCurves: [],
   portfolios: [],
@@ -155,6 +156,7 @@ export const ensureStateIntegrity = (state: any, mergeWith?: AppState, priority:
     batchRevenues: filterByTombstone(base.batchRevenues || []),
     coldStorageLogs: filterByTombstone(base.coldStorageLogs || []),
     utilityLogs: filterByTombstone(base.utilityLogs || []),
+    coldChambers: filterByTombstone(base.coldChambers || []),
     feedingTables: filterByTombstone(base.feedingTables || []),
     farmTargetCapacity: base.farmTargetCapacity || 0,
   };
@@ -203,6 +205,7 @@ export const ensureStateIntegrity = (state: any, mergeWith?: AppState, priority:
       batchRevenues: mergeArraysById(result.batchRevenues || [], mergeWith.batchRevenues || [], combinedDeletedIds, priority),
       coldStorageLogs: mergeArraysById(result.coldStorageLogs || [], mergeWith.coldStorageLogs || [], combinedDeletedIds, priority),
       utilityLogs: mergeArraysById(result.utilityLogs || [], mergeWith.utilityLogs || [], combinedDeletedIds, priority),
+      coldChambers: mergeArraysById(result.coldChambers || [], mergeWith.coldChambers || [], combinedDeletedIds, priority),
       feedingTables: mergeArraysById(result.feedingTables || [], mergeWith.feedingTables || [], combinedDeletedIds, priority),
       farmTargetCapacity: priority === 'remote' 
         ? (mergeWith.farmTargetCapacity !== undefined ? mergeWith.farmTargetCapacity : result.farmTargetCapacity)
