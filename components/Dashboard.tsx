@@ -1160,7 +1160,7 @@ const Dashboard: React.FC<Props> = ({ state }) => {
           "Data": l.date,
           "Hora": l.time,
           "Tipo": "Câmara Fria",
-          "Local/Medição": chamber?.name || '---',
+          "Local/Medição": chamber?.name || (l.chamberId?.startsWith('chamber-') ? l.chamberId.replace('chamber-', '').toUpperCase() : '---'),
           "Valor/Temp": !isNaN(Number(l.temperature)) ? `${l.temperature}°C` : l.temperature,
           "Lançado por": userMap.get(l.userId) || l.userId
         };

@@ -522,7 +522,9 @@ const SlaughterhouseMaintenance: React.FC<Props> = ({ state, onUpdate, currentUs
                             </div>
                           </td>
                           <td className="px-6 py-4">
-                            <span className="text-xs font-black text-slate-800 uppercase italic">{chamber?.name || '---'}</span>
+                            <span className="text-xs font-black text-slate-800 uppercase italic">
+                              {chamber?.name || (log.chamberId?.startsWith('chamber-') ? log.chamberId.replace('chamber-', '').toUpperCase() : '---')}
+                            </span>
                           </td>
                           <td className="px-6 py-4 text-right">
                             <span className={`text-xs font-black ${!isNaN(Number(log.temperature)) && Number(log.temperature) > 0 ? 'text-red-600' : 'text-blue-600'}`}>

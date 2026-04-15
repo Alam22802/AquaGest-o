@@ -69,10 +69,13 @@ const App: React.FC = () => {
       
       const migratedLogs = initialLogs.map(l => {
         if (l.chamberName && !l.chamberId) {
-          let chamber = migratedChambers.find(c => c.name === l.chamberName);
+          // Use a deterministic ID based on the name to avoid duplicates across users
+          const deterministicId = `chamber-${l.chamberName.toLowerCase().replace(/\s+/g, '-')}`;
+          let chamber = migratedChambers.find(c => c.id === deterministicId || c.name === l.chamberName);
+          
           if (!chamber) {
             chamber = {
-              id: Math.random().toString(36).substring(2, 15),
+              id: deterministicId,
               name: l.chamberName,
               updatedAt: Date.now()
             };
