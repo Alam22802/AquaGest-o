@@ -22,6 +22,11 @@ const SlaughterhouseMaintenance: React.FC<Props> = ({ state, onUpdate, currentUs
   const [activeSubTab, setActiveSubTab] = useState<'temperature' | 'utilities' | 'chambers'>('temperature');
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [dateFilter, setDateFilter] = useState({
+    startDate: '',
+    endDate: ''
+  });
+  const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
 
   // Chamber Form State
   const [chamberData, setChamberData] = useState({
@@ -173,32 +178,47 @@ const SlaughterhouseMaintenance: React.FC<Props> = ({ state, onUpdate, currentUs
   };
 
   const filteredTempLogs = useMemo(() => {
-    const logs = [...(state.coldStorageLogs || [])];
+    let logs = [...(state.coldStorageLogs || [])];
+    
+    if (dateFilter.startDate) {
+      logs = logs.filter(l => l.date >= dateFilter.startDate);
+    }
+    
+    if (dateFilter.endDate) {
+      logs = logs.filter(l => l.date <= dateFilter.endDate);
+    }
+
     return logs
       .filter(l => {
         const chamber = (state.coldChambers || []).find(c => c.id === l.chamberId);
         return !searchTerm || (chamber?.name || '').toLowerCase().includes(searchTerm.toLowerCase());
       })
-      .sort((a, b) => b.date.localeCompare(a.date) || b.time.localeCompare(a.time) || b.timestamp.localeCompare(a.timestamp));
-  }, [state.coldStorageLogs, state.coldChambers, searchTerm]);
+      .sort((a, b) => {
+        const comparison = a.date.localeCompare(b.date) || a.time.localeCompare(b.time) || a.timestamp.localeCompare(b.timestamp);
+        return sortOrder === 'desc' ? -comparison : comparison;
+      });
+  }, [state.coldStorageLogs, state.coldChambers, searchTerm, dateFilter, sortOrder]);
 
   const filteredUtilityLogs = useMemo(() => {
     let logs = [...(state.utilityLogs || [])];
     
+    if (dateFilter.startDate) {
+      logs = logs.filter(l => l.date >= dateFilter.startDate);
+    }
+    
+    if (dateFilter.endDate) {
+      logs = logs.filter(l => l.date <= dateFilter.endDate);
+    }
+
     if (utilityFilter.type !== 'all') {
       logs = logs.filter(l => l.type === utilityFilter.type);
     }
     
-    if (utilityFilter.startDate) {
-      logs = logs.filter(l => l.date >= utilityFilter.startDate);
-    }
-    
-    if (utilityFilter.endDate) {
-      logs = logs.filter(l => l.date <= utilityFilter.endDate);
-    }
-
-    return logs.sort((a, b) => b.date.localeCompare(a.date) || b.timestamp.localeCompare(a.timestamp));
-  }, [state.utilityLogs, utilityFilter]);
+    return logs.sort((a, b) => {
+      const comparison = a.date.localeCompare(b.date) || a.timestamp.localeCompare(b.timestamp);
+      return sortOrder === 'desc' ? -comparison : comparison;
+    });
+  }, [state.utilityLogs, utilityFilter, dateFilter, sortOrder]);
 
   const getConsumption = (currentLog: UtilityLog) => {
     const allLogs = state.utilityLogs || [];
@@ -443,6 +463,40 @@ const SlaughterhouseMaintenance: React.FC<Props> = ({ state, onUpdate, currentUs
                   Histórico de {activeSubTab === 'temperature' ? 'Temperaturas' : activeSubTab === 'chambers' ? 'Câmaras Frias' : 'Consumo'}
                 </h3>
               </div>
+              <div className="flex flex-wrap items-center gap-3">
+                <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-xl px-3 py-1.5">
+                  <Calendar className="w-3.5 h-3.5 text-slate-400" />
+                  <input 
+                    type="date"
+                    className="bg-transparent text-[10px] font-bold outline-none text-slate-600"
+                    value={dateFilter.startDate}
+                    onChange={e => setDateFilter({ ...dateFilter, startDate: e.target.value })}
+                  />
+                  <span className="text-[10px] font-black text-slate-300">ATÉ</span>
+                  <input 
+                    type="date"
+                    className="bg-transparent text-[10px] font-bold outline-none text-slate-600"
+                    value={dateFilter.endDate}
+                    onChange={e => setDateFilter({ ...dateFilter, endDate: e.target.value })}
+                  />
+                  {(dateFilter.startDate || dateFilter.endDate) && (
+                    <button 
+                      onClick={() => setDateFilter({ startDate: '', endDate: '' })}
+                      className="ml-1 text-slate-400 hover:text-red-500 transition-colors"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  )}
+                </div>
+
+                <button
+                  onClick={() => setSortOrder(sortOrder === 'desc' ? 'asc' : 'desc')}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-[9px] font-black uppercase tracking-widest text-slate-400 hover:text-slate-600 transition-all"
+                >
+                  <Clock className="w-3 h-3" />
+                  {sortOrder === 'desc' ? 'Mais Recentes' : 'Mais Antigos'}
+                </button>
+              </div>
               
               {activeSubTab === 'temperature' ? (
                 <div className="relative">
@@ -455,8 +509,8 @@ const SlaughterhouseMaintenance: React.FC<Props> = ({ state, onUpdate, currentUs
                     onChange={e => setSearchTerm(e.target.value)}
                   />
                 </div>
-              ) : (
-                <div className="flex flex-wrap items-center gap-2">
+              ) : activeSubTab === 'utilities' ? (
+                <div className="flex items-center gap-2">
                   <select
                     className="px-3 py-2 bg-white border border-slate-200 rounded-xl text-[10px] font-bold outline-none focus:ring-2 focus:ring-blue-500/10"
                     value={utilityFilter.type}
@@ -466,23 +520,8 @@ const SlaughterhouseMaintenance: React.FC<Props> = ({ state, onUpdate, currentUs
                     <option value="energy">Energia</option>
                     <option value="water">Água</option>
                   </select>
-                  <div className="flex items-center gap-1">
-                    <input 
-                      type="date"
-                      className="px-3 py-2 bg-white border border-slate-200 rounded-xl text-[10px] font-bold outline-none focus:ring-2 focus:ring-blue-500/10"
-                      value={utilityFilter.startDate}
-                      onChange={e => setUtilityFilter({ ...utilityFilter, startDate: e.target.value })}
-                    />
-                    <span className="text-[10px] font-black text-slate-400">A</span>
-                    <input 
-                      type="date"
-                      className="px-3 py-2 bg-white border border-slate-200 rounded-xl text-[10px] font-bold outline-none focus:ring-2 focus:ring-blue-500/10"
-                      value={utilityFilter.endDate}
-                      onChange={e => setUtilityFilter({ ...utilityFilter, endDate: e.target.value })}
-                    />
-                  </div>
                 </div>
-              )}
+              ) : null}
             </div>
 
             <div className="overflow-x-auto">
