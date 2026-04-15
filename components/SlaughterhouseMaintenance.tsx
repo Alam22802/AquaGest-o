@@ -53,9 +53,7 @@ const SlaughterhouseMaintenance: React.FC<Props> = ({ state, onUpdate, currentUs
 
   // Utility Filter State
   const [utilityFilter, setUtilityFilter] = useState({
-    type: 'all' as 'all' | 'energy' | 'water',
-    startDate: '',
-    endDate: ''
+    type: 'all' as 'all' | 'energy' | 'water'
   });
 
   const hasPermission = currentUser.isMaster || currentUser.canEdit;
@@ -463,40 +461,42 @@ const SlaughterhouseMaintenance: React.FC<Props> = ({ state, onUpdate, currentUs
                   Histórico de {activeSubTab === 'temperature' ? 'Temperaturas' : activeSubTab === 'chambers' ? 'Câmaras Frias' : 'Consumo'}
                 </h3>
               </div>
-              <div className="flex flex-wrap items-center gap-3">
-                <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-xl px-3 py-1.5">
-                  <Calendar className="w-3.5 h-3.5 text-slate-400" />
-                  <input 
-                    type="date"
-                    className="bg-transparent text-[10px] font-bold outline-none text-slate-600"
-                    value={dateFilter.startDate}
-                    onChange={e => setDateFilter({ ...dateFilter, startDate: e.target.value })}
-                  />
-                  <span className="text-[10px] font-black text-slate-300">ATÉ</span>
-                  <input 
-                    type="date"
-                    className="bg-transparent text-[10px] font-bold outline-none text-slate-600"
-                    value={dateFilter.endDate}
-                    onChange={e => setDateFilter({ ...dateFilter, endDate: e.target.value })}
-                  />
-                  {(dateFilter.startDate || dateFilter.endDate) && (
-                    <button 
-                      onClick={() => setDateFilter({ startDate: '', endDate: '' })}
-                      className="ml-1 text-slate-400 hover:text-red-500 transition-colors"
-                    >
-                      <X className="w-3 h-3" />
-                    </button>
-                  )}
-                </div>
+              {activeSubTab !== 'chambers' && (
+                <div className="flex flex-wrap items-center gap-3">
+                  <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-xl px-3 py-1.5">
+                    <Calendar className="w-3.5 h-3.5 text-slate-400" />
+                    <input 
+                      type="date"
+                      className="bg-transparent text-[10px] font-bold outline-none text-slate-600"
+                      value={dateFilter.startDate}
+                      onChange={e => setDateFilter({ ...dateFilter, startDate: e.target.value })}
+                    />
+                    <span className="text-[10px] font-black text-slate-300">ATÉ</span>
+                    <input 
+                      type="date"
+                      className="bg-transparent text-[10px] font-bold outline-none text-slate-600"
+                      value={dateFilter.endDate}
+                      onChange={e => setDateFilter({ ...dateFilter, endDate: e.target.value })}
+                    />
+                    {(dateFilter.startDate || dateFilter.endDate) && (
+                      <button 
+                        onClick={() => setDateFilter({ startDate: '', endDate: '' })}
+                        className="ml-1 text-slate-400 hover:text-red-500 transition-colors"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    )}
+                  </div>
 
-                <button
-                  onClick={() => setSortOrder(sortOrder === 'desc' ? 'asc' : 'desc')}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-[9px] font-black uppercase tracking-widest text-slate-400 hover:text-slate-600 transition-all"
-                >
-                  <Clock className="w-3 h-3" />
-                  {sortOrder === 'desc' ? 'Mais Recentes' : 'Mais Antigos'}
-                </button>
-              </div>
+                  <button
+                    onClick={() => setSortOrder(sortOrder === 'desc' ? 'asc' : 'desc')}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-[9px] font-black uppercase tracking-widest text-slate-400 hover:text-slate-600 transition-all"
+                  >
+                    <Clock className="w-3 h-3" />
+                    {sortOrder === 'desc' ? 'Mais Recentes' : 'Mais Antigos'}
+                  </button>
+                </div>
+              )}
               
               {activeSubTab === 'temperature' ? (
                 <div className="relative">

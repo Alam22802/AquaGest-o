@@ -553,8 +553,8 @@ const SlaughterOverview: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
     const totalInvoiceValue = filteredLogs.reduce((acc, l) => acc + (l.invoiceValue || 0), 0);
     const revenuePerKg = totalPacked > 0 ? totalInvoiceValue / totalPacked : 0;
     
-    // Custo KG Produzido = (Total Invoices + Freight + Labor + Water + Energy) / Total Packed
-    const totalCost = totalInvoiceValue + totalFreightValue + totalSalaryValue + totalWaterValue + totalEnergyValue;
+    // Custo KG Produzido = (Total Invoices + Freight + Labor) / Total Packed
+    const totalCost = totalInvoiceValue + totalFreightValue + totalSalaryValue;
     const costPerKgProduced = totalPacked > 0 ? totalCost / totalPacked : 0;
 
     const uniqueSlaughterDays = new Set(filteredLogs.map(log => log.date)).size;
