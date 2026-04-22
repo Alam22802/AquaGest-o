@@ -383,6 +383,7 @@ export interface UtilityLog {
   type: 'water' | 'energy';
   reading: number;
   horimetro?: number;
+  hidrometro?: string;
   userId: string;
   timestamp: string;
   updatedAt: number;

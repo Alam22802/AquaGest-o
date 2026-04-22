@@ -48,7 +48,8 @@ const SlaughterhouseMaintenance: React.FC<Props> = ({ state, onUpdate, currentUs
     date: new Date().toISOString().split('T')[0],
     type: 'energy' as 'water' | 'energy',
     reading: '',
-    horimetro: ''
+    horimetro: '',
+    hidrometro: ''
   });
 
   // Utility Filter State
@@ -139,7 +140,8 @@ const SlaughterhouseMaintenance: React.FC<Props> = ({ state, onUpdate, currentUs
       date: utilityData.date,
       type: utilityData.type,
       reading: Number(utilityData.reading),
-      horimetro: utilityData.type === 'water' ? Number(utilityData.horimetro) : undefined,
+      horimetro: utilityData.type === 'water' && utilityData.horimetro ? Number(utilityData.horimetro) : undefined,
+      hidrometro: utilityData.type === 'water' ? utilityData.hidrometro : undefined,
       userId: currentUser.id,
       timestamp: new Date().toISOString(),
       updatedAt: Date.now()
@@ -150,7 +152,7 @@ const SlaughterhouseMaintenance: React.FC<Props> = ({ state, onUpdate, currentUs
       utilityLogs: [newLog, ...(state.utilityLogs || [])]
     });
 
-    setUtilityData({ ...utilityData, reading: '', horimetro: '' });
+    setUtilityData({ ...utilityData, reading: '', horimetro: '', hidrometro: '' });
     setSaveSuccess(true);
     setTimeout(() => setSaveSuccess(false), 3000);
   };
@@ -392,6 +394,19 @@ const SlaughterhouseMaintenance: React.FC<Props> = ({ state, onUpdate, currentUs
                   </div>
                 </div>
 
+                {utilityData.type === 'water' && (
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-widest">HIDROMETRO</label>
+                    <input 
+                      type="text" 
+                      placeholder="Nº do Registro"
+                      className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none focus:ring-2 focus:ring-blue-500/10 text-sm"
+                      value={utilityData.hidrometro}
+                      onChange={e => setUtilityData({ ...utilityData, hidrometro: e.target.value })}
+                    />
+                  </div>
+                )}
+
                 <div className="space-y-1">
                   <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-widest">
                     Leitura Atual ({utilityData.type === 'energy' ? 'kWh' : 'm³'}) *
@@ -539,6 +554,7 @@ const SlaughterhouseMaintenance: React.FC<Props> = ({ state, onUpdate, currentUs
                         <th className="px-6 py-4">Tipo</th>
                         <th className="px-6 py-4 text-right">Leitura</th>
                         <th className="px-6 py-4 text-right">Consumo</th>
+                        <th className="px-6 py-4 text-right">Hidrômetro</th>
                         <th className="px-6 py-4 text-right">Horímetro</th>
                       </>
                     )}
@@ -656,6 +672,11 @@ const SlaughterhouseMaintenance: React.FC<Props> = ({ state, onUpdate, currentUs
                         <td className="px-6 py-4 text-right">
                           <span className="text-xs font-black text-emerald-600">
                             {getConsumption(log) !== null ? `+${getConsumption(log)?.toLocaleString('pt-BR')}` : '---'} {log.type === 'energy' ? 'kWh' : 'm³'}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                          <span className="text-xs font-black text-slate-800">
+                            {log.hidrometro || '---'}
                           </span>
                         </td>
                         <td className="px-6 py-4 text-right">
