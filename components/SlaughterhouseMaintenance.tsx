@@ -1,8 +1,11 @@
 
 import React, { useState, useMemo } from 'react';
 import { AppState, User, ColdStorageLog, UtilityLog, ColdChamber } from '../types';
-import { Thermometer, Droplets, Zap, Plus, Trash2, Calendar, Info, CheckCircle2, AlertTriangle, History, Search, Warehouse, Clock, Edit, X } from 'lucide-react';
+import { Thermometer, Droplets, Zap, Plus, Trash2, Calendar, Info, CheckCircle2, AlertTriangle, History, Search, Warehouse, Clock, Edit, X, FileText } from 'lucide-react';
 import { format } from 'date-fns';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
+import { mmToPt } from 'jspdf';
 
 interface Props {
   state: AppState;
@@ -219,6 +222,153 @@ const SlaughterhouseMaintenance: React.FC<Props> = ({ state, onUpdate, currentUs
       return sortOrder === 'desc' ? -comparison : comparison;
     });
   }, [state.utilityLogs, utilityFilter, dateFilter, sortOrder]);
+
+  const handleGeneratePDF = () => {
+    if (!state.coldStorageLogs || state.coldStorageLogs.length === 0) return;
+
+    const doc = new jsPDF();
+    const title = 'Relatório de Monitoramento de Temperaturas';
+    const dateRange = dateFilter.startDate && dateFilter.endDate 
+      ? `Período: ${format(new Date(dateFilter.startDate + 'T12:00:00'), 'dd/MM/yyyy')} até ${format(new Date(dateFilter.endDate + 'T12:00:00'), 'dd/MM/yyyy')}`
+      : 'Período: Histórico Completo';
+
+    doc.setFontSize(16);
+    doc.text(title, 14, 20);
+    doc.setFontSize(10);
+    doc.text(dateRange, 14, 30);
+    doc.text(`Gerado em: ${format(new Date(), 'dd/MM/yyyy HH:mm')}`, 14, 35);
+
+    let currentY = 45;
+
+    // Group logs by chamber
+    const chambers = state.coldChambers || [];
+    chambers.forEach((chamber, index) => {
+      const chamberLogs = (state.coldStorageLogs || [])
+        .filter(l => l.chamberId === chamber.id)
+        .filter(l => {
+          if (dateFilter.startDate && l.date < dateFilter.startDate) return false;
+          if (dateFilter.endDate && l.date > dateFilter.endDate) return false;
+          return true;
+        })
+        .sort((a, b) => a.date.localeCompare(b.date) || a.time.localeCompare(b.time));
+
+      if (chamberLogs.length > 0) {
+        if (currentY > 240) {
+          doc.addPage();
+          currentY = 20;
+        }
+
+        doc.setFontSize(12);
+        doc.setFont('helvetica', 'bold');
+        doc.text(`Câmara: ${chamber.name}`, 14, currentY);
+        currentY += 5;
+
+        autoTable(doc, {
+          startY: currentY,
+          head: [['Data', 'Hora', 'Temperatura', 'Responsável']],
+          body: chamberLogs.map(log => [
+            format(new Date(log.date + 'T12:00:00'), 'dd/MM/yyyy'),
+            log.time,
+            !isNaN(Number(log.temperature)) ? `${log.temperature} °C` : log.temperature,
+            state.users.find(u => u.id === log.userId)?.name || '---'
+          ]),
+          theme: 'striped',
+          headStyles: { fillStyle: 'fill', fillColor: [51, 65, 85] },
+          styles: { fontSize: 9 },
+          margin: { left: 14, right: 14 }
+        });
+
+        currentY = (doc as any).lastAutoTable.finalY + 15;
+      }
+    });
+
+    doc.save(`relatorio_temperaturas_${format(new Date(), 'yyyyMMdd_HHmm')}.pdf`);
+  };
+
+  const handleGenerateUtilityPDF = () => {
+    if (!state.utilityLogs || state.utilityLogs.length === 0) return;
+
+    const doc = new jsPDF();
+    const title = 'Relatório de Consumo de Utilitários (Água/Energia)';
+    const dateRange = dateFilter.startDate && dateFilter.endDate 
+      ? `Período: ${format(new Date(dateFilter.startDate + 'T12:00:00'), 'dd/MM/yyyy')} até ${format(new Date(dateFilter.endDate + 'T12:00:00'), 'dd/MM/yyyy')}`
+      : 'Período: Histórico Completo';
+
+    doc.setFontSize(16);
+    doc.text(title, 14, 20);
+    doc.setFontSize(10);
+    doc.text(dateRange, 14, 30);
+    doc.text(`Gerado em: ${format(new Date(), 'dd/MM/yyyy HH:mm')}`, 14, 35);
+
+    let currentY = 45;
+
+    const types: ('energy' | 'water')[] = ['energy', 'water'];
+    types.forEach((type) => {
+      // Filter logs by type and current filters
+      const typeLogs = (state.utilityLogs || [])
+        .filter(l => l.type === type)
+        .filter(l => {
+          if (dateFilter.startDate && l.date < dateFilter.startDate) return false;
+          if (dateFilter.endDate && l.date > dateFilter.endDate) return false;
+          if (utilityFilter.type !== 'all' && l.type !== utilityFilter.type) return false;
+          return true;
+        })
+        .sort((a, b) => a.date.localeCompare(b.date) || a.timestamp.localeCompare(b.timestamp));
+
+      if (typeLogs.length > 0) {
+        if (currentY > 230) {
+          doc.addPage();
+          currentY = 20;
+        }
+
+        doc.setFontSize(12);
+        doc.setFont('helvetica', 'bold');
+        doc.text(`Tipo: ${type === 'energy' ? 'Energia' : 'Água'}`, 14, currentY);
+        currentY += 5;
+
+        const columns = type === 'water' 
+          ? [
+              { header: 'Data', dataKey: 'date' },
+              { header: 'Leitura', dataKey: 'reading' },
+              { header: 'Consumo', dataKey: 'consumption' },
+              { header: 'Hidrômetro', dataKey: 'hidrometro' },
+              { header: 'Horímetro', dataKey: 'horimetro' },
+              { header: 'Responsável', dataKey: 'user' }
+            ]
+          : [
+              { header: 'Data', dataKey: 'date' },
+              { header: 'Leitura', dataKey: 'reading' },
+              { header: 'Consumo', dataKey: 'consumption' },
+              { header: 'Horímetro', dataKey: 'horimetro' },
+              { header: 'Responsável', dataKey: 'user' }
+            ];
+
+        autoTable(doc, {
+          startY: currentY,
+          columns: columns,
+          body: typeLogs.map(log => {
+            const row: any = {
+              date: format(new Date(log.date + 'T12:00:00'), 'dd/MM/yyyy'),
+              reading: `${log.reading.toLocaleString('pt-BR')} ${type === 'energy' ? 'kWh' : 'm³'}`,
+              consumption: getConsumption(log) !== null ? `+${getConsumption(log)?.toLocaleString('pt-BR')} ${type === 'energy' ? 'kWh' : 'm³'}` : '---',
+              horimetro: log.horimetro ? `${log.horimetro.toLocaleString('pt-BR')} h` : '---',
+              user: state.users.find(u => u.id === log.userId)?.name || '---'
+            };
+            if (type === 'water') row.hidrometro = log.hidrometro || '---';
+            return row;
+          }),
+          theme: 'striped',
+          headStyles: { fillStyle: 'fill', fillColor: type === 'energy' ? [217, 119, 6] : [37, 99, 235] },
+          styles: { fontSize: 8 },
+          margin: { left: 14, right: 14 }
+        });
+
+        currentY = (doc as any).lastAutoTable.finalY + 15;
+      }
+    });
+
+    doc.save(`relatorio_utilitarios_${format(new Date(), 'yyyyMMdd_HHmm')}.pdf`);
+  };
 
   const getConsumption = (currentLog: UtilityLog) => {
     const allLogs = state.utilityLogs || [];
@@ -510,6 +660,16 @@ const SlaughterhouseMaintenance: React.FC<Props> = ({ state, onUpdate, currentUs
                     <Clock className="w-3 h-3" />
                     {sortOrder === 'desc' ? 'Mais Recentes' : 'Mais Antigos'}
                   </button>
+
+                  {activeSubTab === 'temperature' && (
+                    <button
+                      onClick={handleGeneratePDF}
+                      className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 rounded-lg text-[9px] font-black uppercase tracking-widest text-white hover:bg-blue-700 transition-all shadow-lg shadow-blue-600/20"
+                    >
+                      <FileText className="w-3 h-3" />
+                      Gerar PDF
+                    </button>
+                  )}
                 </div>
               )}
               
@@ -535,6 +695,14 @@ const SlaughterhouseMaintenance: React.FC<Props> = ({ state, onUpdate, currentUs
                     <option value="energy">Energia</option>
                     <option value="water">Água</option>
                   </select>
+
+                  <button
+                    onClick={handleGenerateUtilityPDF}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 rounded-lg text-[9px] font-black uppercase tracking-widest text-white hover:bg-blue-700 transition-all shadow-lg shadow-blue-600/20"
+                  >
+                    <FileText className="w-3 h-3" />
+                    Gerar PDF
+                  </button>
                 </div>
               ) : null}
             </div>
