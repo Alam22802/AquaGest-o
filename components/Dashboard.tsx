@@ -248,9 +248,9 @@ const TilapiaPriceWidget = () => {
   }
 
   return (
-    <div className="bg-[#344434] rounded-2xl p-4 text-[#e4e4d4] shadow-lg shadow-black/10 flex flex-col gap-5 overflow-hidden relative group border border-white/5 min-h-[180px] justify-center">
-      <div className="relative z-10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div className="flex items-center gap-4 text-left w-full sm:w-auto">
+    <div className="bg-[#344434] rounded-2xl p-4 text-[#e4e4d4] shadow-lg shadow-black/10 flex flex-col gap-4 overflow-hidden relative group border border-white/5">
+      <div className="relative z-10 flex flex-col sm:flex-row items-center justify-between gap-4 text-left">
+        <div className="flex items-center gap-4 w-full sm:w-auto">
           <div className="p-3 bg-white/5 backdrop-blur-md rounded-xl border border-white/10 shadow-inner">
             <TrendingUp className="w-6 h-6" />
           </div>
@@ -259,70 +259,59 @@ const TilapiaPriceWidget = () => {
               <span className="text-[9px] font-black uppercase tracking-[0.2em] text-[#e4e4d4]/60">Mercado Triângulo Mineiro</span>
               <span className="px-1.5 py-0.5 bg-white/10 rounded text-[8px] font-black uppercase tracking-widest text-[#e4e4d4] border border-white/5">CEPEA/Peixe BR</span>
             </div>
-            <div className="flex items-center gap-4 flex-wrap">
+            <div className="flex items-baseline gap-3">
               <h2 className="text-3xl font-black tracking-tighter italic drop-shadow-sm">R$ {(marketData?.price ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</h2>
               
-              <div className="flex items-center gap-2 min-w-fit">
-                {marketData?.variation !== undefined && (
-                  <div className="flex flex-col items-center">
-                    <span className="text-[7px] font-black uppercase tracking-tighter text-[#e4e4d4]/40">Variação Dia</span>
-                    <span className={`text-[10px] font-black px-1.5 py-0.5 rounded ${marketData.variation >= 0 ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'}`}>
-                      {marketData.variation >= 0 ? '+' : ''}{marketData.variation}%
-                    </span>
-                  </div>
-                )}
-                {marketData?.weeklyVariation !== undefined && (
-                  <div className="flex flex-col items-center">
-                    <span className="text-[7px] font-black uppercase tracking-tighter text-[#e4e4d4]/40">Variação Sem.</span>
-                    <span className={`text-[10px] font-black px-1.5 py-0.5 rounded ${marketData.weeklyVariation >= 0 ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'}`}>
-                      {marketData.weeklyVariation >= 0 ? '+' : ''}{marketData.weeklyVariation}%
-                    </span>
-                  </div>
-                )}
-                <button 
-                  onClick={fetchPrice}
-                  className="p-2 ml-1 bg-white/10 hover:bg-white/20 rounded-xl text-[#e4e4d4] transition-all border border-white/10 active:scale-95 shadow-lg"
-                  title="Atualizar Preço"
-                >
-                  <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-                </button>
+              <div className="flex items-center gap-2">
+                <div className="flex flex-col items-center">
+                  <span className="text-[7px] font-black uppercase tracking-tighter text-[#e4e4d4]/40">Dia</span>
+                  <span className={`text-[10px] font-black px-1 py-0.5 rounded ${ (marketData?.variation || 0) >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                    {(marketData?.variation || 0) >= 0 ? '+' : ''}{(marketData?.variation || 0)}%
+                  </span>
+                </div>
+                <div className="flex flex-col items-center">
+                  <span className="text-[7px] font-black uppercase tracking-tighter text-[#e4e4d4]/40">Semana</span>
+                  <span className={`text-[10px] font-black px-1 py-0.5 rounded ${(marketData?.weeklyVariation || 0) >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                    {(marketData?.weeklyVariation || 0) >= 0 ? '+' : ''}{(marketData?.weeklyVariation || 0)}%
+                  </span>
+                </div>
               </div>
             </div>
           </div>
         </div>
         
-        <div className="flex items-center gap-3 self-end sm:self-auto opacity-60">
-          <div className="text-right">
-            <div className="text-[9px] font-black text-[#e4e4d4]/40 uppercase tracking-widest mb-0.5">Última Sincronização</div>
-            <div className="text-[10px] font-bold text-[#e4e4d4]/70">{marketData ? format(new Date(marketData.lastUpdate), 'dd/MM HH:mm') : '---'}</div>
+        <div className="hidden sm:flex items-center gap-3 text-right">
+          <div>
+            <div className="text-[9px] font-black text-[#e4e4d4]/40 uppercase tracking-widest mb-0.5">Atualizado</div>
+            <div className="text-[11px] font-bold text-[#e4e4d4]/70">{marketData ? format(new Date(marketData.lastUpdate), 'HH:mm') : '---'}</div>
           </div>
+          <button 
+            onClick={fetchPrice}
+            className="p-1.5 bg-white/5 hover:bg-white/10 rounded-lg text-[#e4e4d4]/60 hover:text-[#e4e4d4] transition-all border border-white/5 active:scale-95"
+            title="Atualizar"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+          </button>
         </div>
       </div>
 
       {/* MG variations list */}
       {marketData?.mgRegions && marketData.mgRegions.length > 0 && (
-        <div className="relative z-10 grid grid-cols-2 sm:grid-cols-4 gap-3 pt-3 border-t border-white/10">
-          {marketData.mgRegions.map((region, idx) => (
+        <div className="relative z-10 grid grid-cols-5 gap-2">
+          {marketData.mgRegions.slice(0, 5).map((region, idx) => (
             <div key={idx} className="bg-white/5 backdrop-blur-sm p-2 rounded-xl border border-white/5 flex flex-col items-center text-center transition-all hover:bg-white/10 group/item">
-              <span className="text-[9px] font-black uppercase tracking-wider text-[#e4e4d4]/70 mb-1">{region.name}</span>
-              <div className="text-sm font-black italic text-[#e4e4d4]">R$ {(region.price ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
-              <div className="flex gap-2 mt-1">
-                {region.variation !== undefined && (
-                  <div className="flex flex-col items-center">
-                    <span className="text-[7px] font-black text-white/30 uppercase tracking-tighter">Dia</span>
-                    <span className={`text-[9px] font-black ${region.variation >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                      {region.variation >= 0 ? '↑' : '↓'} {Math.abs(region.variation)}%
-                    </span>
-                  </div>
-                )}
-                {region.weeklyVariation !== undefined && (
-                  <div className="flex flex-col items-center">
-                    <span className="text-[7px] font-black text-white/30 uppercase tracking-tighter">Sem</span>
-                    <span className={`text-[9px] font-black ${region.weeklyVariation >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                      {region.weeklyVariation >= 0 ? '↑' : '↓'} {Math.abs(region.weeklyVariation)}%
-                    </span>
-                  </div>
-                )}
+              <span className="text-[8px] font-black uppercase tracking-widest text-[#e4e4d4]/50 mb-1 truncate w-full">{region.name.split(' ')[0]}</span>
+              <div className="flex items-center gap-1 mb-1">
+                <span className="text-xs font-black">R$ {Math.floor(region.price)}</span>
+                <span className="text-[9px] font-bold text-[#e4e4d4]/40">,{(region.price % 1).toFixed(2).split('.')[1]}</span>
+              </div>
+              <div className="flex flex-col gap-0.5 pt-1.5 border-t border-white/5 w-full">
+                <div className={`text-[8px] font-black ${(region.variation || 0) >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                  D: {(region.variation || 0) >= 0 ? '+' : ''}{(region.variation || 0)}%
+                </div>
+                <div className={`text-[8px] font-black ${(region.weeklyVariation || 0) >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                  S: {(region.weeklyVariation || 0) >= 0 ? '+' : ''}{(region.weeklyVariation || 0)}%
+                </div>
               </div>
             </div>
           ))}

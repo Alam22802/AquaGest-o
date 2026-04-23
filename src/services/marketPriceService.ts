@@ -85,13 +85,13 @@ export async function getTilapiaPriceMG(): Promise<MarketPrice> {
       price: safePrice,
       source: result.source || "Fonte Indisponível",
       lastUpdate: new Date().toISOString(),
-      variation: typeof result.variation === 'number' ? result.variation : undefined,
-      weeklyVariation: typeof result.weeklyVariation === 'number' ? result.weeklyVariation : undefined,
+      variation: typeof result.variation === 'number' ? result.variation : 0,
+      weeklyVariation: typeof result.weeklyVariation === 'number' ? result.weeklyVariation : 0,
       mgRegions: Array.isArray(result.mgRegions) ? result.mgRegions.map((r: any) => ({
         name: String(r.name || 'Desconhecida'),
         price: typeof r.price === 'number' ? r.price : safePrice,
-        variation: typeof r.variation === 'number' ? r.variation : undefined,
-        weeklyVariation: typeof r.weeklyVariation === 'number' ? r.weeklyVariation : undefined
+        variation: typeof r.variation === 'number' ? r.variation : 0,
+        weeklyVariation: typeof r.weeklyVariation === 'number' ? r.weeklyVariation : 0
       })) : []
     };
 
