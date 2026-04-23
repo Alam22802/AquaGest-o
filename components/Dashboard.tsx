@@ -10,6 +10,7 @@ import { Fish, Utensils, Scale, TrendingUp, FishOff, Calendar, Layers, Download,
 import * as XLSX from 'xlsx';
 import { format, isWithinInterval, parseISO, startOfDay, endOfDay, subDays, differenceInDays, addDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { getTilapiaPriceMG, MarketPrice } from '../src/services/marketPriceService';
 
 const getInterpolatedStandardCurvePoints = (standardCurves: any[], avgInitial: number) => {
   const curves = (standardCurves || []).filter(sc => sc.curve && sc.curve.some((p: any) => p.weight > 0));
@@ -206,6 +207,108 @@ const WeatherWidget = () => {
       {/* Decorative background elements */}
       <div className="absolute right-[-15px] top-[-15px] opacity-5 group-hover:scale-110 transition-transform duration-1000">
         <CloudSun className="w-32 h-32" />
+      </div>
+    </div>
+  );
+};
+
+const TilapiaPriceWidget = () => {
+  const [marketData, setMarketData] = useState<MarketPrice | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchPrice = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await getTilapiaPriceMG();
+      setMarketData(data);
+    } catch (err: any) {
+      console.error('Error fetching price:', err);
+      setError('Falha ao obter preço');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchPrice();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="bg-[#344434] p-6 rounded-2xl border border-white/5 shadow-sm animate-pulse flex items-center gap-4">
+        <div className="w-12 h-12 bg-white/5 rounded-xl" />
+        <div className="space-y-2 flex-1">
+          <div className="h-3 bg-white/5 rounded w-1/4" />
+          <div className="h-6 bg-white/5 rounded w-1/2" />
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-[#344434] rounded-2xl p-4 text-[#e4e4d4] shadow-lg shadow-black/10 flex flex-col gap-4 overflow-hidden relative group border border-white/5">
+      <div className="relative z-10 flex flex-col sm:flex-row items-center justify-between gap-4">
+        <div className="flex items-center gap-4 text-left">
+          <div className="p-3 bg-white/5 backdrop-blur-md rounded-xl border border-white/10 shadow-inner">
+            <TrendingUp className="w-6 h-6" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2 mb-0.5">
+              <span className="text-[9px] font-black uppercase tracking-[0.2em] text-[#e4e4d4]/60">Mercado Triângulo Mineiro</span>
+              <span className="px-1.5 py-0.5 bg-white/10 rounded text-[8px] font-black uppercase tracking-widest text-[#e4e4d4] border border-white/5">CEPEA/Peixe BR</span>
+            </div>
+            <div className="flex items-baseline gap-3">
+              <h2 className="text-3xl font-black tracking-tighter italic drop-shadow-sm">R$ {marketData?.price.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</h2>
+              {marketData?.variation !== undefined && (
+                <span className={`text-[10px] font-black px-1.5 py-0.5 rounded ${marketData.variation >= 0 ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'}`}>
+                  {marketData.variation >= 0 ? '+' : ''}{marketData.variation}%
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+        
+        <div className="flex items-center gap-3">
+          <div className="text-right hidden sm:block">
+            <div className="text-[8px] font-black text-[#e4e4d4]/40 uppercase tracking-widest mb-0.5">Sincronizado</div>
+            <div className="text-[10px] font-bold text-[#e4e4d4]/70">{marketData ? format(new Date(marketData.lastUpdate), 'dd/MM HH:mm') : '---'}</div>
+          </div>
+          <button 
+            onClick={fetchPrice}
+            className="p-2 bg-white/5 hover:bg-white/10 rounded-xl text-[#e4e4d4]/60 hover:text-[#e4e4d4] transition-all border border-white/5 active:scale-95"
+            title="Atualizar Preço"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+          </button>
+        </div>
+      </div>
+
+      {/* MG variations list */}
+      {marketData?.mgRegions && marketData.mgRegions.length > 0 && (
+        <div className="relative z-10 grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2 border-t border-white/5">
+          {marketData.mgRegions.map((region, idx) => (
+            <div key={idx} className="bg-white/5 backdrop-blur-sm p-2 rounded-xl border border-white/5 flex flex-col items-center text-center transition-all hover:bg-white/10">
+              <span className="text-[8px] font-black uppercase tracking-widest text-[#e4e4d4]/50 mb-1">{region.name}</span>
+              <div className="text-xs font-black">R$ {region.price.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
+              {region.variation !== undefined && (
+                <span className={`text-[7px] font-black ${region.variation >= 0 ? 'text-emerald-400' : 'text-red-400'} mt-0.5`}>
+                  {region.variation >= 0 ? '↑' : '↓'} {Math.abs(region.variation)}%
+                </span>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="text-[8px] font-bold text-[#e4e4d4]/30 uppercase tracking-tighter">
+        Fonte: {marketData?.source}
+      </div>
+
+      {/* Decorative background element */}
+      <div className="absolute right-[-15px] top-[-15px] opacity-10 group-hover:scale-110 transition-transform duration-1000">
+        <TrendingUp className="w-32 h-32" />
       </div>
     </div>
   );
@@ -1195,8 +1298,11 @@ const Dashboard: React.FC<Props> = ({ state }) => {
 
   return (
     <div className="space-y-6 pb-20">
-      {/* Clima Tempo */}
-      <WeatherWidget />
+      {/* Clima e Mercado stacked */}
+      <div className="grid grid-cols-1 gap-4">
+        <WeatherWidget />
+        <TilapiaPriceWidget />
+      </div>
 
       {/* Alerta de Estoque Baixo */}
       {lowStockFeeds.length > 0 && (
