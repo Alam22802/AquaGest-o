@@ -15,10 +15,12 @@ export interface MarketPrice {
   source: string;
   lastUpdate: string;
   variation?: number;
+  weeklyVariation?: number;
   mgRegions?: {
     name: string;
     price: number;
     variation?: number;
+    weeklyVariation?: number;
   }[];
 }
 
@@ -43,7 +45,7 @@ export async function getTilapiaPriceMG(): Promise<MarketPrice> {
     const ai = getAI();
     const response = await ai.models.generateContent({
       model: "gemini-1.5-flash",
-      contents: "Qual o preço médio atual do quilo da tilápia (peixe vivo) no Triângulo Mineiro e demais regiões de Minas Gerais (MG) de acordo com o indicador CEPEA/Peixe BR? Retorne o preço específico para o Triângulo Mineiro como valor principal, a fonte com data, e uma lista de variações para as outras regiões polo de MG (como Norte de Minas, etc).",
+      contents: "Qual o preço médio atual do quilo da tilápia (peixe vivo) no Triângulo Mineiro e demais regiões de Minas Gerais (MG) de acordo com o indicador CEPEA/Peixe BR? Retorne o preço específico para o Triângulo Mineiro como valor principal, a fonte com data, a variação percentual diária E a variação semanal (7 dias). Também retorne uma lista para as outras regiões polo de MG (Norte de Minas, Sul de Minas, Grande BH, etc) incluindo preços e variações semanais.",
       config: {
         responseMimeType: "application/json",
         responseSchema: {
@@ -51,15 +53,17 @@ export async function getTilapiaPriceMG(): Promise<MarketPrice> {
           properties: {
             price: { type: Type.NUMBER, description: "Preço médio no Triângulo Mineiro por kg (R$)" },
             source: { type: Type.STRING, description: "Fonte e data da informação" },
-            variation: { type: Type.NUMBER, description: "Variação percentual geral em MG" },
+            variation: { type: Type.NUMBER, description: "Variação percentual diária em MG" },
+            weeklyVariation: { type: Type.NUMBER, description: "Variação percentual semanal (7 dias) em MG" },
             mgRegions: {
               type: Type.ARRAY,
               items: {
                 type: Type.OBJECT,
                 properties: {
-                  name: { type: Type.STRING, description: "Nome da região polo (Ex: Grande BH, Norte de Minas)" },
+                  name: { type: Type.STRING, description: "Nome da região polo" },
                   price: { type: Type.NUMBER, description: "Preço médio na região (R$)" },
-                  variation: { type: Type.NUMBER, description: "Variação percentual na região" }
+                  variation: { type: Type.NUMBER, description: "Variação diária na região" },
+                  weeklyVariation: { type: Type.NUMBER, description: "Variação semanal na região" }
                 },
                 required: ["name", "price"]
               }
@@ -82,10 +86,12 @@ export async function getTilapiaPriceMG(): Promise<MarketPrice> {
       source: result.source || "Fonte Indisponível",
       lastUpdate: new Date().toISOString(),
       variation: typeof result.variation === 'number' ? result.variation : undefined,
+      weeklyVariation: typeof result.weeklyVariation === 'number' ? result.weeklyVariation : undefined,
       mgRegions: Array.isArray(result.mgRegions) ? result.mgRegions.map((r: any) => ({
         name: String(r.name || 'Desconhecida'),
         price: typeof r.price === 'number' ? r.price : safePrice,
-        variation: typeof r.variation === 'number' ? r.variation : undefined
+        variation: typeof r.variation === 'number' ? r.variation : undefined,
+        weeklyVariation: typeof r.weeklyVariation === 'number' ? r.weeklyVariation : undefined
       })) : []
     };
 
