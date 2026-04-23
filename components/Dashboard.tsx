@@ -260,7 +260,7 @@ const TilapiaPriceWidget = () => {
               <span className="px-1.5 py-0.5 bg-white/10 rounded text-[8px] font-black uppercase tracking-widest text-[#e4e4d4] border border-white/5">CEPEA/Peixe BR</span>
             </div>
             <div className="flex items-baseline gap-3">
-              <h2 className="text-3xl font-black tracking-tighter italic drop-shadow-sm">R$ {marketData?.price.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</h2>
+              <h2 className="text-3xl font-black tracking-tighter italic drop-shadow-sm">R$ {(marketData?.price ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</h2>
               {marketData?.variation !== undefined && (
                 <span className={`text-[10px] font-black px-1.5 py-0.5 rounded ${marketData.variation >= 0 ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'}`}>
                   {marketData.variation >= 0 ? '+' : ''}{marketData.variation}%
@@ -291,7 +291,7 @@ const TilapiaPriceWidget = () => {
           {marketData.mgRegions.map((region, idx) => (
             <div key={idx} className="bg-white/5 backdrop-blur-sm p-2 rounded-xl border border-white/5 flex flex-col items-center text-center transition-all hover:bg-white/10">
               <span className="text-[8px] font-black uppercase tracking-widest text-[#e4e4d4]/50 mb-1">{region.name}</span>
-              <div className="text-xs font-black">R$ {region.price.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
+              <div className="text-xs font-black">R$ {(region.price ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
               {region.variation !== undefined && (
                 <span className={`text-[7px] font-black ${region.variation >= 0 ? 'text-emerald-400' : 'text-red-400'} mt-0.5`}>
                   {region.variation >= 0 ? '↑' : '↓'} {Math.abs(region.variation)}%
