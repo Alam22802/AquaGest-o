@@ -256,7 +256,7 @@ const TilapiaPriceWidget = () => {
           </div>
           <div className="flex-1">
             <div className="flex items-center gap-2 mb-0.5">
-              <span className="text-[9px] font-black uppercase tracking-[0.2em] text-[#e4e4d4]/60">Mercado Triângulo Mineiro</span>
+              <span className="text-[9px] font-black uppercase tracking-[0.2em] text-[#e4e4d4]/60">Triângulo Mineiro/Alto Paranaíba</span>
               <span className="px-1.5 py-0.5 bg-white/10 rounded text-[8px] font-black uppercase tracking-widest text-[#e4e4d4] border border-white/5">CEPEA/Peixe BR</span>
             </div>
             <div className="flex items-baseline gap-3">
@@ -264,14 +264,8 @@ const TilapiaPriceWidget = () => {
               
               <div className="flex items-center gap-2">
                 <div className="flex flex-col items-center">
-                  <span className="text-[7px] font-black uppercase tracking-tighter text-[#e4e4d4]/40">Dia</span>
-                  <span className={`text-[10px] font-black px-1 py-0.5 rounded ${ (marketData?.variation || 0) >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                    {(marketData?.variation || 0) >= 0 ? '+' : ''}{(marketData?.variation || 0)}%
-                  </span>
-                </div>
-                <div className="flex flex-col items-center">
-                  <span className="text-[7px] font-black uppercase tracking-tighter text-[#e4e4d4]/40">Semana</span>
-                  <span className={`text-[10px] font-black px-1 py-0.5 rounded ${(marketData?.weeklyVariation || 0) >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                  <span className="text-[7px] font-black uppercase tracking-tighter text-[#e4e4d4]/40">Variação Semanal</span>
+                  <span className={`text-[10px] font-black px-1.5 py-0.5 rounded ${(marketData?.weeklyVariation || 0) >= 0 ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'}`}>
                     {(marketData?.weeklyVariation || 0) >= 0 ? '+' : ''}{(marketData?.weeklyVariation || 0)}%
                   </span>
                 </div>
@@ -283,7 +277,7 @@ const TilapiaPriceWidget = () => {
         <div className="hidden sm:flex items-center gap-3 text-right">
           <div>
             <div className="text-[9px] font-black text-[#e4e4d4]/40 uppercase tracking-widest mb-0.5">Atualizado</div>
-            <div className="text-[11px] font-bold text-[#e4e4d4]/70">{marketData ? format(new Date(marketData.lastUpdate), 'HH:mm') : '---'}</div>
+            <div className="text-[10px] font-bold text-[#e4e4d4]/70">{marketData ? format(new Date(marketData.lastUpdate), 'dd/MM HH:mm') : '---'}</div>
           </div>
           <button 
             onClick={fetchPrice}
@@ -305,13 +299,10 @@ const TilapiaPriceWidget = () => {
                 <span className="text-xs font-black">R$ {Math.floor(region.price)}</span>
                 <span className="text-[9px] font-bold text-[#e4e4d4]/40">,{(region.price % 1).toFixed(2).split('.')[1]}</span>
               </div>
-              <div className="flex flex-col gap-0.5 pt-1.5 border-t border-white/5 w-full">
-                <div className={`text-[8px] font-black ${(region.variation || 0) >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                  D: {(region.variation || 0) >= 0 ? '+' : ''}{(region.variation || 0)}%
-                </div>
-                <div className={`text-[8px] font-black ${(region.weeklyVariation || 0) >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                  S: {(region.weeklyVariation || 0) >= 0 ? '+' : ''}{(region.weeklyVariation || 0)}%
-                </div>
+              <div className="flex flex-col items-center pt-1.5 border-t border-white/5 w-full">
+                <span className={`text-[8px] font-black ${(region.weeklyVariation || 0) >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                  {(region.weeklyVariation || 0) >= 0 ? '+' : ''}{(region.weeklyVariation || 0)}%
+                </span>
               </div>
             </div>
           ))}

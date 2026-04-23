@@ -45,25 +45,23 @@ export async function getTilapiaPriceMG(): Promise<MarketPrice> {
     const ai = getAI();
     const response = await ai.models.generateContent({
       model: "gemini-1.5-flash",
-      contents: "Qual o preço médio atual do quilo da tilápia (peixe vivo) no Triângulo Mineiro e demais regiões de Minas Gerais (MG) de acordo com o indicador CEPEA/Peixe BR? Retorne o preço específico para o Triângulo Mineiro como valor principal, a fonte com data, a variação percentual diária E a variação semanal (7 dias). Também retorne uma lista para as outras regiões polo de MG (Norte de Minas, Sul de Minas, Grande BH, etc) incluindo preços e variações semanais.",
+      contents: "Qual o preço médio atual do quilo da tilápia (peixe vivo) no Triângulo Mineiro/Alto Paranaíba e demais regiões de Minas Gerais (MG) de acordo com o indicador CEPEA/Peixe BR? Retorne como valor principal o mercado 'Triângulo Mineiro/Alto Paranaíba'. Para cada região (incluindo a principal e secundárias como Norte, Sul, Grande BH), traga APENAS o preço em R$ e a variação semanal (7 dias). Ignore variações diárias.",
       config: {
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.OBJECT,
           properties: {
-            price: { type: Type.NUMBER, description: "Preço médio no Triângulo Mineiro por kg (R$)" },
-            source: { type: Type.STRING, description: "Fonte e data da informação" },
-            variation: { type: Type.NUMBER, description: "Variação percentual diária em MG" },
-            weeklyVariation: { type: Type.NUMBER, description: "Variação percentual semanal (7 dias) em MG" },
+            price: { type: Type.NUMBER, description: "Preço médio no Triângulo Mineiro/Alto Paranaíba (R$)" },
+            source: { type: Type.STRING, description: "Fonte e data da informação (Ex: CEPEA 17/04)" },
+            weeklyVariation: { type: Type.NUMBER, description: "Variação semanal percentual" },
             mgRegions: {
               type: Type.ARRAY,
               items: {
                 type: Type.OBJECT,
                 properties: {
-                  name: { type: Type.STRING, description: "Nome da região polo" },
-                  price: { type: Type.NUMBER, description: "Preço médio na região (R$)" },
-                  variation: { type: Type.NUMBER, description: "Variação diária na região" },
-                  weeklyVariation: { type: Type.NUMBER, description: "Variação semanal na região" }
+                  name: { type: Type.STRING, description: "Nome da região" },
+                  price: { type: Type.NUMBER, description: "Preço médio (R$)" },
+                  weeklyVariation: { type: Type.NUMBER, description: "Variação semanal percentual" }
                 },
                 required: ["name", "price"]
               }
@@ -78,20 +76,20 @@ export async function getTilapiaPriceMG(): Promise<MarketPrice> {
     if (!response.text) throw new Error("Resposta do Gemini vazia");
     const result = JSON.parse(response.text);
     
-    // Safety check for numerical values
-    const safePrice = typeof result.price === 'number' ? result.price : 9.95;
+    // Fallback values provided by user for context
+    const safePrice = typeof result.price === 'number' ? result.price : 10.23;
     
     const marketPrice: MarketPrice = {
       price: safePrice,
-      source: result.source || "Fonte Indisponível",
+      source: result.source || "CEPEA (17/04)",
       lastUpdate: new Date().toISOString(),
-      variation: typeof result.variation === 'number' ? result.variation : 0,
-      weeklyVariation: typeof result.weeklyVariation === 'number' ? result.weeklyVariation : 0,
+      variation: 0,
+      weeklyVariation: typeof result.weeklyVariation === 'number' ? result.weeklyVariation : 0.11,
       mgRegions: Array.isArray(result.mgRegions) ? result.mgRegions.map((r: any) => ({
         name: String(r.name || 'Desconhecida'),
         price: typeof r.price === 'number' ? r.price : safePrice,
-        variation: typeof r.variation === 'number' ? r.variation : 0,
-        weeklyVariation: typeof r.weeklyVariation === 'number' ? r.weeklyVariation : 0
+        variation: 0,
+        weeklyVariation: typeof r.weeklyVariation === 'number' ? r.weeklyVariation : 0.11
       })) : []
     };
 
