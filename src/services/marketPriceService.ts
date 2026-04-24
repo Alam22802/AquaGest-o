@@ -44,7 +44,7 @@ export async function getTilapiaPriceMG(): Promise<MarketPrice> {
   try {
     const ai = getAI();
     const response = await ai.models.generateContent({
-      model: "gemini-1.5-flash",
+      model: "gemini-3-flash-preview",
       contents: "Qual o preço médio atual do quilo da tilápia (peixe vivo) no Triângulo Mineiro/Alto Paranaíba e demais regiões de Minas Gerais (MG) de acordo com o indicador CEPEA/Peixe BR? Retorne como valor principal o mercado 'Triângulo Mineiro/Alto Paranaíba'. Para cada região (incluindo a principal e secundárias como Norte, Sul, Grande BH), traga APENAS o preço em R$ e a variação semanal (7 dias). Ignore variações diárias.",
       config: {
         responseMimeType: "application/json",
