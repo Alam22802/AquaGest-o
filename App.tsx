@@ -499,11 +499,17 @@ const App: React.FC = () => {
     }
   };
 
-  if (isLoading) {
+  if (isLoading || !state) {
     return (
       <div className="min-h-screen bg-[#1a1f1a] flex flex-col items-center justify-center text-[#e4e4d4]">
         <Loader2 className="w-12 h-12 text-[#e4e4d4] animate-spin mb-4 opacity-40" />
         <h2 className="text-xl font-black tracking-widest uppercase italic opacity-80">AquaGestão</h2>
+        {!state && !isLoading && (
+          <div className="mt-4 text-center">
+            <p className="text-xs text-red-400 mb-2">Erro ao carregar os dados.</p>
+            <button onClick={() => window.location.reload()} className="px-4 py-2 bg-white/10 rounded-xl text-[10px] font-black uppercase tracking-widest">Recarregar</button>
+          </div>
+        )}
       </div>
     );
   }

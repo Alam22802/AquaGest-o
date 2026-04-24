@@ -4,7 +4,7 @@ import { GoogleGenAI, Type } from "@google/genai";
 let aiInstance: GoogleGenAI | null = null;
 const getAI = () => {
   if (!aiInstance) {
-    const apiKey = typeof process !== 'undefined' ? process.env.GEMINI_API_KEY : '';
+    const apiKey = (typeof process !== 'undefined' && process.env) ? process.env.GEMINI_API_KEY : '';
     aiInstance = new GoogleGenAI({ apiKey: apiKey || '' });
   }
   return aiInstance;
@@ -44,7 +44,7 @@ export async function getTilapiaPriceMG(): Promise<MarketPrice> {
   try {
     const ai = getAI();
     const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
+      model: "gemini-1.5-flash-latest",
       contents: "Qual o preço médio atual do quilo da tilápia (peixe vivo) no Triângulo Mineiro/Alto Paranaíba e demais regiões de Minas Gerais (MG) de acordo com o indicador CEPEA/Peixe BR? Retorne como valor principal o mercado 'Triângulo Mineiro/Alto Paranaíba'. Para cada região (incluindo a principal e secundárias como Norte, Sul, Grande BH), traga APENAS o preço em R$ e a variação semanal (7 dias). Ignore variações diárias.",
       config: {
         responseMimeType: "application/json",

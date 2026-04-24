@@ -146,7 +146,7 @@ const WeatherWidget = () => {
   const currentInfo = getWeatherInfo(current.weathercode);
 
   return (
-    <div className="bg-[#344434] rounded-2xl p-4 text-[#e4e4d4] shadow-lg shadow-black/10 flex flex-col gap-4 overflow-hidden relative group border border-white/5">
+    <div className="bg-[#344434] rounded-2xl p-4 sm:p-6 text-[#e4e4d4] shadow-lg shadow-black/10 flex flex-col justify-between gap-4 overflow-hidden relative group border border-white/5 h-full">
       <div className="relative z-10 flex flex-col sm:flex-row items-center justify-between gap-4">
         <div className="flex items-center gap-4 text-left">
           <div className="p-3 bg-white/5 backdrop-blur-md rounded-xl border border-white/10 shadow-inner">
@@ -248,7 +248,7 @@ const TilapiaPriceWidget = () => {
   }
 
   return (
-    <div className="bg-[#344434] rounded-2xl p-4 text-[#e4e4d4] shadow-lg shadow-black/10 flex flex-col gap-4 overflow-hidden relative group border border-white/5">
+    <div className="bg-[#344434] rounded-2xl p-4 sm:p-6 text-[#e4e4d4] shadow-lg shadow-black/10 flex flex-col justify-between gap-4 overflow-hidden relative group border border-white/5 h-full min-h-[160px]">
       <div className="relative z-10 flex flex-col sm:flex-row items-center justify-between gap-4 text-left">
         <div className="flex items-center gap-4 w-full sm:w-auto">
           <div className="p-3 bg-white/5 backdrop-blur-md rounded-xl border border-white/10 shadow-inner">
@@ -1305,8 +1305,8 @@ const Dashboard: React.FC<Props> = ({ state }) => {
 
   return (
     <div className="space-y-6 pb-20">
-      {/* Clima e Mercado stacked */}
-      <div className="grid grid-cols-1 gap-4">
+      {/* Clima e Mercado side-by-side */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <WeatherWidget />
         <TilapiaPriceWidget />
       </div>
