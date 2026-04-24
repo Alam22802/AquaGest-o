@@ -441,6 +441,56 @@ export interface FeedingTable {
   updatedAt?: number;
 }
 
+export interface CostCenter {
+  id: string;
+  name: string;
+  code: string;
+  userId?: string;
+  updatedAt?: number;
+}
+
+export interface PCMEquipment {
+  id: string;
+  name: string;
+  code: string;
+  costCenterId: string;
+  userId?: string;
+  updatedAt?: number;
+}
+
+export interface PCMStoppageReason {
+  id: string;
+  name: string;
+  userId?: string;
+  updatedAt?: number;
+}
+
+export interface PCMProductionStoppage {
+  id: string;
+  costCenterId: string;
+  equipmentId: string;
+  reasonId: string;
+  startDateTime: string;
+  endDateTime: string;
+  description?: string;
+  userId: string;
+  updatedAt?: number;
+}
+
+export interface PCMPlannedImprovement {
+  id: string;
+  costCenterId: string;
+  equipmentId: string;
+  reason: string;
+  isUrgent: boolean;
+  plannedStartDate: string;
+  plannedEndDate: string;
+  description?: string;
+  status: 'Pendente' | 'Em Andamento' | 'Concluído' | 'Cancelado';
+  userId: string;
+  updatedAt?: number;
+}
+
 export interface AppState {
   users: User[];
   lines: Line[];
@@ -485,6 +535,11 @@ export interface AppState {
   capexProjects: CapexProject[];
   capexInvoices: CapexInvoice[];
   feedingTables?: FeedingTable[];
+  costCenters?: CostCenter[];
+  pcmEquipments?: PCMEquipment[];
+  pcmStoppageReasons?: PCMStoppageReason[];
+  pcmProductionStoppages?: PCMProductionStoppage[];
+  pcmPlannedImprovements?: PCMPlannedImprovement[];
   farmTargetCapacity?: number;
   notificationSettings?: NotificationSettings;
   supabaseConfig?: { url: string; key: string };

@@ -28,6 +28,7 @@ const Layout: React.FC<Props> = ({ children, activeTab, setActiveTab, currentUse
     { id: 'feed', label: 'Estoque Ração', icon: <Package className="w-5 h-5" /> },
     { id: 'slaughter', label: 'Frigorífico', icon: <Factory className="w-5 h-5" /> },
     { id: 'capex', label: 'Investimentos CAPEX', icon: <DollarSign className="w-5 h-5" /> },
+    { id: 'pcm', label: 'PCM', icon: <ClipboardList className="w-5 h-5" /> },
     { id: 'lines', label: 'Linhas/Setores', icon: <Layers className="w-5 h-5" /> },
     { id: 'batches', label: 'Lotes (Estoque)', icon: <Tag className="w-5 h-5" /> },
     { id: 'maintenance', label: 'Manutenção', icon: <Settings className="w-5 h-5" /> },

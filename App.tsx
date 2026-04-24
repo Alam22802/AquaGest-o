@@ -15,6 +15,7 @@ import UserManagement from './components/UserManagement.tsx';
 import CloudSettings from './components/CloudSettings.tsx';
 import ProtocolManagement from './components/ProtocolManagement.tsx';
 import CapexManagement from './components/CapexManagement.tsx';
+import PCMManagement from './components/PCMManagement.tsx';
 import SlaughterHouse from './components/SlaughterHouse.tsx';
 import Login from './components/Login.tsx';
 import ErrorBoundary from './components/ErrorBoundary.tsx';
@@ -121,6 +122,11 @@ const App: React.FC = () => {
         portfolios: inject(data.portfolios),
         capexProjects: inject(data.capexProjects),
         capexInvoices: inject(data.capexInvoices),
+        costCenters: inject(data.costCenters || []),
+        pcmEquipments: inject(data.pcmEquipments || []),
+        pcmStoppageReasons: inject(data.pcmStoppageReasons || []),
+        pcmProductionStoppages: inject(data.pcmProductionStoppages || []),
+        pcmPlannedImprovements: inject(data.pcmPlannedImprovements || []),
       };
 
       setState(data);
@@ -350,6 +356,11 @@ const App: React.FC = () => {
         portfolios: injectTimestamps(prev.portfolios, newState.portfolios),
         capexProjects: injectTimestamps(prev.capexProjects, newState.capexProjects),
         capexInvoices: injectTimestamps(prev.capexInvoices, newState.capexInvoices),
+        costCenters: injectTimestamps(prev.costCenters || [], newState.costCenters || []),
+        pcmEquipments: injectTimestamps(prev.pcmEquipments || [], newState.pcmEquipments || []),
+        pcmStoppageReasons: injectTimestamps(prev.pcmStoppageReasons || [], newState.pcmStoppageReasons || []),
+        pcmProductionStoppages: injectTimestamps(prev.pcmProductionStoppages || [], newState.pcmProductionStoppages || []),
+        pcmPlannedImprovements: injectTimestamps(prev.pcmPlannedImprovements || [], newState.pcmPlannedImprovements || []),
         slaughterHRRolesUpdated: JSON.stringify(prev.slaughterHRRoles) !== JSON.stringify(newState.slaughterHRRoles) ? Date.now() : prev.slaughterHRRolesUpdated,
         slaughterHRDepartmentsUpdated: JSON.stringify(prev.slaughterHRDepartments) !== JSON.stringify(newState.slaughterHRDepartments) ? Date.now() : prev.slaughterHRDepartmentsUpdated,
         slaughterHREntryTypesUpdated: JSON.stringify(prev.slaughterHREntryTypes) !== JSON.stringify(newState.slaughterHREntryTypes) ? Date.now() : prev.slaughterHREntryTypesUpdated,
@@ -397,6 +408,11 @@ const App: React.FC = () => {
         ...findDeleted(prev.portfolios, stateWithTimestamps.portfolios),
         ...findDeleted(prev.capexProjects, stateWithTimestamps.capexProjects),
         ...findDeleted(prev.capexInvoices, stateWithTimestamps.capexInvoices),
+        ...findDeleted(prev.costCenters || [], stateWithTimestamps.costCenters || []),
+        ...findDeleted(prev.pcmEquipments || [], stateWithTimestamps.pcmEquipments || []),
+        ...findDeleted(prev.pcmStoppageReasons || [], stateWithTimestamps.pcmStoppageReasons || []),
+        ...findDeleted(prev.pcmProductionStoppages || [], stateWithTimestamps.pcmProductionStoppages || []),
+        ...findDeleted(prev.pcmPlannedImprovements || [], stateWithTimestamps.pcmPlannedImprovements || []),
       ];
 
       if (deleted.length > 0) {
@@ -493,6 +509,7 @@ const App: React.FC = () => {
       case 'biometry': return <BiometryLog state={state} onUpdate={handleStateUpdate} currentUser={currentUser} />;
       case 'mortality': return <MortalityLog state={state} onUpdate={handleStateUpdate} currentUser={currentUser} />;
       case 'slaughter': return <SlaughterHouse state={state} onUpdate={handleStateUpdate} currentUser={currentUser} />;
+      case 'pcm': return <PCMManagement state={state} onUpdate={handleStateUpdate} currentUser={currentUser} />;
       case 'users': return <UserManagement state={state} onUpdate={handleStateUpdate} currentUser={currentUser} />;
       case 'cloud': return <CloudSettings state={state} onUpdate={handleStateUpdate} currentUser={currentUser} onSync={backgroundSync} isSyncing={isSyncingBackground} />;
       default: return <Dashboard state={state} />;

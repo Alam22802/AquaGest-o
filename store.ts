@@ -65,6 +65,11 @@ const initialState: AppState = {
   capexProjects: [],
   capexInvoices: [],
   feedingTables: [],
+  costCenters: [],
+  pcmEquipments: [],
+  pcmStoppageReasons: [],
+  pcmProductionStoppages: [],
+  pcmPlannedImprovements: [],
   farmTargetCapacity: 0,
   notificationSettings: defaultNotificationSettings,
   deletedIds: []
@@ -158,6 +163,11 @@ export const ensureStateIntegrity = (state: any, mergeWith?: AppState, priority:
     utilityLogs: filterByTombstone(base.utilityLogs || []),
     coldChambers: filterByTombstone(base.coldChambers || []),
     feedingTables: filterByTombstone(base.feedingTables || []),
+    costCenters: filterByTombstone(base.costCenters || []),
+    pcmEquipments: filterByTombstone(base.pcmEquipments || []),
+    pcmStoppageReasons: filterByTombstone(base.pcmStoppageReasons || []),
+    pcmProductionStoppages: filterByTombstone(base.pcmProductionStoppages || []),
+    pcmPlannedImprovements: filterByTombstone(base.pcmPlannedImprovements || []),
     farmTargetCapacity: base.farmTargetCapacity || 0,
   };
 
@@ -207,6 +217,11 @@ export const ensureStateIntegrity = (state: any, mergeWith?: AppState, priority:
       utilityLogs: mergeArraysById(result.utilityLogs || [], mergeWith.utilityLogs || [], combinedDeletedIds, priority),
       coldChambers: mergeArraysById(result.coldChambers || [], mergeWith.coldChambers || [], combinedDeletedIds, priority),
       feedingTables: mergeArraysById(result.feedingTables || [], mergeWith.feedingTables || [], combinedDeletedIds, priority),
+      costCenters: mergeArraysById(result.costCenters || [], mergeWith.costCenters || [], combinedDeletedIds, priority),
+      pcmEquipments: mergeArraysById(result.pcmEquipments || [], mergeWith.pcmEquipments || [], combinedDeletedIds, priority),
+      pcmStoppageReasons: mergeArraysById(result.pcmStoppageReasons || [], mergeWith.pcmStoppageReasons || [], combinedDeletedIds, priority),
+      pcmProductionStoppages: mergeArraysById(result.pcmProductionStoppages || [], mergeWith.pcmProductionStoppages || [], combinedDeletedIds, priority),
+      pcmPlannedImprovements: mergeArraysById(result.pcmPlannedImprovements || [], mergeWith.pcmPlannedImprovements || [], combinedDeletedIds, priority),
       farmTargetCapacity: priority === 'remote' 
         ? (mergeWith.farmTargetCapacity !== undefined ? mergeWith.farmTargetCapacity : result.farmTargetCapacity)
         : (result.farmTargetCapacity !== undefined ? result.farmTargetCapacity : mergeWith.farmTargetCapacity),
