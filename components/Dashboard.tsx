@@ -295,10 +295,10 @@ const TilapiaPriceWidget = () => {
         </div>
       </div>
 
-      {/* MG variations list */}
-      {marketData?.mgRegions && marketData.mgRegions.length > 0 && (
+      {/* Regions variations list */}
+      {marketData?.regions && marketData.regions.length > 0 && (
         <div className="relative z-10 grid grid-cols-5 gap-2">
-          {marketData.mgRegions.slice(0, 5).map((region, idx) => (
+          {marketData.regions.slice(0, 5).map((region, idx) => (
             <div key={idx} className="bg-white/5 backdrop-blur-sm p-2 rounded-xl border border-white/5 flex flex-col items-center text-center transition-all hover:bg-white/10 group/item">
               <span className="text-[8px] font-black uppercase tracking-widest text-[#e4e4d4]/50 mb-1 truncate w-full">{region.name.split(' ')[0]}</span>
               <div className="flex items-center gap-1 mb-1">
