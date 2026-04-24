@@ -205,7 +205,7 @@ const UserManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       password: user.password,
       canEdit: true, // Default to editor on approval
       receiveNotifications: user.receiveNotifications,
-      allowedTabs: user.allowedTabs || ['dashboard', 'feeding', 'biometry', 'mortality'] // Default tabs for new users
+      allowedTabs: user.allowedTabs || ['dashboard', 'feeding', 'biometry', 'mortality', 'pcm'] // Default tabs for new users
     });
     // Mark as approved in the form data so it saves as approved
     // We'll handle the actual isApproved: true in handleSaveUser
@@ -501,7 +501,7 @@ const UserManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                         const allTabs = [
                           'capex', 'inventory', 'maintenance', 'protocols', 'batches', 
                           'lines', 'cages', 'feed', 'feeding', 'biometry', 
-                          'mortality', 'slaughter', 'cloud'
+                          'mortality', 'slaughter', 'cloud', 'pcm'
                         ];
                         const isAllSelected = allTabs.every(id => (formData.allowedTabs || []).includes(id));
                         return (
@@ -535,6 +535,7 @@ const UserManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                         { id: 'biometry', label: 'Biometria' },
                         { id: 'mortality', label: 'Mortalidade' },
                         { id: 'slaughter', label: 'Frigorífico' },
+                        { id: 'pcm', label: 'PCM' },
                         { id: 'cloud', label: 'Backup/Nuvem' }
                       ].map(tab => (
                         <label key={tab.id} className="flex items-center gap-2 p-2 bg-white rounded-lg border border-slate-200 cursor-pointer hover:border-emerald-500 transition-all">
