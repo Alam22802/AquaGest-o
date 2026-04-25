@@ -517,25 +517,26 @@ const SlaughterOverview: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
     const totalRendering = filteredLogs.reduce((acc, l) => acc + (l.renderingWeight || 0), 0);
     const yieldPercentage = totalRecep > 0 ? (totalPacked / totalRecep) * 100 : 0;
 
-    const totalWaterValue = filteredExpenses.filter(e => e.category === 'Água').reduce((acc, e) => acc + e.value, 0);
+    const waterExpenses = filteredExpenses.filter(e => e.category === 'Água');
+    const totalWaterValue = waterExpenses.reduce((acc, e) => acc + e.value, 0);
     
     // Calculate total water consumed from utility logs (readings)
+    const waterUtilityLogs = (state.utilityLogs || [])
+      .filter(l => l.type === 'water')
+      .sort((a, b) => a.date.localeCompare(b.date) || a.timestamp.localeCompare(b.timestamp));
+
     const totalWaterConsumed = filteredUtilityLogs
       .filter(l => l.type === 'water')
       .reduce((acc, log) => {
-        const sameTypeLogs = (state.utilityLogs || [])
-          .filter(l => l.type === 'water')
-          .sort((a, b) => b.date.localeCompare(a.date) || b.timestamp.localeCompare(a.timestamp));
+        const currentIndex = waterUtilityLogs.findIndex(l => l.id === log.id);
+        if (currentIndex <= 0) return acc;
         
-        const currentIndex = sameTypeLogs.findIndex(l => l.id === log.id);
-        if (currentIndex === -1 || currentIndex === sameTypeLogs.length - 1) return acc;
-        
-        const previousLog = sameTypeLogs[currentIndex + 1];
+        const previousLog = waterUtilityLogs[currentIndex - 1];
         const consumption = log.reading - previousLog.reading;
         return acc + (consumption > 0 ? consumption : 0);
       }, 0);
 
-    const waterConsumptionPerKg = totalPacked > 0 ? totalWaterConsumed / totalPacked : 0;
+    const waterConsumptionPerKg = totalRecep > 0 ? (totalWaterConsumed * 1000) / totalRecep : 0;
 
     const totalEnergyValue = filteredExpenses.filter(e => e.category === 'Energia').reduce((acc, e) => acc + e.value, 0);
     const energyCostPerKg = totalPacked > 0 ? totalEnergyValue / totalPacked : 0;
