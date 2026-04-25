@@ -525,11 +525,14 @@ const SlaughterOverview: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
       .filter(l => l.type === 'water')
       .sort((a, b) => a.date.localeCompare(b.date) || a.timestamp.localeCompare(b.timestamp));
 
+    // Create a map of IDs to indices for O(1) lookup during calculations to avoid O(N^2) complexity
+    const waterLogIndices = new Map(waterUtilityLogs.map((l, i) => [l.id, i]));
+
     const totalWaterConsumed = filteredUtilityLogs
       .filter(l => l.type === 'water')
       .reduce((acc, log) => {
-        const currentIndex = waterUtilityLogs.findIndex(l => l.id === log.id);
-        if (currentIndex <= 0) return acc;
+        const currentIndex = waterLogIndices.get(log.id);
+        if (currentIndex === undefined || currentIndex <= 0) return acc;
         
         const previousLog = waterUtilityLogs[currentIndex - 1];
         const consumption = log.reading - previousLog.reading;
@@ -583,7 +586,7 @@ const SlaughterOverview: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
       avgSlaughterPerDay,
       avgFinishedProductPerDay
     };
-  }, [state.slaughterLogs, state.slaughterExpenses, summaryStartDate, summaryEndDate]);
+  }, [state.slaughterLogs, state.slaughterExpenses, state.utilityLogs, summaryStartDate, summaryEndDate]);
 
   const dailyYieldData = useMemo(() => {
     const baseDate = new Date(chartYear, chartMonth, 1);

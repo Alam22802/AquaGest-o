@@ -499,9 +499,9 @@ const UserManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                       <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">Acesso às Abas</label>
                       {(() => {
                         const allTabs = [
-                          'capex', 'inventory', 'maintenance', 'protocols', 'batches', 
-                          'lines', 'cages', 'feed', 'feeding', 'biometry', 
-                          'mortality', 'slaughter', 'cloud', 'pcm'
+                          'biometry', 'inventory', 'feed', 'slaughter', 'capex', 
+                          'lines', 'batches', 'maintenance', 'protocols', 'mortality', 
+                          'pcm', 'cages', 'feeding', 'cloud'
                         ];
                         const isAllSelected = allTabs.every(id => (formData.allowedTabs || []).includes(id));
                         return (
@@ -523,19 +523,19 @@ const UserManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                     </div>
                     <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto pr-2 scrollbar-thin">
                       {[
-                        { id: 'capex', label: 'Investimentos CAPEX' },
+                        { id: 'biometry', label: 'Biometria' },
                         { id: 'inventory', label: 'Cadastro Gaiolas' },
+                        { id: 'feed', label: 'Estoque Ração' },
+                        { id: 'slaughter', label: 'Frigorífico' },
+                        { id: 'capex', label: 'Investimentos CAPEX' },
+                        { id: 'lines', label: 'Linhas/Setores' },
+                        { id: 'batches', label: 'Lotes (Estoque)' },
                         { id: 'maintenance', label: 'Manutenção' },
                         { id: 'protocols', label: 'Modelos de Produção' },
-                        { id: 'batches', label: 'Lotes (Estoque)' },
-                        { id: 'lines', label: 'Linhas/Setores' },
-                        { id: 'cages', label: 'Povoamento' },
-                        { id: 'feed', label: 'Estoque Ração' },
-                        { id: 'feeding', label: 'Trato Diário' },
-                        { id: 'biometry', label: 'Biometria' },
                         { id: 'mortality', label: 'Mortalidade' },
-                        { id: 'slaughter', label: 'Frigorífico' },
                         { id: 'pcm', label: 'PCM' },
+                        { id: 'cages', label: 'Povoamento' },
+                        { id: 'feeding', label: 'Trato Diário' },
                         { id: 'cloud', label: 'Backup/Nuvem' }
                       ].map(tab => (
                         <label key={tab.id} className="flex items-center gap-2 p-2 bg-white rounded-lg border border-slate-200 cursor-pointer hover:border-emerald-500 transition-all">
