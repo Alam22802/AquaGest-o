@@ -264,12 +264,6 @@ const TilapiaPriceWidget = () => {
               
               <div className="flex items-center gap-3">
                 <div className="flex flex-col items-center">
-                  <span className="text-[7px] font-black uppercase tracking-tighter text-[#e4e4d4]/40">Dia</span>
-                  <span className={`text-[10px] font-black px-1.5 py-0.5 rounded ${(marketData?.variation || 0) >= 0 ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'}`}>
-                    {(marketData?.variation || 0) >= 0 ? '+' : ''}{(marketData?.variation || 0)}%
-                  </span>
-                </div>
-                <div className="flex flex-col items-center">
                   <span className="text-[7px] font-black uppercase tracking-tighter text-[#e4e4d4]/40">Semana</span>
                   <span className={`text-[10px] font-black px-1.5 py-0.5 rounded ${(marketData?.weeklyVariation || 0) >= 0 ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'}`}>
                     {(marketData?.weeklyVariation || 0) >= 0 ? '+' : ''}{(marketData?.weeklyVariation || 0)}%
@@ -306,11 +300,8 @@ const TilapiaPriceWidget = () => {
                 <span className="text-[9px] font-bold text-[#e4e4d4]/40">,{(region.price % 1).toFixed(2).split('.')[1]}</span>
               </div>
               <div className="flex flex-col items-center pt-1.5 border-t border-white/5 w-full gap-0.5">
-                <span className={`text-[7px] font-black ${(region.variation || 0) >= 0 ? 'text-emerald-400/60' : 'text-red-400/60'}`}>
-                  D: {(region.variation || 0) >= 0 ? '+' : ''}{(region.variation || 0)}%
-                </span>
                 <span className={`text-[8px] font-black ${(region.weeklyVariation || 0) >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                  S: {(region.weeklyVariation || 0) >= 0 ? '+' : ''}{(region.weeklyVariation || 0)}%
+                  Sem: {(region.weeklyVariation || 0) >= 0 ? '+' : ''}{(region.weeklyVariation || 0)}%
                 </span>
               </div>
             </div>
