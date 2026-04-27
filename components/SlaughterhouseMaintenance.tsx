@@ -347,11 +347,27 @@ const SlaughterhouseMaintenance: React.FC<Props> = ({ state, onUpdate, currentUs
           startY: currentY,
           columns: columns,
           body: typeLogs.map(log => {
+            const consumption = getConsumption(log);
+            const horimetroDiff = getHorimetroDiff(log);
             const row: any = {
               date: format(new Date(log.date + 'T12:00:00'), 'dd/MM/yyyy'),
-              reading: `${log.reading.toLocaleString('pt-BR')} ${type === 'energy' ? 'kWh' : 'm³'}`,
-              consumption: getConsumption(log) !== null ? `+${getConsumption(log)?.toLocaleString('pt-BR')} ${type === 'energy' ? 'kWh' : 'm³'}` : '---',
-              horimetro: log.horimetro ? `${log.horimetro.toLocaleString('pt-BR')} h` : '---',
+              reading: log.reading.toLocaleString('pt-BR'),
+              consumption: consumption !== null ? `+${consumption.toLocaleString('pt-BR')}` : '---',
+              horimetro: log.horimetro 
+                ? (() => {
+                    const hNum = Number(log.horimetro);
+                    const diff = getHorimetroDiff(log);
+                    let diffStr = '';
+                    if (diff !== null) {
+                      const absDiff = Math.abs(diff);
+                      const dh = Math.floor(absDiff / 60);
+                      const dm = Math.round(absDiff % 60);
+                      const sign = diff >= 0 ? '+' : '-';
+                      diffStr = ` (${sign}${dh.toString().padStart(2, '0')}:${dm.toString().padStart(2, '0')} h)`;
+                    }
+                    return `${hNum.toLocaleString('pt-BR')}${diffStr}`;
+                  })()
+                : '---',
               user: state.users.find(u => u.id === log.userId)?.name || '---'
             };
             if (type === 'water') row.hidrometro = log.hidrometro || '---';
@@ -384,18 +400,26 @@ const SlaughterhouseMaintenance: React.FC<Props> = ({ state, onUpdate, currentUs
   };
 
   const getHorimetroDiff = (currentLog: UtilityLog) => {
-    if (!currentLog.horimetro) return null;
+    const currentH = currentLog.horimetro !== null && currentLog.horimetro !== undefined ? Number(currentLog.horimetro) : null;
+    if (currentH === null || isNaN(currentH)) return null;
+
     const allLogs = state.utilityLogs || [];
-    const sameTypeLogs = allLogs
+    const sameTypeLogs = [...allLogs]
       .filter(l => l.type === currentLog.type)
-      .sort((a, b) => b.date.localeCompare(a.date) || b.timestamp.localeCompare(a.timestamp));
+      .sort((a, b) => b.date.localeCompare(a.date) || (b.timestamp || '').localeCompare(a.timestamp || ''));
     
     const currentIndex = sameTypeLogs.findIndex(l => l.id === currentLog.id);
-    if (currentIndex === -1 || currentIndex === sameTypeLogs.length - 1) return null;
+    if (currentIndex === -1) return null;
     
-    const previousLog = sameTypeLogs[currentIndex + 1];
-    if (!previousLog.horimetro) return null;
-    return currentLog.horimetro - previousLog.horimetro;
+    const previousLogs = sameTypeLogs.slice(currentIndex + 1);
+    const previousLog = previousLogs.find(l => {
+      const h = l.horimetro !== null && l.horimetro !== undefined ? Number(l.horimetro) : null;
+      return h !== null && !isNaN(h);
+    });
+    
+    if (!previousLog) return null;
+    const prevH = Number(previousLog.horimetro);
+    return currentH - prevH;
   };
 
   return (
@@ -864,17 +888,26 @@ const SlaughterhouseMaintenance: React.FC<Props> = ({ state, onUpdate, currentUs
                         </td>
                         <td className="px-6 py-4 text-right">
                           {(() => {
-                            if (!log.horimetro) return <span className="text-xs font-black text-slate-800">---</span>;
-                            const hours = Math.floor(log.horimetro / 60);
-                            const minutes = Math.round(log.horimetro % 60);
+                            const currentH = log.horimetro !== null && log.horimetro !== undefined ? Number(log.horimetro) : null;
+                            if (currentH === null || isNaN(currentH)) return <span className="text-xs font-black text-slate-800">---</span>;
+                            
                             const diff = getHorimetroDiff(log);
+                            
+                            let formattedDiff = '';
+                            if (diff !== null) {
+                              const absDiff = Math.abs(diff);
+                              const h = Math.floor(absDiff / 60);
+                              const m = Math.round(absDiff % 60);
+                              const sign = diff >= 0 ? '+' : '-';
+                              formattedDiff = `${sign}${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')} h`;
+                            }
                             
                             return (
                               <div className="flex flex-col items-end">
-                                <span className="text-xs font-black text-slate-800">{log.horimetro.toLocaleString('pt-BR')}</span>
-                                {diff !== null && diff > 0 && (
-                                  <span className="text-[10px] font-bold text-emerald-500">
-                                    (+{Math.floor(diff / 60).toString().padStart(2, '0')}:{(diff % 60).toString().padStart(2, '0')} h)
+                                <span className="text-xs font-black text-slate-800">{currentH.toLocaleString('pt-BR')}</span>
+                                {diff !== null && (
+                                  <span className={`text-[10px] font-bold ${diff >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
+                                    ({formattedDiff})
                                   </span>
                                 )}
                               </div>
