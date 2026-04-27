@@ -1083,6 +1083,7 @@ const Dashboard: React.FC<Props> = ({ state }) => {
     const lineMap = new Map(state.lines.map(l => [l.id, l.name]));
     const batchMap = new Map(state.batches.map(b => [b.id, b.name]));
     const protocolMap = new Map(state.protocols.map(p => [p.id, p.name]));
+    const sortedHarvestLogs = [...(state.harvestLogs || [])].sort((a, b) => a.date.localeCompare(b.date));
 
     const wb = XLSX.utils.book_new();
 
@@ -1161,22 +1162,62 @@ const Dashboard: React.FC<Props> = ({ state }) => {
 
     // 6. ABA: MORTALIDADE - FILTRADO
     const filteredMortalityLogs = (state.mortalityLogs || []).filter(m => filterByDate(m.date));
-    const wsMortality = XLSX.utils.json_to_sheet(filteredMortalityLogs.map(m => ({
-      "Data": m.date,
-      "Gaiola": cageMap.get(m.cageId) || m.cageId,
-      "Quantidade": m.count,
-      "Lançado por": userMap.get(m.userId) || m.userId
-    })));
+    const wsMortality = XLSX.utils.json_to_sheet(filteredMortalityLogs.map(m => {
+      let bId = m.batchId;
+      if (!bId && m.cageId) {
+        const mDate = m.date;
+        const harvest = sortedHarvestLogs.find(h => h.cageId === m.cageId && h.date >= mDate);
+        if (harvest) {
+          bId = harvest.batchId;
+        } else {
+          const cage = (state.cages || []).find(c => c.id === m.cageId);
+          if (cage?.batchId) {
+            const batch = (state.batches || []).find(b => b.id === cage.batchId);
+            if (batch && mDate >= batch.settlementDate) {
+              bId = cage.batchId;
+            }
+          }
+        }
+      }
+
+      return {
+        "Data": m.date,
+        "Lote": batchMap.get(bId || '') || "N/A",
+        "Gaiola": cageMap.get(m.cageId) || m.cageId,
+        "Quantidade": m.count,
+        "Lançado por": userMap.get(m.userId) || m.userId
+      };
+    }));
     XLSX.utils.book_append_sheet(wb, wsMortality, "Mortalidade");
 
     // 7. ABA: BIOMETRIA - FILTRADO
     const filteredBiometryLogs = (state.biometryLogs || []).filter(b => filterByDate(b.date));
-    const wsBiometry = XLSX.utils.json_to_sheet(filteredBiometryLogs.map(b => ({
-      "Data": b.date,
-      "Gaiola": cageMap.get(b.cageId) || b.cageId,
-      "Peso Médio (g)": b.averageWeight,
-      "Lançado por": userMap.get(b.userId) || b.userId
-    })));
+    const wsBiometry = XLSX.utils.json_to_sheet(filteredBiometryLogs.map(b => {
+      let bId = b.batchId;
+      if (!bId && b.cageId) {
+        const bDate = b.date;
+        const harvest = sortedHarvestLogs.find(h => h.cageId === b.cageId && h.date >= bDate);
+        if (harvest) {
+          bId = harvest.batchId;
+        } else {
+          const cage = (state.cages || []).find(c => c.id === b.cageId);
+          if (cage?.batchId) {
+            const batch = (state.batches || []).find(b => b.id === cage.batchId);
+            if (batch && bDate >= batch.settlementDate) {
+              bId = cage.batchId;
+            }
+          }
+        }
+      }
+
+      return {
+        "Data": b.date,
+        "Lote": batchMap.get(bId || '') || "N/A",
+        "Gaiola": cageMap.get(b.cageId) || b.cageId,
+        "Peso Médio (g)": b.averageWeight,
+        "Lançado por": userMap.get(b.userId) || b.userId
+      };
+    }));
     XLSX.utils.book_append_sheet(wb, wsBiometry, "Biometria");
 
     // 8. ABA: ESTOQUE RAÇÃO
