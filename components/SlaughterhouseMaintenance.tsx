@@ -48,6 +48,7 @@ const SlaughterhouseMaintenance: React.FC<Props> = ({ state, onUpdate, currentUs
 
   // Utility Form State
   const [utilityData, setUtilityData] = useState({
+    id: '',
     date: new Date().toISOString().split('T')[0],
     type: 'energy' as 'water' | 'energy',
     reading: '',
@@ -138,24 +139,41 @@ const SlaughterhouseMaintenance: React.FC<Props> = ({ state, onUpdate, currentUs
     if (!hasPermission) return;
     if (!utilityData.reading) return;
 
-    const newLog: UtilityLog = {
-      id: generateId(),
-      date: utilityData.date,
-      type: utilityData.type,
-      reading: Number(utilityData.reading),
-      horimetro: utilityData.type === 'water' && utilityData.horimetro ? Number(utilityData.horimetro) : undefined,
-      hidrometro: utilityData.type === 'water' ? utilityData.hidrometro : undefined,
-      userId: currentUser.id,
-      timestamp: new Date().toISOString(),
-      updatedAt: Date.now()
-    };
+    if (utilityData.id) {
+      // Update existing log
+      const updatedLogs = (state.utilityLogs || []).map(l => 
+        l.id === utilityData.id ? {
+          ...l,
+          date: utilityData.date,
+          type: utilityData.type,
+          reading: Number(utilityData.reading),
+          horimetro: utilityData.type === 'water' && utilityData.horimetro ? Number(utilityData.horimetro) : undefined,
+          hidrometro: utilityData.type === 'water' ? utilityData.hidrometro : undefined,
+          updatedAt: Date.now()
+        } : l
+      );
+      onUpdate({ ...state, utilityLogs: updatedLogs });
+    } else {
+      // Create new log
+      const newLog: UtilityLog = {
+        id: generateId(),
+        date: utilityData.date,
+        type: utilityData.type,
+        reading: Number(utilityData.reading),
+        horimetro: utilityData.type === 'water' && utilityData.horimetro ? Number(utilityData.horimetro) : undefined,
+        hidrometro: utilityData.type === 'water' ? utilityData.hidrometro : undefined,
+        userId: currentUser.id,
+        timestamp: new Date().toISOString(),
+        updatedAt: Date.now()
+      };
 
-    onUpdate({
-      ...state,
-      utilityLogs: [newLog, ...(state.utilityLogs || [])]
-    });
+      onUpdate({
+        ...state,
+        utilityLogs: [newLog, ...(state.utilityLogs || [])]
+      });
+    }
 
-    setUtilityData({ ...utilityData, reading: '', horimetro: '', hidrometro: '' });
+    setUtilityData({ id: '', date: new Date().toISOString().split('T')[0], type: utilityData.type, reading: '', horimetro: '', hidrometro: '' });
     setSaveSuccess(true);
     setTimeout(() => setSaveSuccess(false), 3000);
   };
@@ -641,8 +659,17 @@ const SlaughterhouseMaintenance: React.FC<Props> = ({ state, onUpdate, currentUs
                   disabled={!hasPermission}
                   className={`w-full py-4 text-white rounded-2xl font-black uppercase tracking-widest text-xs shadow-xl transition-all active:scale-95 disabled:opacity-50 ${utilityData.type === 'energy' ? 'bg-amber-600 shadow-amber-600/20 hover:bg-amber-700' : 'bg-blue-600 shadow-blue-600/20 hover:bg-blue-700'}`}
                 >
-                  Salvar Leitura
+                  {utilityData.id ? 'Salvar Alterações' : 'Salvar Leitura'}
                 </button>
+                {utilityData.id && (
+                  <button 
+                    type="button"
+                    onClick={() => setUtilityData({ id: '', date: new Date().toISOString().split('T')[0], type: utilityData.type, reading: '', horimetro: '', hidrometro: '' })}
+                    className="w-full py-3 text-slate-400 font-bold uppercase tracking-widest text-[10px] hover:text-slate-600 transition-colors"
+                  >
+                    Cancelar Edição
+                  </button>
+                )}
               </form>
             )}
 
@@ -924,12 +951,30 @@ const SlaughterhouseMaintenance: React.FC<Props> = ({ state, onUpdate, currentUs
                         </td>
                         <td className="px-6 py-4 text-center">
                           {hasPermission && (
-                            <button 
-                              onClick={() => removeUtilityLog(log.id)}
-                              className="p-2 text-slate-300 hover:text-red-500 transition-colors"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
+                            <div className="flex items-center justify-center gap-1">
+                              <button 
+                                onClick={() => {
+                                  setUtilityData({
+                                    id: log.id,
+                                    date: log.date,
+                                    type: log.type,
+                                    reading: log.reading.toString(),
+                                    horimetro: log.horimetro ? log.horimetro.toString() : '',
+                                    hidrometro: log.hidrometro || ''
+                                  });
+                                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                                }}
+                                className="p-2 text-slate-300 hover:text-blue-600 transition-colors"
+                              >
+                                <Edit className="w-4 h-4" />
+                              </button>
+                              <button 
+                                onClick={() => removeUtilityLog(log.id)}
+                                className="p-2 text-slate-300 hover:text-red-500 transition-colors"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
                           )}
                         </td>
                       </tr>
