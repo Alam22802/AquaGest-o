@@ -383,6 +383,21 @@ const SlaughterhouseMaintenance: React.FC<Props> = ({ state, onUpdate, currentUs
     return currentLog.reading - previousLog.reading;
   };
 
+  const getHorimetroDiff = (currentLog: UtilityLog) => {
+    if (!currentLog.horimetro) return null;
+    const allLogs = state.utilityLogs || [];
+    const sameTypeLogs = allLogs
+      .filter(l => l.type === currentLog.type)
+      .sort((a, b) => b.date.localeCompare(a.date) || b.timestamp.localeCompare(a.timestamp));
+    
+    const currentIndex = sameTypeLogs.findIndex(l => l.id === currentLog.id);
+    if (currentIndex === -1 || currentIndex === sameTypeLogs.length - 1) return null;
+    
+    const previousLog = sameTypeLogs[currentIndex + 1];
+    if (!previousLog.horimetro) return null;
+    return currentLog.horimetro - previousLog.horimetro;
+  };
+
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
       {/* Sub-tabs Header */}
@@ -574,11 +589,11 @@ const SlaughterhouseMaintenance: React.FC<Props> = ({ state, onUpdate, currentUs
 
                 {utilityData.type === 'water' && (
                   <div className="space-y-1">
-                    <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-widest">Horímetro (h)</label>
+                    <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-widest">Horímetro (min)</label>
                     <input 
                       type="number" 
-                      step="0.1"
-                      placeholder="0.0"
+                      step="1"
+                      placeholder="Minutos"
                       className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none focus:ring-2 focus:ring-blue-500/10 text-sm"
                       value={utilityData.horimetro}
                       onChange={e => setUtilityData({ ...utilityData, horimetro: e.target.value })}
@@ -848,12 +863,34 @@ const SlaughterhouseMaintenance: React.FC<Props> = ({ state, onUpdate, currentUs
                           </span>
                         </td>
                         <td className="px-6 py-4 text-right">
-                          <span className="text-xs font-black text-slate-800">
-                            {log.horimetro ? `${log.horimetro.toLocaleString('pt-BR')} h` : '---'}
-                          </span>
+                          {(() => {
+                            if (!log.horimetro) return <span className="text-xs font-black text-slate-800">---</span>;
+                            const hours = Math.floor(log.horimetro / 60);
+                            const minutes = Math.round(log.horimetro % 60);
+                            const diff = getHorimetroDiff(log);
+                            
+                            return (
+                              <div className="flex flex-col items-end">
+                                <span className="text-xs font-black text-slate-800">{log.horimetro.toLocaleString('pt-BR')} min</span>
+                                <span className="text-[10px] font-bold text-slate-400">
+                                  {hours.toString().padStart(2, '0')}:{minutes.toString().padStart(2, '0')} h
+                                  {diff !== null && diff > 0 && (
+                                    <span className="text-emerald-500 ml-1">
+                                      (+{Math.floor(diff / 60).toString().padStart(2, '0')}:{(diff % 60).toString().padStart(2, '0')} h)
+                                    </span>
+                                  )}
+                                </span>
+                              </div>
+                            );
+                          })()}
                         </td>
                         <td className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase">
-                          {state.users.find(u => u.id === log.userId)?.name || '---'}
+                          {(() => {
+                            const user = state.users.find(u => u.id === log.userId);
+                            if (!user) return '---';
+                            const nameParts = user.name.split(' ');
+                            return nameParts.length > 1 ? `${nameParts[0]} ${nameParts[nameParts.length - 1][0]}.` : user.name;
+                          })()}
                         </td>
                         <td className="px-6 py-4 text-center">
                           {hasPermission && (
