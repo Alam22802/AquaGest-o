@@ -735,10 +735,10 @@ const SlaughterhouseMaintenance: React.FC<Props> = ({ state, onUpdate, currentUs
                     ) : (
                       <>
                         <th className="px-6 py-4">Tipo</th>
-                        <th className="px-6 py-4 text-right">Leitura</th>
-                        <th className="px-6 py-4 text-right">Consumo</th>
+                        <th className="px-6 py-4 text-right">Leitura (m³)</th>
+                        <th className="px-6 py-4 text-right">Consumo (m³)</th>
                         <th className="px-6 py-4 text-right">Hidrômetro</th>
-                        <th className="px-6 py-4 text-right">Horímetro</th>
+                        <th className="px-6 py-4 text-right">Horímetro (min)</th>
                       </>
                     )}
                     <th className="px-6 py-4">Lançado por</th>
@@ -849,12 +849,12 @@ const SlaughterhouseMaintenance: React.FC<Props> = ({ state, onUpdate, currentUs
                         </td>
                         <td className="px-6 py-4 text-right">
                           <span className="text-xs font-black text-slate-800">
-                            {log.reading.toLocaleString('pt-BR')} {log.type === 'energy' ? 'kWh' : 'm³'}
+                            {log.reading.toLocaleString('pt-BR')}
                           </span>
                         </td>
                         <td className="px-6 py-4 text-right">
                           <span className="text-xs font-black text-emerald-600">
-                            {getConsumption(log) !== null ? `+${getConsumption(log)?.toLocaleString('pt-BR')}` : '---'} {log.type === 'energy' ? 'kWh' : 'm³'}
+                            {getConsumption(log) !== null ? `+${getConsumption(log)?.toLocaleString('pt-BR')}` : '---'}
                           </span>
                         </td>
                         <td className="px-6 py-4 text-right">
@@ -871,15 +871,12 @@ const SlaughterhouseMaintenance: React.FC<Props> = ({ state, onUpdate, currentUs
                             
                             return (
                               <div className="flex flex-col items-end">
-                                <span className="text-xs font-black text-slate-800">{log.horimetro.toLocaleString('pt-BR')} min</span>
-                                <span className="text-[10px] font-bold text-slate-400">
-                                  {hours.toString().padStart(2, '0')}:{minutes.toString().padStart(2, '0')} h
-                                  {diff !== null && diff > 0 && (
-                                    <span className="text-emerald-500 ml-1">
-                                      (+{Math.floor(diff / 60).toString().padStart(2, '0')}:{(diff % 60).toString().padStart(2, '0')} h)
-                                    </span>
-                                  )}
-                                </span>
+                                <span className="text-xs font-black text-slate-800">{log.horimetro.toLocaleString('pt-BR')}</span>
+                                {diff !== null && diff > 0 && (
+                                  <span className="text-[10px] font-bold text-emerald-500">
+                                    (+{Math.floor(diff / 60).toString().padStart(2, '0')}:{(diff % 60).toString().padStart(2, '0')} h)
+                                  </span>
+                                )}
                               </div>
                             );
                           })()}
