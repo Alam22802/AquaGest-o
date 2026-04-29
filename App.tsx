@@ -293,146 +293,75 @@ const App: React.FC = () => {
     setState(prev => {
       if (!prev) return newState;
 
-      const injectTimestamps = (oldList: any[], newList: any[]) => {
-        if (oldList === newList) return oldList;
+      // Heuristic: identify what actually changed and ensure timestamps
+      const ensureTimestamps = (oldList: any[], newList: any[]) => {
+        if (!newList) return [];
+        if (!oldList) return newList.map(i => i.updatedAt ? i : { ...i, updatedAt: Date.now() });
         
-        const oldMap = new Map((oldList || []).map(i => [i.id, i]));
-        let listChanged = (oldList || []).length !== (newList || []).length;
-        
-        const updatedList = (newList || []).map(item => {
+        const oldMap = new Map(oldList.map(i => [i.id, i]));
+        return newList.map(item => {
           const oldItem = oldMap.get(item.id);
-          if (!oldItem) {
-            listChanged = true;
-            return { ...item, updatedAt: Date.now() };
-          }
+          if (!oldItem) return item.updatedAt ? item : { ...item, updatedAt: Date.now() };
           
-          let hasChanged = false;
-          const configKeys = ['id', 'updatedAt'];
-          const keys = Object.keys(item);
-          for (const key of keys) {
-            if (configKeys.includes(key)) continue;
-            if (typeof (item as any)[key] === 'object' && (item as any)[key] !== null) {
-              if (JSON.stringify((item as any)[key]) !== JSON.stringify((oldItem as any)[key])) {
-                hasChanged = true;
-                break;
-              }
-            } else if ((item as any)[key] !== (oldItem as any)[key]) {
-              hasChanged = true;
-              break;
-            }
-          }
-          
-          if (hasChanged) {
-            listChanged = true;
-            return { ...item, updatedAt: Date.now() };
-          }
+          // Check for changes (shallow)
+          const changed = Object.keys(item).some(k => k !== 'updatedAt' && (item as any)[k] !== (oldItem as any)[k]);
+          if (changed) return { ...item, updatedAt: Date.now() };
           return oldItem;
         });
-
-        return listChanged ? updatedList : oldList;
       };
 
-      // Base internal state (prev) is the source of truth for items not touched by this update
-      const stateWithTimestamps: AppState = {
-        ...prev, // Use prev as base instead of newState to avoid reverting background syncs
-        ...newState, // Overwrite with newState requested values
-        users: injectTimestamps(prev.users, newState.users),
-        lines: injectTimestamps(prev.lines, newState.lines),
-        batches: injectTimestamps(prev.batches, newState.batches),
-        cages: injectTimestamps(prev.cages, newState.cages),
-        feedTypes: injectTimestamps(prev.feedTypes, newState.feedTypes),
-        feedingLogs: injectTimestamps(prev.feedingLogs, newState.feedingLogs),
-        feedStockLogs: injectTimestamps(prev.feedStockLogs, newState.feedStockLogs),
-        mortalityLogs: injectTimestamps(prev.mortalityLogs, newState.mortalityLogs),
-        biometryLogs: injectTimestamps(prev.biometryLogs, newState.biometryLogs),
-        slaughterLogs: injectTimestamps(prev.slaughterLogs, newState.slaughterLogs),
-        slaughterExpenses: injectTimestamps(prev.slaughterExpenses || [], newState.slaughterExpenses || []),
-        slaughterEmployees: injectTimestamps(prev.slaughterEmployees || [], newState.slaughterEmployees || []),
-        slaughterHRIndicators: injectTimestamps(prev.slaughterHRIndicators || [], newState.slaughterHRIndicators || []),
-        slaughterHREntries: injectTimestamps(prev.slaughterHREntries || [], newState.slaughterHREntries || []),
-        slaughterHRVacancies: injectTimestamps(prev.slaughterHRVacancies || [], newState.slaughterHRVacancies || []),
-        slaughterSupplyItems: injectTimestamps(prev.slaughterSupplyItems || [], newState.slaughterSupplyItems || []),
-        slaughterSuppliers: injectTimestamps(prev.slaughterSuppliers || [], newState.slaughterSuppliers || []),
-        slaughterSupplyRequests: injectTimestamps(prev.slaughterSupplyRequests || [], newState.slaughterSupplyRequests || []),
-        slaughterPurchaseOrders: injectTimestamps(prev.slaughterPurchaseOrders || [], newState.slaughterPurchaseOrders || []),
-        slaughterSupplyInvoices: injectTimestamps(prev.slaughterSupplyInvoices || [], newState.slaughterSupplyInvoices || []),
-        harvestLogs: injectTimestamps(prev.harvestLogs || [], newState.harvestLogs || []),
-        harvestSchedules: injectTimestamps(prev.harvestSchedules || [], newState.harvestSchedules || []),
-        batchExpenses: injectTimestamps(prev.batchExpenses || [], newState.batchExpenses || []),
-        batchRevenues: injectTimestamps(prev.batchRevenues || [], newState.batchRevenues || []),
-        coldStorageLogs: injectTimestamps(prev.coldStorageLogs || [], newState.coldStorageLogs || []),
-        utilityLogs: injectTimestamps(prev.utilityLogs || [], newState.utilityLogs || []),
-        coldChambers: injectTimestamps(prev.coldChambers || [], newState.coldChambers || []),
-        protocols: injectTimestamps(prev.protocols, newState.protocols),
-        standardCurves: injectTimestamps(prev.standardCurves || [], newState.standardCurves || []),
-        feedingTables: injectTimestamps(prev.feedingTables || [], newState.feedingTables || []),
-        portfolios: injectTimestamps(prev.portfolios, newState.portfolios),
-        capexProjects: injectTimestamps(prev.capexProjects, newState.capexProjects),
-        capexInvoices: injectTimestamps(prev.capexInvoices, newState.capexInvoices),
-        costCenters: injectTimestamps(prev.costCenters || [], newState.costCenters || []),
-        pcmEquipments: injectTimestamps(prev.pcmEquipments || [], newState.pcmEquipments || []),
-        pcmStoppageReasons: injectTimestamps(prev.pcmStoppageReasons || [], newState.pcmStoppageReasons || []),
-        pcmProductionStoppages: injectTimestamps(prev.pcmProductionStoppages || [], newState.pcmProductionStoppages || []),
-        pcmPlannedImprovements: injectTimestamps(prev.pcmPlannedImprovements || [], newState.pcmPlannedImprovements || []),
-        slaughterHRRolesUpdated: JSON.stringify(prev.slaughterHRRoles) !== JSON.stringify(newState.slaughterHRRoles) ? Date.now() : prev.slaughterHRRolesUpdated,
-        slaughterHRDepartmentsUpdated: JSON.stringify(prev.slaughterHRDepartments) !== JSON.stringify(newState.slaughterHRDepartments) ? Date.now() : prev.slaughterHRDepartmentsUpdated,
-        slaughterHREntryTypesUpdated: JSON.stringify(prev.slaughterHREntryTypes) !== JSON.stringify(newState.slaughterHREntryTypes) ? Date.now() : prev.slaughterHREntryTypesUpdated,
-        slaughterExpenseCategoriesUpdated: JSON.stringify(prev.slaughterExpenseCategories) !== JSON.stringify(newState.slaughterExpenseCategories) ? Date.now() : prev.slaughterExpenseCategoriesUpdated,
-        slaughterSupplyCategoriesUpdated: JSON.stringify(prev.slaughterSupplyCategories) !== JSON.stringify(newState.slaughterSupplyCategories) ? Date.now() : prev.slaughterSupplyCategoriesUpdated,
+      const preparedState: AppState = {
+        ...newState,
+        users: ensureTimestamps(prev.users, newState.users),
+        lines: ensureTimestamps(prev.lines, newState.lines),
+        batches: ensureTimestamps(prev.batches, newState.batches),
+        cages: ensureTimestamps(prev.cages, newState.cages),
+        feedTypes: ensureTimestamps(prev.feedTypes, newState.feedTypes),
+        feedingLogs: ensureTimestamps(prev.feedingLogs, newState.feedingLogs),
+        feedStockLogs: ensureTimestamps(prev.feedStockLogs || [], newState.feedStockLogs || []),
+        mortalityLogs: ensureTimestamps(prev.mortalityLogs, newState.mortalityLogs),
+        biometryLogs: ensureTimestamps(prev.biometryLogs, newState.biometryLogs),
+        slaughterLogs: ensureTimestamps(prev.slaughterLogs, newState.slaughterLogs),
+        slaughterExpenses: ensureTimestamps(prev.slaughterExpenses || [], newState.slaughterExpenses || []),
+        slaughterEmployees: ensureTimestamps(prev.slaughterEmployees || [], newState.slaughterEmployees || []),
+        slaughterHRIndicators: ensureTimestamps(prev.slaughterHRIndicators || [], newState.slaughterHRIndicators || []),
+        slaughterHREntries: ensureTimestamps(prev.slaughterHREntries || [], newState.slaughterHREntries || []),
+        slaughterHRVacancies: ensureTimestamps(prev.slaughterHRVacancies || [], newState.slaughterHRVacancies || []),
+        slaughterSupplyItems: ensureTimestamps(prev.slaughterSupplyItems || [], newState.slaughterSupplyItems || []),
+        slaughterSuppliers: ensureTimestamps(prev.slaughterSuppliers || [], newState.slaughterSuppliers || []),
+        slaughterSupplyRequests: ensureTimestamps(prev.slaughterSupplyRequests || [], newState.slaughterSupplyRequests || []),
+        slaughterPurchaseOrders: ensureTimestamps(prev.slaughterPurchaseOrders || [], newState.slaughterPurchaseOrders || []),
+        slaughterSupplyInvoices: ensureTimestamps(prev.slaughterSupplyInvoices || [], newState.slaughterSupplyInvoices || []),
+        harvestLogs: ensureTimestamps(prev.harvestLogs || [], newState.harvestLogs || []),
+        harvestSchedules: ensureTimestamps(prev.harvestSchedules || [], newState.harvestSchedules || []),
+        batchExpenses: ensureTimestamps(prev.batchExpenses || [], newState.batchExpenses || []),
+        batchRevenues: ensureTimestamps(prev.batchRevenues || [], newState.batchRevenues || []),
+        coldStorageLogs: ensureTimestamps(prev.coldStorageLogs || [], newState.coldStorageLogs || []),
+        utilityLogs: ensureTimestamps(prev.utilityLogs || [], newState.utilityLogs || []),
+        coldChambers: ensureTimestamps(prev.coldChambers || [], newState.coldChambers || []),
+        protocols: ensureTimestamps(prev.protocols, newState.protocols),
+        standardCurves: ensureTimestamps(prev.standardCurves || [], newState.standardCurves || []),
+        feedingTables: ensureTimestamps(prev.feedingTables || [], newState.feedingTables || []),
+        portfolios: ensureTimestamps(prev.portfolios || [], newState.portfolios || []),
+        capexInvoices: ensureTimestamps(prev.capexInvoices || [], newState.capexInvoices || []),
+        capexProjects: ensureTimestamps(prev.capexProjects || [], newState.capexProjects || []),
+        pcmEquipments: ensureTimestamps(prev.pcmEquipments || [], newState.pcmEquipments || []),
+        pcmStoppageReasons: ensureTimestamps(prev.pcmStoppageReasons || [], newState.pcmStoppageReasons || []),
+        pcmProductionStoppages: ensureTimestamps(prev.pcmProductionStoppages || [], newState.pcmProductionStoppages || []),
+        pcmPlannedImprovements: ensureTimestamps(prev.pcmPlannedImprovements || [], newState.pcmPlannedImprovements || []),
       };
 
-      const findDeleted = (oldList: any[], newList: any[]) => {
-        if (!oldList || !newList || oldList === newList) return [];
-        const newIds = new Set(newList.map(i => i.id));
-        return oldList.filter(i => i && i.id && !newIds.has(i.id)).map(i => i.id);
+      const merged = ensureStateIntegrity(prev, preparedState, 'local');
+      
+      const combinedDeletedIds = Array.from(new Set([
+        ...(prev.deletedIds || []),
+        ...(newState.deletedIds || [])
+      ]));
+
+      return {
+        ...merged,
+        deletedIds: combinedDeletedIds
       };
-
-      const deleted = [
-        ...findDeleted(prev.users, stateWithTimestamps.users),
-        ...findDeleted(prev.lines, stateWithTimestamps.lines),
-        ...findDeleted(prev.batches, stateWithTimestamps.batches),
-        ...findDeleted(prev.cages, stateWithTimestamps.cages),
-        ...findDeleted(prev.feedTypes, stateWithTimestamps.feedTypes),
-        ...findDeleted(prev.feedingLogs, stateWithTimestamps.feedingLogs),
-        ...findDeleted(prev.feedStockLogs, stateWithTimestamps.feedStockLogs),
-        ...findDeleted(prev.mortalityLogs, stateWithTimestamps.mortalityLogs),
-        ...findDeleted(prev.biometryLogs, stateWithTimestamps.biometryLogs),
-        ...findDeleted(prev.slaughterLogs, stateWithTimestamps.slaughterLogs),
-        ...findDeleted(prev.slaughterExpenses || [], stateWithTimestamps.slaughterExpenses || []),
-        ...findDeleted(prev.slaughterEmployees || [], stateWithTimestamps.slaughterEmployees || []),
-        ...findDeleted(prev.slaughterHRIndicators || [], stateWithTimestamps.slaughterHRIndicators || []),
-        ...findDeleted(prev.slaughterHREntries || [], stateWithTimestamps.slaughterHREntries || []),
-        ...findDeleted(prev.slaughterHRVacancies || [], stateWithTimestamps.slaughterHRVacancies || []),
-        ...findDeleted(prev.slaughterSupplyItems || [], stateWithTimestamps.slaughterSupplyItems || []),
-        ...findDeleted(prev.slaughterSuppliers || [], stateWithTimestamps.slaughterSuppliers || []),
-        ...findDeleted(prev.slaughterSupplyRequests || [], stateWithTimestamps.slaughterSupplyRequests || []),
-        ...findDeleted(prev.slaughterPurchaseOrders || [], stateWithTimestamps.slaughterPurchaseOrders || []),
-        ...findDeleted(prev.slaughterSupplyInvoices || [], stateWithTimestamps.slaughterSupplyInvoices || []),
-        ...findDeleted(prev.harvestLogs || [], stateWithTimestamps.harvestLogs || []),
-        ...findDeleted(prev.harvestSchedules || [], stateWithTimestamps.harvestSchedules || []),
-        ...findDeleted(prev.batchExpenses || [], stateWithTimestamps.batchExpenses || []),
-        ...findDeleted(prev.batchRevenues || [], stateWithTimestamps.batchRevenues || []),
-        ...findDeleted(prev.coldStorageLogs || [], stateWithTimestamps.coldStorageLogs || []),
-        ...findDeleted(prev.utilityLogs || [], stateWithTimestamps.utilityLogs || []),
-        ...findDeleted(prev.coldChambers || [], stateWithTimestamps.coldChambers || []),
-        ...findDeleted(prev.protocols, stateWithTimestamps.protocols),
-        ...findDeleted(prev.standardCurves || [], stateWithTimestamps.standardCurves || []),
-        ...findDeleted(prev.feedingTables || [], stateWithTimestamps.feedingTables || []),
-        ...findDeleted(prev.portfolios, stateWithTimestamps.portfolios),
-        ...findDeleted(prev.capexProjects, stateWithTimestamps.capexProjects),
-        ...findDeleted(prev.capexInvoices, stateWithTimestamps.capexInvoices),
-        ...findDeleted(prev.costCenters || [], stateWithTimestamps.costCenters || []),
-        ...findDeleted(prev.pcmEquipments || [], stateWithTimestamps.pcmEquipments || []),
-        ...findDeleted(prev.pcmStoppageReasons || [], stateWithTimestamps.pcmStoppageReasons || []),
-        ...findDeleted(prev.pcmProductionStoppages || [], stateWithTimestamps.pcmProductionStoppages || []),
-        ...findDeleted(prev.pcmPlannedImprovements || [], stateWithTimestamps.pcmPlannedImprovements || []),
-      ];
-
-      if (deleted.length > 0) {
-        const updatedDeletedIds = Array.from(new Set([...(prev.deletedIds || []), ...deleted]));
-        return { ...stateWithTimestamps, deletedIds: updatedDeletedIds };
-      }
-      return stateWithTimestamps;
     });
   }, []);
 

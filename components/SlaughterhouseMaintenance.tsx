@@ -410,7 +410,7 @@ const SlaughterhouseMaintenance: React.FC<Props> = ({ state, onUpdate, currentUs
     const allLogs = state.utilityLogs || [];
     const sameTypeLogs = allLogs
       .filter(l => l.type === currentLog.type)
-      .sort((a, b) => b.date.localeCompare(a.date) || b.timestamp.localeCompare(a.timestamp));
+      .sort((a, b) => b.date.localeCompare(a.date) || (b.timestamp || '').localeCompare(a.timestamp || ''));
     
     const currentIndex = sameTypeLogs.findIndex(l => l.id === currentLog.id);
     if (currentIndex === -1 || currentIndex === sameTypeLogs.length - 1) return null;
@@ -994,7 +994,7 @@ const SlaughterhouseMaintenance: React.FC<Props> = ({ state, onUpdate, currentUs
                   {((activeSubTab === 'temperature' && filteredTempLogs.length === 0) || 
                     (activeSubTab === 'utilities' && filteredUtilityLogs.length === 0)) && (
                     <tr>
-                      <td colSpan={5} className="px-6 py-12 text-center">
+                      <td colSpan={10} className="px-6 py-12 text-center">
                         <AlertTriangle className="w-8 h-8 text-slate-200 mx-auto mb-2" />
                         <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Nenhum registro encontrado.</p>
                       </td>
