@@ -207,11 +207,12 @@ const App: React.FC = () => {
     if (!configToUse) return;
 
     const unsubscribe = subscribeToRemoteChanges(configToUse, (remoteState) => {
-      if (isSavingRef.current) return;
-
+      // Don't skip updates, just merge them carefully
       setState(prev => {
         if (!prev) return remoteState;
         
+        // If we are currently saving, we should still merge remote changes
+        // but ensure our own recent changes (if newer) survive.
         const merged = ensureStateIntegrity(prev, remoteState, 'remote');
         lastSavedStateRef.current = remoteState;
         return merged;
@@ -240,7 +241,7 @@ const App: React.FC = () => {
         }).finally(() => {
           isSavingRef.current = false;
         });
-      }, 2000); 
+      }, 500); 
 
       // Verificar alertas
       const now = Date.now();
@@ -270,7 +271,12 @@ const App: React.FC = () => {
   }, [state, currentUser]);
 
   useEffect(() => {
-    const interval = setInterval(backgroundSync, 30000); 
+    (window as any).forceSync = backgroundSync;
+    return () => { delete (window as any).forceSync; };
+  }, [backgroundSync]);
+
+  useEffect(() => {
+    const interval = setInterval(backgroundSync, 15000); 
     return () => clearInterval(interval);
   }, [backgroundSync]);
 
@@ -287,7 +293,6 @@ const App: React.FC = () => {
     setState(prev => {
       if (!prev) return newState;
 
-      // Optimized timestamp injection: only for items that actually changed
       const injectTimestamps = (oldList: any[], newList: any[]) => {
         if (oldList === newList) return oldList;
         
@@ -302,10 +307,16 @@ const App: React.FC = () => {
           }
           
           let hasChanged = false;
-          const keys = Object.keys(item) as (keyof typeof item)[];
+          const configKeys = ['id', 'updatedAt'];
+          const keys = Object.keys(item);
           for (const key of keys) {
-            if (key === 'updatedAt') continue;
-            if ((item as any)[key] !== (oldItem as any)[key]) {
+            if (configKeys.includes(key)) continue;
+            if (typeof (item as any)[key] === 'object' && (item as any)[key] !== null) {
+              if (JSON.stringify((item as any)[key]) !== JSON.stringify((oldItem as any)[key])) {
+                hasChanged = true;
+                break;
+              }
+            } else if ((item as any)[key] !== (oldItem as any)[key]) {
               hasChanged = true;
               break;
             }
@@ -321,8 +332,10 @@ const App: React.FC = () => {
         return listChanged ? updatedList : oldList;
       };
 
+      // Base internal state (prev) is the source of truth for items not touched by this update
       const stateWithTimestamps: AppState = {
-        ...newState,
+        ...prev, // Use prev as base instead of newState to avoid reverting background syncs
+        ...newState, // Overwrite with newState requested values
         users: injectTimestamps(prev.users, newState.users),
         lines: injectTimestamps(prev.lines, newState.lines),
         batches: injectTimestamps(prev.batches, newState.batches),

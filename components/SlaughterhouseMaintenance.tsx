@@ -50,11 +50,13 @@ const SlaughterhouseMaintenance: React.FC<Props> = ({ state, onUpdate, currentUs
   const [utilityData, setUtilityData] = useState({
     id: '',
     date: new Date().toISOString().split('T')[0],
-    type: 'energy' as 'water' | 'energy',
+    type: 'water' as 'water' | 'energy',
     reading: '',
     horimetro: '',
     hidrometro: ''
   });
+
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   // Utility Filter State
   const [utilityFilter, setUtilityFilter] = useState({
@@ -451,13 +453,22 @@ const SlaughterhouseMaintenance: React.FC<Props> = ({ state, onUpdate, currentUs
           <Thermometer className="w-4 h-4" />
           Temperaturas
         </button>
-        <button 
-          onClick={() => setActiveSubTab('utilities')}
-          className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${activeSubTab === 'utilities' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
-        >
-          <Droplets className="w-4 h-4" />
-          Consumo Água/Energia
-        </button>
+          <button 
+            onClick={async () => {
+              if (activeSubTab === 'utilities') {
+                setIsRefreshing(true);
+                // Call potential sync passed via props or global
+                if ((window as any).forceSync) await (window as any).forceSync();
+                setTimeout(() => setIsRefreshing(false), 1000);
+              } else {
+                setActiveSubTab('utilities');
+              }
+            }}
+            className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${activeSubTab === 'utilities' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+          >
+            <Droplets className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+            Consumo Água/Energia
+          </button>
         <button 
           onClick={() => setActiveSubTab('chambers')}
           className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${activeSubTab === 'chambers' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}

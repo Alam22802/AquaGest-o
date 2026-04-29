@@ -92,8 +92,8 @@ function mergeArraysById<T extends { id: string, updatedAt?: number }>(
     if (!existing) {
       map.set(item.id, item);
     } else {
-      const itemTime = item.updatedAt || 0;
-      const existingTime = existing.updatedAt || 0;
+      const itemTime = Number(item.updatedAt) || 0;
+      const existingTime = Number(existing.updatedAt) || 0;
       if (itemTime > existingTime) {
         map.set(item.id, item);
       } else if (itemTime === existingTime && priority === 'remote') {
