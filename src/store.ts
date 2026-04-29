@@ -301,14 +301,13 @@ export const ensureStateIntegrity = (state: any, mergeWith?: AppState, priority:
  * Ignora IDs deletados atuais para permitir que dados antigos sejam recuperados.
  */
 export const restoreFromBackup = (backup: AppState): AppState => {
-  // Garantir que o backup tenha todos os campos necessários
-  const base = { ...initialState, ...backup };
+  // Garantir que o backup tenha todos os campos necessários e limpar deletedIds ANTES de processar a integridade
+  // para que itens marcados como excluídos no backup NÃO sejam filtrados
+  const base = { ...initialState, ...backup, deletedIds: [] };
   
-  // No caso de restauração parcial/manual, limpamos os deletedIds que conflitam com o backup
-  // ou simplesmente limpamos todos se for um backup "mestre"
   return {
     ...ensureStateIntegrity(base),
-    deletedIds: [], // Limpa a lista de exclusões após restauração para garantir que os dados apareçam
+    deletedIds: [], // Reinicia a lista de exclusões
     lastSync: new Date().toISOString()
   };
 };

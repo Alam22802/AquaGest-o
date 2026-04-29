@@ -366,12 +366,23 @@ create policy "Allow All Access" on farm_data for all using (true) with check (t
 
           <div className="bg-white/50 p-4 rounded-2xl border border-amber-200/50">
             <h4 className="text-[10px] font-black text-amber-900 uppercase mb-1 flex items-center gap-2">
-              <Database className="w-3 h-3" /> Dados não aparecem após a importação?
+              <RefreshCw className="w-3 h-3" /> Recuperar Dados Ocultos?
             </h4>
-            <p className="text-[10px] text-amber-700 font-bold leading-relaxed">
-              O sistema agora utiliza uma restauração profunda que limpa o histórico de exclusões ao importar um backup. 
-              Se os dados ainda não aparecerem, tente recarregar a página após a importação.
+            <p className="text-[10px] text-amber-700 font-bold leading-relaxed mb-3">
+              Se você acredita que dados desapareceram por erro, tente limpar o histórico de exclusões. 
+              Isso fará com que itens marcados como deletados voltem a aparecer.
             </p>
+            <button 
+              onClick={() => {
+                if(confirm('Isso irá restaurar todos os itens que foram deletados anteriormente. Deseja continuar?')) {
+                  onUpdate({ ...state, deletedIds: [] }, true);
+                  alert('Histórico de exclusões limpo! Verifique se os dados voltaram.');
+                }
+              }}
+              className="px-4 py-2 bg-amber-600 text-white rounded-xl text-[9px] font-black uppercase shadow-lg shadow-amber-600/20 active:scale-95 transition-all"
+            >
+              Restaurar Itens Deletados
+            </button>
           </div>
         </div>
       </div>

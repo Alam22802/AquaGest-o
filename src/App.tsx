@@ -409,6 +409,9 @@ const App: React.FC = () => {
     }
   }, [state, currentUser]);
 
+  // Commented out the auto-cleanup to prevent accidental data loss. 
+  // Users should manage their own data volume.
+  /*
   useEffect(() => {
     if (state && currentUser?.isMaster) {
       const ninetyDaysAgo = new Date();
@@ -429,8 +432,6 @@ const App: React.FC = () => {
           biometryLogs: (state.biometryLogs || []).filter(l => !batchIdsToRemove.has(l.batchId || '')),
           harvestLogs: (state.harvestLogs || []).filter(l => !batchIdsToRemove.has(l.batchId)),
           batchExpenses: (state.batchExpenses || []).filter(l => !batchIdsToRemove.has(l.batchId)),
-          // Also cleanup logs that might be linked via cage but the batch is gone
-          // (Though usually batchId is the primary link for these logs in the cleanup context)
         };
 
         handleStateUpdate(newState);
@@ -438,6 +439,7 @@ const App: React.FC = () => {
       }
     }
   }, [state, currentUser, handleStateUpdate]);
+  */
 
   const renderContent = () => {
     if (!state || !currentUser) return null;
