@@ -289,7 +289,11 @@ const App: React.FC = () => {
     }
   }, [activeTab, currentUser]);
 
-  const handleStateUpdate = useCallback((newState: AppState) => {
+  const handleStateUpdate = useCallback((newState: AppState, overwrite: boolean = false) => {
+    if (overwrite) {
+      setState(newState);
+      return;
+    }
     setState(prev => {
       if (!prev) return newState;
 

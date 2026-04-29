@@ -6,11 +6,11 @@ import {
   FileUp, Globe, AlertCircle, AlertTriangle, Copy, Import, Server, Save, 
   ExternalLink, Info, Activity, ShieldCheck, XCircle, Terminal
 } from 'lucide-react';
-import { exportData, getSupabase, ensureStateIntegrity, applyConfigFromLink } from '../store';
+import { exportData, getSupabase, ensureStateIntegrity, applyConfigFromLink, restoreFromBackup } from '../store';
 
 interface Props {
   state: AppState;
-  onUpdate: (newState: AppState) => void;
+  onUpdate: (newState: AppState, overwrite?: boolean) => void;
   currentUser: any;
   onSync?: () => Promise<void>;
   isSyncing?: boolean;
@@ -328,14 +328,51 @@ create policy "Allow All Access" on farm_data for all using (true) with check (t
                 reader.onload = (ev) => {
                   try {
                     const content = ev.target?.result as string;
-                    onUpdate(JSON.parse(content));
-                    alert('Dados restaurados!');
-                  } catch { alert('Erro no arquivo.'); }
+                    const importedData = JSON.parse(content);
+                    
+                    if (confirm('Atenção: A importação substituirá seus dados locais pelos do backup. Deseja continuar?')) {
+                      const restored = restoreFromBackup(importedData);
+                      onUpdate(restored, true);
+                      alert('Restauração concluída! Os dados foram carregados e serão sincronizados com a nuvem.');
+                    }
+                  } catch (err) { 
+                    console.error('Erro na importação:', err);
+                    alert('Erro no arquivo: Verifique se o formato JSON é válido.'); 
+                  }
                 };
                 reader.readAsText(file);
               }
             }} />
           </button>
+        </div>
+      </div>
+      {/* AJUDA E DIAGNÓSTICO */}
+      <div className="bg-amber-50 p-8 rounded-[2.5rem] border border-amber-100 space-y-4">
+        <div className="flex items-center gap-3 text-amber-800">
+          <Info className="w-5 h-5" />
+          <h3 className="text-sm font-black uppercase italic tracking-tight">Ajuda com Erros Comuns</h3>
+        </div>
+        
+        <div className="space-y-4">
+          <div className="bg-white/50 p-4 rounded-2xl border border-amber-200/50">
+            <h4 className="text-[10px] font-black text-amber-900 uppercase mb-1 flex items-center gap-2">
+              <AlertCircle className="w-3 h-3" /> Erro "requireInvokerIam" no Google Cloud
+            </h4>
+            <p className="text-[10px] text-amber-700 font-bold leading-relaxed">
+              Esse erro ocorre devido a uma política de segurança organizacional do Google Cloud que impede o acesso público. 
+              Geralmente é resolvido por um administrador permitindo "Invocação não autenticada" no serviço Cloud Run.
+            </p>
+          </div>
+
+          <div className="bg-white/50 p-4 rounded-2xl border border-amber-200/50">
+            <h4 className="text-[10px] font-black text-amber-900 uppercase mb-1 flex items-center gap-2">
+              <Database className="w-3 h-3" /> Dados não aparecem após a importação?
+            </h4>
+            <p className="text-[10px] text-amber-700 font-bold leading-relaxed">
+              O sistema agora utiliza uma restauração profunda que limpa o histórico de exclusões ao importar um backup. 
+              Se os dados ainda não aparecerem, tente recarregar a página após a importação.
+            </p>
+          </div>
         </div>
       </div>
     </div>

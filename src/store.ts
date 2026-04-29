@@ -171,6 +171,10 @@ export const ensureStateIntegrity = (state: any, mergeWith?: AppState, priority:
   // We keep a decent amount of deleted IDs to ensure sync consistency, but limit it to avoid bloat
   const combinedDeletedIds = allDeletedIds.slice(-2000); 
 
+  // If priority is 'local' and we are doing a full merge (like from an import), 
+  // we might want to ignore some deleted IDs. 
+  // For now, we just ensure that common collections are handled.
+
   const base: AppState = {
     ...initialState,
     ...state,
@@ -290,6 +294,23 @@ export const ensureStateIntegrity = (state: any, mergeWith?: AppState, priority:
   }
 
   return result;
+};
+
+/**
+ * Força a restauração completa de um estado vindo de um backup JSON.
+ * Ignora IDs deletados atuais para permitir que dados antigos sejam recuperados.
+ */
+export const restoreFromBackup = (backup: AppState): AppState => {
+  // Garantir que o backup tenha todos os campos necessários
+  const base = { ...initialState, ...backup };
+  
+  // No caso de restauração parcial/manual, limpamos os deletedIds que conflitam com o backup
+  // ou simplesmente limpamos todos se for um backup "mestre"
+  return {
+    ...ensureStateIntegrity(base),
+    deletedIds: [], // Limpa a lista de exclusões após restauração para garantir que os dados apareçam
+    lastSync: new Date().toISOString()
+  };
 };
 
 export const getSupabaseConfig = () => {
