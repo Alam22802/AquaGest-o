@@ -37,16 +37,16 @@ const safeLocalStorageSetItem = (key: string, value: string) => {
           // Conservative pruning for emergency space - keep much more history
           const prunedState: AppState = {
             ...state,
-            feedingLogs: sortByRecent(state.feedingLogs || [], 4000),
-            mortalityLogs: sortByRecent(state.mortalityLogs || [], 4000),
-            biometryLogs: sortByRecent(state.biometryLogs || [], 4000),
-            slaughterLogs: sortByRecent(state.slaughterLogs || [], 4000),
-            harvestLogs: sortByRecent(state.harvestLogs || [], 4000),
-            utilityLogs: sortByRecent(state.utilityLogs || [], 4000),
-            coldStorageLogs: sortByRecent(state.coldStorageLogs || [], 4000),
-            feedStockLogs: sortByRecent(state.feedStockLogs || [], 4000),
-            feedingTables: (state.feedingTables || []).slice(0, 150),
-            deletedIds: (state.deletedIds || []).slice(-300), 
+            feedingLogs: sortByRecent(state.feedingLogs || [], 10000),
+            mortalityLogs: sortByRecent(state.mortalityLogs || [], 10000),
+            biometryLogs: sortByRecent(state.biometryLogs || [], 10000),
+            slaughterLogs: sortByRecent(state.slaughterLogs || [], 10000),
+            harvestLogs: sortByRecent(state.harvestLogs || [], 10000),
+            utilityLogs: sortByRecent(state.utilityLogs || [], 10000),
+            coldStorageLogs: sortByRecent(state.coldStorageLogs || [], 10000),
+            feedStockLogs: sortByRecent(state.feedStockLogs || [], 10000),
+            feedingTables: (state.feedingTables || []).slice(0, 300),
+            deletedIds: (state.deletedIds || []).slice(-500), 
           };
           localStorage.setItem(key, JSON.stringify(prunedState));
           console.log('State pruned and saved successfully.');
@@ -168,7 +168,8 @@ export const ensureStateIntegrity = (state: any, mergeWith?: AppState, priority:
   const initialDeletedIds = state?.deletedIds || [];
   const mergeDeletedIds = mergeWith?.deletedIds || [];
   const allDeletedIds = Array.from(new Set([...initialDeletedIds, ...mergeDeletedIds]));
-  const combinedDeletedIds = allDeletedIds.slice(-500); 
+  // We keep a decent amount of deleted IDs to ensure sync consistency, but limit it to avoid bloat
+  const combinedDeletedIds = allDeletedIds.slice(-2000); 
 
   const base: AppState = {
     ...initialState,
@@ -283,64 +284,12 @@ export const ensureStateIntegrity = (state: any, mergeWith?: AppState, priority:
         : (result.farmTargetCapacity !== undefined ? result.farmTargetCapacity : mergeWith.farmTargetCapacity),
     };
 
-    // Global limit on logs to prevent localStorage bloat (Keeping 10k records for deep history)
-    const logLimit = 10000;
-    const sortByRecent = (arr: any[]) => {
-      if (!arr || arr.length === 0) return [];
-      return [...arr].sort((a, b) => {
-        const timeA = Number(a.updatedAt) || 0;
-        const timeB = Number(b.updatedAt) || 0;
-        if (timeA !== timeB) return timeB - timeA;
-        
-        const dateA = a.date || a.timestamp || '';
-        const dateB = b.date || b.timestamp || '';
-        if (dateA || dateB) return dateB.localeCompare(dateA);
-        
-        return 0;
-      }).slice(0, logLimit);
-    };
-
-    return {
-      ...mergedResult,
-      feedingLogs: sortByRecent(mergedResult.feedingLogs || []),
-      mortalityLogs: sortByRecent(mergedResult.mortalityLogs || []),
-      biometryLogs: sortByRecent(mergedResult.biometryLogs || []),
-      slaughterLogs: sortByRecent(mergedResult.slaughterLogs || []),
-      harvestLogs: sortByRecent(mergedResult.harvestLogs || []),
-      coldStorageLogs: sortByRecent(mergedResult.coldStorageLogs || []),
-      utilityLogs: sortByRecent(mergedResult.utilityLogs || []),
-      feedStockLogs: sortByRecent(mergedResult.feedStockLogs || []),
-    };
+    // Note: Removed automatic pruning from here. 
+    // Pruning should only happen during safeLocalStorageSetItem to protect the cloud state from truncation.
+    return mergedResult;
   }
 
-  // Also prune the non-merge result (Keeping 10k records for deep history)
-  const logLimit = 10000;
-  const sortByRecent = (arr: any[]) => {
-    if (!arr || arr.length === 0) return [];
-    return [...arr].sort((a, b) => {
-      const timeA = Number(a.updatedAt) || 0;
-      const timeB = Number(b.updatedAt) || 0;
-      if (timeA !== timeB) return timeB - timeA;
-      
-      const dateA = a.date || a.timestamp || '';
-      const dateB = b.date || b.timestamp || '';
-      if (dateA || dateB) return dateB.localeCompare(dateA);
-      
-      return 0;
-    }).slice(0, logLimit);
-  };
-
-  return {
-    ...result,
-    feedingLogs: sortByRecent(result.feedingLogs || []),
-    mortalityLogs: sortByRecent(result.mortalityLogs || []),
-    biometryLogs: sortByRecent(result.biometryLogs || []),
-    slaughterLogs: sortByRecent(result.slaughterLogs || []),
-    harvestLogs: sortByRecent(result.harvestLogs || []),
-    coldStorageLogs: sortByRecent(result.coldStorageLogs || []),
-    utilityLogs: sortByRecent(result.utilityLogs || []),
-    feedStockLogs: sortByRecent(result.feedStockLogs || []),
-  };
+  return result;
 };
 
 export const getSupabaseConfig = () => {

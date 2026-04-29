@@ -531,8 +531,8 @@ const Dashboard: React.FC<Props> = ({ state }) => {
   }, [state.batches, state.cages, state.mortalityLogs, state.biometryLogs, state.feedingLogs, state.feedTypes, state.harvestLogs]);
 
   const filteredBatchStats = useMemo(() => {
-    // Show only batches that are fully settled (balance 0)
-    return batchStats.filter(b => b.settlementBalance === 0);
+    // Show all active batches that haven't been closed, or are recently settled
+    return batchStats.filter(b => b.stock > 0 || b.settlementBalance > 0);
   }, [batchStats]);
 
   const selectedBatchData = useMemo(() => {
