@@ -22,34 +22,37 @@ const safeLocalStorageSetItem = (key: string, value: string) => {
           const state = JSON.parse(value) as AppState;
           
           const sortByRecent = (arr: any[], limit: number) => {
-            return [...(arr || [])].sort((a, b) => {
-              if (a.updatedAt && b.updatedAt) return b.updatedAt - a.updatedAt;
+            if (!arr || arr.length === 0) return [];
+            return [...arr].sort((a, b) => {
+              const timeA = Number(a.updatedAt) || 0;
+              const timeB = Number(b.updatedAt) || 0;
+              if (timeA !== timeB) return timeB - timeA;
               const dateA = a.date || a.timestamp || '';
               const dateB = b.date || b.timestamp || '';
-              return dateB.localeCompare(dateA);
+              if (dateA || dateB) return dateB.localeCompare(dateA);
+              return 0;
             }).slice(0, limit);
           };
 
           // Conservative pruning for emergency space - keep much more history
           const prunedState: AppState = {
             ...state,
-            feedingLogs: sortByRecent(state.feedingLogs || [], 5000),
-            mortalityLogs: sortByRecent(state.mortalityLogs || [], 5000),
-            biometryLogs: sortByRecent(state.biometryLogs || [], 5000),
-            slaughterLogs: sortByRecent(state.slaughterLogs || [], 5000),
-            utilityLogs: sortByRecent(state.utilityLogs || [], 5000),
-            coldStorageLogs: sortByRecent(state.coldStorageLogs || [], 5000),
-            feedStockLogs: sortByRecent(state.feedStockLogs || [], 5000),
-            feedingTables: (state.feedingTables || []).slice(0, 100),
-            deletedIds: (state.deletedIds || []).slice(-200), 
+            feedingLogs: sortByRecent(state.feedingLogs || [], 4000),
+            mortalityLogs: sortByRecent(state.mortalityLogs || [], 4000),
+            biometryLogs: sortByRecent(state.biometryLogs || [], 4000),
+            slaughterLogs: sortByRecent(state.slaughterLogs || [], 4000),
+            harvestLogs: sortByRecent(state.harvestLogs || [], 4000),
+            utilityLogs: sortByRecent(state.utilityLogs || [], 4000),
+            coldStorageLogs: sortByRecent(state.coldStorageLogs || [], 4000),
+            feedStockLogs: sortByRecent(state.feedStockLogs || [], 4000),
+            feedingTables: (state.feedingTables || []).slice(0, 150),
+            deletedIds: (state.deletedIds || []).slice(-300), 
           };
           localStorage.setItem(key, JSON.stringify(prunedState));
-          console.log('Aggressively pruned state saved successfully.');
+          console.log('State pruned and saved successfully.');
         } catch (innerError) {
-          console.error('Failed to save even after aggressive pruning:', innerError);
-          // If still failing, last resort: clear everything and reload from remote
-          localStorage.removeItem(STORAGE_KEY);
-          window.location.reload();
+          console.error('Failed to save even after pruning:', innerError);
+          // Don't reload/clear, just let it fail silently or log it
         }
       }
     } else {
@@ -280,16 +283,20 @@ export const ensureStateIntegrity = (state: any, mergeWith?: AppState, priority:
         : (result.farmTargetCapacity !== undefined ? result.farmTargetCapacity : mergeWith.farmTargetCapacity),
     };
 
-    // Global limit on logs to prevent localStorage bloat (Keeping 20k records for deep history)
-    const logLimit = 20000;
+    // Global limit on logs to prevent localStorage bloat (Keeping 10k records for deep history)
+    const logLimit = 10000;
     const sortByRecent = (arr: any[]) => {
+      if (!arr || arr.length === 0) return [];
       return [...arr].sort((a, b) => {
-        // Try updatedAt first
-        if (a.updatedAt && b.updatedAt) return b.updatedAt - a.updatedAt;
-        // Fallback to date/timestamp string comparison
+        const timeA = Number(a.updatedAt) || 0;
+        const timeB = Number(b.updatedAt) || 0;
+        if (timeA !== timeB) return timeB - timeA;
+        
         const dateA = a.date || a.timestamp || '';
         const dateB = b.date || b.timestamp || '';
-        return dateB.localeCompare(dateA);
+        if (dateA || dateB) return dateB.localeCompare(dateA);
+        
+        return 0;
       }).slice(0, logLimit);
     };
 
@@ -306,14 +313,20 @@ export const ensureStateIntegrity = (state: any, mergeWith?: AppState, priority:
     };
   }
 
-  // Also prune the non-merge result (Keeping 20k records for deep history)
-  const logLimit = 20000;
+  // Also prune the non-merge result (Keeping 10k records for deep history)
+  const logLimit = 10000;
   const sortByRecent = (arr: any[]) => {
+    if (!arr || arr.length === 0) return [];
     return [...arr].sort((a, b) => {
-      if (a.updatedAt && b.updatedAt) return b.updatedAt - a.updatedAt;
+      const timeA = Number(a.updatedAt) || 0;
+      const timeB = Number(b.updatedAt) || 0;
+      if (timeA !== timeB) return timeB - timeA;
+      
       const dateA = a.date || a.timestamp || '';
       const dateB = b.date || b.timestamp || '';
-      return dateB.localeCompare(dateA);
+      if (dateA || dateB) return dateB.localeCompare(dateA);
+      
+      return 0;
     }).slice(0, logLimit);
   };
 
