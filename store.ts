@@ -6,6 +6,58 @@ const STORAGE_KEY = 'aquagestao_v1';
 const SUPABASE_CONFIG_KEY = 'aquagestao_supabase_config';
 const SESSION_KEY = 'aquagestao_session';
 
+const safeLocalStorageSetItem = (key: string, value: string) => {
+  try {
+    localStorage.setItem(key, value);
+  } catch (e) {
+    if (e instanceof DOMException && (
+      e.code === 22 || 
+      e.code === 1014 || 
+      e.name === 'QuotaExceededError' || 
+      e.name === 'NS_ERROR_DOM_QUOTA_REACHED'
+    )) {
+      console.warn('LocalStorage quota exceeded. Attempting to prune state...');
+      if (key === STORAGE_KEY) {
+        try {
+          const state = JSON.parse(value) as AppState;
+          
+          const sortByRecent = (arr: any[], limit: number) => {
+            return [...(arr || [])].sort((a, b) => {
+              if (a.updatedAt && b.updatedAt) return b.updatedAt - a.updatedAt;
+              const dateA = a.date || a.timestamp || '';
+              const dateB = b.date || b.timestamp || '';
+              return dateB.localeCompare(dateA);
+            }).slice(0, limit);
+          };
+
+          // Aggressive pruning for emergency space
+          const prunedState: AppState = {
+            ...state,
+            feedingLogs: sortByRecent(state.feedingLogs, 300),
+            mortalityLogs: sortByRecent(state.mortalityLogs, 300),
+            biometryLogs: sortByRecent(state.biometryLogs, 300),
+            slaughterLogs: sortByRecent(state.slaughterLogs, 300),
+            utilityLogs: sortByRecent(state.utilityLogs, 300),
+            coldStorageLogs: sortByRecent(state.coldStorageLogs, 300),
+            feedStockLogs: sortByRecent(state.feedStockLogs, 300),
+            feedingTables: (state.feedingTables || []).slice(0, 50),
+            deletedIds: (state.deletedIds || []).slice(-50), 
+          };
+          localStorage.setItem(key, JSON.stringify(prunedState));
+          console.log('Aggressively pruned state saved successfully.');
+        } catch (innerError) {
+          console.error('Failed to save even after aggressive pruning:', innerError);
+          // If still failing, last resort: clear everything and reload from remote
+          localStorage.removeItem(STORAGE_KEY);
+          window.location.reload();
+        }
+      }
+    } else {
+      throw e;
+    }
+  }
+};
+
 const initialMaster: User = {
   id: 'master-001',
   name: 'Administrador Mestre',
@@ -109,10 +161,11 @@ function mergeArraysById<T extends { id: string, updatedAt?: number }>(
 }
 
 export const ensureStateIntegrity = (state: any, mergeWith?: AppState, priority: 'local' | 'remote' = 'remote'): AppState => {
-  const combinedDeletedIds = Array.from(new Set([
-    ...(state?.deletedIds || []),
-    ...(mergeWith?.deletedIds || [])
-  ]));
+  // Prune deletedIds to keep only the last 500 to save space
+  const initialDeletedIds = state?.deletedIds || [];
+  const mergeDeletedIds = mergeWith?.deletedIds || [];
+  const allDeletedIds = Array.from(new Set([...initialDeletedIds, ...mergeDeletedIds]));
+  const combinedDeletedIds = allDeletedIds.slice(-500); 
 
   const base: AppState = {
     ...initialState,
@@ -172,7 +225,7 @@ export const ensureStateIntegrity = (state: any, mergeWith?: AppState, priority:
   };
 
   if (mergeWith) {
-    return {
+    const mergedResult: AppState = {
       ...result,
       users: mergeArraysById(result.users, mergeWith.users, combinedDeletedIds, priority),
       slaughterLogs: mergeArraysById(result.slaughterLogs, mergeWith.slaughterLogs, combinedDeletedIds, priority),
@@ -226,8 +279,56 @@ export const ensureStateIntegrity = (state: any, mergeWith?: AppState, priority:
         ? (mergeWith.farmTargetCapacity !== undefined ? mergeWith.farmTargetCapacity : result.farmTargetCapacity)
         : (result.farmTargetCapacity !== undefined ? result.farmTargetCapacity : mergeWith.farmTargetCapacity),
     };
+
+    // Global limit on logs to prevent localStorage bloat
+    // We sort by date/timestamp/updatedAt to keep the MOST RECENT logs
+    const logLimit = 1500;
+    const sortByRecent = (arr: any[]) => {
+      return [...arr].sort((a, b) => {
+        // Try updatedAt first
+        if (a.updatedAt && b.updatedAt) return b.updatedAt - a.updatedAt;
+        // Fallback to date/timestamp string comparison
+        const dateA = a.date || a.timestamp || '';
+        const dateB = b.date || b.timestamp || '';
+        return dateB.localeCompare(dateA);
+      }).slice(0, logLimit);
+    };
+
+    return {
+      ...mergedResult,
+      feedingLogs: sortByRecent(mergedResult.feedingLogs || []),
+      mortalityLogs: sortByRecent(mergedResult.mortalityLogs || []),
+      biometryLogs: sortByRecent(mergedResult.biometryLogs || []),
+      slaughterLogs: sortByRecent(mergedResult.slaughterLogs || []),
+      harvestLogs: sortByRecent(mergedResult.harvestLogs || []),
+      coldStorageLogs: sortByRecent(mergedResult.coldStorageLogs || []),
+      utilityLogs: sortByRecent(mergedResult.utilityLogs || []),
+      feedStockLogs: sortByRecent(mergedResult.feedStockLogs || []),
+    };
   }
-  return result;
+
+  // Also prune the non-merge result
+  const logLimit = 1500;
+  const sortByRecent = (arr: any[]) => {
+    return [...arr].sort((a, b) => {
+      if (a.updatedAt && b.updatedAt) return b.updatedAt - a.updatedAt;
+      const dateA = a.date || a.timestamp || '';
+      const dateB = b.date || b.timestamp || '';
+      return dateB.localeCompare(dateA);
+    }).slice(0, logLimit);
+  };
+
+  return {
+    ...result,
+    feedingLogs: sortByRecent(result.feedingLogs || []),
+    mortalityLogs: sortByRecent(result.mortalityLogs || []),
+    biometryLogs: sortByRecent(result.biometryLogs || []),
+    slaughterLogs: sortByRecent(result.slaughterLogs || []),
+    harvestLogs: sortByRecent(result.harvestLogs || []),
+    coldStorageLogs: sortByRecent(result.coldStorageLogs || []),
+    utilityLogs: sortByRecent(result.utilityLogs || []),
+    feedStockLogs: sortByRecent(result.feedStockLogs || []),
+  };
 };
 
 export const getSupabaseConfig = () => {
@@ -262,7 +363,7 @@ export const applyConfigFromLink = (link: string): boolean => {
     const s_key = url.searchParams.get('s_key');
     if (s_url && s_key) {
       const config = { url: decodeURIComponent(s_url), key: decodeURIComponent(s_key) };
-      localStorage.setItem(SUPABASE_CONFIG_KEY, JSON.stringify(config));
+      safeLocalStorageSetItem(SUPABASE_CONFIG_KEY, JSON.stringify(config));
       return true;
     }
   } catch (e) {
@@ -283,7 +384,7 @@ export const getSupabase = (stateConfig?: { url: string, key: string }) => {
 
 export const saveSession = (user: User | null) => {
   if (user) {
-    localStorage.setItem(SESSION_KEY, JSON.stringify(user));
+    safeLocalStorageSetItem(SESSION_KEY, JSON.stringify(user));
   } else {
     localStorage.removeItem(SESSION_KEY);
   }
@@ -316,19 +417,19 @@ export const loadState = async (): Promise<AppState> => {
   const remote = await fetchRemoteState(state.supabaseConfig);
   if (remote) {
     state = ensureStateIntegrity(state, remote, 'remote');
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    safeLocalStorageSetItem(STORAGE_KEY, JSON.stringify(state));
   }
   return state;
 };
 
 export const saveState = async (state: AppState, userConfig?: {url: string, key: string}): Promise<void> => {
   const integrityState = ensureStateIntegrity(state);
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(integrityState));
+  safeLocalStorageSetItem(STORAGE_KEY, JSON.stringify(integrityState));
   
   const configToUse = userConfig || integrityState.supabaseConfig;
   
   if (configToUse) {
-    localStorage.setItem(SUPABASE_CONFIG_KEY, JSON.stringify(configToUse));
+    safeLocalStorageSetItem(SUPABASE_CONFIG_KEY, JSON.stringify(configToUse));
   }
 
   const supabase = getSupabase(configToUse);
