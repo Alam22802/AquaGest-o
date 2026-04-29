@@ -30,18 +30,18 @@ const safeLocalStorageSetItem = (key: string, value: string) => {
             }).slice(0, limit);
           };
 
-          // Aggressive pruning for emergency space
+          // Conservative pruning for emergency space - keep much more history
           const prunedState: AppState = {
             ...state,
-            feedingLogs: sortByRecent(state.feedingLogs, 300),
-            mortalityLogs: sortByRecent(state.mortalityLogs, 300),
-            biometryLogs: sortByRecent(state.biometryLogs, 300),
-            slaughterLogs: sortByRecent(state.slaughterLogs, 300),
-            utilityLogs: sortByRecent(state.utilityLogs, 300),
-            coldStorageLogs: sortByRecent(state.coldStorageLogs, 300),
-            feedStockLogs: sortByRecent(state.feedStockLogs, 300),
-            feedingTables: (state.feedingTables || []).slice(0, 50),
-            deletedIds: (state.deletedIds || []).slice(-50), 
+            feedingLogs: sortByRecent(state.feedingLogs || [], 5000),
+            mortalityLogs: sortByRecent(state.mortalityLogs || [], 5000),
+            biometryLogs: sortByRecent(state.biometryLogs || [], 5000),
+            slaughterLogs: sortByRecent(state.slaughterLogs || [], 5000),
+            utilityLogs: sortByRecent(state.utilityLogs || [], 5000),
+            coldStorageLogs: sortByRecent(state.coldStorageLogs || [], 5000),
+            feedStockLogs: sortByRecent(state.feedStockLogs || [], 5000),
+            feedingTables: (state.feedingTables || []).slice(0, 100),
+            deletedIds: (state.deletedIds || []).slice(-200), 
           };
           localStorage.setItem(key, JSON.stringify(prunedState));
           console.log('Aggressively pruned state saved successfully.');
@@ -280,9 +280,8 @@ export const ensureStateIntegrity = (state: any, mergeWith?: AppState, priority:
         : (result.farmTargetCapacity !== undefined ? result.farmTargetCapacity : mergeWith.farmTargetCapacity),
     };
 
-    // Global limit on logs to prevent localStorage bloat
-    // We sort by date/timestamp/updatedAt to keep the MOST RECENT logs
-    const logLimit = 1500;
+    // Global limit on logs to prevent localStorage bloat (Keeping 20k records for deep history)
+    const logLimit = 20000;
     const sortByRecent = (arr: any[]) => {
       return [...arr].sort((a, b) => {
         // Try updatedAt first
@@ -307,8 +306,8 @@ export const ensureStateIntegrity = (state: any, mergeWith?: AppState, priority:
     };
   }
 
-  // Also prune the non-merge result
-  const logLimit = 1500;
+  // Also prune the non-merge result (Keeping 20k records for deep history)
+  const logLimit = 20000;
   const sortByRecent = (arr: any[]) => {
     return [...arr].sort((a, b) => {
       if (a.updatedAt && b.updatedAt) return b.updatedAt - a.updatedAt;

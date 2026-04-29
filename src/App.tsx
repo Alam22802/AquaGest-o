@@ -1,29 +1,29 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import Layout from './components/Layout.tsx';
-import Dashboard from './components/Dashboard.tsx';
-import LineManagement from './components/LineManagement.tsx';
-import BatchManagement from './components/BatchManagement.tsx';
-import CageManagement from './components/CageManagement.tsx';
-import CageInventory from './components/CageInventory.tsx';
-import Maintenance from './components/Maintenance.tsx';
-import FeedingLog from './components/FeedingLog.tsx';
-import MortalityLog from './components/MortalityLog.tsx';
-import BiometryLog from './components/BiometryLog.tsx';
-import FeedManagement from './components/FeedManagement.tsx';
-import UserManagement from './components/UserManagement.tsx';
-import CloudSettings from './components/CloudSettings.tsx';
-import ProtocolManagement from './components/ProtocolManagement.tsx';
-import CapexManagement from './components/CapexManagement.tsx';
-import PCMManagement from './components/PCMManagement.tsx';
-import SlaughterHouse from './components/SlaughterHouse.tsx';
-import Login from './components/Login.tsx';
-import ErrorBoundary from './components/ErrorBoundary.tsx';
-import { loadState, saveState, getSession, saveSession, ensureStateIntegrity, fetchRemoteState, subscribeToRemoteChanges } from './store.ts';
-import { AppState, User } from './types.ts';
+import Layout from './components/Layout';
+import Dashboard from './components/Dashboard';
+import LineManagement from './components/LineManagement';
+import BatchManagement from './components/BatchManagement';
+import CageManagement from './components/CageManagement';
+import CageInventory from './components/CageInventory';
+import Maintenance from './components/Maintenance';
+import FeedingLog from './components/FeedingLog';
+import MortalityLog from './components/MortalityLog';
+import BiometryLog from './components/BiometryLog';
+import FeedManagement from './components/FeedManagement';
+import UserManagement from './components/UserManagement';
+import CloudSettings from './components/CloudSettings';
+import ProtocolManagement from './components/ProtocolManagement';
+import CapexManagement from './components/CapexManagement';
+import PCMManagement from './components/PCMManagement';
+import SlaughterHouse from './components/SlaughterHouse';
+import Login from './components/Login';
+import ErrorBoundary from './components/ErrorBoundary';
+import { loadState, saveState, getSession, saveSession, ensureStateIntegrity, fetchRemoteState, subscribeToRemoteChanges } from './store';
+import { AppState, User } from './types';
 import { Loader2, RefreshCw, AlertTriangle, X, Cloud, CheckCircle2 } from 'lucide-react';
 
-import { checkAndTriggerAlerts } from './src/services/alertService.ts';
+import { checkAndTriggerAlerts } from './services/alertService';
 
 const App: React.FC = () => {
   const [state, setState] = useState<AppState | null>(null);
