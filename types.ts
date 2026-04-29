@@ -21,7 +21,6 @@ export interface User {
 export interface NotificationSettings {
   notifyMasterOnNewUser: boolean;
   notifyOnLowFeed: boolean;
-  notifyOnWaterCritical?: boolean;
   systemEmailSender: string;
   updatedAt?: number;
 }
@@ -135,9 +134,6 @@ export interface SlaughterLog {
   receptionWeight: number;
   startTime: string;
   slaughterBatch: string;
-  batchId?: string;
-  netWeight?: number;
-  fishCount?: number;
   endTime: string;
   packedQuantity: number;
   packagingBatch: string;
@@ -367,7 +363,6 @@ export interface ColdStorageLog {
   date: string;
   time: string;
   chamberId: string;
-  chamberName?: string;
   temperature: string;
   userId: string;
   timestamp: string;

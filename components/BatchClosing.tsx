@@ -213,8 +213,8 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     const slaughters = (state.slaughterLogs || [])
       .filter(s => s.batchId === batch.id);
     
-    const slaughteredWeight = slaughters.reduce((acc, curr) => acc + (curr.netWeight || 0), 0);
-    const slaughteredCount = slaughters.reduce((acc, curr) => acc + (curr.fishCount || 0), 0);
+    const slaughteredWeight = slaughters.reduce((acc, curr) => acc + curr.netWeight, 0);
+    const slaughteredCount = slaughters.reduce((acc, curr) => acc + curr.fishCount, 0);
 
     const expenses = (state.batchExpenses || [])
       .filter(e => e.batchId === batch.id);

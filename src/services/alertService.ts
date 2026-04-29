@@ -1,6 +1,6 @@
 
-import { AppState, NotificationSettings, User } from '../types';
-import { formatNumber } from '../utils/formatters';
+import { AppState, NotificationSettings, User } from '../../types';
+import { formatNumber } from '../../utils/formatters';
 
 export const sendEmailAlert = async (to: string, subject: string, body: string, settings?: NotificationSettings) => {
   console.log(`[ALERT] Enviando e-mail para: ${to}`);

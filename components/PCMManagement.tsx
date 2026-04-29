@@ -5,7 +5,7 @@ import {
   ChevronRight, Filter, Download, ArrowUpRight, ArrowDownRight,
   ClipboardList, HardDrive, ListOrdered, User, AlertTriangle
 } from 'lucide-react';
-import { AppState, CostCenter, PCMEquipment, PCMStoppageReason, PCMProductionStoppage, PCMPlannedImprovement, User as AppUser } from '../types';
+import { AppState, CostCenter, PCMEquipment, PCMStoppageReason, PCMProductionStoppage, PCMPlannedImprovement, User as AppUser } from '../types.ts';
 
 const generateId = () => {
   try {

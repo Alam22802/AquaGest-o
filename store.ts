@@ -1,65 +1,11 @@
 
 import { AppState, User, NotificationSettings, SlaughterLog } from './types';
 import { createClient } from '@supabase/supabase-js';
+import LZString from 'lz-string';
 
 const STORAGE_KEY = 'aquagestao_v1';
 const SUPABASE_CONFIG_KEY = 'aquagestao_supabase_config';
 const SESSION_KEY = 'aquagestao_session';
-
-const safeLocalStorageSetItem = (key: string, value: string) => {
-  try {
-    localStorage.setItem(key, value);
-  } catch (e) {
-    if (e instanceof DOMException && (
-      e.code === 22 || 
-      e.code === 1014 || 
-      e.name === 'QuotaExceededError' || 
-      e.name === 'NS_ERROR_DOM_QUOTA_REACHED'
-    )) {
-      console.warn('LocalStorage quota exceeded. Attempting to prune state...');
-      if (key === STORAGE_KEY) {
-        try {
-          const state = JSON.parse(value) as AppState;
-          
-          const sortByRecent = (arr: any[], limit: number) => {
-            if (!arr || arr.length === 0) return [];
-            return [...arr].sort((a, b) => {
-              const timeA = Number(a.updatedAt) || 0;
-              const timeB = Number(b.updatedAt) || 0;
-              if (timeA !== timeB) return timeB - timeA;
-              const dateA = a.date || a.timestamp || '';
-              const dateB = b.date || b.timestamp || '';
-              if (dateA || dateB) return dateB.localeCompare(dateA);
-              return 0;
-            }).slice(0, limit);
-          };
-
-          // Conservative pruning for emergency space - keep much more history
-          const prunedState: AppState = {
-            ...state,
-            feedingLogs: sortByRecent(state.feedingLogs || [], 10000),
-            mortalityLogs: sortByRecent(state.mortalityLogs || [], 10000),
-            biometryLogs: sortByRecent(state.biometryLogs || [], 10000),
-            slaughterLogs: sortByRecent(state.slaughterLogs || [], 10000),
-            harvestLogs: sortByRecent(state.harvestLogs || [], 10000),
-            utilityLogs: sortByRecent(state.utilityLogs || [], 10000),
-            coldStorageLogs: sortByRecent(state.coldStorageLogs || [], 10000),
-            feedStockLogs: sortByRecent(state.feedStockLogs || [], 10000),
-            feedingTables: (state.feedingTables || []).slice(0, 300),
-            deletedIds: (state.deletedIds || []).slice(-500), 
-          };
-          localStorage.setItem(key, JSON.stringify(prunedState));
-          console.log('State pruned and saved successfully.');
-        } catch (innerError) {
-          console.error('Failed to save even after pruning:', innerError);
-          // Don't reload/clear, just let it fail silently or log it
-        }
-      }
-    } else {
-      throw e;
-    }
-  }
-};
 
 const initialMaster: User = {
   id: 'master-001',
@@ -164,16 +110,10 @@ function mergeArraysById<T extends { id: string, updatedAt?: number }>(
 }
 
 export const ensureStateIntegrity = (state: any, mergeWith?: AppState, priority: 'local' | 'remote' = 'remote'): AppState => {
-  // Prune deletedIds to keep only the last 500 to save space
-  const initialDeletedIds = state?.deletedIds || [];
-  const mergeDeletedIds = mergeWith?.deletedIds || [];
-  const allDeletedIds = Array.from(new Set([...initialDeletedIds, ...mergeDeletedIds]));
-  // We keep a decent amount of deleted IDs to ensure sync consistency, but limit it to avoid bloat
-  const combinedDeletedIds = allDeletedIds.slice(-2000); 
-
-  // If priority is 'local' and we are doing a full merge (like from an import), 
-  // we might want to ignore some deleted IDs. 
-  // For now, we just ensure that common collections are handled.
+  const combinedDeletedIds = Array.from(new Set([
+    ...(state?.deletedIds || []),
+    ...(mergeWith?.deletedIds || [])
+  ]));
 
   const base: AppState = {
     ...initialState,
@@ -233,7 +173,7 @@ export const ensureStateIntegrity = (state: any, mergeWith?: AppState, priority:
   };
 
   if (mergeWith) {
-    const mergedResult: AppState = {
+    return {
       ...result,
       users: mergeArraysById(result.users, mergeWith.users, combinedDeletedIds, priority),
       slaughterLogs: mergeArraysById(result.slaughterLogs, mergeWith.slaughterLogs, combinedDeletedIds, priority),
@@ -287,29 +227,8 @@ export const ensureStateIntegrity = (state: any, mergeWith?: AppState, priority:
         ? (mergeWith.farmTargetCapacity !== undefined ? mergeWith.farmTargetCapacity : result.farmTargetCapacity)
         : (result.farmTargetCapacity !== undefined ? result.farmTargetCapacity : mergeWith.farmTargetCapacity),
     };
-
-    // Note: Removed automatic pruning from here. 
-    // Pruning should only happen during safeLocalStorageSetItem to protect the cloud state from truncation.
-    return mergedResult;
   }
-
   return result;
-};
-
-/**
- * Força a restauração completa de um estado vindo de um backup JSON.
- * Ignora IDs deletados atuais para permitir que dados antigos sejam recuperados.
- */
-export const restoreFromBackup = (backup: AppState): AppState => {
-  // Garantir que o backup tenha todos os campos necessários e limpar deletedIds ANTES de processar a integridade
-  // para que itens marcados como excluídos no backup NÃO sejam filtrados
-  const base = { ...initialState, ...backup, deletedIds: [] };
-  
-  return {
-    ...ensureStateIntegrity(base),
-    deletedIds: [], // Reinicia a lista de exclusões
-    lastSync: new Date().toISOString()
-  };
 };
 
 export const getSupabaseConfig = () => {
@@ -328,7 +247,11 @@ export const getSupabaseConfig = () => {
 
   if (urlParam && keyParam) {
     const config = { url: decodeURIComponent(urlParam), key: decodeURIComponent(keyParam) };
-    localStorage.setItem(SUPABASE_CONFIG_KEY, JSON.stringify(config));
+    try {
+      localStorage.setItem(SUPABASE_CONFIG_KEY, JSON.stringify(config));
+    } catch (e) {
+      console.warn('Falha ao salvar config Supabase (Quota)');
+    }
     return config;
   }
 
@@ -344,7 +267,11 @@ export const applyConfigFromLink = (link: string): boolean => {
     const s_key = url.searchParams.get('s_key');
     if (s_url && s_key) {
       const config = { url: decodeURIComponent(s_url), key: decodeURIComponent(s_key) };
-      safeLocalStorageSetItem(SUPABASE_CONFIG_KEY, JSON.stringify(config));
+      try {
+        localStorage.setItem(SUPABASE_CONFIG_KEY, JSON.stringify(config));
+      } catch (e) {
+        console.warn('Falha ao salvar config Supabase (Quota)');
+      }
       return true;
     }
   } catch (e) {
@@ -365,7 +292,11 @@ export const getSupabase = (stateConfig?: { url: string, key: string }) => {
 
 export const saveSession = (user: User | null) => {
   if (user) {
-    safeLocalStorageSetItem(SESSION_KEY, JSON.stringify(user));
+    try {
+      localStorage.setItem(SESSION_KEY, JSON.stringify(user));
+    } catch (e) {
+      console.warn('Falha ao salvar sessão (Quota)');
+    }
   } else {
     localStorage.removeItem(SESSION_KEY);
   }
@@ -390,7 +321,31 @@ export const fetchRemoteState = async (config?: {url: string, key: string}): Pro
 
 export const loadState = async (): Promise<AppState> => {
   const localData = localStorage.getItem(STORAGE_KEY);
-  let state = localData ? ensureStateIntegrity(JSON.parse(localData)) : initialState;
+  let state: AppState;
+
+  if (localData) {
+    try {
+      // Tenta descomprimir primeiro
+      let decompressed = LZString.decompressFromUTF16(localData);
+      
+      // Se a descompressão falhar ou retornar nulo, pode ser que o dado não esteja comprimido (versão antiga)
+      if (!decompressed) {
+        // Verifica se parece um JSON (inicia com { ou [)
+        if (localData.trim().startsWith('{') || localData.trim().startsWith('[')) {
+          decompressed = localData;
+        } else {
+          throw new Error('Falha na descompressão do estado local');
+        }
+      }
+
+      state = ensureStateIntegrity(JSON.parse(decompressed));
+    } catch (err) {
+      console.error('Erro ao ler estado do localStorage:', err);
+      state = initialState;
+    }
+  } else {
+    state = initialState;
+  }
 
   const config = getSupabaseConfig();
   if (config) state.supabaseConfig = config;
@@ -398,19 +353,53 @@ export const loadState = async (): Promise<AppState> => {
   const remote = await fetchRemoteState(state.supabaseConfig);
   if (remote) {
     state = ensureStateIntegrity(state, remote, 'remote');
-    safeLocalStorageSetItem(STORAGE_KEY, JSON.stringify(state));
+    try {
+      const compressed = LZString.compressToUTF16(JSON.stringify(state));
+      localStorage.setItem(STORAGE_KEY, compressed);
+    } catch (e) {
+      console.warn('Não foi possível salvar estado remoto no cache local:', e);
+    }
   }
   return state;
 };
 
 export const saveState = async (state: AppState, userConfig?: {url: string, key: string}): Promise<void> => {
   const integrityState = ensureStateIntegrity(state);
-  safeLocalStorageSetItem(STORAGE_KEY, JSON.stringify(integrityState));
+  
+  try {
+    const jsonStr = JSON.stringify(integrityState);
+    const compressed = LZString.compressToUTF16(jsonStr);
+    localStorage.setItem(STORAGE_KEY, compressed);
+  } catch (err) {
+    console.error('Erro de Quota no localStorage:', err);
+    // Se falhar mesmo com compressão, tentamos remover dados antigos/logs pesados como última medida
+    try {
+      const minimizedState = {
+        ...integrityState,
+        feedingLogs: integrityState.feedingLogs.slice(-500), // Mantém apenas os últimos 500
+        mortalityLogs: integrityState.mortalityLogs.slice(-500),
+        biometryLogs: integrityState.biometryLogs.slice(-500),
+        feedStockLogs: (integrityState.feedStockLogs || []).slice(-500),
+        slaughterLogs: integrityState.slaughterLogs.slice(-500),
+        slaughterExpenses: (integrityState.slaughterExpenses || []).slice(-500),
+      };
+      const compressed = LZString.compressToUTF16(JSON.stringify(minimizedState));
+      localStorage.setItem(STORAGE_KEY, compressed);
+      console.log('Estado salvo no cache local após minificação (excesso de quota).');
+    } catch (e) {
+      // Se ainda falhar, apenas notificamos que o cache local não funcionou
+      console.warn('Não foi possível salvar nem o estado reduzido no cache local.');
+    }
+  }
   
   const configToUse = userConfig || integrityState.supabaseConfig;
   
   if (configToUse) {
-    safeLocalStorageSetItem(SUPABASE_CONFIG_KEY, JSON.stringify(configToUse));
+    try {
+      localStorage.setItem(SUPABASE_CONFIG_KEY, JSON.stringify(configToUse));
+    } catch (e) {
+      console.warn('Não foi possível salvar config do Supabase no localStorage');
+    }
   }
 
   const supabase = getSupabase(configToUse);

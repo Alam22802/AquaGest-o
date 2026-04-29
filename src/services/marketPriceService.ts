@@ -101,7 +101,11 @@ export async function getTilapiaPriceMG(): Promise<MarketPrice> {
       })) : []
     };
 
-    localStorage.setItem(CACHE_KEY, JSON.stringify(marketPrice));
+    try {
+      localStorage.setItem(CACHE_KEY, JSON.stringify(marketPrice));
+    } catch (e) {
+      console.warn("Falha ao salvar cache de preços (Quota excedida)");
+    }
     return marketPrice;
   } catch (error) {
     console.error("Erro ao buscar preço da tilápia:", error);

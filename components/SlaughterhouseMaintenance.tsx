@@ -5,6 +5,7 @@ import { Thermometer, Droplets, Zap, Plus, Trash2, Calendar, Info, CheckCircle2,
 import { format } from 'date-fns';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { mmToPt } from 'jspdf';
 
 interface Props {
   state: AppState;
@@ -292,7 +293,7 @@ const SlaughterhouseMaintenance: React.FC<Props> = ({ state, onUpdate, currentUs
             state.users.find(u => u.id === log.userId)?.name || '---'
           ]),
           theme: 'striped',
-          headStyles: { fillColor: [51, 65, 85] },
+          headStyles: { fillStyle: 'fill', fillColor: [51, 65, 85] },
           styles: { fontSize: 9 },
           margin: { left: 14, right: 14 }
         });
@@ -393,7 +394,7 @@ const SlaughterhouseMaintenance: React.FC<Props> = ({ state, onUpdate, currentUs
             return row;
           }),
           theme: 'striped',
-          headStyles: { fillColor: type === 'energy' ? [217, 119, 6] : [37, 99, 235] },
+          headStyles: { fillStyle: 'fill', fillColor: type === 'energy' ? [217, 119, 6] : [37, 99, 235] },
           styles: { fontSize: 8 },
           margin: { left: 14, right: 14 }
         });

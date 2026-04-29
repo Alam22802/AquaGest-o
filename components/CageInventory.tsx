@@ -64,7 +64,7 @@ const CageInventory: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
             ? Math.floor((formData.length ? Number(formData.length) : c.dimensions.length) * 
                          (formData.width ? Number(formData.width) : c.dimensions.width) * 
                          (formData.depth ? Number(formData.depth) : c.dimensions.depth) * 
-                         (formData.stockingDensity ? Number(formData.stockingDensity) : (c.stockingDensity || 0)))
+                         (formData.stockingDensity ? Number(formData.stockingDensity) : c.stockingDensity))
             : c.stockingCapacity
         } : c
       );

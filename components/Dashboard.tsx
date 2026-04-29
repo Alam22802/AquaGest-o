@@ -10,7 +10,7 @@ import { Fish, Utensils, Scale, TrendingUp, FishOff, Calendar, Layers, Download,
 import * as XLSX from 'xlsx';
 import { format, isWithinInterval, parseISO, startOfDay, endOfDay, subDays, differenceInDays, addDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { getTilapiaPriceMG, MarketPrice } from '../services/marketPriceService';
+import { getTilapiaPriceMG, MarketPrice } from '../src/services/marketPriceService';
 
 const getInterpolatedStandardCurvePoints = (standardCurves: any[], avgInitial: number) => {
   const curves = (standardCurves || []).filter(sc => sc.curve && sc.curve.some((p: any) => p.weight > 0));
@@ -531,8 +531,8 @@ const Dashboard: React.FC<Props> = ({ state }) => {
   }, [state.batches, state.cages, state.mortalityLogs, state.biometryLogs, state.feedingLogs, state.feedTypes, state.harvestLogs]);
 
   const filteredBatchStats = useMemo(() => {
-    // Show all active batches that haven't been closed, or are recently settled
-    return batchStats.filter(b => b.stock > 0 || b.settlementBalance > 0);
+    // Show only batches that are fully settled (balance 0)
+    return batchStats.filter(b => b.settlementBalance === 0);
   }, [batchStats]);
 
   const selectedBatchData = useMemo(() => {
@@ -989,22 +989,22 @@ const Dashboard: React.FC<Props> = ({ state }) => {
         // Use current live stock for the entire prediction curve as requested
         const estimatedPop = currentLiveStock;
 
-        let supplierBiomass = null;
+        let supplierBiomass = undefined;
         if (showSupplierCurve) {
           let supplierWeight = getWeightAtDay(supplierCurvePoints, day);
           if (day > 210 || (supplierWeight !== null && supplierWeight !== undefined && supplierWeight > targetW + 50)) {
-            supplierWeight = null;
+            supplierWeight = undefined;
           }
           if (supplierWeight !== undefined && supplierWeight !== null) {
             supplierBiomass = (estimatedPop * supplierWeight) / 1000;
           }
         }
 
-        let standardBiomass = null;
+        let standardBiomass = undefined;
         if (showStandardCurve) {
           let standardWeight = getWeightAtDay(standardCurvePoints, day);
           if (day > 210 || (standardWeight !== null && standardWeight !== undefined && standardWeight > targetW + 50)) {
-            standardWeight = null;
+            standardWeight = undefined;
           }
           if (standardWeight !== undefined && standardWeight !== null) {
             standardBiomass = (estimatedPop * standardWeight) / 1000;
@@ -1529,7 +1529,7 @@ const Dashboard: React.FC<Props> = ({ state }) => {
                     stroke="#3b82f6" 
                     strokeWidth={2} 
                     strokeDasharray="5 5" 
-                    dot={((props: any) => {
+                    dot={(props: any) => {
                       const { cx, cy, payload } = props;
                       if (payload.isHarvestDate) {
                         return (
@@ -1542,7 +1542,7 @@ const Dashboard: React.FC<Props> = ({ state }) => {
                         );
                       }
                       return null;
-                    }) as any} 
+                    }} 
                     connectNulls 
                   />
                 )}

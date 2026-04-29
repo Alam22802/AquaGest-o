@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { 
   LayoutDashboard, Layers, Box, Utensils, FishOff, Waves, Package, Users, LogOut, Cloud, Scale, Tag, Settings, ClipboardList, BookOpen, Menu, X, Home, Bell, Factory, DollarSign, TrendingDown
 } from 'lucide-react';
-import { User, AppState } from '../types';
+import { User, AppState } from '../types.ts';
 
 import Logo from './Logo';
 
