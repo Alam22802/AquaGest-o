@@ -507,6 +507,28 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     });
   };
 
+  const handleDeleteBatch = () => {
+    if (!selectedBatchId || !currentUser.isMaster) return;
+    if (!confirm('Deseja realmente EXCLUIR este lote PERMANENTEMENTE? Todos os dados (lançamentos, tratos, mortalidade, biometria e despescas) associados a ele serão apagados para liberar espaço e tornar o sistema mais leve. Esta ação não pode ser desfeita.')) return;
+
+    onUpdate({
+      ...state,
+      batches: (state.batches || []).filter(b => b.id !== selectedBatchId),
+      feedingLogs: (state.feedingLogs || []).filter(f => f.batchId !== selectedBatchId),
+      mortalityLogs: (state.mortalityLogs || []).filter(m => m.batchId !== selectedBatchId),
+      biometryLogs: (state.biometryLogs || []).filter(b => b.batchId !== selectedBatchId),
+      harvestLogs: (state.harvestLogs || []).filter(h => h.batchId !== selectedBatchId),
+      batchExpenses: (state.batchExpenses || []).filter(e => e.batchId !== selectedBatchId),
+      batchRevenues: (state.batchRevenues || []).filter(r => r.batchId !== selectedBatchId),
+      slaughterLogs: (state.slaughterLogs || []).filter((s: any) => s.batchId !== selectedBatchId),
+      harvestSchedules: (state.harvestSchedules || []).filter(hs => hs.batchId !== selectedBatchId),
+      cages: (state.cages || []).map(c => c.batchId === selectedBatchId ? { ...c, batchId: undefined, initialFishCount: undefined, settlementDate: undefined, harvestDate: undefined } : c),
+      deletedIds: [...(state.deletedIds || []), selectedBatchId],
+    });
+
+    setSelectedBatchId('');
+  };
+
   const handlePrint = () => {
     window.print();
   };
@@ -898,9 +920,21 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                 )}
 
                 {batchData.batch.isClosed && (
-                  <div className="p-4 bg-slate-100 rounded-2xl border border-slate-200 text-center">
-                    <p className="text-[10px] font-black text-slate-600 uppercase tracking-widest">Lote Encerrado</p>
-                    <p className="text-[9px] font-bold text-slate-600 uppercase mt-1">Nenhuma alteração permitida</p>
+                  <div className="space-y-4">
+                    <div className="p-4 bg-slate-100 rounded-2xl border border-slate-200 text-center">
+                      <p className="text-[10px] font-black text-slate-600 uppercase tracking-widest">Lote Encerrado</p>
+                      <p className="text-[9px] font-bold text-slate-600 uppercase mt-1">Nenhuma alteração permitida</p>
+                    </div>
+                    
+                    {currentUser.isMaster && (
+                      <button 
+                        onClick={handleDeleteBatch}
+                        className="w-full py-4 bg-red-50 text-red-600 border border-red-100 rounded-2xl font-black uppercase tracking-widest text-xs hover:bg-red-600 hover:text-white transition-all active:scale-95 flex items-center justify-center gap-2"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                        Excluir Lote Permanentemente
+                      </button>
+                    )}
                   </div>
                 )}
               </div>

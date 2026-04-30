@@ -137,14 +137,33 @@ const BatchManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     if (!hasPermission) return;
     if (
       !confirm(
-        "Excluir este lote? Isso removerá o vínculo com todas as gaiolas.",
+        "Deseja excluir este lote PERMANENTEMENTE? Todos os dados (lançamentos, tratos, mortalidade, biometria e despescas) associados a ele serão apagados para liberar espaço. Esta ação não pode ser desfeita.",
       )
     )
       return;
     onUpdate({
       ...state,
       batches: (state.batches || []).filter((b) => b.id !== id),
-      deletedIds: [...(state.deletedIds || []), id]
+      feedingLogs: (state.feedingLogs || []).filter((f) => f.batchId !== id),
+      mortalityLogs: (state.mortalityLogs || []).filter((m) => m.batchId !== id),
+      biometryLogs: (state.biometryLogs || []).filter((b) => b.batchId !== id),
+      harvestLogs: (state.harvestLogs || []).filter((h) => h.batchId !== id),
+      batchExpenses: (state.batchExpenses || []).filter((e) => e.batchId !== id),
+      batchRevenues: (state.batchRevenues || []).filter((r) => r.batchId !== id),
+      slaughterLogs: (state.slaughterLogs || []).filter((s: any) => s.batchId !== id),
+      harvestSchedules: (state.harvestSchedules || []).filter((hs) => hs.batchId !== id),
+      cages: (state.cages || []).map((c) =>
+        c.batchId === id
+          ? {
+              ...c,
+              batchId: undefined,
+              initialFishCount: undefined,
+              settlementDate: undefined,
+              harvestDate: undefined,
+            }
+          : c,
+      ),
+      deletedIds: [...(state.deletedIds || []), id],
     });
   };
 

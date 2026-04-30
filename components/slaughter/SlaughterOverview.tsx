@@ -470,6 +470,7 @@ const SlaughterOverview: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
     receptionWeight: '',
     startTime: format(new Date(), 'HH:mm'),
     slaughterBatch: '',
+    batchId: '',
     endTime: '',
     packedQuantity: '',
     renderingWeight: '',
@@ -642,12 +643,7 @@ const SlaughterOverview: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
       const updatedLogs = currentLogs.map(log => 
         log.id === editingId ? { 
           ...log, 
-          producer: formData.producer,
-          date: formData.date,
-          slaughterBatch: formData.slaughterBatch,
-          startTime: formData.startTime,
-          endTime: formData.endTime,
-          packagingBatch: formData.packagingBatch,
+          ...formData,
           gtaWeight: Number(formData.gtaWeight) || 0,
           receptionWeight: Number(formData.receptionWeight) || 0,
           packingList: Number(formData.packingList) || 0,
@@ -669,17 +665,12 @@ const SlaughterOverview: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
     } else {
       const newLog: SlaughterLog = {
         id: generateId(),
-        producer: formData.producer,
-        date: formData.date,
+        ...formData,
         gtaWeight: Number(formData.gtaWeight) || 0,
         packingList: Number(formData.packingList) || 0,
         receptionWeight: Number(formData.receptionWeight) || 0,
-        startTime: formData.startTime,
-        slaughterBatch: formData.slaughterBatch,
-        endTime: formData.endTime,
         packedQuantity: Number(formData.packedQuantity) || 0,
         renderingWeight: Number(formData.renderingWeight) || 0,
-        packagingBatch: formData.packagingBatch,
         freightValue: Number(formData.freightValue) || 0,
         transportCondemnation: Number(formData.transportCondemnation) || 0,
         slaughterCondemnation: Number(formData.slaughterCondemnation) || 0,
@@ -687,7 +678,9 @@ const SlaughterOverview: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
         revenuePerKg: (Number(formData.packedQuantity) || 0) > 0 ? (Number(formData.invoiceValue) || 0) / (Number(formData.packedQuantity) || 0) : 0,
         userId: currentUser.id,
         timestamp: new Date().toISOString(),
-        updatedAt: Date.now()
+        updatedAt: Date.now(),
+        netWeight: 0, // Mandatory for type
+        fishCount: 0  // Mandatory for type
       };
       
       onUpdate({ 
@@ -733,6 +726,7 @@ const SlaughterOverview: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
       receptionWeight: (log.receptionWeight || 0).toString(),
       startTime: log.startTime || '',
       slaughterBatch: log.slaughterBatch || '',
+      batchId: log.batchId || '',
       endTime: log.endTime || '',
       packedQuantity: (log.packedQuantity || 0).toString(),
       renderingWeight: (log.renderingWeight || 0).toString(),
@@ -853,6 +847,20 @@ const SlaughterOverview: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
             <div className="space-y-1">
               <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-widest">Data</label>
               <input type="date" required className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none text-xs" value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} />
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-widest">Lote Produção</label>
+              <select 
+                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none text-xs" 
+                value={formData.batchId} 
+                onChange={e => setFormData({...formData, batchId: e.target.value})}
+              >
+                <option value="">Nenhum</option>
+                {(state.batches || []).sort((a, b) => b.id.localeCompare(a.id)).map(b => (
+                  <option key={b.id} value={b.id}>{b.name} {b.isClosed ? '(Encerrado)' : ''}</option>
+                ))}
+              </select>
             </div>
 
             <div className="space-y-1">

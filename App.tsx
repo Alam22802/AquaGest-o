@@ -424,9 +424,11 @@ const App: React.FC = () => {
           mortalityLogs: (state.mortalityLogs || []).filter(l => !batchIdsToRemove.has(l.batchId || '')),
           biometryLogs: (state.biometryLogs || []).filter(l => !batchIdsToRemove.has(l.batchId || '')),
           harvestLogs: (state.harvestLogs || []).filter(l => !batchIdsToRemove.has(l.batchId)),
+          harvestSchedules: (state.harvestSchedules || []).filter(l => !batchIdsToRemove.has(l.batchId)),
           batchExpenses: (state.batchExpenses || []).filter(l => !batchIdsToRemove.has(l.batchId)),
-          // Also cleanup logs that might be linked via cage but the batch is gone
-          // (Though usually batchId is the primary link for these logs in the cleanup context)
+          batchRevenues: (state.batchRevenues || []).filter(l => !batchIdsToRemove.has(l.batchId)),
+          slaughterLogs: (state.slaughterLogs || []).filter(l => !batchIdsToRemove.has(l.batchId || '')),
+          cages: (state.cages || []).map(c => c.batchId && batchIdsToRemove.has(c.batchId) ? { ...c, batchId: undefined, initialFishCount: undefined, settlementDate: undefined, harvestDate: undefined } : c),
         };
 
         handleStateUpdate(newState);

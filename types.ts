@@ -134,6 +134,9 @@ export interface SlaughterLog {
   receptionWeight: number;
   startTime: string;
   slaughterBatch: string;
+  batchId?: string; // Link to production batch
+  netWeight: number; // Net weight of meat/fish
+  fishCount: number; // Number of fish
   endTime: string;
   packedQuantity: number;
   packagingBatch: string;
