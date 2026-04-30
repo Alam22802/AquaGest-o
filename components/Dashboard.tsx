@@ -348,6 +348,10 @@ const Dashboard: React.FC<Props> = ({ state }) => {
 
   const batchStats = useMemo(() => {
     const cagesByBatch = new Map<string, typeof state.cages>();
+    const cageMap = new Map(state.cages.map(c => [c.id, c]));
+    const batchMap = new Map(state.batches.map(b => [b.id, b]));
+    const feedTypeMap = new Map(state.feedTypes.map(ft => [ft.id, ft]));
+
     (state.cages || []).forEach(c => {
       if (c.batchId) {
         const list = cagesByBatch.get(c.batchId) || [];
@@ -357,6 +361,13 @@ const Dashboard: React.FC<Props> = ({ state }) => {
     });
 
     const sortedHarvestLogs = [...(state.harvestLogs || [])].sort((a, b) => a.date.localeCompare(b.date));
+    // Index harvest logs by cageId for faster lookup
+    const harvestLogsByCage = new Map<string, typeof state.harvestLogs>();
+    sortedHarvestLogs.forEach(h => {
+      const list = harvestLogsByCage.get(h.cageId) || [];
+      list.push(h);
+      harvestLogsByCage.set(h.cageId, list);
+    });
 
     const mortalityByBatch = new Map<string, number>();
     (state.mortalityLogs || []).forEach(m => {
@@ -364,14 +375,15 @@ const Dashboard: React.FC<Props> = ({ state }) => {
       if (!bId && m.cageId) {
         const mDate = m.date;
         // 1. Check harvest logs first (historical data) - find the first harvest after the log date
-        const harvest = sortedHarvestLogs.find(h => h.cageId === m.cageId && h.date >= mDate);
+        const cageHarvests = harvestLogsByCage.get(m.cageId) || [];
+        const harvest = cageHarvests.find(h => h.date >= mDate);
         if (harvest) {
           bId = harvest.batchId;
         } else {
           // 2. Check current cage assignment
-          const cage = (state.cages || []).find(c => c.id === m.cageId);
+          const cage = cageMap.get(m.cageId);
           if (cage?.batchId) {
-            const batch = (state.batches || []).find(b => b.id === cage.batchId);
+            const batch = batchMap.get(cage.batchId);
             if (batch && mDate >= batch.settlementDate) {
               bId = cage.batchId;
             }
@@ -391,14 +403,15 @@ const Dashboard: React.FC<Props> = ({ state }) => {
       if (!bId && f.cageId) {
         const fDate = (f.timestamp || '').split('T')[0];
         // 1. Check harvest logs first (historical data)
-        const harvest = sortedHarvestLogs.find(h => h.cageId === f.cageId && h.date >= fDate);
+        const cageHarvests = harvestLogsByCage.get(f.cageId) || [];
+        const harvest = cageHarvests.find(h => h.date >= fDate);
         if (harvest) {
           bId = harvest.batchId;
         } else {
           // 2. Check current cage assignment
-          const cage = (state.cages || []).find(c => c.id === f.cageId);
+          const cage = cageMap.get(f.cageId);
           if (cage?.batchId) {
-            const batch = (state.batches || []).find(b => b.id === cage.batchId);
+            const batch = batchMap.get(cage.batchId);
             if (batch && fDate >= batch.settlementDate) {
               bId = cage.batchId;
             }
@@ -410,7 +423,7 @@ const Dashboard: React.FC<Props> = ({ state }) => {
         feedingByBatch.set(bId, (feedingByBatch.get(bId) || 0) + f.amount);
         
         const breakdown = feedBreakdownByBatch.get(bId) || {};
-        const feedType = (state.feedTypes || []).find(ft => ft.id === f.feedTypeId);
+        const feedType = feedTypeMap.get(f.feedTypeId);
         const name = feedType ? feedType.name : 'Ração S/ Ident.';
         breakdown[name] = (breakdown[name] || 0) + f.amount;
         feedBreakdownByBatch.set(bId, breakdown);
@@ -425,18 +438,25 @@ const Dashboard: React.FC<Props> = ({ state }) => {
     });
 
     const harvestsByBatch = new Map<string, { fishCount: number, weight: number, initialFishCount: number }>();
+    const mortalityByCage = new Map<string, typeof state.mortalityLogs>();
+    (state.mortalityLogs || []).forEach(m => {
+      const list = mortalityByCage.get(m.cageId) || [];
+      list.push(m);
+      mortalityByCage.set(m.cageId, list);
+    });
+
     (state.harvestLogs || []).forEach(h => {
       const current = harvestsByBatch.get(h.batchId) || { fishCount: 0, weight: 0, initialFishCount: 0 };
       
       // Fallback for old logs missing initialFishCount
       let initial = h.initialFishCount;
       if (!initial) {
-        const batch = (state.batches || []).find(b => b.id === h.batchId);
-        const cageMortality = (state.mortalityLogs || [])
+        const batchForHarvest = batchMap.get(h.batchId);
+        const cageMorts = mortalityByCage.get(h.cageId) || [];
+        const cageMortality = cageMorts
           .filter(m => {
-            if (m.cageId !== h.cageId) return false;
             if (m.batchId) return m.batchId === h.batchId;
-            return batch && m.date >= batch.settlementDate && m.date <= h.date;
+            return batchForHarvest && m.date >= batchForHarvest.settlementDate && m.date <= h.date;
           })
           .reduce((acc, curr) => acc + curr.count, 0);
         initial = h.fishCount + cageMortality;
@@ -469,15 +489,17 @@ const Dashboard: React.FC<Props> = ({ state }) => {
       const batchBiometries = (state.biometryLogs || []).filter(b => {
         if (b.batchId) return b.batchId === batch.id;
         // Fallback: check if cage is currently in this batch and date is after settlement
-        const cage = (state.cages || []).find(c => c.id === b.cageId);
+        const cage = cageMap.get(b.cageId);
         if (cage?.batchId === batch.id && b.date >= batch.settlementDate) {
           // Ensure there isn't a harvest for this cage between settlement and biometry
-          const harvestBeforeBiometry = sortedHarvestLogs.find(h => h.cageId === b.cageId && h.date >= batch.settlementDate && h.date < b.date);
+          const cageHarvests = harvestLogsByCage.get(b.cageId) || [];
+          const harvestBeforeBiometry = cageHarvests.find(h => h.date >= batch.settlementDate && h.date < b.date);
           if (!harvestBeforeBiometry) return true;
         }
         
         // Fallback for harvested cages
-        const harvest = sortedHarvestLogs.find(h => h.cageId === b.cageId && h.date >= b.date);
+        const cageHarvests = harvestLogsByCage.get(b.cageId) || [];
+        const harvest = cageHarvests.find(h => h.date >= b.date);
         return harvest?.batchId === batch.id;
       });
 
@@ -600,6 +622,16 @@ const Dashboard: React.FC<Props> = ({ state }) => {
       return isSettled && isSelected;
     });
     
+    // Optimization: Index filtered batches, cages and harvest logs
+    const filteredBatchMap = new Map(filteredBatches.map(b => [b.id, b]));
+    const cageMap = new Map(state.cages.map(c => [c.id, c]));
+    const harvestLogsByCage = new Map<string, typeof state.harvestLogs>();
+    (state.harvestLogs || []).forEach(h => {
+      const list = harvestLogsByCage.get(h.cageId) || [];
+      list.push(h);
+      harvestLogsByCage.set(h.cageId, list);
+    });
+
     initialWeights = filteredBatches.map(b => b.initialUnitWeight);
     if (filteredBatches.length > 0) {
       settlementDate = filteredBatches[0].settlementDate;
@@ -607,16 +639,17 @@ const Dashboard: React.FC<Props> = ({ state }) => {
     }
     
     logs = (state.biometryLogs || []).filter(l => {
-      const batch = filteredBatches.find(b => b.id === l.batchId);
+      const batch = filteredBatchMap.get(l.batchId || '');
       if (batch) return true;
       
       if (!l.batchId && l.cageId) {
-        const cage = state.cages.find(c => c.id === l.cageId);
-        const cageBatch = filteredBatches.find(b => b.id === cage?.batchId);
+        const cage = cageMap.get(l.cageId);
+        const cageBatch = cage?.batchId ? filteredBatchMap.get(cage.batchId) : null;
         if (cageBatch && l.date >= cageBatch.settlementDate) return true;
         
-        const harvest = (state.harvestLogs || []).find(h => h.cageId === l.cageId && h.date >= l.date);
-        return filteredBatches.some(b => b.id === harvest?.batchId);
+        const cageHarvests = harvestLogsByCage.get(l.cageId) || [];
+        const harvest = cageHarvests.find(h => h.date >= l.date);
+        return harvest && filteredBatchMap.has(harvest.batchId);
       }
       return false;
     });
@@ -774,17 +807,27 @@ const Dashboard: React.FC<Props> = ({ state }) => {
       return isSettled && isSelected;
     });
 
+    const filteredBatchMap = new Map(filteredBatches.map(b => [b.id, b]));
+    const cageMap = new Map(state.cages.map(c => [c.id, c]));
+    const harvestLogsByCage = new Map<string, typeof state.harvestLogs>();
+    (state.harvestLogs || []).forEach(h => {
+      const list = harvestLogsByCage.get(h.cageId) || [];
+      list.push(h);
+      harvestLogsByCage.set(h.cageId, list);
+    });
+
     logs = (state.mortalityLogs || []).filter(m => {
-      const batch = filteredBatches.find(b => b.id === m.batchId);
+      const batch = filteredBatchMap.get(m.batchId || '');
       if (batch) return true;
 
       if (!m.batchId && m.cageId) {
-        const cage = state.cages.find(c => c.id === m.cageId);
-        const cageBatch = filteredBatches.find(b => b.id === cage?.batchId);
+        const cage = cageMap.get(m.cageId);
+        const cageBatch = cage?.batchId ? filteredBatchMap.get(cage.batchId) : null;
         if (cageBatch && m.date >= cageBatch.settlementDate) return true;
         
-        const harvest = (state.harvestLogs || []).find(h => h.cageId === m.cageId && h.date >= m.date);
-        return filteredBatches.some(b => b.id === harvest?.batchId);
+        const cageHarvests = harvestLogsByCage.get(m.cageId) || [];
+        const harvest = cageHarvests.find(h => h.date >= m.date);
+        return harvest && filteredBatchMap.has(harvest.batchId);
       }
       return false;
     });
@@ -808,11 +851,10 @@ const Dashboard: React.FC<Props> = ({ state }) => {
   }, [state.mortalityLogs, state.cages, state.batches, state.harvestLogs, selectedBatchIds, batchStats]);
 
   const biomassEvolutionData = useMemo(() => {
-    let relevantBatches: any[] = [];
     let settlementDate = '';
     let expectedHarvestDate = '';
 
-    relevantBatches = (state.batches || []).filter(b => {
+    const relevantBatches = (state.batches || []).filter(b => {
       const stats = batchStats.find(s => s.id === b.id);
       const isSettled = stats?.settlementBalance === 0;
       const isSelected = selectedBatchIds.length === 0 || selectedBatchIds.includes(b.id);
@@ -827,20 +869,31 @@ const Dashboard: React.FC<Props> = ({ state }) => {
     if (relevantBatches.length === 0) return [];
 
     const batchIds = relevantBatches.map(b => b.id);
+    const relevantBatchMap = new Map(relevantBatches.map(b => [b.id, b]));
+    const batchIdSet = new Set(batchIds);
+    const cageMap = new Map(state.cages.map(c => [c.id, c]));
+    const harvestLogsByCage = new Map<string, typeof state.harvestLogs>();
+    (state.harvestLogs || []).forEach(h => {
+      const list = harvestLogsByCage.get(h.cageId) || [];
+      list.push(h);
+      harvestLogsByCage.set(h.cageId, list);
+    });
+
     const initialPop = relevantBatches.reduce((acc, b) => acc + b.initialQuantity, 0);
     const initialWeight = relevantBatches.length > 0 ? relevantBatches.reduce((acc, b) => acc + b.initialUnitWeight, 0) / relevantBatches.length : 0;
 
     // Helper to check if a log belongs to the relevant batches
     const isLogRelevant = (log: any) => {
-      if (log.batchId && batchIds.includes(log.batchId)) return true;
+      if (log.batchId && batchIdSet.has(log.batchId)) return true;
       if (!log.batchId && log.cageId) {
-        const cage = state.cages.find(c => c.id === log.cageId);
-        if (cage?.batchId && batchIds.includes(cage.batchId)) {
-          const batch = relevantBatches.find(b => b.id === cage.batchId);
+        const cage = cageMap.get(log.cageId);
+        if (cage?.batchId && batchIdSet.has(cage.batchId)) {
+          const batch = relevantBatchMap.get(cage.batchId);
           if (batch && log.date >= batch.settlementDate) return true;
         }
-        const harvest = (state.harvestLogs || []).find(h => h.cageId === log.cageId && h.date >= log.date);
-        if (harvest && batchIds.includes(harvest.batchId)) return true;
+        const cageHarvests = harvestLogsByCage.get(log.cageId) || [];
+        const harvest = cageHarvests.find(h => h.date >= log.date);
+        if (harvest && batchIdSet.has(harvest.batchId)) return true;
       }
       return false;
     };
@@ -1370,6 +1423,21 @@ const Dashboard: React.FC<Props> = ({ state }) => {
           </div>
           <div className="hidden lg:block text-[10px] font-black text-red-400 uppercase tracking-widest max-w-[150px] text-right">
             Providencie a compra imediata para evitar falhas no trato.
+          </div>
+        </div>
+      )}
+
+      {/* Alerta de Otimização de Espaço (Lotes Antigos) */}
+      {state.batches.filter(b => b.isClosed).length >= 5 && (
+        <div className="bg-amber-50 border border-amber-200 rounded-3xl p-5 flex flex-col md:flex-row items-center gap-6 shadow-lg shadow-amber-500/5">
+          <div className="p-4 bg-amber-100 rounded-2xl text-amber-600">
+            <PackageSearch className="w-8 h-8" />
+          </div>
+          <div className="flex-1 text-center md:text-left">
+            <h3 className="text-sm font-black text-amber-800 uppercase tracking-widest italic">Otimização de Sistema</h3>
+            <p className="text-xs font-bold text-amber-700 mt-1 uppercase tracking-tight">
+              Existem {state.batches.filter(b => b.isClosed).length} lotes fechados no sistema. Para manter a performance ideal no celular e computador, considere excluir permanentemente lotes antigos na aba "Lote Estoque".
+            </p>
           </div>
         </div>
       )}

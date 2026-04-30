@@ -82,13 +82,16 @@ function mergeArraysById<T extends { id: string, updatedAt?: number }>(
   deletedIds: string[] = [],
   priority: 'local' | 'remote' = 'remote'
 ): T[] {
-  const map = new Map<string, T>();
   const safeLocal = local || [];
   const safeRemote = remote || [];
-  const deletedSet = new Set(deletedIds);
+  
+  if (safeRemote.length === 0 && deletedIds.length === 0) return safeLocal;
+  
+  const map = new Map<string, T>();
+  const deletedSet = deletedIds.length > 0 ? new Set(deletedIds) : null;
 
   const processItem = (item: T) => {
-    if (!item || !item.id || deletedSet.has(item.id)) return;
+    if (!item || !item.id || (deletedSet && deletedSet.has(item.id))) return;
     const existing = map.get(item.id);
     if (!existing) {
       map.set(item.id, item);
@@ -103,8 +106,8 @@ function mergeArraysById<T extends { id: string, updatedAt?: number }>(
     }
   };
 
-  safeLocal.forEach(processItem);
-  safeRemote.forEach(processItem);
+  for (let i = 0; i < safeLocal.length; i++) processItem(safeLocal[i]);
+  for (let i = 0; i < safeRemote.length; i++) processItem(safeRemote[i]);
 
   return Array.from(map.values());
 }

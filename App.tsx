@@ -276,7 +276,11 @@ const App: React.FC = () => {
   }, [backgroundSync]);
 
   useEffect(() => {
-    const interval = setInterval(backgroundSync, 15000); 
+    const interval = setInterval(() => {
+      if (document.visibilityState === 'visible') {
+        backgroundSync();
+      }
+    }, 15000); 
     return () => clearInterval(interval);
   }, [backgroundSync]);
 
@@ -296,18 +300,36 @@ const App: React.FC = () => {
       // Heuristic: identify what actually changed and ensure timestamps
       const ensureTimestamps = (oldList: any[], newList: any[]) => {
         if (!newList) return [];
-        if (!oldList) return newList.map(i => i.updatedAt ? i : { ...i, updatedAt: Date.now() });
+        if (!oldList || oldList.length === 0) return newList.map(i => i.updatedAt ? i : { ...i, updatedAt: Date.now() });
         
         const oldMap = new Map(oldList.map(i => [i.id, i]));
-        return newList.map(item => {
+        let anyChanged = oldList.length !== newList.length;
+        
+        const processedList = newList.map(item => {
           const oldItem = oldMap.get(item.id);
-          if (!oldItem) return item.updatedAt ? item : { ...item, updatedAt: Date.now() };
+          if (!oldItem) {
+            anyChanged = true;
+            return item.updatedAt ? item : { ...item, updatedAt: Date.now() };
+          }
           
-          // Check for changes (shallow)
-          const changed = Object.keys(item).some(k => k !== 'updatedAt' && (item as any)[k] !== (oldItem as any)[k]);
-          if (changed) return { ...item, updatedAt: Date.now() };
-          return oldItem;
+          const keys = Object.keys(item);
+          let itemChanged = false;
+          for (let i = 0; i < keys.length; i++) {
+            const k = keys[i];
+            if (k !== 'updatedAt' && (item as any)[k] !== (oldItem as any)[k]) {
+              itemChanged = true;
+              break;
+            }
+          }
+          
+          if (itemChanged) {
+            anyChanged = true;
+            return { ...item, updatedAt: Date.now() };
+          }
+          return oldItem; 
         });
+
+        return anyChanged ? processedList : oldList;
       };
 
       const preparedState: AppState = {
