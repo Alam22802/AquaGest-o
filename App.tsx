@@ -437,7 +437,8 @@ const App: React.FC = () => {
       );
 
       if (batchesToCleanup.length > 0) {
-        const batchIdsToRemove = new Set(batchesToCleanup.map(b => b.id));
+        const batchIdsToRemoveArray = batchesToCleanup.map(b => b.id);
+        const batchIdsToRemove = new Set(batchIdsToRemoveArray);
         
         const newState: AppState = {
           ...state,
@@ -451,6 +452,7 @@ const App: React.FC = () => {
           batchRevenues: (state.batchRevenues || []).filter(l => !batchIdsToRemove.has(l.batchId)),
           slaughterLogs: (state.slaughterLogs || []).filter(l => !batchIdsToRemove.has(l.batchId || '')),
           cages: (state.cages || []).map(c => c.batchId && batchIdsToRemove.has(c.batchId) ? { ...c, batchId: undefined, initialFishCount: undefined, settlementDate: undefined, harvestDate: undefined } : c),
+          deletedIds: Array.from(new Set([...(state.deletedIds || []), ...batchIdsToRemoveArray]))
         };
 
         handleStateUpdate(newState);

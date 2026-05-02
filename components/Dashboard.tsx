@@ -623,8 +623,8 @@ const Dashboard: React.FC<Props> = ({ state }) => {
     });
     
     // Optimization: Index filtered batches, cages and harvest logs
-    const filteredBatchMap = new Map(filteredBatches.map(b => [b.id, b]));
-    const cageMap = new Map(state.cages.map(c => [c.id, c]));
+    const filteredBatchMap = new Map((filteredBatches || []).map(b => [b.id, b]));
+    const cageMap = new Map((state.cages || []).map(c => [c.id, c]));
     const harvestLogsByCage = new Map<string, typeof state.harvestLogs>();
     (state.harvestLogs || []).forEach(h => {
       const list = harvestLogsByCage.get(h.cageId) || [];
@@ -807,8 +807,8 @@ const Dashboard: React.FC<Props> = ({ state }) => {
       return isSettled && isSelected;
     });
 
-    const filteredBatchMap = new Map(filteredBatches.map(b => [b.id, b]));
-    const cageMap = new Map(state.cages.map(c => [c.id, c]));
+    const filteredBatchMap = new Map((filteredBatches || []).map(b => [b.id, b]));
+    const cageMap = new Map((state.cages || []).map(c => [c.id, c]));
     const harvestLogsByCage = new Map<string, typeof state.harvestLogs>();
     (state.harvestLogs || []).forEach(h => {
       const list = harvestLogsByCage.get(h.cageId) || [];
@@ -868,10 +868,10 @@ const Dashboard: React.FC<Props> = ({ state }) => {
 
     if (relevantBatches.length === 0) return [];
 
-    const batchIds = relevantBatches.map(b => b.id);
-    const relevantBatchMap = new Map(relevantBatches.map(b => [b.id, b]));
+    const batchIds = (relevantBatches || []).map(b => b.id);
+    const relevantBatchMap = new Map((relevantBatches || []).map(b => [b.id, b]));
     const batchIdSet = new Set(batchIds);
-    const cageMap = new Map(state.cages.map(c => [c.id, c]));
+    const cageMap = new Map((state.cages || []).map(c => [c.id, c]));
     const harvestLogsByCage = new Map<string, typeof state.harvestLogs>();
     (state.harvestLogs || []).forEach(h => {
       const list = harvestLogsByCage.get(h.cageId) || [];

@@ -1,10 +1,11 @@
 
 import React, { useState } from 'react';
 import { AppState, User } from '../types';
-import { Factory, DollarSign, Users, LayoutDashboard } from 'lucide-react';
+import { Factory, DollarSign, Users, LayoutDashboard, ClipboardList } from 'lucide-react';
 import SlaughterOverview from './slaughter/SlaughterOverview';
 import SlaughterFinance from './slaughter/SlaughterFinance';
 import SlaughterHR from './slaughter/SlaughterHR';
+import SlaughterPCP from './slaughter/SlaughterPCP';
 
 interface Props {
   state: AppState;
@@ -12,7 +13,7 @@ interface Props {
   currentUser: User;
 }
 
-type SlaughterTab = 'overview' | 'finance' | 'hr';
+type SlaughterTab = 'overview' | 'finance' | 'hr' | 'pcp';
 
 const SlaughterHouse: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
   const [activeSubTab, setActiveSubTab] = useState<SlaughterTab>('overview');
@@ -21,6 +22,7 @@ const SlaughterHouse: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     { id: 'overview', label: 'Visão Geral', icon: LayoutDashboard },
     { id: 'finance', label: 'Financeiro', icon: DollarSign },
     { id: 'hr', label: 'RH', icon: Users },
+    { id: 'pcp', label: 'PCP', icon: ClipboardList },
   ];
 
   const renderSubContent = () => {
@@ -28,6 +30,7 @@ const SlaughterHouse: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       case 'overview': return <SlaughterOverview state={state} onUpdate={onUpdate} currentUser={currentUser} />;
       case 'finance': return <SlaughterFinance state={state} onUpdate={onUpdate} currentUser={currentUser} />;
       case 'hr': return <SlaughterHR state={state} onUpdate={onUpdate} currentUser={currentUser} />;
+      case 'pcp': return <SlaughterPCP state={state} onUpdate={onUpdate} currentUser={currentUser} />;
       default: return <SlaughterOverview state={state} onUpdate={onUpdate} currentUser={currentUser} />;
     }
   };

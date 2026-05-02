@@ -494,6 +494,28 @@ export interface PCMPlannedImprovement {
   updatedAt?: number;
 }
 
+export interface PCPSupplier {
+  id: string;
+  sequentialCode: number;
+  name: string;
+  cnpj?: string;
+  contact?: string;
+  phone?: string;
+  address?: string;
+  userId: string;
+  updatedAt?: number;
+}
+
+export interface PCPSlaughterSchedule {
+  id: string;
+  supplierId: string;
+  expectedDate: string;
+  expectedWeight: number;
+  pricePerKg: number;
+  userId: string;
+  updatedAt?: number;
+}
+
 export interface AppState {
   users: User[];
   lines: Line[];
@@ -505,6 +527,8 @@ export interface AppState {
   mortalityLogs: MortalityLog[];
   biometryLogs: BiometryLog[];
   slaughterLogs: SlaughterLog[];
+  pcpSuppliers?: PCPSupplier[];
+  pcpSlaughterSchedules?: PCPSlaughterSchedule[];
   slaughterExpenses?: SlaughterExpense[];
   slaughterEmployees?: SlaughterEmployee[];
   slaughterHRIndicators?: SlaughterHRIndicator[];
