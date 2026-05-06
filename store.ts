@@ -115,18 +115,24 @@ function mergeArraysById<T extends { id: string, updatedAt?: number }>(
 }
 
 export const ensureStateIntegrity = (state: any, mergeWith?: AppState, priority: 'local' | 'remote' = 'remote'): AppState => {
-  const combinedDeletedIds = Array.from(new Set([
+  const combinedDeletedIdsArray = Array.from(new Set([
     ...(state?.deletedIds || []),
     ...(mergeWith?.deletedIds || [])
   ]));
+  
+  const deletedSet = new Set(combinedDeletedIdsArray);
 
   const base: AppState = {
     ...initialState,
     ...state,
-    deletedIds: combinedDeletedIds
+    deletedIds: combinedDeletedIdsArray
   };
 
-  const filterByTombstone = (arr: any[]) => (arr || []).filter(i => !combinedDeletedIds.includes(i.id));
+  const filterByTombstone = (arr: any[]) => {
+    if (!arr) return [];
+    if (deletedSet.size === 0) return arr;
+    return arr.filter(i => !deletedSet.has(i.id));
+  };
 
   const result: AppState = {
     ...base,
@@ -182,26 +188,26 @@ export const ensureStateIntegrity = (state: any, mergeWith?: AppState, priority:
   if (mergeWith) {
     return {
       ...result,
-      users: mergeArraysById(result.users, mergeWith.users, combinedDeletedIds, priority),
-      slaughterLogs: mergeArraysById(result.slaughterLogs, mergeWith.slaughterLogs, combinedDeletedIds, priority),
-      feedTypes: mergeArraysById(result.feedTypes, mergeWith.feedTypes, combinedDeletedIds, priority),
-      lines: mergeArraysById(result.lines, mergeWith.lines, combinedDeletedIds, priority),
-      batches: mergeArraysById(result.batches, mergeWith.batches, combinedDeletedIds, priority),
-      cages: mergeArraysById(result.cages, mergeWith.cages, combinedDeletedIds, priority),
-      feedingLogs: mergeArraysById(result.feedingLogs, mergeWith.feedingLogs, combinedDeletedIds, priority),
-      feedStockLogs: mergeArraysById(result.feedStockLogs || [], mergeWith.feedStockLogs || [], combinedDeletedIds, priority),
-      mortalityLogs: mergeArraysById(result.mortalityLogs, mergeWith.mortalityLogs, combinedDeletedIds, priority),
-      biometryLogs: mergeArraysById(result.biometryLogs, mergeWith.biometryLogs, combinedDeletedIds, priority),
-      slaughterExpenses: mergeArraysById(result.slaughterExpenses || [], mergeWith.slaughterExpenses || [], combinedDeletedIds, priority),
-      slaughterEmployees: mergeArraysById(result.slaughterEmployees || [], mergeWith.slaughterEmployees || [], combinedDeletedIds, priority),
-      slaughterHRIndicators: mergeArraysById(result.slaughterHRIndicators || [], mergeWith.slaughterHRIndicators || [], combinedDeletedIds, priority),
-      slaughterHREntries: mergeArraysById(result.slaughterHREntries || [], mergeWith.slaughterHREntries || [], combinedDeletedIds, priority),
-      slaughterHRVacancies: mergeArraysById(result.slaughterHRVacancies || [], mergeWith.slaughterHRVacancies || [], combinedDeletedIds, priority),
-      slaughterSupplyItems: mergeArraysById(result.slaughterSupplyItems || [], mergeWith.slaughterSupplyItems || [], combinedDeletedIds, priority),
-      slaughterSuppliers: mergeArraysById(result.slaughterSuppliers || [], mergeWith.slaughterSuppliers || [], combinedDeletedIds, priority),
-      slaughterSupplyRequests: mergeArraysById(result.slaughterSupplyRequests || [], mergeWith.slaughterSupplyRequests || [], combinedDeletedIds, priority),
-      slaughterPurchaseOrders: mergeArraysById(result.slaughterPurchaseOrders || [], mergeWith.slaughterPurchaseOrders || [], combinedDeletedIds, priority),
-      slaughterSupplyInvoices: mergeArraysById(result.slaughterSupplyInvoices || [], mergeWith.slaughterSupplyInvoices || [], combinedDeletedIds, priority),
+      users: mergeArraysById(result.users, mergeWith.users, combinedDeletedIdsArray, priority),
+      slaughterLogs: mergeArraysById(result.slaughterLogs, mergeWith.slaughterLogs, combinedDeletedIdsArray, priority),
+      feedTypes: mergeArraysById(result.feedTypes, mergeWith.feedTypes, combinedDeletedIdsArray, priority),
+      lines: mergeArraysById(result.lines, mergeWith.lines, combinedDeletedIdsArray, priority),
+      batches: mergeArraysById(result.batches, mergeWith.batches, combinedDeletedIdsArray, priority),
+      cages: mergeArraysById(result.cages, mergeWith.cages, combinedDeletedIdsArray, priority),
+      feedingLogs: mergeArraysById(result.feedingLogs, mergeWith.feedingLogs, combinedDeletedIdsArray, priority),
+      feedStockLogs: mergeArraysById(result.feedStockLogs || [], mergeWith.feedStockLogs || [], combinedDeletedIdsArray, priority),
+      mortalityLogs: mergeArraysById(result.mortalityLogs, mergeWith.mortalityLogs, combinedDeletedIdsArray, priority),
+      biometryLogs: mergeArraysById(result.biometryLogs, mergeWith.biometryLogs, combinedDeletedIdsArray, priority),
+      slaughterExpenses: mergeArraysById(result.slaughterExpenses || [], mergeWith.slaughterExpenses || [], combinedDeletedIdsArray, priority),
+      slaughterEmployees: mergeArraysById(result.slaughterEmployees || [], mergeWith.slaughterEmployees || [], combinedDeletedIdsArray, priority),
+      slaughterHRIndicators: mergeArraysById(result.slaughterHRIndicators || [], mergeWith.slaughterHRIndicators || [], combinedDeletedIdsArray, priority),
+      slaughterHREntries: mergeArraysById(result.slaughterHREntries || [], mergeWith.slaughterHREntries || [], combinedDeletedIdsArray, priority),
+      slaughterHRVacancies: mergeArraysById(result.slaughterHRVacancies || [], mergeWith.slaughterHRVacancies || [], combinedDeletedIdsArray, priority),
+      slaughterSupplyItems: mergeArraysById(result.slaughterSupplyItems || [], mergeWith.slaughterSupplyItems || [], combinedDeletedIdsArray, priority),
+      slaughterSuppliers: mergeArraysById(result.slaughterSuppliers || [], mergeWith.slaughterSuppliers || [], combinedDeletedIdsArray, priority),
+      slaughterSupplyRequests: mergeArraysById(result.slaughterSupplyRequests || [], mergeWith.slaughterSupplyRequests || [], combinedDeletedIdsArray, priority),
+      slaughterPurchaseOrders: mergeArraysById(result.slaughterPurchaseOrders || [], mergeWith.slaughterPurchaseOrders || [], combinedDeletedIdsArray, priority),
+      slaughterSupplyInvoices: mergeArraysById(result.slaughterSupplyInvoices || [], mergeWith.slaughterSupplyInvoices || [], combinedDeletedIdsArray, priority),
       slaughterSupplyCategories: (mergeWith.slaughterSupplyCategoriesUpdated || 0) > (result.slaughterSupplyCategoriesUpdated || 0) ? mergeWith.slaughterSupplyCategories : result.slaughterSupplyCategories,
       slaughterSupplyCategoriesUpdated: Math.max(result.slaughterSupplyCategoriesUpdated || 0, mergeWith.slaughterSupplyCategoriesUpdated || 0),
       slaughterExpenseCategories: (mergeWith.slaughterExpenseCategoriesUpdated || 0) > (result.slaughterExpenseCategoriesUpdated || 0) ? mergeWith.slaughterExpenseCategories : result.slaughterExpenseCategories,
@@ -212,26 +218,26 @@ export const ensureStateIntegrity = (state: any, mergeWith?: AppState, priority:
       slaughterHRDepartmentsUpdated: Math.max(result.slaughterHRDepartmentsUpdated || 0, mergeWith.slaughterHRDepartmentsUpdated || 0),
       slaughterHRRoles: (mergeWith.slaughterHRRolesUpdated || 0) > (result.slaughterHRRolesUpdated || 0) ? mergeWith.slaughterHRRoles : result.slaughterHRRoles,
       slaughterHRRolesUpdated: Math.max(result.slaughterHRRolesUpdated || 0, mergeWith.slaughterHRRolesUpdated || 0),
-      protocols: mergeArraysById(result.protocols, mergeWith.protocols, combinedDeletedIds, priority),
-      standardCurves: mergeArraysById(result.standardCurves || [], mergeWith.standardCurves || [], combinedDeletedIds, priority),
-      portfolios: mergeArraysById(result.portfolios || [], mergeWith.portfolios || [], combinedDeletedIds, priority),
-      capexProjects: mergeArraysById(result.capexProjects || [], mergeWith.capexProjects || [], combinedDeletedIds, priority),
-      capexInvoices: mergeArraysById(result.capexInvoices || [], mergeWith.capexInvoices || [], combinedDeletedIds, priority),
-      harvestLogs: mergeArraysById(result.harvestLogs || [], mergeWith.harvestLogs || [], combinedDeletedIds, priority),
-      harvestSchedules: mergeArraysById(result.harvestSchedules || [], mergeWith.harvestSchedules || [], combinedDeletedIds, priority),
-      batchExpenses: mergeArraysById(result.batchExpenses || [], mergeWith.batchExpenses || [], combinedDeletedIds, priority),
-      batchRevenues: mergeArraysById(result.batchRevenues || [], mergeWith.batchRevenues || [], combinedDeletedIds, priority),
-      coldStorageLogs: mergeArraysById(result.coldStorageLogs || [], mergeWith.coldStorageLogs || [], combinedDeletedIds, priority),
-      utilityLogs: mergeArraysById(result.utilityLogs || [], mergeWith.utilityLogs || [], combinedDeletedIds, priority),
-      coldChambers: mergeArraysById(result.coldChambers || [], mergeWith.coldChambers || [], combinedDeletedIds, priority),
-      pcpSuppliers: mergeArraysById(result.pcpSuppliers || [], mergeWith.pcpSuppliers || [], combinedDeletedIds, priority),
-      pcpSlaughterSchedules: mergeArraysById(result.pcpSlaughterSchedules || [], mergeWith.pcpSlaughterSchedules || [], combinedDeletedIds, priority),
-      feedingTables: mergeArraysById(result.feedingTables || [], mergeWith.feedingTables || [], combinedDeletedIds, priority),
-      costCenters: mergeArraysById(result.costCenters || [], mergeWith.costCenters || [], combinedDeletedIds, priority),
-      pcmEquipments: mergeArraysById(result.pcmEquipments || [], mergeWith.pcmEquipments || [], combinedDeletedIds, priority),
-      pcmStoppageReasons: mergeArraysById(result.pcmStoppageReasons || [], mergeWith.pcmStoppageReasons || [], combinedDeletedIds, priority),
-      pcmProductionStoppages: mergeArraysById(result.pcmProductionStoppages || [], mergeWith.pcmProductionStoppages || [], combinedDeletedIds, priority),
-      pcmPlannedImprovements: mergeArraysById(result.pcmPlannedImprovements || [], mergeWith.pcmPlannedImprovements || [], combinedDeletedIds, priority),
+      protocols: mergeArraysById(result.protocols, mergeWith.protocols, combinedDeletedIdsArray, priority),
+      standardCurves: mergeArraysById(result.standardCurves || [], mergeWith.standardCurves || [], combinedDeletedIdsArray, priority),
+      portfolios: mergeArraysById(result.portfolios || [], mergeWith.portfolios || [], combinedDeletedIdsArray, priority),
+      capexProjects: mergeArraysById(result.capexProjects || [], mergeWith.capexProjects || [], combinedDeletedIdsArray, priority),
+      capexInvoices: mergeArraysById(result.capexInvoices || [], mergeWith.capexInvoices || [], combinedDeletedIdsArray, priority),
+      harvestLogs: mergeArraysById(result.harvestLogs || [], mergeWith.harvestLogs || [], combinedDeletedIdsArray, priority),
+      harvestSchedules: mergeArraysById(result.harvestSchedules || [], mergeWith.harvestSchedules || [], combinedDeletedIdsArray, priority),
+      batchExpenses: mergeArraysById(result.batchExpenses || [], mergeWith.batchExpenses || [], combinedDeletedIdsArray, priority),
+      batchRevenues: mergeArraysById(result.batchRevenues || [], mergeWith.batchRevenues || [], combinedDeletedIdsArray, priority),
+      coldStorageLogs: mergeArraysById(result.coldStorageLogs || [], mergeWith.coldStorageLogs || [], combinedDeletedIdsArray, priority),
+      utilityLogs: mergeArraysById(result.utilityLogs || [], mergeWith.utilityLogs || [], combinedDeletedIdsArray, priority),
+      coldChambers: mergeArraysById(result.coldChambers || [], mergeWith.coldChambers || [], combinedDeletedIdsArray, priority),
+      pcpSuppliers: mergeArraysById(result.pcpSuppliers || [], mergeWith.pcpSuppliers || [], combinedDeletedIdsArray, priority),
+      pcpSlaughterSchedules: mergeArraysById(result.pcpSlaughterSchedules || [], mergeWith.pcpSlaughterSchedules || [], combinedDeletedIdsArray, priority),
+      feedingTables: mergeArraysById(result.feedingTables || [], mergeWith.feedingTables || [], combinedDeletedIdsArray, priority),
+      costCenters: mergeArraysById(result.costCenters || [], mergeWith.costCenters || [], combinedDeletedIdsArray, priority),
+      pcmEquipments: mergeArraysById(result.pcmEquipments || [], mergeWith.pcmEquipments || [], combinedDeletedIdsArray, priority),
+      pcmStoppageReasons: mergeArraysById(result.pcmStoppageReasons || [], mergeWith.pcmStoppageReasons || [], combinedDeletedIdsArray, priority),
+      pcmProductionStoppages: mergeArraysById(result.pcmProductionStoppages || [], mergeWith.pcmProductionStoppages || [], combinedDeletedIdsArray, priority),
+      pcmPlannedImprovements: mergeArraysById(result.pcmPlannedImprovements || [], mergeWith.pcmPlannedImprovements || [], combinedDeletedIdsArray, priority),
       farmTargetCapacity: priority === 'remote' 
         ? (mergeWith.farmTargetCapacity !== undefined ? mergeWith.farmTargetCapacity : result.farmTargetCapacity)
         : (result.farmTargetCapacity !== undefined ? result.farmTargetCapacity : mergeWith.farmTargetCapacity),

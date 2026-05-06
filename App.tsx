@@ -174,21 +174,21 @@ const App: React.FC = () => {
       const remote = await fetchRemoteState(configToUse);
       
       if (remote) {
-        // Simple check to avoid unnecessary updates if remote is same as local
-        if (lastSavedStateRef.current && JSON.stringify(remote) === JSON.stringify(lastSavedStateRef.current)) {
+        // Use a faster check than JSON.stringify for background sync
+        const merged = ensureStateIntegrity(state, remote, 'remote');
+        
+        // If nothing changed in the merge, avoid setting state
+        if (merged === state) {
           setIsSyncingBackground(false);
           return;
         }
-
-        const merged = ensureStateIntegrity(state, remote, 'remote');
         
         const updatedUsers = merged.users.map(u => 
           u.id === currentUser.id ? { ...u, lastSync: new Date().toISOString() } : u
         );
         
-        const finalState = { ...merged, users: updatedUsers };
-        setState(finalState);
-        lastSavedStateRef.current = merged;
+        setState({ ...merged, users: updatedUsers });
+        lastSavedStateRef.current = remote;
       }
     } catch (err) {
       console.warn('Erro na sincronização de background:', err);
@@ -280,7 +280,7 @@ const App: React.FC = () => {
       if (document.visibilityState === 'visible') {
         backgroundSync();
       }
-    }, 15000); 
+    }, 30000); 
     return () => clearInterval(interval);
   }, [backgroundSync]);
 
@@ -293,27 +293,23 @@ const App: React.FC = () => {
     }
   }, [activeTab, currentUser]);
 
-  const handleStateUpdate = useCallback((newState: AppState) => {
+  const handleStateUpdate = useCallback((update: Partial<AppState>) => {
     setState(prev => {
-      if (!prev) return newState;
+      if (!prev) return prev;
 
-      // Heuristic: identify what actually changed and ensure timestamps
-      const ensureTimestamps = (oldList: any[], newList: any[]) => {
-        if (!newList) return [];
-        if (!oldList || oldList.length === 0) return newList.map(i => i.updatedAt ? i : { ...i, updatedAt: Date.now() });
+      const ensureTimestamps = (newList: any[], oldList: any[]) => {
+        let anyChanged = (oldList || []).length !== (newList || []).length;
+        const oldMap = new Map((oldList || []).map(item => [item.id, item]));
         
-        const oldMap = new Map(oldList.map(i => [i.id, i]));
-        let anyChanged = oldList.length !== newList.length;
-        
-        const processedList = newList.map(item => {
+        const processedList = (newList || []).map(item => {
           const oldItem = oldMap.get(item.id);
           if (!oldItem) {
             anyChanged = true;
-            return item.updatedAt ? item : { ...item, updatedAt: Date.now() };
+            return { ...item, updatedAt: item.updatedAt || Date.now() };
           }
           
-          const keys = Object.keys(item);
           let itemChanged = false;
+          const keys = Object.keys(item);
           for (let i = 0; i < keys.length; i++) {
             const k = keys[i];
             if (k !== 'updatedAt' && (item as any)[k] !== (oldItem as any)[k]) {
@@ -329,57 +325,38 @@ const App: React.FC = () => {
           return oldItem; 
         });
 
-        return anyChanged ? processedList : oldList;
+        return anyChanged ? processedList : (oldList || []);
       };
 
-      const preparedState: AppState = {
-        ...newState,
-        users: ensureTimestamps(prev.users, newState.users),
-        lines: ensureTimestamps(prev.lines, newState.lines),
-        batches: ensureTimestamps(prev.batches, newState.batches),
-        cages: ensureTimestamps(prev.cages, newState.cages),
-        feedTypes: ensureTimestamps(prev.feedTypes, newState.feedTypes),
-        feedingLogs: ensureTimestamps(prev.feedingLogs, newState.feedingLogs),
-        feedStockLogs: ensureTimestamps(prev.feedStockLogs || [], newState.feedStockLogs || []),
-        mortalityLogs: ensureTimestamps(prev.mortalityLogs, newState.mortalityLogs),
-        biometryLogs: ensureTimestamps(prev.biometryLogs, newState.biometryLogs),
-        slaughterLogs: ensureTimestamps(prev.slaughterLogs, newState.slaughterLogs),
-        slaughterExpenses: ensureTimestamps(prev.slaughterExpenses || [], newState.slaughterExpenses || []),
-        slaughterEmployees: ensureTimestamps(prev.slaughterEmployees || [], newState.slaughterEmployees || []),
-        slaughterHRIndicators: ensureTimestamps(prev.slaughterHRIndicators || [], newState.slaughterHRIndicators || []),
-        slaughterHREntries: ensureTimestamps(prev.slaughterHREntries || [], newState.slaughterHREntries || []),
-        slaughterHRVacancies: ensureTimestamps(prev.slaughterHRVacancies || [], newState.slaughterHRVacancies || []),
-        slaughterSupplyItems: ensureTimestamps(prev.slaughterSupplyItems || [], newState.slaughterSupplyItems || []),
-        slaughterSuppliers: ensureTimestamps(prev.slaughterSuppliers || [], newState.slaughterSuppliers || []),
-        slaughterSupplyRequests: ensureTimestamps(prev.slaughterSupplyRequests || [], newState.slaughterSupplyRequests || []),
-        slaughterPurchaseOrders: ensureTimestamps(prev.slaughterPurchaseOrders || [], newState.slaughterPurchaseOrders || []),
-        slaughterSupplyInvoices: ensureTimestamps(prev.slaughterSupplyInvoices || [], newState.slaughterSupplyInvoices || []),
-        harvestLogs: ensureTimestamps(prev.harvestLogs || [], newState.harvestLogs || []),
-        harvestSchedules: ensureTimestamps(prev.harvestSchedules || [], newState.harvestSchedules || []),
-        batchExpenses: ensureTimestamps(prev.batchExpenses || [], newState.batchExpenses || []),
-        batchRevenues: ensureTimestamps(prev.batchRevenues || [], newState.batchRevenues || []),
-        coldStorageLogs: ensureTimestamps(prev.coldStorageLogs || [], newState.coldStorageLogs || []),
-        utilityLogs: ensureTimestamps(prev.utilityLogs || [], newState.utilityLogs || []),
-        coldChambers: ensureTimestamps(prev.coldChambers || [], newState.coldChambers || []),
-        protocols: ensureTimestamps(prev.protocols, newState.protocols),
-        standardCurves: ensureTimestamps(prev.standardCurves || [], newState.standardCurves || []),
-        feedingTables: ensureTimestamps(prev.feedingTables || [], newState.feedingTables || []),
-        portfolios: ensureTimestamps(prev.portfolios || [], newState.portfolios || []),
-        capexInvoices: ensureTimestamps(prev.capexInvoices || [], newState.capexInvoices || []),
-        capexProjects: ensureTimestamps(prev.capexProjects || [], newState.capexProjects || []),
-        pcmEquipments: ensureTimestamps(prev.pcmEquipments || [], newState.pcmEquipments || []),
-        pcmStoppageReasons: ensureTimestamps(prev.pcmStoppageReasons || [], newState.pcmStoppageReasons || []),
-        pcmProductionStoppages: ensureTimestamps(prev.pcmProductionStoppages || [], newState.pcmProductionStoppages || []),
-        pcmPlannedImprovements: ensureTimestamps(prev.pcmPlannedImprovements || [], newState.pcmPlannedImprovements || []),
-      };
+      const newState = { ...prev };
+      let globalChanged = false;
 
-      const merged = ensureStateIntegrity(prev, preparedState, 'local');
-      
+      (Object.keys(update) as Array<keyof AppState>).forEach(key => {
+        const newVal = update[key];
+        const oldVal = (prev as any)[key];
+
+        if (Array.isArray(newVal) && Array.isArray(oldVal)) {
+          const processedList = ensureTimestamps(newVal, oldVal);
+          if (processedList !== oldVal) {
+            (newState as any)[key] = processedList;
+            globalChanged = true;
+          }
+        } else if (newVal !== oldVal) {
+          (newState as any)[key] = newVal;
+          globalChanged = true;
+        }
+      });
+
+      if (!globalChanged && !update.deletedIds) return prev;
+
       const combinedDeletedIds = Array.from(new Set([
         ...(prev.deletedIds || []),
-        ...(newState.deletedIds || [])
+        ...(update.deletedIds || [])
       ]));
 
+      // Merge and handle integrity
+      const merged = ensureStateIntegrity(newState, undefined, 'local');
+      
       return {
         ...merged,
         deletedIds: combinedDeletedIds

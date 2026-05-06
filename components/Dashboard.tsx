@@ -348,9 +348,9 @@ const Dashboard: React.FC<Props> = ({ state }) => {
 
   const batchStats = useMemo(() => {
     const cagesByBatch = new Map<string, typeof state.cages>();
-    const cageMap = new Map(state.cages.map(c => [c.id, c]));
-    const batchMap = new Map(state.batches.map(b => [b.id, b]));
-    const feedTypeMap = new Map(state.feedTypes.map(ft => [ft.id, ft]));
+    const cageMap = new Map((state.cages || []).map(c => [c.id, c]));
+    const batchMap = new Map((state.batches || []).map(b => [b.id, b]));
+    const feedTypeMap = new Map((state.feedTypes || []).map(ft => [ft.id, ft]));
 
     (state.cages || []).forEach(c => {
       if (c.batchId) {
@@ -361,7 +361,6 @@ const Dashboard: React.FC<Props> = ({ state }) => {
     });
 
     const sortedHarvestLogs = [...(state.harvestLogs || [])].sort((a, b) => a.date.localeCompare(b.date));
-    // Index harvest logs by cageId for faster lookup
     const harvestLogsByCage = new Map<string, typeof state.harvestLogs>();
     sortedHarvestLogs.forEach(h => {
       const list = harvestLogsByCage.get(h.cageId) || [];
@@ -369,59 +368,49 @@ const Dashboard: React.FC<Props> = ({ state }) => {
       harvestLogsByCage.set(h.cageId, list);
     });
 
+    // Performance Optimization: Index logs by batchId
     const mortalityByBatch = new Map<string, number>();
+    const nurseryMortalityByBatch = new Map<string, number>();
+    const feedingByBatch = new Map<string, number>();
+    const feedBreakdownByBatch = new Map<string, { [name: string]: number }>();
+
     (state.mortalityLogs || []).forEach(m => {
       let bId = m.batchId;
       if (!bId && m.cageId) {
-        const mDate = m.date;
-        // 1. Check harvest logs first (historical data) - find the first harvest after the log date
-        const cageHarvests = harvestLogsByCage.get(m.cageId) || [];
-        const harvest = cageHarvests.find(h => h.date >= mDate);
-        if (harvest) {
-          bId = harvest.batchId;
-        } else {
-          // 2. Check current cage assignment
+        const hList = harvestLogsByCage.get(m.cageId);
+        const harvest = hList?.find(h => h.date >= m.date);
+        if (harvest) bId = harvest.batchId;
+        else {
           const cage = cageMap.get(m.cageId);
           if (cage?.batchId) {
             const batch = batchMap.get(cage.batchId);
-            if (batch && mDate >= batch.settlementDate) {
-              bId = cage.batchId;
-            }
+            if (batch && m.date >= batch.settlementDate) bId = cage.batchId;
           }
         }
       }
-      
       if (bId) {
         mortalityByBatch.set(bId, (mortalityByBatch.get(bId) || 0) + m.count);
+        if (!m.cageId) nurseryMortalityByBatch.set(bId, (nurseryMortalityByBatch.get(bId) || 0) + m.count);
       }
     });
 
-    const feedingByBatch = new Map<string, number>();
-    const feedBreakdownByBatch = new Map<string, { [name: string]: number }>();
     (state.feedingLogs || []).forEach(f => {
       let bId = f.batchId;
       if (!bId && f.cageId) {
         const fDate = (f.timestamp || '').split('T')[0];
-        // 1. Check harvest logs first (historical data)
-        const cageHarvests = harvestLogsByCage.get(f.cageId) || [];
-        const harvest = cageHarvests.find(h => h.date >= fDate);
-        if (harvest) {
-          bId = harvest.batchId;
-        } else {
-          // 2. Check current cage assignment
+        const hList = harvestLogsByCage.get(f.cageId);
+        const harvest = hList?.find(h => h.date >= fDate);
+        if (harvest) bId = harvest.batchId;
+        else {
           const cage = cageMap.get(f.cageId);
           if (cage?.batchId) {
             const batch = batchMap.get(cage.batchId);
-            if (batch && fDate >= batch.settlementDate) {
-              bId = cage.batchId;
-            }
+            if (batch && fDate >= batch.settlementDate) bId = cage.batchId;
           }
         }
       }
-      
       if (bId) {
         feedingByBatch.set(bId, (feedingByBatch.get(bId) || 0) + f.amount);
-        
         const breakdown = feedBreakdownByBatch.get(bId) || {};
         const feedType = feedTypeMap.get(f.feedTypeId);
         const name = feedType ? feedType.name : 'Ração S/ Ident.';
@@ -430,49 +419,46 @@ const Dashboard: React.FC<Props> = ({ state }) => {
       }
     });
 
-    const nurseryMortalityByBatch = new Map<string, number>();
-    (state.mortalityLogs || []).forEach(m => {
-      if (m.batchId && !m.cageId) {
-        nurseryMortalityByBatch.set(m.batchId, (nurseryMortalityByBatch.get(m.batchId) || 0) + m.count);
-      }
-    });
-
     const harvestsByBatch = new Map<string, { fishCount: number, weight: number, initialFishCount: number }>();
-    const mortalityByCage = new Map<string, typeof state.mortalityLogs>();
-    (state.mortalityLogs || []).forEach(m => {
-      const list = mortalityByCage.get(m.cageId) || [];
-      list.push(m);
-      mortalityByCage.set(m.cageId, list);
-    });
-
     (state.harvestLogs || []).forEach(h => {
       const current = harvestsByBatch.get(h.batchId) || { fishCount: 0, weight: 0, initialFishCount: 0 };
-      
-      // Fallback for old logs missing initialFishCount
-      let initial = h.initialFishCount;
+      let initial = h.initialFishCount || 0;
       if (!initial) {
-        const batchForHarvest = batchMap.get(h.batchId);
-        const cageMorts = mortalityByCage.get(h.cageId) || [];
-        const cageMortality = cageMorts
-          .filter(m => {
-            if (m.batchId) return m.batchId === h.batchId;
-            return batchForHarvest && m.date >= batchForHarvest.settlementDate && m.date <= h.date;
-          })
-          .reduce((acc, curr) => acc + curr.count, 0);
-        initial = h.fishCount + cageMortality;
+        initial = h.fishCount; // Fallback aproximado se não houver dado histórico
       }
-
       harvestsByBatch.set(h.batchId, {
         fishCount: current.fishCount + h.fishCount,
-        weight: current.weight + h.totalWeight,
-        initialFishCount: current.initialFishCount + (initial || 0)
+        weight: current.weight + (h.totalWeight || 0),
+        initialFishCount: current.initialFishCount + initial
       });
+    });
+
+    // Biometry Indexing
+    const biometriesByBatch = new Map<string, typeof state.biometryLogs>();
+    (state.biometryLogs || []).forEach(b => {
+      let bId = b.batchId;
+      if (!bId && b.cageId) {
+        const hList = harvestLogsByCage.get(b.cageId);
+        const harvest = hList?.find(h => h.date >= b.date);
+        if (harvest) bId = harvest.batchId;
+        else {
+          const cage = cageMap.get(b.cageId);
+          if (cage?.batchId) {
+            const batch = batchMap.get(cage.batchId);
+            if (batch && b.date >= batch.settlementDate) bId = cage.batchId;
+          }
+        }
+      }
+      if (bId) {
+        const list = biometriesByBatch.get(bId) || [];
+        list.push(b);
+        biometriesByBatch.set(bId, list);
+      }
     });
 
     return (state.batches || []).map(batch => {
       const batchCages = cagesByBatch.get(batch.id) || [];
-      
-      const totalInitial = batch.initialQuantity;
+      const totalInitial = batch.initialQuantity || 0;
       const harvestData = harvestsByBatch.get(batch.id) || { fishCount: 0, weight: 0, initialFishCount: 0 };
       const totalHarvested = harvestData.fishCount;
       const totalHarvestedWeight = harvestData.weight;
@@ -482,72 +468,35 @@ const Dashboard: React.FC<Props> = ({ state }) => {
 
       const usedFish = batchCages.reduce((acc, curr) => acc + (curr.initialFishCount || 0), 0);
       const settlementBalance = batch.isSettlementComplete ? 0 : Math.max(0, totalInitial - usedFish - totalInitialInHarvested - nurseryMortality);
-
       const currentTotalStock = Math.max(0, totalInitial - totalMortality - totalHarvested);
 
-      // Filter biometries for this batch
-      const batchBiometries = (state.biometryLogs || []).filter(b => {
-        if (b.batchId) return b.batchId === batch.id;
-        // Fallback: check if cage is currently in this batch and date is after settlement
-        const cage = cageMap.get(b.cageId);
-        if (cage?.batchId === batch.id && b.date >= batch.settlementDate) {
-          // Ensure there isn't a harvest for this cage between settlement and biometry
-          const cageHarvests = harvestLogsByCage.get(b.cageId) || [];
-          const harvestBeforeBiometry = cageHarvests.find(h => h.date >= batch.settlementDate && h.date < b.date);
-          if (!harvestBeforeBiometry) return true;
-        }
-        
-        // Fallback for harvested cages
-        const cageHarvests = harvestLogsByCage.get(b.cageId) || [];
-        const harvest = cageHarvests.find(h => h.date >= b.date);
-        return harvest?.batchId === batch.id;
-      });
-
-      let currentAvgWeight = batch.initialUnitWeight;
+      const batchBiometries = biometriesByBatch.get(batch.id) || [];
+      let currentAvgWeight = batch.initialUnitWeight || 0;
       let samplingInfo = "Peso Inicial";
 
       if (batchBiometries.length > 0) {
-        const lastDate = batchBiometries.reduce((max, log) => log.date > max ? log.date : max, "");
+        const sorted = [...batchBiometries].sort((a, b) => b.date.localeCompare(a.date));
+        const lastDate = sorted[0].date;
         const lastDayLogs = batchBiometries.filter(log => log.date === lastDate);
-        if (lastDayLogs.length > 0) {
-          const sumWeights = lastDayLogs.reduce((acc, log) => acc + log.averageWeight, 0);
-          currentAvgWeight = sumWeights / lastDayLogs.length;
-          try {
-            samplingInfo = `Média de ${lastDayLogs.length} gaiolas (Dia: ${format(parseISO(lastDate), 'dd/MM')})`;
-          } catch {
-            samplingInfo = `Média de ${lastDayLogs.length} gaiolas`;
-          }
-        }
+        const sumWeights = lastDayLogs.reduce((acc, log) => acc + log.averageWeight, 0);
+        currentAvgWeight = sumWeights / lastDayLogs.length;
+        samplingInfo = `Média de ${lastDayLogs.length} gaiolas (${lastDate})`;
       }
 
       const totalBiomassKg = (currentTotalStock * currentAvgWeight) / 1000;
-      
-      const totalFeedAmount = feedingByBatch.get(batch.id) || 0;
-      const feedBreakdownObj = feedBreakdownByBatch.get(batch.id) || {};
-
-      const totalFeedKg = totalFeedAmount / 1000;
-      const feedBreakdown = Object.entries(feedBreakdownObj).map(([name, amount]) => ({
-        name,
-        amountKg: amount / 1000
+      const totalFeedKg = (feedingByBatch.get(batch.id) || 0) / 1000;
+      const feedBreakdown = Object.entries(feedBreakdownByBatch.get(batch.id) || {}).map(([name, amount]) => ({
+        name, amountKg: amount / 1000
       })).sort((a, b) => a.name.localeCompare(b.name));
 
       const totalProducedWeightKg = totalBiomassKg + totalHarvestedWeight;
       const fcaValue = totalProducedWeightKg > 0 ? formatNumber(totalFeedKg / totalProducedWeightKg, 2) : '0,00';
 
       return { 
-        id: batch.id, 
-        name: batch.name, 
-        stock: currentTotalStock, 
-        harvested: totalHarvested,
-        harvestedWeight: totalHarvestedWeight,
-        mortality: totalMortality,
-        biomass: totalBiomassKg, 
-        feed: totalFeedKg, 
-        feedBreakdown,
-        fca: fcaValue,
-        avgWeight: currentAvgWeight,
-        samplingInfo,
-        settlementBalance
+        id: batch.id, name: batch.name, stock: currentTotalStock, harvested: totalHarvested,
+        harvestedWeight: totalHarvestedWeight, mortality: totalMortality, biomass: totalBiomassKg, 
+        feed: totalFeedKg, feedBreakdown, fca: fcaValue, avgWeight: currentAvgWeight,
+        samplingInfo, settlementBalance
       };
     }).sort((a, b) => a.name.localeCompare(b.name));
   }, [state.batches, state.cages, state.mortalityLogs, state.biometryLogs, state.feedingLogs, state.feedTypes, state.harvestLogs]);
