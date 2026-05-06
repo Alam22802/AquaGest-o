@@ -19,7 +19,7 @@ import PCMManagement from './components/PCMManagement.tsx';
 import SlaughterHouse from './components/SlaughterHouse.tsx';
 import Login from './components/Login.tsx';
 import ErrorBoundary from './components/ErrorBoundary.tsx';
-import { loadState, saveState, getSession, saveSession, ensureStateIntegrity, fetchRemoteState, subscribeToRemoteChanges } from './store.ts';
+import { loadState, saveState, getSession, saveSession, ensureStateIntegrity, fetchRemoteState, subscribeToRemoteChanges, repairArray } from './store.ts';
 import { AppState, User } from './types.ts';
 import { Loader2, RefreshCw, AlertTriangle, X, Cloud, CheckCircle2 } from 'lucide-react';
 
@@ -43,7 +43,10 @@ const App: React.FC = () => {
       let data = await loadState();
       
       // Migration: Inject missing timestamps to ensure sync works for old data
-      const inject = (arr: any[]) => (arr || []).map(i => i.updatedAt ? i : { ...i, updatedAt: Date.now() });
+      const inject = (arr: any[]) => (arr || []).map(i => {
+        if (typeof i !== 'object' || i === null || !i.id) return i;
+        return i.updatedAt ? i : { ...i, updatedAt: Date.now() };
+      });
       // Migration: Update cage models to new definitions
       const migrateCages = (cages: any[]) => (cages || []).map(c => {
         const { length: l, width: w, depth: d } = c.dimensions || {};
@@ -62,6 +65,10 @@ const App: React.FC = () => {
         }
         return c;
       });
+
+      // migrateChecklists is not defined here but it was present in previous turns. 
+      // I will assume it's part of data cleanup if it existed.
+      // Looking at the view_file output, it wasn't there. 
 
       // Migration: Create cold chambers from existing logs if they don't exist
       const initialChambers = data.coldChambers || [];
@@ -89,7 +96,7 @@ const App: React.FC = () => {
 
       data = {
         ...data,
-        users: inject(data.users),
+        users: repairArray(inject(data.users)), // repairArray now handles nested allowedTabs too
         lines: inject(data.lines),
         batches: inject(data.batches),
         cages: migrateCages(inject(data.cages)),
@@ -109,6 +116,12 @@ const App: React.FC = () => {
         slaughterSupplyRequests: inject(data.slaughterSupplyRequests || []),
         slaughterPurchaseOrders: inject(data.slaughterPurchaseOrders || []),
         slaughterSupplyInvoices: inject(data.slaughterSupplyInvoices || []),
+        slaughterExpenseCategories: repairArray(data.slaughterExpenseCategories),
+        slaughterHREntryTypes: repairArray(data.slaughterHREntryTypes),
+        slaughterHRDepartments: repairArray(data.slaughterHRDepartments),
+        slaughterHRRoles: repairArray(data.slaughterHRRoles),
+        slaughterSupplyCategories: repairArray(data.slaughterSupplyCategories),
+        deletedIds: repairArray(data.deletedIds || []),
         harvestLogs: inject(data.harvestLogs || []),
         harvestSchedules: inject(data.harvestSchedules || []),
         batchExpenses: inject(data.batchExpenses || []),
@@ -303,10 +316,16 @@ const App: React.FC = () => {
 
       const ensureTimestamps = (newList: any[], oldList: any[]) => {
         if (newList === oldList) return oldList;
-        let anyChanged = (oldList || []).length !== (newList || []).length;
-        const oldMap = new Map((oldList || []).map(item => [item.id, item]));
         
-        const processedList = (newList || []).map(item => {
+        // Skip for primitive arrays or empty lists
+        if (!newList || newList.length === 0) return newList || [];
+        if (typeof newList[0] !== 'object' || newList[0] === null || !newList[0].id) return newList;
+
+        let anyChanged = (oldList || []).length !== (newList || []).length;
+        const oldMap = new Map((oldList || []).filter(i => i && i.id).map(item => [item.id, item]));
+        
+        const processedList = newList.map(item => {
+          if (!item || !item.id) return item;
           const oldItem = oldMap.get(item.id);
           if (!oldItem) {
             anyChanged = true;

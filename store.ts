@@ -114,20 +114,50 @@ function mergeArraysById<T extends { id: string, updatedAt?: number }>(
   return Array.from(map.values());
 }
 
+export const repairArray = (arr: any[]): any[] => {
+  if (!Array.isArray(arr)) return arr || [];
+  return arr.map(item => {
+    if (item && typeof item === 'object' && !item.id && (Object.keys(item).includes('0') || item.updatedAt)) {
+      // Check if it looks like a spread string object
+      const keys = Object.keys(item).filter(k => !isNaN(Number(k))).sort((a, b) => Number(a) - Number(b));
+      if (keys.length > 0) {
+        return keys.map(k => (item as any)[k]).join('');
+      }
+    }
+    // Deep repair for users if needed
+    if (item && typeof item === 'object' && item.id && item.username && item.allowedTabs) {
+      return {
+        ...item,
+        allowedTabs: repairArray(item.allowedTabs)
+      };
+    }
+    return item;
+  });
+};
+
 export const ensureStateIntegrity = (state: any, mergeWith?: AppState, priority: 'local' | 'remote' = 'remote'): AppState => {
-  const combinedDeletedIdsArray = Array.from(new Set([
+  const rawDeletedIds = [
     ...(state?.deletedIds || []),
     ...(mergeWith?.deletedIds || [])
-  ]));
+  ];
+  
+  const repairedDeletedIdsArr = repairArray(rawDeletedIds);
+  const combinedDeletedIdsArray = Array.from(new Set(repairedDeletedIdsArr));
   
   const deletedSet = new Set(combinedDeletedIdsArray);
 
   const base: AppState = {
     ...initialState,
     ...state,
-    deletedIds: combinedDeletedIdsArray
+    deletedIds: combinedDeletedIdsArray,
+    slaughterExpenseCategories: repairArray(state?.slaughterExpenseCategories || initialState.slaughterExpenseCategories),
+    slaughterHREntryTypes: repairArray(state?.slaughterHREntryTypes || initialState.slaughterHREntryTypes),
+    slaughterHRDepartments: repairArray(state?.slaughterHRDepartments || initialState.slaughterHRDepartments),
+    slaughterHRRoles: repairArray(state?.slaughterHRRoles || initialState.slaughterHRRoles),
+    slaughterSupplyCategories: repairArray(state?.slaughterSupplyCategories || initialState.slaughterSupplyCategories),
+    users: repairArray(state?.users || initialState.users)
   };
-
+  
   const filterByTombstone = (arr: any[]) => {
     if (!arr) return [];
     if (deletedSet.size === 0) return arr;
