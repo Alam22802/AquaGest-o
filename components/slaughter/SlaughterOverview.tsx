@@ -524,7 +524,7 @@ const SlaughterOverview: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
     // Calculate total water consumed from utility logs (readings)
     const waterUtilityLogs = (state.utilityLogs || [])
       .filter(l => l.type === 'water')
-      .sort((a, b) => a.date.localeCompare(b.date) || a.timestamp.localeCompare(b.timestamp));
+      .sort((a, b) => (a.date || '').localeCompare(b.date || '') || (a.timestamp || '').localeCompare(b.timestamp || ''));
 
     // Create a map of IDs to indices for O(1) lookup during calculations to avoid O(N^2) complexity
     const waterLogIndices = new Map(waterUtilityLogs.map((l, i) => [l.id, i]));
@@ -617,11 +617,11 @@ const SlaughterOverview: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
         name: format(day, 'dd'),
         fullDate: format(day, "dd/MM/yyyy"),
         yield: Number(yieldPct.toFixed(1)),
-        recep: dayRecep,
-        packed: dayPacked
+        recep: dayRecep || 0,
+        packed: dayPacked || 0
       };
     }); 
-  }, [state.slaughterLogs, chartMonth, chartYear]);
+  }, [state.slaughterLogs, chartMonth, chartYear, selectedBatches]);
 
   const hasPermission = currentUser.isMaster || currentUser.canEdit;
 
@@ -744,7 +744,8 @@ const SlaughterOverview: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
     if (!confirm('Deseja excluir este registro de frigorífico?')) return;
     onUpdate({ 
       ...state, 
-      slaughterLogs: (state.slaughterLogs || []).filter(l => l.id !== id) 
+      slaughterLogs: (state.slaughterLogs || []).filter(l => l.id !== id),
+      deletedIds: Array.from(new Set([...(state.deletedIds || []), id]))
     });
   };
 

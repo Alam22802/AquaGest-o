@@ -297,7 +297,12 @@ const App: React.FC = () => {
     setState(prev => {
       if (!prev) return prev;
 
+      // Detect which keys actually changed
+      const changedKeys = (Object.keys(update) as Array<keyof AppState>).filter(key => update[key] !== (prev as any)[key]);
+      if (changedKeys.length === 0) return prev;
+
       const ensureTimestamps = (newList: any[], oldList: any[]) => {
+        if (newList === oldList) return oldList;
         let anyChanged = (oldList || []).length !== (newList || []).length;
         const oldMap = new Map((oldList || []).map(item => [item.id, item]));
         
@@ -309,9 +314,9 @@ const App: React.FC = () => {
           }
           
           let itemChanged = false;
-          const keys = Object.keys(item);
-          for (let i = 0; i < keys.length; i++) {
-            const k = keys[i];
+          const currentKeys = Object.keys(item);
+          for (let i = 0; i < currentKeys.length; i++) {
+            const k = currentKeys[i];
             if (k !== 'updatedAt' && (item as any)[k] !== (oldItem as any)[k]) {
               itemChanged = true;
               break;
@@ -329,9 +334,9 @@ const App: React.FC = () => {
       };
 
       const newState = { ...prev };
-      let globalChanged = false;
+      let actuallyChanged = false;
 
-      (Object.keys(update) as Array<keyof AppState>).forEach(key => {
+      changedKeys.forEach(key => {
         const newVal = update[key];
         const oldVal = (prev as any)[key];
 
@@ -339,28 +344,24 @@ const App: React.FC = () => {
           const processedList = ensureTimestamps(newVal, oldVal);
           if (processedList !== oldVal) {
             (newState as any)[key] = processedList;
-            globalChanged = true;
+            actuallyChanged = true;
           }
         } else if (newVal !== oldVal) {
           (newState as any)[key] = newVal;
-          globalChanged = true;
+          actuallyChanged = true;
         }
       });
 
-      if (!globalChanged && !update.deletedIds) return prev;
+      if (!actuallyChanged) return prev;
 
       const combinedDeletedIds = Array.from(new Set([
         ...(prev.deletedIds || []),
-        ...(update.deletedIds || [])
+        ...(newState.deletedIds || [])
       ]));
+      newState.deletedIds = combinedDeletedIds;
 
-      // Merge and handle integrity
       const merged = ensureStateIntegrity(newState, undefined, 'local');
-      
-      return {
-        ...merged,
-        deletedIds: combinedDeletedIds
-      };
+      return merged;
     });
   }, []);
 

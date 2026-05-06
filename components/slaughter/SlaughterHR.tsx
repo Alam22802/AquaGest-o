@@ -297,7 +297,11 @@ const SlaughterHR: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
 
   const removeVacancy = (id: string) => {
     if (!confirm('Deseja excluir este quadro de vagas?')) return;
-    onUpdate({ ...state, slaughterHRVacancies: vacancies.filter(v => v.id !== id) });
+    onUpdate({ 
+      ...state, 
+      slaughterHRVacancies: (state.slaughterHRVacancies || []).filter(v => v.id !== id),
+      deletedIds: Array.from(new Set([...(state.deletedIds || []), id]))
+    });
   };
 
   const handleSaveEmployee = (e: React.FormEvent) => {
@@ -329,7 +333,11 @@ const SlaughterHR: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
 
   const removeEmployee = (id: string) => {
     if (!confirm('Deseja excluir este colaborador?')) return;
-    onUpdate({ ...state, slaughterEmployees: employees.filter(e => e.id !== id) });
+    onUpdate({ 
+      ...state, 
+      slaughterEmployees: (state.slaughterEmployees || []).filter(e => e.id !== id),
+      deletedIds: Array.from(new Set([...(state.deletedIds || []), id]))
+    });
   };
 
   const handleSaveEntry = (e: React.FormEvent) => {
@@ -370,7 +378,11 @@ const SlaughterHR: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
 
   const removeEntry = (id: string) => {
     if (!confirm('Deseja excluir este lançamento?')) return;
-    onUpdate({ ...state, slaughterHREntries: entries.filter(e => e.id !== id) });
+    onUpdate({ 
+      ...state, 
+      slaughterHREntries: (state.slaughterHREntries || []).filter(e => e.id !== id),
+      deletedIds: Array.from(new Set([...(state.deletedIds || []), id]))
+    });
   };
 
   const [editingIndicatorId, setEditingIndicatorId] = useState<string | null>(null);
@@ -435,7 +447,11 @@ const SlaughterHR: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
 
   const removeIndicator = (id: string) => {
     if (!confirm('Deseja excluir este indicador?')) return;
-    onUpdate({ ...state, slaughterHRIndicators: indicators.filter(i => i.id !== id) });
+    onUpdate({ 
+      ...state, 
+      slaughterHRIndicators: (state.slaughterHRIndicators || []).filter(i => i.id !== id),
+      deletedIds: Array.from(new Set([...(state.deletedIds || []), id]))
+    });
   };
 
   const updateRole = (oldRole: string, newRole: string) => {

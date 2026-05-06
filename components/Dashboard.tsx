@@ -360,7 +360,7 @@ const Dashboard: React.FC<Props> = ({ state }) => {
       }
     });
 
-    const sortedHarvestLogs = [...(state.harvestLogs || [])].sort((a, b) => a.date.localeCompare(b.date));
+    const sortedHarvestLogs = [...(state.harvestLogs || [])].sort((a, b) => (a.date || '').localeCompare(b.date || ''));
     const harvestLogsByCage = new Map<string, typeof state.harvestLogs>();
     sortedHarvestLogs.forEach(h => {
       const list = harvestLogsByCage.get(h.cageId) || [];
@@ -498,7 +498,7 @@ const Dashboard: React.FC<Props> = ({ state }) => {
         feed: totalFeedKg, feedBreakdown, fca: fcaValue, avgWeight: currentAvgWeight,
         samplingInfo, settlementBalance
       };
-    }).sort((a, b) => a.name.localeCompare(b.name));
+    }).sort((a, b) => (a.name || '').localeCompare(b.name || ''));
   }, [state.batches, state.cages, state.mortalityLogs, state.biometryLogs, state.feedingLogs, state.feedTypes, state.harvestLogs]);
 
   const filteredBatchStats = useMemo(() => {
@@ -1085,7 +1085,7 @@ const Dashboard: React.FC<Props> = ({ state }) => {
     const lineMap = new Map(state.lines.map(l => [l.id, l.name]));
     const batchMap = new Map(state.batches.map(b => [b.id, b.name]));
     const protocolMap = new Map(state.protocols.map(p => [p.id, p.name]));
-    const sortedHarvestLogs = [...(state.harvestLogs || [])].sort((a, b) => a.date.localeCompare(b.date));
+    const sortedHarvestLogs = [...(state.harvestLogs || [])].sort((a, b) => (a.date || '').localeCompare(b.date || ''));
 
     const wb = XLSX.utils.book_new();
 

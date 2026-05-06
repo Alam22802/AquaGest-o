@@ -6,6 +6,7 @@ import SlaughterOverview from './slaughter/SlaughterOverview';
 import SlaughterFinance from './slaughter/SlaughterFinance';
 import SlaughterHR from './slaughter/SlaughterHR';
 import SlaughterPCP from './slaughter/SlaughterPCP';
+import ErrorBoundary from './ErrorBoundary';
 
 interface Props {
   state: AppState;
@@ -61,7 +62,9 @@ const SlaughterHouse: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
 
       {/* Main Content Area */}
       <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-        {renderSubContent()}
+        <ErrorBoundary>
+          {renderSubContent()}
+        </ErrorBoundary>
       </div>
     </div>
   );
