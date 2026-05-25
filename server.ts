@@ -1,5 +1,6 @@
 import express from "express";
 import path from "path";
+import fs from "fs";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI, Type } from "@google/genai";
 
@@ -50,11 +51,48 @@ async function startServer() {
     };
   };
 
-  // Simple in-memory cache for Tilapia Price API call to prevent hitting Gemini rate limits
+  // Load cash from disk if available to persist across server restarts and avoid rate-limiting
+  const CACHE_FILE = path.join(process.cwd(), "tilapia_cache.json");
   let priceCache: {
     data: any;
     timestamp: number;
+    isFallback?: boolean;
+    isExhausted?: boolean;
   } | null = null;
+
+  try {
+    if (fs.existsSync(CACHE_FILE)) {
+      const cachedContent = fs.readFileSync(CACHE_FILE, "utf-8");
+      priceCache = JSON.parse(cachedContent);
+      console.log("Loaded Tilapia Price cache from persistent storage. Cache date:", priceCache?.data?.lastUpdate || "none");
+    }
+  } catch (e) {
+    console.warn("Failed to read tilapia price cache template file:", e);
+  }
+
+  const savePriceCacheToDisk = (data: any, timestamp: number, isFallback = false, isExhausted = false) => {
+    try {
+      priceCache = { data, timestamp, isFallback, isExhausted };
+      fs.writeFileSync(CACHE_FILE, JSON.stringify(priceCache, null, 2), "utf-8");
+      console.log(`Saved Tilapia Price cache to persistent storage (isFallback: ${isFallback}, isExhausted: ${isExhausted})`);
+    } catch (e) {
+      console.warn("Failed to write tilapia price cache to file:", e);
+    }
+  };
+
+  const isQuotaExceeded = (err: any): boolean => {
+    if (!err) return false;
+    const errStr = String(err).toLowerCase();
+    const errJson = typeof err === 'object' ? JSON.stringify(err).toLowerCase() : '';
+    return (
+      errStr.includes("429") ||
+      errStr.includes("resource_exhausted") ||
+      errStr.includes("quota") ||
+      errJson.includes("429") ||
+      errJson.includes("resource_exhausted") ||
+      errJson.includes("quota")
+    );
+  };
 
   // Cache is valid for 12 hours (43200000 ms) because market prices change very infrequently (weekly basis)
   const CACHE_TTL = 12 * 60 * 60 * 1000;
@@ -63,9 +101,10 @@ async function startServer() {
   app.get("/api/tilapia-price", async (req, res) => {
     const now = Date.now();
     
-    // Serve from cache if it exists and hasn't expired
+    // Serve from cache if it exists and hasn't expired.
+    // If the cache was marked as quota-exhausted, still serve it to avoid spamming the Gemini API on every load.
     if (priceCache && (now - priceCache.timestamp < CACHE_TTL)) {
-      console.log("Serving Tilapia Price from server-side memory cache (valid for 12h).");
+      console.log(`Serving Tilapia Price from persistent cache. IsFallback: ${!!priceCache.isFallback}, IsExhausted: ${!!priceCache.isExhausted}`);
       return res.json(priceCache.data);
     }
 
@@ -138,26 +177,41 @@ async function startServer() {
           lastUpdate: new Date().toISOString()
         };
 
-        // Cache the successful fetch
-        priceCache = {
-          data: finalizedData,
-          timestamp: now
-        };
+        // Cache the successful fetch to disk
+        savePriceCacheToDisk(finalizedData, now, false, false);
 
         return res.json(finalizedData);
       } else {
         throw new Error("No text response received from Gemini.");
       }
     } catch (error) {
-      console.error("Error communicating with Gemini, checking for stale cache or returning fallback:", error);
+      const quotaExceeded = isQuotaExceeded(error);
+      
+      if (quotaExceeded) {
+        console.warn("⚠️ Gemini API quota has been exhausted (code 429 RESOURCE_EXHAUSTED). Gracefully falling back to cached or simulated data to prevent visual disruptions.");
+      } else {
+        console.error("Error communicating with Gemini, checking for stale cache or returning fallback:", error);
+      }
       
       // Serve expired/stale cache if we have it to avoid breaking or falling back to static
       if (priceCache) {
-        console.log("Serving stale (expired) cache to avoid showing simulated fallback during rate limit or temporary outage...");
+        console.log("Serving stale or previous persistent cache to prevent error visibility in the frontend...");
+        
+        // If quota was exceeded, update cache timestamp on disk so we wait a comfortable CACHE_TTL before hammering Gemini again
+        if (quotaExceeded) {
+          savePriceCacheToDisk(priceCache.data, now, !!priceCache.isFallback, true);
+        }
+        
         return res.json(priceCache.data);
       }
 
-      return res.json(getDynamicFallback());
+      // No persistent cache exists: generate premium dynamic simulated fallback data
+      const fallback = getDynamicFallback();
+      
+      // Register fallback data into cache and save to disk to prevent hitting Gemini again during the TTL
+      savePriceCacheToDisk(fallback, now, true, quotaExceeded);
+
+      return res.json(fallback);
     }
   });
 
