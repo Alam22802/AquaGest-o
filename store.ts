@@ -395,16 +395,6 @@ export const loadState = async (): Promise<AppState> => {
   const config = getSupabaseConfig();
   if (config) state.supabaseConfig = config;
 
-  const remote = await fetchRemoteState(state.supabaseConfig);
-  if (remote) {
-    state = ensureStateIntegrity(state, remote, 'remote');
-    try {
-      const compressed = LZString.compressToUTF16(JSON.stringify(state));
-      localStorage.setItem(STORAGE_KEY, compressed);
-    } catch (e) {
-      console.warn('Não foi possível salvar estado remoto no cache local:', e);
-    }
-  }
   return state;
 };
 

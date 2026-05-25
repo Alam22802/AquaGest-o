@@ -35,17 +35,17 @@ async function startServer() {
     const sourceRange = `CEPEA (${mondayStr} a ${fridayStr})`;
 
     return {
-      price: 10.85,
+      price: 9.95,
       source: sourceRange,
       lastUpdate: now.toISOString(),
-      variation: -0.09,
-      weeklyVariation: 0.46,
+      variation: 0.15,
+      weeklyVariation: 0.52,
       regions: [
-        { name: "Triângulo Mineiro", price: 10.85, variation: -0.09, weeklyVariation: 0.46 },
-        { name: "Grandes Lagos", price: 10.70, variation: 0.19, weeklyVariation: 0.28 },
-        { name: "Norte do Paraná", price: 11.23, variation: 0.09, weeklyVariation: 0.18 },
-        { name: "Morada Nova", price: 10.60, variation: 0.00, weeklyVariation: 0.38 },
-        { name: "Oeste do Paraná", price: 9.87, variation: 0.20, weeklyVariation: 0.51 }
+        { name: "Triângulo Mineiro", price: 9.95, variation: 0.15, weeklyVariation: 0.52 },
+        { name: "Grandes Lagos", price: 9.98, variation: 0.25, weeklyVariation: 0.45 },
+        { name: "Norte do Paraná", price: 10.15, variation: -0.10, weeklyVariation: 0.20 },
+        { name: "Morada Nova", price: 9.72, variation: 0.00, weeklyVariation: 0.15 },
+        { name: "Oeste do Paraná", price: 9.25, variation: 0.30, weeklyVariation: 0.65 }
       ]
     };
   };
@@ -177,8 +177,12 @@ async function startServer() {
     }
 
     try {
-      const url = "https://api.open-meteo.com/v1/forecast?latitude=-18.6475&longitude=-48.1872&current_weather=true&daily=weathercode,temperature_2m_max,temperature_2m_min,precipitation_probability_max,precipitation_sum&timezone=auto";
-      const response = await fetch(url);
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 1500); // 1.5 seconds abort timeout
+      
+      const url = "https://api.open-meteo.com/v1/forecast?latitude=-18.6475&longitude=-48.1872&current_weather=true&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,precipitation_sum&timezone=auto";
+      const response = await fetch(url, { signal: controller.signal });
+      clearTimeout(timeoutId);
       
       if (!response.ok) {
         throw new Error(`Open-Meteo responded with status ${response.status}`);
@@ -186,6 +190,18 @@ async function startServer() {
 
       const data = await response.json();
       
+      // Normalize response so both weathercode and weather_code exist on the object
+      if (data.current_weather) {
+        const code = data.current_weather.weather_code !== undefined ? data.current_weather.weather_code : data.current_weather.weathercode;
+        data.current_weather.weathercode = code;
+        data.current_weather.weather_code = code;
+      }
+      if (data.daily) {
+        const codes = data.daily.weather_code !== undefined ? data.daily.weather_code : data.daily.weathercode;
+        data.daily.weathercode = codes;
+        data.daily.weather_code = codes;
+      }
+
       weatherCache = {
         data,
         timestamp: now
@@ -206,6 +222,7 @@ async function startServer() {
         current_weather: {
           temperature: 24.5,
           weathercode: 3,
+          weather_code: 3,
           windspeed: 12.5,
           winddirection: 180,
           time: new Date().toISOString()
@@ -217,6 +234,7 @@ async function startServer() {
             return d.toISOString().split("T")[0];
           }),
           weathercode: [3, 0, 1, 2, 80, 51, 3],
+          weather_code: [3, 0, 1, 2, 80, 51, 3],
           temperature_2m_max: [28.5, 29.0, 27.5, 26.0, 25.5, 26.5, 28.0],
           temperature_2m_min: [17.0, 16.5, 18.0, 17.5, 16.0, 15.5, 16.5],
           precipitation_probability_max: [10, 0, 15, 40, 75, 45, 20],

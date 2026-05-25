@@ -142,7 +142,8 @@ const WeatherWidget = () => {
 
   const current = weather.current_weather;
   const daily = weather.daily;
-  const currentInfo = getWeatherInfo(current.weathercode);
+  const currentCode = current.weather_code !== undefined ? current.weather_code : current.weathercode;
+  const currentInfo = getWeatherInfo(currentCode);
 
   return (
     <div className="bg-[#344434] rounded-2xl p-4 sm:p-6 text-[#e4e4d4] shadow-lg shadow-black/10 flex flex-col justify-between gap-4 overflow-hidden relative group border border-white/5 h-full">
@@ -171,11 +172,14 @@ const WeatherWidget = () => {
 
       {/* Previsão 5 Dias */}
       <div className="relative z-10 grid grid-cols-5 gap-2">
-        {daily.time.slice(1, 6).map((date: string, index: number) => {
+        {(daily.time || []).slice(1, 6).map((date: string, index: number) => {
           const idx = index + 1;
-          const info = getWeatherInfo(daily.weathercode[idx]);
-          const rainProb = daily.precipitation_probability_max[idx];
-          const rainSum = daily.precipitation_sum[idx];
+          const weathercodeList = daily.weather_code || daily.weathercode || [];
+          const info = getWeatherInfo(weathercodeList[idx]);
+          const rainProb = daily.precipitation_probability_max ? daily.precipitation_probability_max[idx] : 0;
+          const rainSum = daily.precipitation_sum ? daily.precipitation_sum[idx] : 0;
+          const tempMax = daily.temperature_2m_max ? daily.temperature_2m_max[idx] : 0;
+          const tempMin = daily.temperature_2m_min ? daily.temperature_2m_min[idx] : 0;
           
           return (
             <div key={date} className="bg-white/5 backdrop-blur-sm p-2 rounded-xl border border-white/5 flex flex-col items-center text-center transition-all hover:bg-white/10">
@@ -186,8 +190,8 @@ const WeatherWidget = () => {
                 {info.icon}
               </div>
               <div className="flex items-center gap-1">
-                <span className="text-xs font-black">{Math.round(daily.temperature_2m_max[idx])}°</span>
-                <span className="text-[9px] font-bold text-[#e4e4d4]/40">{Math.round(daily.temperature_2m_min[idx])}°</span>
+                <span className="text-xs font-black">{Math.round(tempMax)}°</span>
+                <span className="text-[9px] font-bold text-[#e4e4d4]/40">{Math.round(tempMin)}°</span>
               </div>
               
               {(rainProb > 20 || rainSum > 0) && (
