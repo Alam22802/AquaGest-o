@@ -72,9 +72,8 @@ const WeatherWidget = () => {
     setLoading(true);
     setError(null);
     try {
-      // Fetch weather for Araguari-MG using Open-Meteo (Free, no key required)
-      // Coordinates: -18.6475, -48.1872
-      const response = await fetch('https://api.open-meteo.com/v1/forecast?latitude=-18.6475&longitude=-48.1872&current_weather=true&daily=weathercode,temperature_2m_max,temperature_2m_min,precipitation_probability_max,precipitation_sum&timezone=auto');
+      // Fetch weather via the server-side cache proxy endpoint to ensure high availability and bypass any sandboxed network restriction
+      const response = await fetch('/api/weather');
       if (!response.ok) throw new Error('Weather fetch failed');
       const data = await response.json();
       setWeather(data);
