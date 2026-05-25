@@ -4,7 +4,7 @@ import { AppState, FeedType, FeedStockLog, User } from '../types';
 import { Plus, Package, TrendingDown, AlertCircle, Calendar, Settings2, Edit, Trash2, X, ArrowUpDown, Clock, User as UserIcon, Filter, CheckSquare, Square, Info, FileText, Copy, RotateCcw, FileDown } from 'lucide-react';
 import { subDays, format, parseISO } from 'date-fns';
 import { jsPDF } from 'jspdf';
-import 'jspdf-autotable';
+import autoTable from 'jspdf-autotable';
 import { formatNumber } from '../utils/formatters';
 
 interface Props {
@@ -705,25 +705,27 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       doc.setTextColor(22, 101, 52);
       doc.text('1. PARÂMETROS E PLANEJAMENTO DETALHADO POR LOTE', 15, 76);
 
-      const batchTableHeader = [['Lote / Tanque', 'Tabela de Ref.', 'Peixes Vivos', 'Peso Médio', 'Semana', 'Dias', 'Dedução Diária', 'Total Calcs (Kg)']];
+      const batchTableHeader = [['Lote / Tanque', 'Tabela Ref.', 'Peixes Vivos', 'P. Médio', 'Semana', 'Dias', 'Ração e % PV', 'Consumo (Kg)']];
       const batchTableRows = planningRows.map((row, index) => {
         const batch = (state.batches || []).find(b => b.id === row.batchId);
         const table = (state.feedingTables || []).find(t => t.id === row.tableId);
         const calcs = getRowCalculations(row);
+        const feed = calcs.feedTypeId ? feedMap.get(calcs.feedTypeId) : null;
+        const feedStr = feed ? `${feed.name.toUpperCase()} (${formatNumber(calcs.feedPercentPV, 2)}% PV)` : 'N/A';
         
         return [
           batch ? batch.name.toUpperCase() : `Lote Desconhecido ${index + 1}`,
           table ? table.name.toUpperCase() : 'N/A',
           formatNumber(Number(row.fishCount) || 0, 0),
           `${formatNumber(Number(row.averageWeight) || 0, 1)}g`,
-          `Semana ${row.currentWeek}`,
+          `S${row.currentWeek}`,
           `${row.calculationDays}d`,
-          `${formatNumber(calcs.dailyFeed, 1)} kg`,
+          feedStr,
           `${formatNumber(calcs.totalFeed, 1)} kg`
         ];
       });
 
-      (doc as any).autoTable({
+      autoTable(doc, {
         startY: 80,
         head: batchTableHeader,
         body: batchTableRows,
@@ -736,14 +738,16 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
           3: { halign: 'center' },
           4: { halign: 'center' },
           5: { halign: 'center' },
-          6: { halign: 'right' },
+          6: { fontStyle: 'bold' },
           7: { halign: 'right', fontStyle: 'bold' }
         },
         margin: { left: 15, right: 15 }
       });
 
       // Section 2: Consolidated PDF result
-      const nextY1 = (doc as any).lastAutoTable.finalY + 10;
+      const nextY1 = ((doc as any).lastAutoTable && (doc as any).lastAutoTable.finalY) 
+        ? (doc as any).lastAutoTable.finalY + 10 
+        : 140;
       
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(10);
@@ -758,7 +762,7 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
         `${formatNumber(item.orderKg, 1)} kg`
       ]);
 
-      (doc as any).autoTable({
+      autoTable(doc, {
         startY: nextY1 + 4,
         head: consolidatedHeaders,
         body: consolidatedRows,
@@ -781,7 +785,9 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
         margin: { left: 15, right: 15 }
       });
 
-      let nextY2 = (doc as any).lastAutoTable.finalY + 18;
+      let nextY2 = ((doc as any).lastAutoTable && (doc as any).lastAutoTable.finalY) 
+        ? (doc as any).lastAutoTable.finalY + 18 
+        : 200;
 
       if (nextY2 > 245) {
         doc.addPage();

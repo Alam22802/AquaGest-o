@@ -50,8 +50,25 @@ async function startServer() {
     };
   };
 
+  // Simple in-memory cache for Tilapia Price API call to prevent hitting Gemini rate limits
+  let priceCache: {
+    data: any;
+    timestamp: number;
+  } | null = null;
+
+  // Cache is valid for 12 hours (43200000 ms) because market prices change very infrequently (weekly basis)
+  const CACHE_TTL = 12 * 60 * 60 * 1000;
+
   // API Route
   app.get("/api/tilapia-price", async (req, res) => {
+    const now = Date.now();
+    
+    // Serve from cache if it exists and hasn't expired
+    if (priceCache && (now - priceCache.timestamp < CACHE_TTL)) {
+      console.log("Serving Tilapia Price from server-side memory cache (valid for 12h).");
+      return res.json(priceCache.data);
+    }
+
     const key = process.env.GEMINI_API_KEY;
     if (!key) {
       console.warn("Using CEPEA simulation due to missing GEMINI_API_KEY.");
@@ -115,15 +132,31 @@ async function startServer() {
         const textToParse = response.text.trim();
         console.log("Parsed response text:", textToParse);
         const data = JSON.parse(textToParse);
-        return res.json({
+        
+        const finalizedData = {
           ...data,
           lastUpdate: new Date().toISOString()
-        });
+        };
+
+        // Cache the successful fetch
+        priceCache = {
+          data: finalizedData,
+          timestamp: now
+        };
+
+        return res.json(finalizedData);
       } else {
         throw new Error("No text response received from Gemini.");
       }
     } catch (error) {
-      console.error("Error communicating with Gemini, returning fallback:", error);
+      console.error("Error communicating with Gemini, checking for stale cache or returning fallback:", error);
+      
+      // Serve expired/stale cache if we have it to avoid breaking or falling back to static
+      if (priceCache) {
+        console.log("Serving stale (expired) cache to avoid showing simulated fallback during rate limit or temporary outage...");
+        return res.json(priceCache.data);
+      }
+
       return res.json(getDynamicFallback());
     }
   });
