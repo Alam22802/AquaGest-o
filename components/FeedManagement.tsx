@@ -1,8 +1,10 @@
 
 import React, { useState, useMemo } from 'react';
 import { AppState, FeedType, FeedStockLog, User } from '../types';
-import { Plus, Package, TrendingDown, AlertCircle, Calendar, Settings2, Edit, Trash2, X, ArrowUpDown, Clock, User as UserIcon, Filter, CheckSquare, Square, Info, FileText } from 'lucide-react';
+import { Plus, Package, TrendingDown, AlertCircle, Calendar, Settings2, Edit, Trash2, X, ArrowUpDown, Clock, User as UserIcon, Filter, CheckSquare, Square, Info, FileText, Copy, RotateCcw, FileDown } from 'lucide-react';
 import { subDays, format, parseISO } from 'date-fns';
+import { jsPDF } from 'jspdf';
+import 'jspdf-autotable';
 import { formatNumber } from '../utils/formatters';
 
 interface Props {
@@ -19,14 +21,49 @@ const generateId = () => {
   }
 };
 
+interface PlanningRow {
+  id: string;
+  tableId: string;
+  batchId: string;
+  fishCount: string;
+  averageWeight: string;
+  currentWeek: string;
+  calculationDays: string;
+}
+
 const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
-  const [activeSubTab, setActiveSubTab] = useState<'stock' | 'recommended'>('stock');
+  const [activeSubTab, setActiveSubTab] = useState<'stock' | 'recommended' | 'planning'>('stock');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formData, setFormData] = useState({ 
     name: '',
     maxCapacity: '1000',
     minStockPercentage: '20',
     currentStockKg: '0'
+  });
+
+  const saveRowsToLocals = (rows: PlanningRow[]) => {
+    localStorage.setItem('feed_planning_rows', JSON.stringify(rows));
+  };
+
+  const [planningRows, setPlanningRows] = useState<PlanningRow[]>(() => {
+    const saved = localStorage.getItem('feed_planning_rows');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      } catch (e) {}
+    }
+    return [
+      {
+        id: generateId(),
+        tableId: '',
+        batchId: '',
+        fishCount: '',
+        averageWeight: '',
+        currentWeek: '1',
+        calculationDays: '7'
+      }
+    ];
   });
 
   // Filters and Pagination
@@ -66,14 +103,6 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
   });
 
   const [editingTableId, setEditingTableId] = useState<string | null>(null);
-
-  const [calcData, setCalcData] = useState({
-    fishCount: '1000',
-    currentWeek: '1',
-    averageWeight: '',
-    selectedTableId: '',
-    calculationDays: '1'
-  });
 
   const { userMap, feedMap } = useMemo(() => {
     const users = new Map((state.users || []).map(u => [u.id, u]));
@@ -376,34 +405,183 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     return closestRow.week;
   };
 
-  const handleWeightChange = (val: string) => {
-    const weight = Number(val);
-    let newWeek = calcData.currentWeek;
-    
-    if (val && !isNaN(weight) && calcData.selectedTableId) {
-      const closestWeek = findClosestWeek(weight, calcData.selectedTableId);
-      if (closestWeek !== null) {
-        newWeek = closestWeek.toString();
+  const handleAddNewPlanningRow = () => {
+    const tId = state.feedingTables?.[0]?.id || '';
+    const newRows = [
+      ...planningRows,
+      {
+        id: generateId(),
+        tableId: tId,
+        batchId: '',
+        fishCount: '',
+        averageWeight: '',
+        currentWeek: '1',
+        calculationDays: '7'
       }
-    }
-    
-    setCalcData({
-      ...calcData,
-      averageWeight: val,
-      currentWeek: newWeek
-    });
+    ];
+    setPlanningRows(newRows);
+    saveRowsToLocals(newRows);
   };
 
-  const calculatedFeed = useMemo(() => {
-    if (!calcData.selectedTableId || !calcData.currentWeek || !calcData.fishCount) return 0;
-    
-    const table = (state.feedingTables || []).find(t => t.id === calcData.selectedTableId);
-    if (!table) return 0;
+  const handleRemovePlanningRow = (id: string) => {
+    if (planningRows.length <= 1) return;
+    const newRows = planningRows.filter(r => r.id !== id);
+    setPlanningRows(newRows);
+    saveRowsToLocals(newRows);
+  };
 
-    const week = Number(calcData.currentWeek);
-    const fishCount = Number(calcData.fishCount);
+  const handleResetPlanning = () => {
+    if (!confirm('Deseja limpar todos os lotes e iniciar uma nova programação?')) return;
+    const tId = state.feedingTables?.[0]?.id || '';
+    const resetRows = [
+      {
+        id: generateId(),
+        tableId: tId,
+        batchId: '',
+        fishCount: '',
+        averageWeight: '',
+        currentWeek: '1',
+        calculationDays: '7'
+      }
+    ];
+    setPlanningRows(resetRows);
+    saveRowsToLocals(resetRows);
+  };
+
+  const handleRowFieldChange = (rowId: string, field: keyof PlanningRow, value: string) => {
+    const newRows = planningRows.map(row => {
+      if (row.id === rowId) {
+        return { ...row, [field]: value };
+      }
+      return row;
+    });
+    setPlanningRows(newRows);
+    saveRowsToLocals(newRows);
+  };
+
+  const handleRowBatchChange = (rowId: string, batchId: string) => {
+    const batch = (state.batches || []).find(b => b.id === batchId);
+    if (!batch) {
+      const newRows = planningRows.map(row => {
+        if (row.id === rowId) {
+          return {
+            ...row,
+            batchId: '',
+            fishCount: '',
+            averageWeight: '',
+            currentWeek: '1'
+          };
+        }
+        return row;
+      });
+      setPlanningRows(newRows);
+      saveRowsToLocals(newRows);
+      return;
+    }
+
+    const cagesMap = new Map((state.cages || []).map(c => [c.id, c]));
     
-    // Find the row for the given week
+    const batchMortality = (state.mortalityLogs || [])
+      .filter(m => m.batchId === batchId || (m.cageId && cagesMap.get(m.cageId)?.batchId === batchId))
+      .reduce((sum, m) => sum + m.count, 0);
+
+    const batchHarvested = (state.harvestLogs || [])
+      .filter(h => h.batchId === batchId)
+      .reduce((sum, h) => sum + h.fishCount, 0);
+
+    const liveFish = Math.max(0, batch.initialQuantity - batchMortality - batchHarvested);
+
+    const batchBiometries = (state.biometryLogs || [])
+      .filter(b => b.batchId === batchId || (b.cageId && cagesMap.get(b.cageId)?.batchId === batchId));
+    const latestBiometry = batchBiometries.length > 0 
+      ? [...batchBiometries].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0]
+      : null;
+    const avgWeight = latestBiometry ? latestBiometry.averageWeight : batch.initialUnitWeight;
+
+    const currentRow = planningRows.find(r => r.id === rowId);
+    const tableId = currentRow?.tableId || (state.feedingTables?.[0]?.id || '');
+    
+    let weekStr = '1';
+    if (tableId) {
+      const closestWeek = findClosestWeek(avgWeight, tableId);
+      if (closestWeek !== null) {
+        weekStr = closestWeek.toString();
+      }
+    }
+
+    const newRows = planningRows.map(row => {
+      if (row.id === rowId) {
+        return {
+          ...row,
+          batchId,
+          tableId,
+          fishCount: liveFish.toString(),
+          averageWeight: avgWeight.toString(),
+          currentWeek: weekStr
+        };
+      }
+      return row;
+    });
+    setPlanningRows(newRows);
+    saveRowsToLocals(newRows);
+  };
+
+  const handleRowWeightChange = (rowId: string, weightStr: string) => {
+    const weight = Number(weightStr);
+    const newRows = planningRows.map(row => {
+      if (row.id === rowId) {
+        let newWeek = row.currentWeek;
+        if (weightStr && !isNaN(weight) && row.tableId) {
+          const closestWeek = findClosestWeek(weight, row.tableId);
+          if (closestWeek !== null) {
+            newWeek = closestWeek.toString();
+          }
+        }
+        return {
+          ...row,
+          averageWeight: weightStr,
+          currentWeek: newWeek
+        };
+      }
+      return row;
+    });
+    setPlanningRows(newRows);
+    saveRowsToLocals(newRows);
+  };
+
+  const handleRowTableChange = (rowId: string, tableId: string) => {
+    const newRows = planningRows.map(row => {
+      if (row.id === rowId) {
+        let newWeek = row.currentWeek;
+        if (row.averageWeight && tableId) {
+          const closestWeek = findClosestWeek(Number(row.averageWeight), tableId);
+          if (closestWeek !== null) {
+            newWeek = closestWeek.toString();
+          }
+        }
+        return {
+          ...row,
+          tableId,
+          currentWeek: newWeek
+        };
+      }
+      return row;
+    });
+    setPlanningRows(newRows);
+    saveRowsToLocals(newRows);
+  };
+
+  const getRowCalculations = (row: PlanningRow) => {
+    if (!row.tableId || !row.currentWeek || !row.fishCount) {
+      return { dailyFeed: 0, totalFeed: 0, feedTypeId: '', feedPercentPV: 0 };
+    }
+
+    const table = (state.feedingTables || []).find(t => t.id === row.tableId);
+    if (!table) return { dailyFeed: 0, totalFeed: 0, feedTypeId: '', feedPercentPV: 0 };
+
+    const week = Number(row.currentWeek);
+    const fishCount = Number(row.fishCount);
+    
     const allRows = [
       ...table.recriaInicial,
       ...table.recriaFinal,
@@ -411,21 +589,269 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       ...table.terminacao
     ];
     
-    const row = allRows.find(r => r.week === week);
-    if (!row) return 0;
+    const r = allRows.find(item => item.week === week);
+    if (!r) return { dailyFeed: 0, totalFeed: 0, feedTypeId: '', feedPercentPV: 0 };
 
-    // If user provided a specific average weight, use it, otherwise use the table's weight
-    const weight = calcData.averageWeight ? Number(calcData.averageWeight) : row.averageWeight;
+    const weight = row.averageWeight ? Number(row.averageWeight) : r.averageWeight;
+    const feedPercentPV = r.feedPercentagePV;
     
-    // Feed Amount (kg) = (Fish Count * Weight (g) / 1000) * (Feed % PV / 100)
-    const dailyFeed = (fishCount * weight / 1000) * (row.feedPercentagePV / 100);
-    const days = Number(calcData.calculationDays) || 1;
-    return dailyFeed * days;
-  }, [calcData, state.feedingTables]);
+    const dailyFeed = (fishCount * weight / 1000) * (feedPercentPV / 100);
+    const days = Number(row.calculationDays) || 1;
+    const totalFeed = dailyFeed * days;
+
+    return {
+      dailyFeed,
+      totalFeed,
+      feedTypeId: r.feedTypeId || '',
+      feedPercentPV
+    };
+  };
+
+  const orderAggregation = useMemo(() => {
+    const map = new Map<string, { feedName: string; totalKg: number }>();
+    let grandTotalKg = 0;
+
+    planningRows.forEach(row => {
+      const calcs = getRowCalculations(row);
+      if (calcs.totalFeed > 0 && calcs.feedTypeId) {
+        const feed = feedMap.get(calcs.feedTypeId);
+        const feedName = feed ? feed.name : 'Ração não especificada';
+        const current = map.get(calcs.feedTypeId) || { feedName, totalKg: 0 };
+        current.totalKg += calcs.totalFeed;
+        map.set(calcs.feedTypeId, current);
+        grandTotalKg += calcs.totalFeed;
+      }
+    });
+
+    let grandTotalStockKg = 0;
+    let grandTotalOrderKg = 0;
+
+    const items = Array.from(map.entries()).map(([feedId, data]) => {
+      const feed = feedMap.get(feedId);
+      const stockKg = feed ? (feed.totalStock / 1000) : 0;
+      const orderKg = Math.max(0, data.totalKg - stockKg);
+      
+      grandTotalStockKg += stockKg;
+      grandTotalOrderKg += orderKg;
+
+      return {
+        feedId,
+        feedName: data.feedName,
+        totalKg: data.totalKg,                     // Demanda planejada
+        stockKg,                                   // Saldo no estoque (Kg)
+        orderKg,                                   // Total real a pedir (Kg)
+        bags25kg: Math.ceil(orderKg / 25),
+        percentage: grandTotalKg > 0 ? (data.totalKg / grandTotalKg) * 100 : 0
+      };
+    });
+
+    return {
+      items,
+      grandTotalKg,
+      grandTotalStockKg,
+      grandTotalOrderKg
+    };
+  }, [planningRows, feedMap, state.feedingTables]);
+
+  const handleDownloadPDF = () => {
+    if (orderAggregation.items.length === 0) return;
+
+    try {
+      const doc = new jsPDF();
+      
+      // Theme colors
+      const primaryColor = [22, 101, 52]; // Emerald 800
+      const secondaryColor = [30, 41, 59]; // Slate 800
+      
+      // Header Banner
+      doc.setFillColor(22, 101, 52); 
+      doc.rect(0, 0, 210, 36, 'F');
+
+      // Title text inside banner
+      doc.setTextColor(255, 255, 255);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(18);
+      doc.text('AQUAGESTÃO PISCICULTURA', 15, 15);
+      
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(10);
+      doc.setTextColor(215, 235, 215);
+      doc.text('Programação de Ração e Pedido Consolidado Oficial', 15, 22);
+      
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(8);
+      doc.text(`Data de Emissão: ${format(new Date(), 'dd/MM/yyyy HH:mm:ss')}`, 15, 29);
+
+      // Metadata card
+      doc.setFillColor(241, 245, 249); // slate 100 bg
+      doc.rect(15, 42, 180, 26, 'F');
+      
+      // User who did the entries / calculations
+      doc.setTextColor(30, 41, 59); // slate 800
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(9);
+      doc.text('METADADOS DO PEDIDO CONSOLIDADO', 20, 48);
+      
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8.5);
+      doc.setTextColor(71, 85, 105); // slate 600
+      doc.text(`Responsável Clínico / Lançamento: ${currentUser?.name || 'Não especificado'} (${currentUser?.email || 'N/A'})`, 20, 54);
+      doc.text(`Regra de Dedução: Totalmente calculado abatendo o saldo real do estoque físico de ração`, 20, 59);
+      doc.text(`Identificação Única: ${generateId().toUpperCase().slice(0, 8)} - PDF não editável certificado por AquaGestão`, 20, 64);
+
+      // Section 1: Detailed Batches feeding table
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(10);
+      doc.setTextColor(22, 101, 52);
+      doc.text('1. PARÂMETROS E PLANEJAMENTO DETALHADO POR LOTE', 15, 76);
+
+      const batchTableHeader = [['Lote / Tanque', 'Tabela de Ref.', 'Peixes Vivos', 'Peso Médio', 'Semana', 'Dias', 'Dedução Diária', 'Total Calcs (Kg)']];
+      const batchTableRows = planningRows.map((row, index) => {
+        const batch = (state.batches || []).find(b => b.id === row.batchId);
+        const table = (state.feedingTables || []).find(t => t.id === row.tableId);
+        const calcs = getRowCalculations(row);
+        
+        return [
+          batch ? batch.name.toUpperCase() : `Lote Desconhecido ${index + 1}`,
+          table ? table.name.toUpperCase() : 'N/A',
+          formatNumber(Number(row.fishCount) || 0, 0),
+          `${formatNumber(Number(row.averageWeight) || 0, 1)}g`,
+          `Semana ${row.currentWeek}`,
+          `${row.calculationDays}d`,
+          `${formatNumber(calcs.dailyFeed, 1)} kg`,
+          `${formatNumber(calcs.totalFeed, 1)} kg`
+        ];
+      });
+
+      (doc as any).autoTable({
+        startY: 80,
+        head: batchTableHeader,
+        body: batchTableRows,
+        theme: 'striped',
+        headStyles: { fillColor: [51, 65, 85], fontStyle: 'bold', fontSize: 8 },
+        bodyStyles: { fontSize: 7.5 },
+        columnStyles: {
+          0: { fontStyle: 'bold' },
+          2: { halign: 'center' },
+          3: { halign: 'center' },
+          4: { halign: 'center' },
+          5: { halign: 'center' },
+          6: { halign: 'right' },
+          7: { halign: 'right', fontStyle: 'bold' }
+        },
+        margin: { left: 15, right: 15 }
+      });
+
+      // Section 2: Consolidated PDF result
+      const nextY1 = (doc as any).lastAutoTable.finalY + 10;
+      
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(10);
+      doc.setTextColor(22, 101, 52);
+      doc.text('2. PEDIDO CONSOLIDADO PARA FORNECEDOR (DEPOIS DE ABATER ESTOQUE)', 15, nextY1);
+
+      const consolidatedHeaders = [['Modelo de Ração', 'Demanda Total (Kg)', 'Saldo Estoque (Kg)', 'A Pedir Real (Kg)']];
+      const consolidatedRows = orderAggregation.items.map(item => [
+        item.feedName.toUpperCase(),
+        `${formatNumber(item.totalKg, 1)} kg`,
+        `${formatNumber(item.stockKg, 1)} kg`,
+        `${formatNumber(item.orderKg, 1)} kg`
+      ]);
+
+      (doc as any).autoTable({
+        startY: nextY1 + 4,
+        head: consolidatedHeaders,
+        body: consolidatedRows,
+        theme: 'grid',
+        headStyles: { fillColor: [22, 101, 52], fontStyle: 'bold', fontSize: 8 },
+        bodyStyles: { fontSize: 8 },
+        columnStyles: {
+          0: { fontStyle: 'bold' },
+          1: { halign: 'right' },
+          2: { halign: 'right' },
+          3: { halign: 'right', fontStyle: 'bold', textColor: [22, 101, 52] }
+        },
+        foot: [[
+          'TOTALIZADORES',
+          `${formatNumber(orderAggregation.grandTotalKg, 1)} kg`,
+          `${formatNumber(orderAggregation.grandTotalStockKg, 1)} kg`,
+          `${formatNumber(orderAggregation.grandTotalOrderKg, 1)} kg`
+        ]],
+        footStyles: { fillColor: [241, 245, 249], textColor: [15, 23, 42], fontStyle: 'bold', fontSize: 8.5 },
+        margin: { left: 15, right: 15 }
+      });
+
+      let nextY2 = (doc as any).lastAutoTable.finalY + 18;
+
+      if (nextY2 > 245) {
+        doc.addPage();
+        nextY2 = 25;
+      }
+
+      // Divider and signature areas
+      doc.setLineWidth(0.4);
+      doc.setDrawColor(203, 213, 225); // Slate 300
+      doc.line(15, nextY2, 95, nextY2);
+      doc.line(115, nextY2, 195, nextY2);
+
+      // Signatures
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8);
+      doc.setTextColor(100, 116, 139); // Slate 500
+      doc.text('Responsável pela Programação', 15, nextY2 + 4);
+      doc.setFont('helvetica', 'bold');
+      doc.text(currentUser?.name || 'Não especificado', 15, nextY2 + 8);
+      doc.setFont('helvetica', 'normal');
+      doc.text(`E-mail: ${currentUser?.email || 'N/A'}`, 15, nextY2 + 12);
+
+      doc.text('Autorização / Compras', 115, nextY2 + 4);
+      doc.text('Assinatura / Carimbo', 115, nextY2 + 8);
+      doc.text('Data: ____ / ____ / ________', 115, nextY2 + 12);
+
+      // Footer notes at bottom (A4 height is 297)
+      doc.setFont('helvetica', 'italic');
+      doc.setFontSize(7.5);
+      doc.setTextColor(148, 163, 184); // slate 400
+      doc.text('Documento eletrônico autenticado pelo sistema AquaGestão. Impresso sob demanda e protegido.', 15, 288);
+      doc.text('Página 1 de 1', 195, 288, { align: 'right' });
+
+      // Save the file
+      const dateStr = format(new Date(), 'dd-MM-yyyy_HHmm');
+      doc.save(`Pedido_Racao_AquaGestao_${dateStr}.pdf`);
+    } catch (error) {
+      console.error('Falha ao gerar o PDF:', error);
+      alert('Houve um erro ao processar a geração do PDF. Por favor, tente novamente.');
+    }
+  };
+
+  const handleCopyOrder = () => {
+    if (orderAggregation.items.length === 0) return;
+    let text = `📋 *RESUMO DO PEDIDO DE RAÇÃO*\n`;
+    text += `----------------------------------\n\n`;
+    
+    orderAggregation.items.forEach(item => {
+      text += `🔹 *${item.feedName.toUpperCase()}*\n`;
+      text += `   • Demanda Total: ${formatNumber(item.totalKg, 1)} kg\n`;
+      text += `   • Saldo em Estoque: ${formatNumber(item.stockKg, 1)} kg\n`;
+      text += `   • *A ser pedido: ${formatNumber(item.orderKg, 1)} kg*\n\n`;
+    });
+
+    text += `----------------------------------\n`;
+    text += `Total Planejado: ${formatNumber(orderAggregation.grandTotalKg, 1)} kg\n`;
+    text += `Estoque Abatido: ${formatNumber(orderAggregation.grandTotalStockKg, 1)} kg\n`;
+    text += `Total Líquido a Pedir: *${formatNumber(orderAggregation.grandTotalOrderKg, 1)} kg*\n\n`;
+    text += `Gerado em: ${format(new Date(), 'dd/MM/yyyy HH:mm')}`;
+
+    navigator.clipboard.writeText(text).then(() => {
+      alert('Pedido copiado para a área de transferência!');
+    }).catch(err => {
+      console.error('Falha ao copiar:', err);
+    });
+  };
 
   return (
     <div className="space-y-8">
-      <div className="flex bg-slate-100 p-1 rounded-2xl w-fit mb-4">
+      <div className="flex flex-wrap bg-slate-100 p-1 rounded-2xl w-fit mb-4 gap-1">
         <button
           onClick={() => setActiveSubTab('stock')}
           className={`px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeSubTab === 'stock' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
@@ -437,6 +863,12 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
           className={`px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeSubTab === 'recommended' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
         >
           Trato Indicado
+        </button>
+        <button
+          onClick={() => setActiveSubTab('planning')}
+          className={`px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeSubTab === 'planning' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+        >
+          Programação Ração
         </button>
       </div>
 
@@ -718,122 +1150,8 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
         )}
       </div>
     </React.Fragment>
-  ) : (
+  ) : activeSubTab === 'recommended' ? (
         <div className="space-y-8 animate-in fade-in duration-500">
-          {/* Calculator Section */}
-          <div className="bg-[#344434] p-8 rounded-[2.5rem] shadow-2xl text-[#e4e4d4]">
-            <h3 className="text-lg font-black mb-8 flex items-center gap-3 uppercase tracking-tighter italic text-white">
-              <TrendingDown className="w-6 h-6 text-blue-400" />
-              Calculadora de Trato
-            </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 items-end">
-              <div>
-                <label className="block text-[10px] font-black text-[#e4e4d4]/60 uppercase mb-2 tracking-widest">Tabela de Referência</label>
-                <select
-                  className="w-full px-4 py-3 bg-black/20 border border-white/10 rounded-2xl font-bold text-sm outline-none focus:ring-2 focus:ring-blue-500/20 text-white"
-                  value={calcData.selectedTableId}
-                  onChange={(e) => {
-                    const tableId = e.target.value;
-                    let newWeek = calcData.currentWeek;
-                    if (calcData.averageWeight && tableId) {
-                      const closestWeek = findClosestWeek(Number(calcData.averageWeight), tableId);
-                      if (closestWeek !== null) {
-                        newWeek = closestWeek.toString();
-                      }
-                    }
-                    setCalcData({ ...calcData, selectedTableId: tableId, currentWeek: newWeek });
-                  }}
-                >
-                  <option value="" className="bg-[#344434]">Selecione uma tabela...</option>
-                  {(state.feedingTables || []).map(t => <option key={t.id} value={t.id} className="bg-[#344434]">{t.name}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="block text-[10px] font-black text-[#e4e4d4]/60 uppercase mb-2 tracking-widest">Quantidade de Peixes</label>
-                <input
-                  type="number"
-                  className="w-full px-4 py-3 bg-black/20 border border-white/10 rounded-2xl font-bold text-sm outline-none focus:ring-2 focus:ring-blue-500/20 text-white"
-                  value={calcData.fishCount}
-                  onChange={(e) => setCalcData({ ...calcData, fishCount: e.target.value })}
-                />
-              </div>
-              <div>
-                <label className="block text-[10px] font-black text-[#e4e4d4]/60 uppercase mb-2 tracking-widest">Semana Atual</label>
-                <div className="w-full px-4 py-3 bg-black/30 border border-white/10 rounded-2xl font-bold text-sm text-blue-400 flex items-center">
-                  {calcData.currentWeek || '---'}
-                </div>
-              </div>
-              <div>
-                <label className="block text-[10px] font-black text-[#e4e4d4]/60 uppercase mb-2 tracking-widest">Peso Médio (g)</label>
-                <input
-                  type="number"
-                  placeholder="Insira o peso..."
-                  className="w-full px-4 py-3 bg-black/20 border border-white/10 rounded-2xl font-bold text-sm outline-none focus:ring-2 focus:ring-blue-500/20 text-white"
-                  value={calcData.averageWeight}
-                  onChange={(e) => handleWeightChange(e.target.value)}
-                />
-              </div>
-              <div>
-                <label className="block text-[10px] font-black text-[#e4e4d4]/60 uppercase mb-2 tracking-widest">Dias para Cálculo</label>
-                <input
-                  type="number"
-                  min="1"
-                  className="w-full px-4 py-3 bg-black/20 border border-white/10 rounded-2xl font-bold text-sm outline-none focus:ring-2 focus:ring-blue-500/20 text-white"
-                  value={calcData.calculationDays}
-                  onChange={(e) => setCalcData({ ...calcData, calculationDays: e.target.value })}
-                />
-              </div>
-            </div>
-
-            <div className="mt-8 p-6 bg-white/5 border border-white/10 rounded-3xl flex flex-col md:flex-row items-center justify-between gap-4">
-              <div className="flex items-center gap-4">
-                <div className="p-4 bg-blue-600 rounded-2xl shadow-lg">
-                  <Package className="w-8 h-8 text-white" />
-                </div>
-                <div>
-                  <p className="text-[10px] font-black text-[#e4e4d4]/60 uppercase tracking-widest">Quantidade de Ração Estimada</p>
-                  <h4 className="text-3xl font-black italic text-white">
-                    {formatNumber(calculatedFeed, 2)} kg 
-                    <span className="text-sm not-italic opacity-60 ml-2">
-                      / {calcData.calculationDays === '1' ? 'dia' : `${calcData.calculationDays} dias`}
-                    </span>
-                  </h4>
-                </div>
-              </div>
-              <div className="text-right">
-                <p className="text-[10px] font-black text-[#e4e4d4]/60 uppercase tracking-widest">Baseado na % PV da Tabela</p>
-                <div className="space-y-2">
-                  <p className="text-xs font-bold text-white">
-                    {calcData.selectedTableId ? (
-                      (() => {
-                        const table = (state.feedingTables || []).find(t => t.id === calcData.selectedTableId);
-                        const allRows = table ? [...table.recriaInicial, ...table.recriaFinal, ...table.crescimento, ...table.terminacao] : [];
-                        const row = allRows.find(r => r.week === Number(calcData.currentWeek));
-                        return row ? `${formatNumber(row.feedPercentagePV, 2)}% PV` : 'Semana não encontrada';
-                      })()
-                    ) : 'Selecione uma tabela'}
-                  </p>
-                  {calcData.selectedTableId && (
-                    <div className="bg-blue-600/20 px-4 py-2 rounded-xl border border-blue-500/30">
-                      <p className="text-xs font-black text-blue-400 uppercase tracking-widest">
-                        {(() => {
-                          const table = (state.feedingTables || []).find(t => t.id === calcData.selectedTableId);
-                          const allRows = table ? [...table.recriaInicial, ...table.recriaFinal, ...table.crescimento, ...table.terminacao] : [];
-                          const row = allRows.find(r => r.week === Number(calcData.currentWeek));
-                          if (row) {
-                            const feed = feedMap.get(row.feedTypeId || '');
-                            return feed ? `Ração Indicada: ${feed.name}` : 'Ração não definida para esta semana';
-                          }
-                          return '';
-                        })()}
-                      </p>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-
           {hasPermission ? (
             <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-200">
               <h3 className="text-lg font-black text-slate-800 mb-8 flex items-center gap-3 uppercase tracking-tighter italic">
@@ -1030,6 +1348,384 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
               </table>
             </div>
           </div>
+        </div>
+      ) : null}
+
+      {activeSubTab === 'planning' && (
+        <div className="space-y-8 animate-in fade-in duration-500">
+          <div className="bg-[#344434] p-8 rounded-[2.5rem] shadow-2xl text-[#e4e4d4]">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+              <div>
+                <h3 className="text-xl font-black flex items-center gap-3 uppercase tracking-tighter italic text-white">
+                  <TrendingDown className="w-6 h-6 text-blue-400" />
+                  Programação de Ração Semanal
+                </h3>
+                <p className="text-xs text-[#e4e4d4]/70 mt-1">
+                  Configure a alimentação para múltiplos lotes simultaneamente e consolide o pedido semanal para o fornecedor.
+                </p>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={handleAddNewPlanningRow}
+                  className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-black uppercase tracking-wider flex items-center gap-2 shadow-lg shadow-blue-600/30 transition-all active:scale-95"
+                >
+                  <Plus className="w-4 h-4" /> Adicionar Lote
+                </button>
+                <button
+                  type="button"
+                  onClick={handleResetPlanning}
+                  className="px-5 py-2.5 bg-white/10 hover:bg-white/20 text-white rounded-xl text-xs font-black uppercase tracking-wider flex items-center gap-2 border border-white/10 transition-all active:scale-95"
+                >
+                  <RotateCcw className="w-4 h-4" /> Limpar
+                </button>
+              </div>
+            </div>
+
+            {/* Desktop Table View */}
+            <div className="hidden lg:block overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="border-b border-white/10 text-[10px] font-black text-[#e4e4d4]/60 uppercase tracking-widest">
+                    <th className="py-3 px-2">Lote</th>
+                    <th className="py-3 px-2">Tabela Referência</th>
+                    <th className="py-3 px-2 w-28 text-center">Peixes Vivos</th>
+                    <th className="py-3 px-2 w-28 text-center">Peso Médio (g)</th>
+                    <th className="py-3 px-2 w-32 text-center">Semana Indicada</th>
+                    <th className="py-3 px-2 w-20 text-center">Dias</th>
+                    <th className="py-3 px-2 text-right">Consumo Período</th>
+                    <th className="py-3 px-2 w-12 text-center"></th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/5">
+                  {planningRows.map((row) => {
+                    const calcs = getRowCalculations(row);
+                    const table = (state.feedingTables || []).find(t => t.id === row.tableId);
+                    const allTableWeeks = table ? [
+                      ...table.recriaInicial,
+                      ...table.recriaFinal,
+                      ...table.crescimento,
+                      ...table.terminacao
+                    ].map(r => r.week) : [];
+
+                    return (
+                      <tr key={row.id} className="hover:bg-white/5 transition-colors group">
+                        <td className="py-3 px-2">
+                          <select
+                            className="w-full px-2 py-2 bg-black/35 border border-white/10 rounded-xl font-bold text-xs outline-none text-white focus:ring-1 focus:ring-blue-500"
+                            value={row.batchId}
+                            onChange={(e) => handleRowBatchChange(row.id, e.target.value)}
+                          >
+                            <option value="">Selecione...</option>
+                            {(state.batches || []).filter(b => !b.isClosed).map(b => (
+                              <option key={b.id} value={b.id}>{b.name}</option>
+                            ))}
+                          </select>
+                        </td>
+                        <td className="py-3 px-2">
+                          <select
+                            className="w-full px-2 py-2 bg-black/35 border border-white/10 rounded-xl font-bold text-xs outline-none text-white focus:ring-1 focus:ring-blue-500"
+                            value={row.tableId}
+                            onChange={(e) => handleRowTableChange(row.id, e.target.value)}
+                          >
+                            <option value="">Selecione...</option>
+                            {(state.feedingTables || []).map(t => (
+                              <option key={t.id} value={t.id}>{t.name}</option>
+                            ))}
+                          </select>
+                        </td>
+                        <td className="py-3 px-2">
+                          <input
+                            type="number"
+                            className="w-full px-2 py-2 bg-black/35 border border-white/10 rounded-xl font-bold text-xs outline-none text-white text-center"
+                            value={row.fishCount}
+                            onChange={(e) => handleRowFieldChange(row.id, 'fishCount', e.target.value)}
+                          />
+                        </td>
+                        <td className="py-3 px-2">
+                          <input
+                            type="number"
+                            step="0.1"
+                            className="w-full px-2 py-2 bg-black/35 border border-white/10 rounded-xl font-bold text-xs outline-none text-white text-center"
+                            value={row.averageWeight}
+                            onChange={(e) => handleRowWeightChange(row.id, e.target.value)}
+                          />
+                        </td>
+                        <td className="py-3 px-2">
+                          {allTableWeeks.length > 0 ? (
+                            <select
+                              className="w-full px-2 py-2 bg-black/35 border border-white/10 rounded-xl font-bold text-xs outline-none text-white text-center"
+                              value={row.currentWeek}
+                              onChange={(e) => handleRowFieldChange(row.id, 'currentWeek', e.target.value)}
+                            >
+                              {allTableWeeks.map(wk => (
+                                <option key={wk} value={wk}>Semana {wk}</option>
+                              ))}
+                            </select>
+                          ) : (
+                            <div className="text-xs font-bold text-slate-400 py-2 text-center bg-black/10 rounded-xl border border-white/5">
+                              {row.currentWeek || '---'}
+                            </div>
+                          )}
+                        </td>
+                        <td className="py-3 px-2">
+                          <input
+                            type="number"
+                            min="1"
+                            className="w-full px-2 py-2 bg-black/35 border border-white/10 rounded-xl font-bold text-xs outline-none text-white text-center"
+                            value={row.calculationDays}
+                            onChange={(e) => handleRowFieldChange(row.id, 'calculationDays', e.target.value)}
+                          />
+                        </td>
+                        <td className="py-3 px-2 text-right">
+                          <div className="font-extrabold text-white text-sm">
+                            {formatNumber(calcs.totalFeed, 1)} kg
+                          </div>
+                          <div className="text-[9px] text-[#e4e4d4]/50 font-bold uppercase">
+                            {calcs.feedPercentPV > 0 ? `${formatNumber(calcs.feedPercentPV, 2)}% PV` : '---'}
+                            {calcs.feedTypeId && (() => {
+                              const fType = feedMap.get(calcs.feedTypeId);
+                              return fType ? ` • ${fType.name}` : '';
+                            })()}
+                          </div>
+                        </td>
+                        <td className="py-3 px-2 text-center">
+                          {planningRows.length > 1 && (
+                            <button
+                              type="button"
+                              onClick={() => handleRemovePlanningRow(row.id)}
+                              className="p-1.5 text-[#e4e4d4]/40 hover:text-red-400 rounded-lg hover:bg-red-500/10 transition-colors"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Mobile Stack View */}
+            <div className="lg:hidden space-y-4">
+              {planningRows.map((row, index) => {
+                const calcs = getRowCalculations(row);
+                const table = (state.feedingTables || []).find(t => t.id === row.tableId);
+                const allTableWeeks = table ? [
+                  ...table.recriaInicial,
+                  ...table.recriaFinal,
+                  ...table.crescimento,
+                  ...table.terminacao
+                ].map(r => r.week) : [];
+
+                return (
+                  <div key={row.id} className="bg-black/20 p-5 rounded-2xl border border-white/10 space-y-3 relative">
+                    {planningRows.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => handleRemovePlanningRow(row.id)}
+                        className="absolute right-3 top-3 p-1 text-[#e4e4d4]/40 hover:text-red-400 rounded-lg hover:bg-red-500/10 transition-colors"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    )}
+                    <div className="text-[10px] font-black text-blue-400 uppercase tracking-widest mb-1">
+                      LOTE #{index + 1}
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-[9px] font-bold text-[#e4e4d4]/50 uppercase tracking-wider mb-1">Lote</label>
+                        <select
+                          className="w-full px-3 py-2 bg-black/20 border border-white/10 rounded-xl font-bold text-xs outline-none text-white"
+                          value={row.batchId}
+                          onChange={(e) => handleRowBatchChange(row.id, e.target.value)}
+                        >
+                          <option value="">Selecione...</option>
+                          {(state.batches || []).filter(b => !b.isClosed).map(b => (
+                            <option key={b.id} value={b.id}>{b.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-[9px] font-bold text-[#e4e4d4]/50 uppercase tracking-wider mb-1">Tabela de Referência</label>
+                        <select
+                          className="w-full px-3 py-2 bg-black/20 border border-white/10 rounded-xl font-bold text-xs outline-none text-white"
+                          value={row.tableId}
+                          onChange={(e) => handleRowTableChange(row.id, e.target.value)}
+                        >
+                          <option value="">Selecione...</option>
+                          {(state.feedingTables || []).map(t => (
+                            <option key={t.id} value={t.id}>{t.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                    
+                    <div className="grid grid-cols-3 gap-2">
+                      <div>
+                        <label className="block text-[9px] font-bold text-[#e4e4d4]/50 uppercase tracking-wider mb-1">Peixes Vivos</label>
+                        <input
+                          type="number"
+                          className="w-full px-2 py-2 bg-black/20 border border-white/10 rounded-xl font-bold text-xs text-center outline-none text-white"
+                          value={row.fishCount}
+                          onChange={(e) => handleRowFieldChange(row.id, 'fishCount', e.target.value)}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[9px] font-bold text-[#e4e4d4]/50 uppercase tracking-wider mb-1">Peso Médio (g)</label>
+                        <input
+                          type="number"
+                          step="0.1"
+                          className="w-full px-2 py-2 bg-black/20 border border-white/10 rounded-xl font-bold text-xs text-center outline-none text-white"
+                          value={row.averageWeight}
+                          onChange={(e) => handleRowWeightChange(row.id, e.target.value)}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[9px] font-bold text-[#e4e4d4]/50 uppercase tracking-wider mb-1">Semana</label>
+                        {allTableWeeks.length > 0 ? (
+                          <select
+                            className="w-full px-2 py-2 bg-black/20 border border-white/10 rounded-xl font-bold text-xs text-center outline-none text-white"
+                            value={row.currentWeek}
+                            onChange={(e) => handleRowFieldChange(row.id, 'currentWeek', e.target.value)}
+                          >
+                            {allTableWeeks.map(wk => (
+                              <option key={wk} value={wk}>Semana {wk}</option>
+                            ))}
+                          </select>
+                        ) : (
+                          <div className="text-xs font-bold text-slate-400 py-2 text-center bg-black/10 rounded-xl border border-white/5">
+                            {row.currentWeek || '---'}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3 items-center pt-2 border-t border-white/5">
+                      <div>
+                        <label className="block text-[9px] font-bold text-[#e4e4d4]/50 uppercase tracking-wider mb-1">Dias p/ Cálculo</label>
+                        <input
+                          type="number"
+                          min="1"
+                          className="w-20 px-2 py-1.5 bg-black/20 border border-white/10 rounded-xl font-bold text-xs text-center outline-none text-white"
+                          value={row.calculationDays}
+                          onChange={(e) => handleRowFieldChange(row.id, 'calculationDays', e.target.value)}
+                        />
+                      </div>
+                      <div className="text-right">
+                        <div className="text-sm font-extrabold text-blue-400">
+                          {formatNumber(calcs.totalFeed, 1)} kg
+                        </div>
+                        <div className="text-[9px] text-[#e4e4d4]/50 font-bold uppercase mt-0.5">
+                          {calcs.feedPercentPV > 0 ? `${formatNumber(calcs.feedPercentPV, 2)}% PV` : ''}
+                          {calcs.feedTypeId && (() => {
+                            const fType = feedMap.get(calcs.feedTypeId);
+                            return fType ? `, ${fType.name}` : '';
+                          })()}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Aggregated Feed Order Summary */}
+          {orderAggregation.items.length > 0 && (
+            <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-200">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 pb-4 border-b border-slate-100 font-sans">
+                <div className="flex items-center gap-3">
+                  <div className="p-3 bg-emerald-50 text-emerald-600 rounded-2xl">
+                    <Package className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-black text-slate-800 uppercase tracking-tighter italic">
+                      Resumo da Programação (Pedido Consolidado)
+                    </h3>
+                    <p className="text-xs text-slate-400 font-bold uppercase tracking-tight">
+                      Calculado abatendo o saldo atual do estoque físico de ração
+                    </p>
+                  </div>
+                </div>
+                <div className="flex flex-wrap gap-3">
+                  <button
+                    onClick={handleDownloadPDF}
+                    className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl font-black uppercase text-xs tracking-wider flex items-center justify-center gap-2 shadow-xl shadow-blue-500/25 transition-all active:scale-95"
+                  >
+                    <FileDown className="w-4 h-4" /> PDF do Pedido
+                  </button>
+                  <button
+                    onClick={handleCopyOrder}
+                    className="px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl font-black uppercase text-xs tracking-wider flex items-center justify-center gap-2 shadow-xl shadow-emerald-500/25 transition-all active:scale-95"
+                  >
+                    <Copy className="w-4 h-4" /> Copiar (WhatsApp)
+                  </button>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 font-sans">
+                <div className="lg:col-span-7 space-y-4">
+                  <div className="overflow-x-auto border border-slate-100 rounded-2xl">
+                    <table className="w-full text-left">
+                      <thead className="bg-slate-50 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100">
+                        <tr>
+                          <th className="px-5 py-3.5">Modelo de Ração</th>
+                          <th className="px-3 py-3.5 text-right font-black">Demanda (Kg)</th>
+                          <th className="px-3 py-3.5 text-right font-black">Estoque (Kg)</th>
+                          <th className="px-3 py-3.5 text-right font-black text-blue-600">A Pedir (Kg)</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {orderAggregation.items.map(item => (
+                          <tr key={item.feedId} className="hover:bg-slate-50 transition-colors">
+                            <td className="px-5 py-4 font-black text-slate-800 uppercase">{item.feedName}</td>
+                            <td className="px-3 py-4 text-right font-bold text-slate-500">{formatNumber(item.totalKg, 1)} kg</td>
+                            <td className="px-3 py-4 text-right font-bold text-slate-400">{formatNumber(item.stockKg, 1)} kg</td>
+                            <td className="px-3 py-4 text-right font-black text-blue-600 text-sm">
+                              {formatNumber(item.orderKg, 1)} kg
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                      <tfoot>
+                        <tr className="bg-slate-50 font-black text-slate-800 border-t border-slate-100">
+                          <td className="px-5 py-4 uppercase">Total Geral</td>
+                          <td className="px-3 py-4 text-right text-slate-600">{formatNumber(orderAggregation.grandTotalKg, 1)} kg</td>
+                          <td className="px-3 py-4 text-right text-slate-500">{formatNumber(orderAggregation.grandTotalStockKg, 1)} kg</td>
+                          <td className="px-3 py-4 text-right text-blue-600 text-sm">{formatNumber(orderAggregation.grandTotalOrderKg, 1)} kg</td>
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </div>
+                </div>
+
+                {/* Copiable Text Preview Box */}
+                <div className="lg:col-span-5 flex flex-col h-full">
+                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Visualização do Texto</label>
+                  <div className="flex-1 min-h-[220px] bg-slate-50 border border-slate-100 rounded-2xl p-4 font-mono text-[11px] text-slate-700 overflow-y-auto leading-relaxed border-dashed whitespace-pre-wrap">
+                    {(() => {
+                      let text = `📋 *RESUMO DO PEDIDO DE RAÇÃO*\n`;
+                      text += `----------------------------------\n\n`;
+                      orderAggregation.items.forEach(item => {
+                        text += `🔹 *${item.feedName.toUpperCase()}*\n`;
+                        text += `   • Demanda Total: ${formatNumber(item.totalKg, 1)} kg\n`;
+                        text += `   • Saldo em Estoque: ${formatNumber(item.stockKg, 1)} kg\n`;
+                        text += `   • *A ser pedido: ${formatNumber(item.orderKg, 1)} kg*\n\n`;
+                      });
+                      text += `----------------------------------\n`;
+                      text += `Total Planejado: ${formatNumber(orderAggregation.grandTotalKg, 1)} kg\n`;
+                      text += `Estoque Abatido: ${formatNumber(orderAggregation.grandTotalStockKg, 1)} kg\n`;
+                      text += `Total Líquido a Pedir: *${formatNumber(orderAggregation.grandTotalOrderKg, 1)} kg*\n\n`;
+                      text += `Gerado em: ${format(new Date(), 'dd/MM/yyyy HH:mm')}`;
+                      return text;
+                    })()}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>
