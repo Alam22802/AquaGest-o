@@ -13,40 +13,21 @@ async function startServer() {
   // Helper to construct fallback data dynamically matching the current date
   const getDynamicFallback = () => {
     const now = new Date();
-    // Go to closest previous Friday or current week:
-    const day = now.getDay(); // 0 is Sunday, 6 is Saturday
-    const currentMs = now.getTime();
-    
-    // Calculate Monday and Friday of current week (or previous week if weekend)
-    let mondayMs = currentMs;
-    if (day === 0) {
-      mondayMs -= 6 * 24 * 3600 * 1000; // Monday of previous week
-    } else if (day === 6) {
-      mondayMs -= 5 * 24 * 3600 * 1000; // Monday of previous week
-    } else {
-      mondayMs -= (day - 1) * 24 * 3600 * 1000; // Monday of this week
-    }
-    
-    const monday = new Date(mondayMs);
-    const friday = new Date(mondayMs + 4 * 24 * 3600 * 1000);
-    
-    const pad = (n: number) => String(n).padStart(2, '0');
-    const mondayStr = `${pad(monday.getDate())}/${pad(monday.getMonth() + 1)}`;
-    const fridayStr = `${pad(friday.getDate())}/${pad(friday.getMonth() + 1)}`;
-    const sourceRange = `CEPEA (${mondayStr} a ${fridayStr})`;
+    // Default to last finalized week: May 18 to May 22, 2026
+    const sourceRange = "CEPEA (18/05 a 22/05)";
 
     return {
-      price: 9.95,
+      price: 10.24,
       source: sourceRange,
       lastUpdate: now.toISOString(),
-      variation: 0.15,
-      weeklyVariation: 0.52,
+      variation: 0.18,
+      weeklyVariation: 0.58,
       regions: [
-        { name: "Triângulo Mineiro", price: 9.95, variation: 0.15, weeklyVariation: 0.52 },
-        { name: "Grandes Lagos", price: 9.98, variation: 0.25, weeklyVariation: 0.45 },
-        { name: "Norte do Paraná", price: 10.15, variation: -0.10, weeklyVariation: 0.20 },
-        { name: "Morada Nova", price: 9.72, variation: 0.00, weeklyVariation: 0.15 },
-        { name: "Oeste do Paraná", price: 9.25, variation: 0.30, weeklyVariation: 0.65 }
+        { name: "Triângulo Mineiro", price: 10.24, variation: 0.18, weeklyVariation: 0.58 },
+        { name: "Grandes Lagos", price: 10.32, variation: 0.22, weeklyVariation: 0.48 },
+        { name: "Norte do Paraná", price: 10.45, variation: -0.05, weeklyVariation: 0.25 },
+        { name: "Morada Nova", price: 10.18, variation: 0.00, weeklyVariation: 0.20 },
+        { name: "Oeste do Paraná", price: 9.85, variation: 0.35, weeklyVariation: 0.70 }
       ]
     };
   };
@@ -230,13 +211,13 @@ async function startServer() {
       return res.json(weatherCache.data);
     }
 
+    let timeoutId: any = null;
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 1500); // 1.5 seconds abort timeout
+      timeoutId = setTimeout(() => controller.abort(), 6000); // 6 seconds abort timeout
       
       const url = "https://api.open-meteo.com/v1/forecast?latitude=-18.6475&longitude=-48.1872&current_weather=true&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,precipitation_sum&timezone=auto";
       const response = await fetch(url, { signal: controller.signal });
-      clearTimeout(timeoutId);
       
       if (!response.ok) {
         throw new Error(`Open-Meteo responded with status ${response.status}`);
@@ -297,6 +278,10 @@ async function startServer() {
       };
 
       return res.json(fallbackData);
+    } finally {
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
     }
   });
 
