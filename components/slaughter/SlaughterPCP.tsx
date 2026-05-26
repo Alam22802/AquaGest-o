@@ -83,17 +83,11 @@ const SlaughterPCP: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     return String(d.getMonth() + 1).padStart(2, '0'); // '01' - '12'
   });
 
-  // PDF Generation Selections
-  const [showPdfOptionsModal, setShowPdfOptionsModal] = useState(false);
-  const [pdfSelectedPeriod, setPdfSelectedPeriod] = useState<'filtered' | 'month'>('filtered');
-  const [pdfSelectedMonth, setPdfSelectedMonth] = useState<string>(() => {
-    const d = new Date();
-    return String(d.getMonth() + 1).padStart(2, '0'); // '01' - '12'
-  });
-  const [pdfSelectedYear, setPdfSelectedYear] = useState<number>(new Date().getFullYear());
+  // Month multi-selection filters and dropdown state
+  const [selectedMonthsFilter, setSelectedMonthsFilter] = useState<string[]>([]);
+  const [isMonthFilterDropdownOpen, setIsMonthFilterDropdownOpen] = useState(false);
 
   // Filter States for Slaughter Schedules
-  const [filterDate, setFilterDate] = useState('');
   const [filterProducerId, setFilterProducerId] = useState('');
   const [showOnlyRecent, setShowOnlyRecent] = useState(false);
   
@@ -121,6 +115,47 @@ const SlaughterPCP: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     ).sort((a, b) => a.sequentialCode - b.sequentialCode);
   }, [suppliers, searchTerm]);
 
+  const availableMonths = useMemo(() => {
+    const monthsMap = new Map<string, string>(); // monthKey -> label
+    schedules.forEach(s => {
+      const parts = s.expectedDate.split('-');
+      if (parts.length >= 2) {
+        const year = parts[0];
+        const monthStr = parts[1];
+        const monthKey = `${year}-${monthStr}`;
+        if (!monthsMap.has(monthKey)) {
+          const mIndex = Number(monthStr) - 1;
+          const monthName = monthsList[mIndex]?.name || monthStr;
+          monthsMap.set(monthKey, `${monthName} de ${year}`);
+        }
+      }
+    });
+
+    // If no schedules exist, put current month as default
+    if (monthsMap.size === 0) {
+      const d = new Date();
+      const currentYear = d.getFullYear();
+      const currentMonthStr = String(d.getMonth() + 1).padStart(2, '0');
+      const mIndex = d.getMonth();
+      const monthName = monthsList[mIndex]?.name || currentMonthStr;
+      monthsMap.set(`${currentYear}-${currentMonthStr}`, `${monthName} de ${currentYear}`);
+    }
+
+    return Array.from(monthsMap.entries())
+      .map(([key, label]) => ({ key, label }))
+      .sort((a, b) => b.key.localeCompare(a.key));
+  }, [schedules]);
+
+  const handleToggleMonthFilter = (monthKey: string) => {
+    setSelectedMonthsFilter(prev => {
+      if (prev.includes(monthKey)) {
+        return prev.filter(m => m !== monthKey);
+      } else {
+        return [...prev, monthKey];
+      }
+    });
+  };
+
   const filteredSchedules = useMemo(() => {
     let result = [...schedules];
 
@@ -129,9 +164,14 @@ const SlaughterPCP: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       result = result.filter(s => s.supplierId === filterProducerId);
     }
 
-    // Filter by date
-    if (filterDate) {
-      result = result.filter(s => s.expectedDate === filterDate);
+    // Filter by selected months
+    if (selectedMonthsFilter.length > 0) {
+      result = result.filter(s => {
+        const parts = s.expectedDate.split('-');
+        if (parts.length < 2) return false;
+        const monthKey = `${parts[0]}-${parts[1]}`;
+        return selectedMonthsFilter.includes(monthKey);
+      });
     }
 
     // Sort strategy and/or limit based on "últimos lançamentos"
@@ -146,7 +186,7 @@ const SlaughterPCP: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     }
 
     return result;
-  }, [schedules, filterProducerId, filterDate, showOnlyRecent]);
+  }, [schedules, filterProducerId, selectedMonthsFilter, showOnlyRecent]);
 
   // Group schedules dynamically by Month, then Day for the Accordion layout
   const groupedSchedules = useMemo(() => {
@@ -854,7 +894,21 @@ const SlaughterPCP: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
               <div className="flex flex-wrap items-center gap-2">
                 <button
                   type="button"
-                  onClick={() => setShowPdfOptionsModal(true)}
+                  onClick={() => {
+                    let pdfSubtitle = 'Filtro Ativo';
+                    if (selectedMonthsFilter.length > 0) {
+                      const monthLabels = selectedMonthsFilter.map(key => {
+                        const [year, monthStr] = key.split('-');
+                        const mIndex = Number(monthStr) - 1;
+                        const monthName = monthsList[mIndex]?.name || monthStr;
+                        return `${monthName}/${year}`;
+                      });
+                      pdfSubtitle = `Meses: ${monthLabels.join(', ')}`;
+                    } else {
+                      pdfSubtitle = 'Todos os Registros';
+                    }
+                    handleDownloadPDF(filteredSchedules, pdfSubtitle);
+                  }}
                   className="flex items-center justify-center gap-2 bg-[#344434] text-white px-5 py-3 rounded-2xl text-xs font-black uppercase tracking-widest shadow-md hover:scale-105 transition-all"
                 >
                   <FileDown className="w-4 h-4" />
@@ -880,25 +934,79 @@ const SlaughterPCP: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
 
             {/* Filters Bar */}
             <div className="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
-              <div>
-                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 ml-1 flex items-center gap-1">
-                  <Calendar className="w-3.5 h-3.5" /> Filtrar por Data
+              <div className="relative">
+                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1 flex items-center gap-1">
+                  <Calendar className="w-3.5 h-3.5" /> Filtrar por Mês
                 </label>
                 <div className="relative">
-                  <input
-                    type="date"
-                    value={filterDate}
-                    onChange={(e) => setFilterDate(e.target.value)}
-                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-slate-900/5 transition-all"
-                  />
-                  {filterDate && (
-                    <button
-                      onClick={() => setFilterDate('')}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-                    >
-                      <X className="w-3.5 h-3.5" />
-                    </button>
-                  )}
+                  <button
+                    type="button"
+                    onClick={() => setIsMonthFilterDropdownOpen(!isMonthFilterDropdownOpen)}
+                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-left flex items-center justify-between text-slate-700 min-h-[38px] focus:outline-none focus:ring-2 focus:ring-slate-900/5"
+                  >
+                    <span className="truncate">
+                      {selectedMonthsFilter.length === 0 
+                        ? 'Todos os Meses' 
+                        : selectedMonthsFilter.length === 1 
+                          ? `${availableMonths.find(m => m.key === selectedMonthsFilter[0])?.label || selectedMonthsFilter[0]}`
+                          : `${selectedMonthsFilter.length} meses selecionados`}
+                    </span>
+                    <ChevronDown className={`w-4 h-4 text-slate-500 transition-transform flex-shrink-0 ${isMonthFilterDropdownOpen ? 'rotate-180' : ''}`} />
+                  </button>
+                  
+                  <AnimatePresence>
+                    {isMonthFilterDropdownOpen && (
+                      <>
+                        <div 
+                          className="fixed inset-0 z-10" 
+                          onClick={() => setIsMonthFilterDropdownOpen(false)} 
+                        />
+                        <motion.div
+                          initial={{ opacity: 0, y: 5 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: 5 }}
+                          className="absolute left-0 right-0 mt-1 max-h-60 overflow-y-auto bg-white border border-slate-200 rounded-2xl shadow-xl z-20 p-2 space-y-1"
+                        >
+                          <div className="flex items-center justify-between border-b border-slate-100 pb-1.5 mb-1.5 px-2">
+                            <button
+                              type="button"
+                              onClick={() => setSelectedMonthsFilter([])}
+                              className="text-[10px] font-black text-[#344434] hover:underline uppercase tracking-wide"
+                            >
+                              Limpar
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setSelectedMonthsFilter(availableMonths.map(m => m.key))}
+                              className="text-[10px] font-black text-[#344434] hover:underline uppercase tracking-wide"
+                            >
+                              Marcar Todos
+                            </button>
+                          </div>
+                          {availableMonths.map(m => {
+                            const isChecked = selectedMonthsFilter.includes(m.key);
+                            return (
+                              <button
+                                key={m.key}
+                                type="button"
+                                onClick={() => handleToggleMonthFilter(m.key)}
+                                className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl hover:bg-slate-50 text-left text-xs transition-colors"
+                              >
+                                {isChecked ? (
+                                  <CheckSquare className="w-4 h-4 text-[#344434]" />
+                                ) : (
+                                  <Square className="w-4 h-4 text-slate-400" />
+                                )}
+                                <span className={`font-bold ${isChecked ? 'text-slate-900' : 'text-slate-600'}`}>
+                                  {m.label}
+                                </span>
+                              </button>
+                            );
+                          })}
+                        </motion.div>
+                      </>
+                    )}
+                  </AnimatePresence>
                 </div>
               </div>
 
@@ -937,10 +1045,10 @@ const SlaughterPCP: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
               </div>
 
               {/* Reset Filters */}
-              {(filterDate || filterProducerId || showOnlyRecent) ? (
+              {(selectedMonthsFilter.length > 0 || filterProducerId || showOnlyRecent) ? (
                 <button
                   onClick={() => {
-                    setFilterDate('');
+                    setSelectedMonthsFilter([]);
                     setFilterProducerId('');
                     setShowOnlyRecent(false);
                   }}
@@ -1024,6 +1132,21 @@ const SlaughterPCP: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                       className="p-5 flex items-center justify-between cursor-pointer hover:bg-slate-50/50 transition-colors border-b border-transparent select-none"
                     >
                       <div className="flex items-center gap-3">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleToggleMonthFilter(group.monthKey);
+                          }}
+                          className="mr-1 p-1 hover:bg-slate-200 rounded-lg text-slate-400 hover:text-slate-600 transition-colors"
+                          title={selectedMonthsFilter.includes(group.monthKey) ? "Filtrado (clique para remover)" : "Clique para selecionar este mês"}
+                        >
+                          {selectedMonthsFilter.includes(group.monthKey) ? (
+                            <CheckSquare className="w-5 h-5 text-[#344434]" />
+                          ) : (
+                            <Square className="w-5 h-5" />
+                          )}
+                        </button>
                         <div className="p-2.5 rounded-xl bg-[#344434]/10 text-[#344434]">
                           <Calendar className="w-5 h-5" />
                         </div>
@@ -1452,151 +1575,6 @@ const SlaughterPCP: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                         className="flex-[2] bg-[#344434] text-white px-6 py-4 rounded-2xl text-xs font-black uppercase tracking-widest shadow-xl shadow-slate-900/20 hover:scale-105 transition-all active:scale-95"
                       >
                         {editingScheduleId ? 'Salvar Alterações' : `Finalizar Cadastro (${tempLines.length} Linhas)`}
-                      </button>
-                    </div>
-                  </div>
-                </motion.div>
-              </div>
-            )}
-
-            {/* Modal de Opções do PDF com Seletor de Período e Mês em Pantone do Sistema */}
-            {showPdfOptionsModal && (
-              <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                <motion.div
-                  initial={{ scale: 0.95, opacity: 0 }}
-                  animate={{ scale: 1, opacity: 1 }}
-                  className="bg-white w-full max-w-md rounded-[3rem] p-8 shadow-2xl relative overflow-hidden"
-                >
-                  <div className="relative z-10 flex flex-col h-full">
-                    <div className="flex items-center justify-between mb-4 border-b border-slate-100 pb-3">
-                      <h2 className="text-xl font-black text-[#344434] uppercase tracking-tight italic flex items-center gap-2">
-                        <FileDown className="w-5 h-5 text-[#344434]" />
-                        Exportar Relatório PCP
-                      </h2>
-                      <button 
-                        onClick={() => setShowPdfOptionsModal(false)}
-                        className="p-2 hover:bg-slate-100 rounded-full text-slate-400 hover:text-slate-600 transition-colors"
-                      >
-                        <X className="w-5 h-5" />
-                      </button>
-                    </div>
-
-                    <div className="space-y-4 py-2">
-                      <p className="text-xs text-slate-500 font-medium">
-                        Selecione as opções de período para geração do relatório em formato PDF de acordo com o padrão do sistema.
-                      </p>
-
-                      <div className="space-y-3">
-                        {/* Option 1: Filtered records */}
-                        <label className={`flex items-start gap-3 p-4 rounded-2xl border cursor-pointer transition-all ${
-                          pdfSelectedPeriod === 'filtered' 
-                            ? 'bg-[#344434]/5 border-[#344434]' 
-                            : 'bg-slate-50/50 border-slate-200 hover:bg-slate-50'
-                        }`}>
-                          <input 
-                            type="radio" 
-                            name="pdfPeriodType"
-                            checked={pdfSelectedPeriod === 'filtered'}
-                            onChange={() => setPdfSelectedPeriod('filtered')}
-                            className="mt-0.5 accent-[#344434]" 
-                          />
-                          <div>
-                            <span className="block text-xs font-black text-slate-950 uppercase tracking-wide">
-                              Filtros Ativos
-                            </span>
-                            <span className="block text-[11px] text-slate-500 mt-0.5">
-                              Exporta apenas os lançamentos que estão visíveis no seu histórico filtrado ({filteredSchedules.length} registros).
-                            </span>
-                          </div>
-                        </label>
-
-                        {/* Option 2: Target month */}
-                        <label className={`flex items-start gap-3 p-4 rounded-2xl border cursor-pointer transition-all ${
-                          pdfSelectedPeriod === 'month' 
-                            ? 'bg-[#344434]/5 border-[#344434]' 
-                            : 'bg-slate-50/50 border-slate-200 hover:bg-slate-50'
-                        }`}>
-                          <input 
-                            type="radio" 
-                            name="pdfPeriodType"
-                            checked={pdfSelectedPeriod === 'month'}
-                            onChange={() => setPdfSelectedPeriod('month')}
-                            className="mt-0.5 accent-[#344434]" 
-                          />
-                          <div className="flex-1">
-                            <span className="block text-xs font-black text-slate-950 uppercase tracking-wide">
-                              Mês Específico
-                            </span>
-                            <span className="block text-[11px] text-slate-500 mt-0.5">
-                              Selecione um mês de referência para exportar todas as programações daquele mês específico.
-                            </span>
-
-                            {pdfSelectedPeriod === 'month' && (
-                              <div className="grid grid-cols-2 gap-2 mt-3 animate-in fade-in slide-in-from-top-1">
-                                <div>
-                                  <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Mês</label>
-                                  <select
-                                    value={pdfSelectedMonth}
-                                    onChange={(e) => setPdfSelectedMonth(e.target.value)}
-                                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold outline-none"
-                                  >
-                                    {monthsList.map(m => (
-                                      <option key={m.value} value={m.value}>{m.name}</option>
-                                    ))}
-                                  </select>
-                                </div>
-                                <div>
-                                  <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Ano</label>
-                                  <select
-                                    value={pdfSelectedYear}
-                                    onChange={(e) => setPdfSelectedYear(Number(e.target.value))}
-                                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold outline-none"
-                                  >
-                                    <option value={currentYear - 1}>{currentYear - 1}</option>
-                                    <option value={currentYear}>{currentYear}</option>
-                                    <option value={currentYear + 1}>{currentYear + 1}</option>
-                                  </select>
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        </label>
-                      </div>
-                    </div>
-
-                    {/* Footer Actions */}
-                    <div className="flex gap-4 border-t border-slate-100 pt-5 mt-4">
-                      <button
-                        onClick={() => setShowPdfOptionsModal(false)}
-                        className="flex-1 px-5 py-3.5 rounded-2xl text-xs font-black uppercase tracking-widest text-slate-400 hover:bg-slate-50 transition-all font-mono"
-                      >
-                        Cancelar
-                      </button>
-                      <button
-                        onClick={() => {
-                          if (pdfSelectedPeriod === 'filtered') {
-                            handleDownloadPDF(filteredSchedules, 'Filtro Ativo');
-                          } else {
-                            const yearStr = String(pdfSelectedYear);
-                            const monthStr = pdfSelectedMonth;
-                            const monthRecords = schedules.filter(s => s.expectedDate.startsWith(`${yearStr}-${monthStr}`));
-                            
-                            if (monthRecords.length === 0) {
-                              const mIndex = Number(monthStr) - 1;
-                              const monthName = monthsList[mIndex]?.name || monthStr;
-                              alert(`Nenhuma programação de abate cadastrada para o mês de ${monthName} de ${yearStr}.`);
-                              return;
-                            }
-                            
-                            const mIndex = Number(monthStr) - 1;
-                            const monthName = monthsList[mIndex]?.name || monthStr;
-                            handleDownloadPDF(monthRecords, `${monthName} de ${yearStr}`);
-                          }
-                          setShowPdfOptionsModal(false);
-                        }}
-                        className="flex-[2] bg-[#344434] text-white px-5 py-3.5 rounded-2xl text-xs font-black uppercase tracking-widest shadow-xl shadow-[#344434]/20 hover:scale-105 transition-all active:scale-95 animate-in"
-                      >
-                        Gerar PDF
                       </button>
                     </div>
                   </div>
