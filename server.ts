@@ -213,7 +213,7 @@ async function startServer() {
     let timeoutId: any = null;
     try {
       const controller = new AbortController();
-      timeoutId = setTimeout(() => controller.abort(), 6000); // 6 seconds abort timeout
+      timeoutId = setTimeout(() => controller.abort(), 10000); // 10 seconds abort timeout
       
       const url = "https://api.open-meteo.com/v1/forecast?latitude=-18.6475&longitude=-48.1872&current_weather=true&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,precipitation_sum&timezone=auto";
       const response = await fetch(url, { signal: controller.signal });
@@ -242,12 +242,9 @@ async function startServer() {
       };
 
       return res.json(data);
-    } catch (error) {
-      console.error("Error calling Open-Meteo weather API server-side:", error);
-      
+    } catch (error: any) {
       // Serve stale cache if available
       if (weatherCache) {
-        console.log("Serving stale weather cache...");
         return res.json(weatherCache.data);
       }
 
