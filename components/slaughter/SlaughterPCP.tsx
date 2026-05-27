@@ -94,6 +94,17 @@ const SlaughterPCP: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
   // Multiple Selection State
   const [selectedScheduleIds, setSelectedScheduleIds] = useState<Set<string>>(new Set());
 
+  // Month-wide editing states
+  const [editingMonthKey, setEditingMonthKey] = useState<string | null>(null);
+  const [editingMonthLabel, setEditingMonthLabel] = useState<string>('');
+  const [monthLines, setMonthLines] = useState<{
+    id: string;
+    supplierId: string;
+    expectedDate: string;
+    expectedWeight: number;
+    pricePerKg: number;
+  }[]>([]);
+
   // Accordion active expanded state (stores monthKeys and dateStrings)
   const [expandedMonths, setExpandedMonths] = useState<Set<string>>(() => {
     // Expand current month by default
@@ -360,6 +371,97 @@ const SlaughterPCP: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     setLineExpectedWeight('');
     setLinePricePerKg('');
     setNewSchedule({ expectedDate: new Date().toISOString().split('T')[0] });
+  };
+
+  const handleStartEditMonth = (monthKey: string, monthLabel: string) => {
+    setEditingMonthKey(monthKey);
+    setEditingMonthLabel(monthLabel);
+    
+    // Find matching schedules
+    const matching = (state.pcpSlaughterSchedules || []).filter(s => s.expectedDate.startsWith(monthKey));
+    setMonthLines(matching.map(s => ({
+      id: s.id,
+      supplierId: s.supplierId || '',
+      expectedDate: s.expectedDate,
+      expectedWeight: s.expectedWeight || 0,
+      pricePerKg: s.pricePerKg || 0
+    })));
+  };
+
+  const handleCancelMonthEdit = () => {
+    setEditingMonthKey(null);
+    setEditingMonthLabel('');
+    setMonthLines([]);
+  };
+
+  const handleMonthLineChange = (index: number, field: string, value: any) => {
+    setMonthLines(prev => {
+      const updated = [...prev];
+      updated[index] = {
+        ...updated[index],
+        [field]: value
+      };
+      return updated;
+    });
+  };
+
+  const handleAddMonthLine = () => {
+    const defaultDate = editingMonthKey ? `${editingMonthKey}-01` : new Date().toISOString().split('T')[0];
+    setMonthLines(prev => [
+      ...prev,
+      {
+        id: `new_${crypto.randomUUID()}`,
+        supplierId: '',
+        expectedDate: defaultDate,
+        expectedWeight: 0,
+        pricePerKg: 0
+      }
+    ]);
+  };
+
+  const handleDeleteMonthLine = (index: number) => {
+    setMonthLines(prev => prev.filter((_, idx) => idx !== index));
+  };
+
+  const handleSaveMonthSchedules = () => {
+    if (!editingMonthKey) return;
+
+    // Validation
+    const invalidLines = monthLines.some(line => !line.supplierId || Number(line.expectedWeight) <= 0 || Number(line.pricePerKg) <= 0 || !line.expectedDate);
+    if (invalidLines) {
+      alert('Por favor, preencha todos os campos corretamente (fornecedor, data, peso > 0 e valor > 0) para todas as programações.');
+      return;
+    }
+
+    const currentSchedules = state.pcpSlaughterSchedules || [];
+    const otherSchedules = currentSchedules.filter(s => !s.expectedDate.startsWith(editingMonthKey));
+    const originalMatching = currentSchedules.filter(s => s.expectedDate.startsWith(editingMonthKey));
+
+    // Convert monthLines to actual schedules
+    const updatedSchedules: PCPSlaughterSchedule[] = monthLines.map(line => ({
+      id: line.id.startsWith('new_') ? crypto.randomUUID() : line.id,
+      supplierId: line.supplierId,
+      expectedDate: line.expectedDate,
+      expectedWeight: Number(line.expectedWeight),
+      pricePerKg: Number(line.pricePerKg),
+      userId: currentUser.id,
+      updatedAt: Date.now()
+    }));
+
+    // Find custom deleted IDs that were originally saved
+    const originalIds = originalMatching.map(s => s.id);
+    const finalIds = new Set(updatedSchedules.map(s => s.id));
+    const deletedSpecificIds = originalIds.filter(id => !finalIds.has(id));
+
+    onUpdate({
+      ...state,
+      pcpSlaughterSchedules: [...otherSchedules, ...updatedSchedules],
+      deletedIds: Array.from(new Set([...(state.deletedIds || []), ...deletedSpecificIds]))
+    });
+
+    setEditingMonthKey(null);
+    setEditingMonthLabel('');
+    setMonthLines([]);
   };
 
   const handleToggleSelectAll = () => {
@@ -1163,7 +1265,15 @@ const SlaughterPCP: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                       <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                        <button
+                          type="button"
+                          onClick={() => handleStartEditMonth(group.monthKey, group.label)}
+                          title="Editar Todas as Programações deste Mês"
+                          className="p-2 hover:bg-amber-50 text-amber-600 rounded-xl transition-all"
+                        >
+                          <Edit className="w-4.5 h-4.5" />
+                        </button>
                         <button
                           type="button"
                           onClick={() => handleDownloadPDF(allMonthSchedules, `Mês ${group.label}`)}
@@ -1575,6 +1685,158 @@ const SlaughterPCP: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                         className="flex-[2] bg-[#344434] text-white px-6 py-4 rounded-2xl text-xs font-black uppercase tracking-widest shadow-xl shadow-slate-900/20 hover:scale-105 transition-all active:scale-95"
                       >
                         {editingScheduleId ? 'Salvar Alterações' : `Finalizar Cadastro (${tempLines.length} Linhas)`}
+                      </button>
+                    </div>
+                  </div>
+                </motion.div>
+              </div>
+            )}
+
+            {/* Modal Edit Month Schedules */}
+            {editingMonthKey && (
+              <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                <motion.div
+                  initial={{ scale: 0.95, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  className="bg-white w-full max-w-5xl rounded-[3rem] p-8 shadow-2xl relative overflow-hidden flex flex-col max-h-[90vh]"
+                >
+                  <div className="relative z-10 flex flex-col h-full overflow-hidden">
+                    {/* Header */}
+                    <div className="flex items-center justify-between mb-4 border-b border-slate-100 pb-3">
+                      <h2 className="text-2xl font-black text-slate-900 uppercase tracking-tight italic flex items-center gap-2">
+                        <Calendar className="w-6 h-6 text-[#344434]" />
+                        Editar Programação Mensal: {editingMonthLabel}
+                      </h2>
+                      <button 
+                        onClick={handleCancelMonthEdit}
+                        className="p-2 hover:bg-slate-100 rounded-full text-slate-400 hover:text-slate-600 transition-colors"
+                      >
+                        <X className="w-5 h-5" />
+                      </button>
+                    </div>
+
+                    {/* Quick Stats indicator inside Modal */}
+                    <div className="bg-[#344434]/5 border border-[#344434]/10 p-4 rounded-2xl flex flex-wrap md:flex-row items-center gap-6 mb-4">
+                      <div className="text-xs text-slate-600 font-bold">
+                        Total de Lançamentos: <span className="font-mono text-sm font-black text-slate-800">{monthLines.length}</span>
+                      </div>
+                      <div className="text-xs text-slate-600 font-bold">
+                        Peso Acumulado: <span className="text-sm font-black text-emerald-700">
+                          {monthLines.reduce((sum, item) => sum + (Number(item.expectedWeight) || 0), 0).toLocaleString()} kg
+                        </span>
+                      </div>
+                      <div className="text-xs text-slate-600 font-bold">
+                        Valor Estimado: <span className="text-sm font-black text-[#344434]">
+                          R$ {monthLines.reduce((sum, item) => sum + ((Number(item.expectedWeight) || 0) * (Number(item.pricePerKg) || 0)), 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Scrollable table container */}
+                    <div className="overflow-y-auto pr-2 flex-1 scrollbar-thin">
+                      <table className="w-full border-collapse">
+                        <thead>
+                          <tr className="border-b border-slate-100 text-left">
+                            <th className="px-3 py-3 text-[10px] font-black uppercase tracking-widest text-slate-400">Data *</th>
+                            <th className="px-3 py-3 text-[10px] font-black uppercase tracking-widest text-slate-400">Fornecedor *</th>
+                            <th className="px-3 py-3 text-[10px] font-black uppercase tracking-widest text-slate-400">Peso Previsto (kg) *</th>
+                            <th className="px-3 py-3 text-[10px] font-black uppercase tracking-widest text-slate-400">Valor/kg (R$) *</th>
+                            <th className="px-3 py-3 text-center text-[10px] font-black uppercase tracking-widest text-slate-400">Ações</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {monthLines.map((line, index) => (
+                            <tr key={line.id} className="hover:bg-slate-50/50 transition-colors">
+                              <td className="px-2 py-3 min-w-[150px]">
+                                <input
+                                  type="date"
+                                  value={line.expectedDate}
+                                  onChange={(e) => handleMonthLineChange(index, 'expectedDate', e.target.value)}
+                                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-bold text-xs outline-none focus:ring-2 focus:ring-[#344434]/10 transition-all"
+                                />
+                              </td>
+                              <td className="px-2 py-3 min-w-[200px]">
+                                <select
+                                  value={line.supplierId}
+                                  onChange={(e) => handleMonthLineChange(index, 'supplierId', e.target.value)}
+                                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-bold text-xs outline-none focus:ring-2 focus:ring-[#344434]/10 transition-all"
+                                >
+                                  <option value="">Selecione o Fornecedor...</option>
+                                  {suppliers.map(s => (
+                                    <option key={s.id} value={s.id}>{s.name} ({s.sequentialCode})</option>
+                                  ))}
+                                </select>
+                              </td>
+                              <td className="px-2 py-3">
+                                <input
+                                  type="number"
+                                  min="0"
+                                  step="any"
+                                  placeholder="0.0"
+                                  value={line.expectedWeight || ''}
+                                  onChange={(e) => handleMonthLineChange(index, 'expectedWeight', Number(e.target.value))}
+                                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-bold text-xs outline-none focus:ring-2 focus:ring-[#344434]/10 transition-all"
+                                />
+                              </td>
+                              <td className="px-2 py-3">
+                                <input
+                                  type="number"
+                                  min="0"
+                                  step="any"
+                                  placeholder="0.00"
+                                  value={line.pricePerKg || ''}
+                                  onChange={(e) => handleMonthLineChange(index, 'pricePerKg', Number(e.target.value))}
+                                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-bold text-xs outline-none focus:ring-2 focus:ring-[#344434]/10 transition-all"
+                                />
+                              </td>
+                              <td className="px-2 py-3 text-center">
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteMonthLine(index)}
+                                  className="p-2 hover:bg-red-50 text-red-500 rounded-xl transition-all"
+                                  title="Remover linha"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                          
+                          {monthLines.length === 0 && (
+                            <tr>
+                              <td colSpan={5} className="py-8 text-center text-slate-400 italic font-medium text-xs">
+                                Nenhuma programação cadastrada para este mês. Clique abaixo para adicionar!
+                              </td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    {/* Inner Actions bar / Add Line button */}
+                    <div className="flex justify-between items-center border-t border-slate-100 pt-4 mt-2">
+                      <button
+                        type="button"
+                        onClick={handleAddMonthLine}
+                        className="flex items-center gap-2 bg-[#344434]/10 hover:bg-[#344434]/15 active:scale-95 text-[#344434] px-5 py-3 rounded-2xl text-xs font-black uppercase tracking-widest transition-all"
+                      >
+                        <Plus className="w-4 h-4" /> Adicionar Programação
+                      </button>
+                    </div>
+
+                    {/* Bottom action bar */}
+                    <div className="flex gap-4 border-t border-slate-100 pt-5 mt-4">
+                      <button
+                        onClick={handleCancelMonthEdit}
+                        className="flex-1 px-6 py-4 rounded-2xl text-xs font-black uppercase tracking-widest text-[#344434] hover:bg-slate-50 transition-all font-mono"
+                      >
+                        Cancelar
+                      </button>
+                      <button
+                        onClick={handleSaveMonthSchedules}
+                        className="flex-[2] bg-emerald-600 text-white px-6 py-4 rounded-2xl text-xs font-black uppercase tracking-widest shadow-xl shadow-emerald-600/20 hover:scale-105 transition-all active:scale-95"
+                      >
+                        Salvar Alterações do Mês
                       </button>
                     </div>
                   </div>
