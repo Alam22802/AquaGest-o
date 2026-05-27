@@ -1423,9 +1423,12 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                             onChange={(e) => handleRowBatchChange(row.id, e.target.value)}
                           >
                             <option value="">Selecione...</option>
-                            {(state.batches || []).filter(b => !b.isClosed).map(b => (
-                              <option key={b.id} value={b.id}>{b.name}</option>
-                            ))}
+                            {[...(state.batches || [])]
+                              .filter(b => !b.isClosed)
+                              .sort((a, b) => (a.name || '').localeCompare(b.name || '', 'pt-BR', { sensitivity: 'base' }))
+                              .map(b => (
+                                <option key={b.id} value={b.id}>{b.name}</option>
+                              ))}
                           </select>
                         </td>
                         <td className="py-3 px-2">
@@ -1548,9 +1551,12 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                           onChange={(e) => handleRowBatchChange(row.id, e.target.value)}
                         >
                           <option value="">Selecione...</option>
-                          {(state.batches || []).filter(b => !b.isClosed).map(b => (
-                            <option key={b.id} value={b.id}>{b.name}</option>
-                          ))}
+                          {[...(state.batches || [])]
+                            .filter(b => !b.isClosed)
+                            .sort((a, b) => (a.name || '').localeCompare(b.name || '', 'pt-BR', { sensitivity: 'base' }))
+                            .map(b => (
+                              <option key={b.id} value={b.id}>{b.name}</option>
+                            ))}
                         </select>
                       </div>
                       <div>
