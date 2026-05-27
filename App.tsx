@@ -147,22 +147,26 @@ const App: React.FC = () => {
       
       const savedUser = getSession();
       if (savedUser) {
-        const updatedUser = data.users.find(u => u.id === savedUser.id);
-        if (updatedUser && updatedUser.isApproved) {
+        const updatedUser = data.users.find(u => u.id === savedUser.id) || savedUser;
+        if (updatedUser && (updatedUser.isApproved || updatedUser.isMaster)) {
           setCurrentUser(updatedUser);
           
-          // Se o usuário tem uma config diferente da global, forçar um sync remoto agora
-          if (updatedUser.supabaseConfig && 
-              (updatedUser.supabaseConfig.url !== data.supabaseConfig?.url || 
-               updatedUser.supabaseConfig.key !== data.supabaseConfig?.key)) {
+          // Sempre forçar uma sincronização remota inicial se houver alguma configuração de banco
+          const configToUse = updatedUser.supabaseConfig || data.supabaseConfig;
+          if (configToUse) {
              setIsSyncingBackground(true);
-             const remote = await fetchRemoteState(updatedUser.supabaseConfig);
-             if (remote) {
-               const merged = ensureStateIntegrity(data, remote, 'remote');
-               setState(merged);
-               lastSavedStateRef.current = merged;
+             try {
+               const remote = await fetchRemoteState(configToUse);
+               if (remote) {
+                 const merged = ensureStateIntegrity(data, remote, 'remote');
+                 setState(merged);
+                 lastSavedStateRef.current = merged;
+               }
+             } catch (syncErr) {
+               console.warn('Erro na sincronização inicial:', syncErr);
+             } finally {
+               setIsSyncingBackground(false);
              }
-             setIsSyncingBackground(false);
           }
         } else if (updatedUser && !updatedUser.isApproved) {
           setCurrentUser(null);
@@ -384,10 +388,31 @@ const App: React.FC = () => {
     });
   }, []);
 
-  const handleLogin = (user: User) => {
+  const handleLogin = useCallback(async (user: User) => {
     setCurrentUser(user);
     saveSession(user);
-  };
+    
+    // Sincronizar imediatamente após o login se houver configuração de banco de dados
+    const configToUse = user.supabaseConfig || state?.supabaseConfig;
+    if (configToUse && state) {
+      setIsSyncingBackground(true);
+      try {
+        const remote = await fetchRemoteState(configToUse);
+        if (remote) {
+          setState(prev => {
+            if (!prev) return remote;
+            const merged = ensureStateIntegrity(prev, remote, 'remote');
+            lastSavedStateRef.current = remote;
+            return merged;
+          });
+        }
+      } catch (err) {
+        console.warn('Erro ao sincronizar após login:', err);
+      } finally {
+        setIsSyncingBackground(false);
+      }
+    }
+  }, [state]);
 
   const handleLogout = () => {
     setCurrentUser(null);
