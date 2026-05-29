@@ -19,7 +19,7 @@ import PCMManagement from './components/PCMManagement.tsx';
 import SlaughterHouse from './components/SlaughterHouse.tsx';
 import Login from './components/Login.tsx';
 import ErrorBoundary from './components/ErrorBoundary.tsx';
-import { loadState, saveState, getSession, saveSession, ensureStateIntegrity, fetchRemoteState, subscribeToRemoteChanges, repairArray } from './store.ts';
+import { loadState, saveState, getSession, saveSession, ensureStateIntegrity, fetchRemoteState, subscribeToRemoteChanges, repairArray, getSupabaseConfig } from './store.ts';
 import { AppState, User } from './types.ts';
 import { Loader2, RefreshCw, AlertTriangle, X, Cloud, CheckCircle2 } from 'lucide-react';
 
@@ -142,6 +142,24 @@ const App: React.FC = () => {
         pcmPlannedImprovements: inject(data.pcmPlannedImprovements || []),
       };
 
+      // 1. Sempre que houver configuração de nuvem, sincronizar com o banco remoto na inicialização,
+      // mesmo se não houver um usuário logado ainda, para que o Login exiba a situação correta de aprovação e usuários atualizados.
+      const initialConfig = data.supabaseConfig || getSupabaseConfig();
+      if (initialConfig) {
+        setIsSyncingBackground(true);
+        try {
+          const remote = await fetchRemoteState(initialConfig);
+          if (remote) {
+            const merged = ensureStateIntegrity(data, remote, 'remote');
+            data = merged;
+          }
+        } catch (syncErr) {
+          console.warn('Erro na sincronização inicial:', syncErr);
+        } finally {
+          setIsSyncingBackground(false);
+        }
+      }
+
       setState(data);
       lastSavedStateRef.current = data;
       
@@ -150,29 +168,11 @@ const App: React.FC = () => {
         const updatedUser = data.users.find(u => u.id === savedUser.id) || savedUser;
         if (updatedUser && (updatedUser.isApproved || updatedUser.isMaster)) {
           setCurrentUser(updatedUser);
-          
-          // Sempre forçar uma sincronização remota inicial se houver alguma configuração de banco
-          const configToUse = updatedUser.supabaseConfig || data.supabaseConfig;
-          if (configToUse) {
-             setIsSyncingBackground(true);
-             try {
-               const remote = await fetchRemoteState(configToUse);
-               if (remote) {
-                 const merged = ensureStateIntegrity(data, remote, 'remote');
-                 setState(merged);
-                 lastSavedStateRef.current = merged;
-               }
-             } catch (syncErr) {
-               console.warn('Erro na sincronização inicial:', syncErr);
-             } finally {
-               setIsSyncingBackground(false);
-             }
-          }
         } else if (updatedUser && !updatedUser.isApproved) {
           setCurrentUser(null);
           saveSession(null);
         } else {
-           setCurrentUser(savedUser);
+          setCurrentUser(savedUser);
         }
       }
     } catch (err) {
@@ -420,6 +420,21 @@ const App: React.FC = () => {
     setActiveTab('dashboard');
   };
 
+  const handleLoginSync = useCallback(async () => {
+    const configToUse = state?.supabaseConfig || getSupabaseConfig();
+    if (configToUse) {
+      const remote = await fetchRemoteState(configToUse);
+      if (remote) {
+        setState(prev => {
+          if (!prev) return remote;
+          const merged = ensureStateIntegrity(prev, remote, 'remote');
+          lastSavedStateRef.current = remote;
+          return merged;
+        });
+      }
+    }
+  }, [state]);
+
   const handleRegister = useCallback(async (u: User) => {
     // Update local state immediately
     setState(prev => {
@@ -549,7 +564,7 @@ const App: React.FC = () => {
         </div>
       )}
       {!currentUser ? (
-        <Login state={state!} onLogin={handleLogin} onRegister={handleRegister} onUpdateState={handleStateUpdate} />
+        <Login state={state!} onLogin={handleLogin} onRegister={handleRegister} onUpdateState={handleStateUpdate} onSync={handleLoginSync} />
       ) : (
         <Layout activeTab={activeTab} setActiveTab={setActiveTab} currentUser={currentUser} onLogout={handleLogout} state={state!}>
           <ErrorBoundary>

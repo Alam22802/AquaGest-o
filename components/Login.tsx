@@ -11,9 +11,10 @@ interface Props {
   onLogin: (user: User) => void;
   onRegister: (user: User) => void;
   onUpdateState: (newState: AppState) => void;
+  onSync?: () => Promise<void>;
 }
 
-const Login: React.FC<Props> = ({ state, onLogin, onRegister, onUpdateState }) => {
+const Login: React.FC<Props> = ({ state, onLogin, onRegister, onUpdateState, onSync }) => {
   const [isRegistering, setIsRegistering] = useState(false);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -45,9 +46,16 @@ const Login: React.FC<Props> = ({ state, onLogin, onRegister, onUpdateState }) =
   const handleSync = async () => {
     setIsSyncing(true);
     setError('');
+    setSuccessMessage('');
     try {
-      await loadState();
-      window.location.reload();
+      if (onSync) {
+        await onSync();
+        setSuccessMessage('Dados atualizados com sucesso da nuvem!');
+        setTimeout(() => setSuccessMessage(''), 3000);
+      } else {
+        await loadState();
+        window.location.reload();
+      }
     } catch (e) {
       setError('Erro ao sincronizar com a nuvem. Verifique sua internet.');
     } finally {
