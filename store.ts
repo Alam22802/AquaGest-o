@@ -114,6 +114,67 @@ function mergeArraysById<T extends { id: string, updatedAt?: number }>(
   return Array.from(map.values());
 }
 
+function mergeUsers(
+  local: User[], 
+  remote: User[], 
+  deletedIds: string[] = [],
+  priority: 'local' | 'remote' = 'remote'
+): User[] {
+  const safeLocal = local || [];
+  const safeRemote = remote || [];
+  
+  const map = new Map<string, User>();
+  const deletedSet = deletedIds.length > 0 ? new Set(deletedIds) : null;
+
+  // 1. Process remote users first (these are the server state)
+  for (let i = 0; i < safeRemote.length; i++) {
+    const u = safeRemote[i];
+    if (!u || !u.id || (deletedSet && deletedSet.has(u.id))) continue;
+    map.set(u.id, u);
+  }
+
+  // 2. Process local users (these are local browser state)
+  for (let i = 0; i < safeLocal.length; i++) {
+    const u = safeLocal[i];
+    if (!u || !u.id || (deletedSet && deletedSet.has(u.id))) continue;
+    const existing = map.get(u.id);
+    if (!existing) {
+      // Exist only locally (e.g. newly registered, not yet synced)
+      map.set(u.id, u);
+    } else {
+      // Exists in both.
+      // Remote (database) is the sovereign source of truth for approvals, passwords and permissions.
+      const localTime = Number(u.updatedAt) || 0;
+      const remoteTime = Number(existing.updatedAt) || 0;
+
+      // Keep sovereign approval status and roles from remote if remote approved it,
+      // or if either is approved, let's keep approved = true to prevent lockouts due to system clock mismatches!
+      const mergedApproval = existing.isApproved || u.isApproved;
+      
+      const mergedUser: User = {
+        ...existing,
+        isApproved: mergedApproval,
+        // If approved on remote, keep permissions/roles from remote
+        canEdit: existing.isApproved ? existing.canEdit : u.canEdit,
+        allowedTabs: existing.isApproved ? existing.allowedTabs : u.allowedTabs,
+      };
+
+      if (priority === 'local' && localTime > remoteTime) {
+        map.set(u.id, {
+          ...u,
+          isApproved: mergedApproval,
+          canEdit: existing.isApproved ? existing.canEdit : u.canEdit,
+          allowedTabs: existing.isApproved ? existing.allowedTabs : u.allowedTabs,
+        });
+      } else {
+        map.set(u.id, mergedUser);
+      }
+    }
+  }
+
+  return Array.from(map.values());
+}
+
 export const repairArray = (arr: any[]): any[] => {
   if (!Array.isArray(arr)) return arr || [];
   return arr.map(item => {
@@ -268,7 +329,7 @@ export const ensureStateIntegrity = (state: any, mergeWith?: AppState, priority:
 
   const finalResult = mergeWith ? {
     ...result,
-    users: mergeArraysById(result.users, mergeWith.users, combinedDeletedIdsArray, priority),
+    users: mergeUsers(result.users, mergeWith.users, combinedDeletedIdsArray, priority),
     slaughterLogs: mergeArraysById(result.slaughterLogs, mergeWith.slaughterLogs, combinedDeletedIdsArray, priority),
     feedTypes: mergeArraysById(result.feedTypes, mergeWith.feedTypes, combinedDeletedIdsArray, priority),
     lines: mergeArraysById(result.lines, mergeWith.lines, combinedDeletedIdsArray, priority),

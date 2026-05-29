@@ -481,8 +481,21 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
 
     const cagesMap = new Map((state.cages || []).map(c => [c.id, c]));
     
+    // Resolve mortality for this batch exactly like Dashboard/BatchManagement
     const batchMortality = (state.mortalityLogs || [])
-      .filter(m => m.batchId === batchId || (m.cageId && cagesMap.get(m.cageId)?.batchId === batchId))
+      .filter(m => {
+        let bId = m.batchId;
+        if (!bId && m.cageId) {
+          const cage = cagesMap.get(m.cageId);
+          if (cage?.batchId) {
+            const bt = (state.batches || []).find(x => x.id === cage.batchId);
+            if (bt && m.date >= bt.settlementDate) {
+              bId = cage.batchId;
+            }
+          }
+        }
+        return bId === batchId;
+      })
       .reduce((sum, m) => sum + m.count, 0);
 
     const batchHarvested = (state.harvestLogs || [])
@@ -491,19 +504,57 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
 
     const liveFish = Math.max(0, batch.initialQuantity - batchMortality - batchHarvested);
 
-    const batchBiometries = (state.biometryLogs || [])
-      .filter(b => b.batchId === batchId || (b.cageId && cagesMap.get(b.cageId)?.batchId === batchId));
-    const latestBiometry = batchBiometries.length > 0 
-      ? [...batchBiometries].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0]
-      : null;
-    const avgWeight = latestBiometry ? latestBiometry.averageWeight : batch.initialUnitWeight;
+    // Resolve biometries for this batch using the same logic as Dashboard and BatchManagement
+    const batchBiometries = (state.biometryLogs || []).filter(b => {
+      let bId = b.batchId;
+      if (!bId && b.cageId) {
+        // 1. Check harvest logs first
+        const harvest = (state.harvestLogs || []).find(
+          h => h.cageId === b.cageId && h.date >= (b.date || "")
+        );
+        if (harvest) {
+          bId = harvest.batchId;
+        } else {
+          // 2. Check current cage
+          const cage = cagesMap.get(b.cageId);
+          if (cage?.batchId) {
+            const bt = (state.batches || []).find(x => x.id === cage.batchId);
+            if (bt && b.date >= bt.settlementDate) {
+              bId = cage.batchId;
+            }
+          }
+        }
+      }
+      return bId === batchId;
+    });
+
+    let avgWeight = batch.initialUnitWeight;
+    if (batchBiometries.length > 0) {
+      // Find the latest biometry date using lexical comparison (ISO safe)
+      const lastDate = batchBiometries.reduce(
+        (max, log) => (log.date > max ? log.date : max),
+        ""
+      );
+      const lastDayLogs = batchBiometries.filter(
+        log => log.date === lastDate
+      );
+      if (lastDayLogs.length > 0) {
+        const sumWeights = lastDayLogs.reduce(
+          (acc, log) => acc + log.averageWeight,
+          0
+        );
+        avgWeight = sumWeights / lastDayLogs.length;
+      }
+    }
+
+    const roundedAvgWeight = Math.round(avgWeight * 10) / 10;
 
     const currentRow = planningRows.find(r => r.id === rowId);
     const tableId = currentRow?.tableId || (state.feedingTables?.[0]?.id || '');
     
     let weekStr = '1';
     if (tableId) {
-      const closestWeek = findClosestWeek(avgWeight, tableId);
+      const closestWeek = findClosestWeek(roundedAvgWeight, tableId);
       if (closestWeek !== null) {
         weekStr = closestWeek.toString();
       }
@@ -516,7 +567,7 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
           batchId,
           tableId,
           fishCount: liveFish.toString(),
-          averageWeight: avgWeight.toString(),
+          averageWeight: roundedAvgWeight.toString(),
           currentWeek: weekStr
         };
       }

@@ -423,46 +423,43 @@ const App: React.FC = () => {
   const handleLoginSync = useCallback(async () => {
     const configToUse = state?.supabaseConfig || getSupabaseConfig();
     if (configToUse) {
-      const remote = await fetchRemoteState(configToUse);
-      if (remote) {
-        setState(prev => {
-          if (!prev) return remote;
-          const merged = ensureStateIntegrity(prev, remote, 'remote');
+      try {
+        const remote = await fetchRemoteState(configToUse);
+        if (remote) {
+          const localState = state || await loadState();
+          const mergedState = ensureStateIntegrity(localState, remote, 'remote');
+          setState(mergedState);
           lastSavedStateRef.current = remote;
-          return merged;
-        });
+          return mergedState;
+        }
+      } catch (err) {
+        console.warn('Erro ao sincronizar login:', err);
       }
     }
+    return state;
   }, [state]);
 
   const handleRegister = useCallback(async (u: User) => {
+    const userWithTimestamp = { ...u, updatedAt: Date.now() };
+
     // Update local state immediately
     setState(prev => {
       if (!prev) return prev;
-      const newState = { ...prev, users: [...prev.users, u] };
-      // Manually inject timestamp for the new user
-      const usersWithTimestamp = newState.users.map(user => 
-        user.id === u.id ? { ...user, updatedAt: Date.now() } : user
-      );
-      return { ...newState, users: usersWithTimestamp };
+      return { ...prev, users: [...prev.users, userWithTimestamp] };
     });
 
     // Force an immediate save to Supabase
-    // We fetch the latest state from the ref if possible, or just use what we have
-    // Actually, saveState already fetches remote and merges, so it's safe.
-    const configToUse = state?.supabaseConfig || currentUser?.supabaseConfig;
-    if (configToUse) {
+    const configToUse = state?.supabaseConfig || getSupabaseConfig();
+    if (configToUse && state) {
       try {
-        // We need the full state to save. 
-        // Since setState is async, we'll construct the state to save manually
-        const stateToSave = { ...state!, users: [...state!.users, u] };
+        const stateToSave = { ...state, users: [...state.users, userWithTimestamp] };
         await saveState(stateToSave, configToUse);
         console.log('Registro salvo na nuvem com sucesso');
       } catch (err) {
         console.error('Erro ao salvar registro na nuvem:', err);
       }
     }
-  }, [state, currentUser]);
+  }, [state]);
 
   useEffect(() => {
     if (state && currentUser?.isMaster) {

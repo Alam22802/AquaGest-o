@@ -11,7 +11,7 @@ interface Props {
   onLogin: (user: User) => void;
   onRegister: (user: User) => void;
   onUpdateState: (newState: AppState) => void;
-  onSync?: () => Promise<void>;
+  onSync?: () => Promise<AppState | null>;
 }
 
 const Login: React.FC<Props> = ({ state, onLogin, onRegister, onUpdateState, onSync }) => {
@@ -22,6 +22,7 @@ const Login: React.FC<Props> = ({ state, onLogin, onRegister, onUpdateState, onS
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
   const [isSyncing, setIsSyncing] = useState(false);
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [showLinkInput, setShowLinkInput] = useState(false);
   const [inviteLink, setInviteLink] = useState('');
   const [isResettingPassword, setIsResettingPassword] = useState(false);
@@ -72,17 +73,32 @@ const Login: React.FC<Props> = ({ state, onLogin, onRegister, onUpdateState, onS
     }
   };
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setIsLoggingIn(true);
     
+    let currentState = state;
+    try {
+      if (onSync) {
+        const syncedState = await onSync();
+        if (syncedState) {
+          currentState = syncedState;
+        }
+      }
+    } catch (syncErr) {
+      console.warn("Erro ao buscar dados mais recentes antes de logar:", syncErr);
+    }
+
     const cleanUser = username.trim().toLowerCase();
     const cleanPass = password.trim();
 
-    const foundUser = state.users.find(u => 
+    const foundUser = currentState.users.find(u => 
       u.username.trim().toLowerCase() === cleanUser && 
       u.password.trim() === cleanPass
     );
+
+    setIsLoggingIn(false);
 
     if (foundUser) {
       if (!foundUser.isApproved) {
@@ -323,8 +339,19 @@ const Login: React.FC<Props> = ({ state, onLogin, onRegister, onUpdateState, onS
                 </div>
               </div>
 
-              <button type="submit" className="w-full bg-[#344434] text-[#e4e4d4] py-5 rounded-2xl font-black text-sm uppercase tracking-widest shadow-xl active:scale-95 transition-all">
-                Acessar Sistema
+              <button 
+                type="submit" 
+                disabled={isLoggingIn}
+                className="w-full bg-[#344434] text-[#e4e4d4] py-5 rounded-2xl font-black text-sm uppercase tracking-widest shadow-xl active:scale-95 transition-all flex items-center justify-center gap-2 disabled:opacity-75"
+              >
+                {isLoggingIn ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                    <span>Verificando...</span>
+                  </>
+                ) : (
+                  <span>Acessar Sistema</span>
+                )}
               </button>
 
               <div className="flex flex-col items-center gap-4 pt-4">
