@@ -170,12 +170,12 @@ async function startServer() {
       if (quotaExceeded) {
         console.warn("⚠️ Gemini API quota has been exhausted (code 429 RESOURCE_EXHAUSTED). Gracefully falling back to cached or simulated data to prevent visual disruptions.");
       } else {
-        console.error("Error communicating with Gemini, checking for stale cache or returning fallback:", error);
+        console.warn("Issue communicating with Gemini API services, checking cache or returning fallback.");
       }
       
       // Serve expired/stale cache if we have it to avoid breaking or falling back to static
       if (priceCache) {
-        console.log("Serving stale or previous persistent cache to prevent error visibility in the frontend...");
+        console.log("Serving persistent data cache to safeguard frontend display continuity...");
         
         // If quota was exceeded, update cache timestamp on disk so we wait a comfortable CACHE_TTL before hammering Gemini again
         if (quotaExceeded) {

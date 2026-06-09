@@ -232,6 +232,7 @@ const BatchManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       harvestSchedules: (state.harvestSchedules || []).filter(
         (s) => s.id !== id,
       ),
+      deletedIds: [...(state.deletedIds || []), id],
     });
   };
 
