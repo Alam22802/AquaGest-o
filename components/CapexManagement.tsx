@@ -1,12 +1,12 @@
 
 import React, { useState, useMemo } from 'react';
-import { AppState, User, InvestmentPortfolio, CapexProject, CapexInvoice, CapexStage } from '../types';
+import { AppState, User, InvestmentPortfolio, CapexProject, CapexInvoice, CapexStage, CapexPurchaseOrder } from '../types';
 import { 
   Wallet, Briefcase, FileText, Plus, Edit, Trash2, X, 
   Calendar, User as UserIcon, DollarSign, Layers, 
   ArrowRight, TrendingDown, CheckCircle2, AlertCircle,
   Search, Filter, ChevronRight, Truck, ClipboardList, Building2, TrendingUp,
-  ChevronUp, ChevronDown, CheckSquare, Square, Save
+  ChevronUp, ChevronDown, CheckSquare, Square, Save, ShoppingBag
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { formatNumber } from '../utils/formatters';
@@ -32,6 +32,8 @@ const CapexManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
   const [editingPortfolioId, setEditingPortfolioId] = useState<string | null>(null);
   const [editingProjectId, setEditingProjectId] = useState<string | null>(null);
   const [editingInvoiceId, setEditingInvoiceId] = useState<string | null>(null);
+  const [editingPurchaseOrderId, setEditingPurchaseOrderId] = useState<string | null>(null);
+  const [executionType, setExecutionType] = useState<'invoice' | 'po'>('invoice');
 
   const hasPermission = currentUser.isMaster || currentUser.canEdit;
 
@@ -94,50 +96,79 @@ const CapexManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     description: ''
   });
 
+  const [purchaseOrderForm, setPurchaseOrderForm] = useState({
+    portfolioId: '',
+    projectId: '',
+    orderNumber: '',
+    supplier: '',
+    cnpj: '',
+    items: '',
+    value: '',
+    date: new Date().toISOString().split('T')[0],
+    deliveryDate: new Date().toISOString().split('T')[0],
+    description: ''
+  });
+
   // Calculations
   const portfolioStats = useMemo(() => {
     const portfolios = state.portfolios || [];
     const projects = state.capexProjects || [];
     const invoices = state.capexInvoices || [];
+    const purchaseOrders = state.capexPurchaseOrders || [];
 
     return portfolios.map(p => {
       const portfolioProjects = projects.filter(proj => proj.portfolioId === p.id);
       const portfolioInvoices = invoices.filter(inv => inv.portfolioId === p.id);
+      const portfolioPOs = purchaseOrders.filter(po => po.portfolioId === p.id);
       
       const allocatedValue = portfolioProjects.reduce((acc, curr) => acc + curr.plannedValue, 0);
       const executedValue = portfolioInvoices.reduce((acc, curr) => acc + curr.value, 0);
-      const balance = p.totalValue - allocatedValue;
+      const poValue = portfolioPOs.reduce((acc, curr) => acc + curr.value, 0);
+
+      const balance = p.totalValue - executedValue;
+      const realFreeBalance = balance - poValue;
       const executionPercentage = p.totalValue > 0 ? (executedValue / p.totalValue) * 100 : 0;
 
       return {
         ...p,
         allocatedValue,
         executedValue,
+        poValue,
         balance,
+        realFreeBalance,
         executionPercentage,
         projectsCount: portfolioProjects.length
       };
     });
-  }, [state.portfolios, state.capexProjects, state.capexInvoices]);
+  }, [state.portfolios, state.capexProjects, state.capexInvoices, state.capexPurchaseOrders]);
 
   const projectStats = useMemo(() => {
     const projects = state.capexProjects || [];
     const invoices = state.capexInvoices || [];
+    const purchaseOrders = state.capexPurchaseOrders || [];
 
     return projects.map(p => {
       const projectInvoices = invoices.filter(inv => inv.projectId === p.id);
+      const projectPurchaseOrders = purchaseOrders.filter(po => po.projectId === p.id);
+
       const executedValue = projectInvoices.reduce((acc, curr) => acc + curr.value, 0);
-      const balance = p.plannedValue - executedValue;
+      const purchaseOrdersValue = projectPurchaseOrders.reduce((acc, curr) => acc + curr.value, 0);
+      const balance = p.plannedValue - executedValue - purchaseOrdersValue;
       const executionPercentage = p.plannedValue > 0 ? (executedValue / p.plannedValue) * 100 : 0;
+      const totalCommitted = executedValue + purchaseOrdersValue;
+      const executionPercentageCommitted = p.plannedValue > 0 ? (totalCommitted / p.plannedValue) * 100 : 0;
 
       return {
         ...p,
         executedValue,
+        purchaseOrdersValue,
+        totalCommitted,
         balance,
-        executionPercentage
+        executionPercentage,
+        executionPercentageCommitted
       };
     });
-  }, [state.capexProjects, state.capexInvoices]);
+  }, [state.capexProjects, state.capexInvoices, state.capexPurchaseOrders]);
 
   // Handlers
   const handleSavePortfolio = (e: React.FormEvent) => {
@@ -290,16 +321,20 @@ const CapexManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     const project = (state.capexProjects || []).find(p => p.id === invoiceForm.projectId);
     if (!project) return;
 
-    // Calcular o saldo atual do CAPEX (Valor Inicial - Soma das outras notas)
+    // Calcular o saldo atual do CAPEX (Valor Inicial - Soma das outras notas - Soma das ordens de compra)
     const otherInvoices = (state.capexInvoices || []).filter(i => i.projectId === invoiceForm.projectId && i.id !== editingInvoiceId);
     const executedValue = otherInvoices.reduce((acc, curr) => acc + curr.value, 0);
-    const availableBalance = project.plannedValue - executedValue;
+
+    const projectPOs = (state.capexPurchaseOrders || []).filter(p => p.projectId === invoiceForm.projectId);
+    const purchaseOrdersValue = projectPOs.reduce((acc, curr) => acc + curr.value, 0);
+
+    const availableBalance = project.plannedValue - executedValue - purchaseOrdersValue;
 
     const newValue = Number(invoiceForm.value);
 
     // Verificar se há saldo no CAPEX
     if (newValue > availableBalance) {
-      alert(`Saldo insuficiente no CAPEX! Saldo disponível: R$ ${formatNumber(availableBalance)}`);
+      alert(`Saldo insuficiente no CAPEX! Saldo disponível (livre): R$ ${formatNumber(availableBalance)}`);
       return;
     }
 
@@ -381,6 +416,76 @@ const CapexManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     onUpdate({ 
       ...state, 
       capexInvoices: (state.capexInvoices || []).filter(i => i.id !== id),
+      deletedIds: [...(state.deletedIds || []), id]
+    });
+  };
+
+  const handleSavePurchaseOrder = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!hasPermission) return;
+
+    const project = (state.capexProjects || []).find(p => p.id === purchaseOrderForm.projectId);
+    if (!project) return;
+
+    // Calcular o saldo atual do CAPEX (Valor Inicial - Notas - Outros pedidos)
+    const projectInvoices = (state.capexInvoices || []).filter(i => i.projectId === purchaseOrderForm.projectId);
+    const executedInvoicesValue = projectInvoices.reduce((acc, curr) => acc + curr.value, 0);
+
+    const otherPOs = (state.capexPurchaseOrders || []).filter(po => po.projectId === purchaseOrderForm.projectId && po.id !== editingPurchaseOrderId);
+    const executedPOsValue = otherPOs.reduce((acc, curr) => acc + curr.value, 0);
+
+    const availableBalance = project.plannedValue - executedInvoicesValue - executedPOsValue;
+
+    const newValue = Number(purchaseOrderForm.value);
+
+    // Verificar se há saldo no CAPEX
+    if (newValue > availableBalance) {
+      alert(`Saldo insuficiente no CAPEX! Saldo disponível (livre): R$ ${formatNumber(availableBalance)}`);
+      return;
+    }
+
+    const newPO: CapexPurchaseOrder = {
+      id: editingPurchaseOrderId || generateId(),
+      portfolioId: purchaseOrderForm.portfolioId,
+      projectId: purchaseOrderForm.projectId,
+      orderNumber: purchaseOrderForm.orderNumber,
+      supplier: purchaseOrderForm.supplier,
+      cnpj: purchaseOrderForm.cnpj,
+      items: purchaseOrderForm.items,
+      value: newValue,
+      date: purchaseOrderForm.date,
+      deliveryDate: purchaseOrderForm.deliveryDate,
+      description: purchaseOrderForm.description,
+      userId: currentUser.id,
+      timestamp: new Date().toISOString(),
+      updatedAt: Date.now()
+    };
+
+    const updatedPOs = editingPurchaseOrderId
+      ? (state.capexPurchaseOrders || []).map(po => po.id === editingPurchaseOrderId ? newPO : po)
+      : [...(state.capexPurchaseOrders || []), newPO];
+
+    onUpdate({ ...state, capexPurchaseOrders: updatedPOs });
+    setEditingPurchaseOrderId(null);
+    setPurchaseOrderForm({
+      portfolioId: '',
+      projectId: '',
+      orderNumber: '',
+      supplier: '',
+      cnpj: '',
+      items: '',
+      value: '',
+      date: new Date().toISOString().split('T')[0],
+      deliveryDate: new Date().toISOString().split('T')[0],
+      description: ''
+    });
+  };
+
+  const removePurchaseOrder = (id: string) => {
+    if (!hasPermission || !confirm('Excluir esta Ordem de Compra? O valor retornará ao saldo disponível do projeto.')) return;
+    onUpdate({ 
+      ...state, 
+      capexPurchaseOrders: (state.capexPurchaseOrders || []).filter(po => po.id !== id),
       deletedIds: [...(state.deletedIds || []), id]
     });
   };
@@ -502,27 +607,34 @@ const CapexManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                             </div>
                           </div>
 
-                          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                            <div className="bg-slate-50 p-6 rounded-3xl border border-slate-100">
+                          <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
+                            <div className="bg-slate-50 p-5 rounded-3xl border border-slate-100">
                               <div className="flex items-center gap-2 mb-2">
                                 <DollarSign className="w-4 h-4 text-slate-400" />
                                 <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Orçamento Previsto</span>
                               </div>
-                              <div className="text-2xl font-black text-slate-800">R$ {formatNumber(project.plannedValue)}</div>
+                              <div className="text-xl font-black text-slate-800">R$ {formatNumber(project.plannedValue)}</div>
                             </div>
-                            <div className="bg-slate-50 p-6 rounded-3xl border border-slate-100">
+                            <div className="bg-slate-50 p-5 rounded-3xl border border-slate-100">
                               <div className="flex items-center gap-2 mb-2">
                                 <ArrowRight className="w-4 h-4 text-blue-500" />
                                 <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Total Executado</span>
                               </div>
-                              <div className="text-2xl font-black text-blue-600">R$ {formatNumber(project.executedValue)}</div>
+                              <div className="text-xl font-black text-blue-600">R$ {formatNumber(project.executedValue)}</div>
                             </div>
-                            <div className={`p-6 rounded-3xl border ${project.balance < 0 ? 'bg-red-50 border-red-100' : 'bg-emerald-50 border-emerald-100'}`}>
+                            <div className="bg-slate-50 p-5 rounded-3xl border border-slate-100">
+                              <div className="flex items-center gap-2 mb-2">
+                                <ShoppingBag className="w-4 h-4 text-amber-500" />
+                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Total Ordem de Compra</span>
+                              </div>
+                              <div className="text-xl font-black text-amber-600">R$ {formatNumber(project.purchaseOrdersValue)}</div>
+                            </div>
+                            <div className={`p-5 rounded-3xl border ${project.balance < 0 ? 'bg-red-50 border-red-100' : 'bg-emerald-50 border-emerald-100'}`}>
                               <div className="flex items-center gap-2 mb-2">
                                 <Wallet className={`w-4 h-4 ${project.balance < 0 ? 'text-red-400' : 'text-emerald-400'}`} />
                                 <span className={`text-[10px] font-black uppercase tracking-widest ${project.balance < 0 ? 'text-red-400' : 'text-emerald-400'}`}>Saldo Disponível</span>
                               </div>
-                              <div className={`text-2xl font-black ${project.balance < 0 ? 'text-red-600' : 'text-emerald-600'}`}>R$ {formatNumber(project.balance)}</div>
+                              <div className={`text-xl font-black ${project.balance < 0 ? 'text-red-600' : 'text-emerald-600'}`}>R$ {formatNumber(project.balance)}</div>
                             </div>
                           </div>
 
@@ -830,26 +942,33 @@ const CapexManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                       {/* Resumo Financeiro */}
                       <div className="bg-blue-600 p-8 rounded-[2.5rem] shadow-xl text-white">
                         <h3 className="text-xs font-black uppercase tracking-[0.2em] mb-6 opacity-60">Resumo Financeiro</h3>
-                        <div className="space-y-8">
+                        <div className="space-y-6">
                           <div>
                             <div className="text-3xl font-black italic tracking-tighter mb-1">
                               R$ {formatNumber(portfolio.totalValue)}
                             </div>
-                            <div className="text-[9px] font-black uppercase tracking-widest opacity-50">Orçamento Total</div>
+                            <div className="text-[9px] font-black uppercase tracking-widest opacity-50">Valor da Carteira</div>
                           </div>
                           <div className="h-px bg-white/10" />
                           <div>
-                            <div className="text-3xl font-black italic tracking-tighter mb-1">
-                              R$ {formatNumber(portfolio.allocatedValue)}
-                            </div>
-                            <div className="text-[9px] font-black uppercase tracking-widest opacity-50">Total Comprometido</div>
-                          </div>
-                          <div className="h-px bg-white/10" />
-                          <div>
-                            <div className="text-3xl font-black italic tracking-tighter mb-1">
+                            <div className="text-2xl font-black italic tracking-tighter mb-1 text-blue-100">
                               R$ {formatNumber(portfolio.executedValue)}
                             </div>
-                            <div className="text-[9px] font-black uppercase tracking-widest opacity-50">Total Liquidado (Notas)</div>
+                            <div className="text-[9px] font-black uppercase tracking-widest opacity-50">Soma das Notas</div>
+                          </div>
+                          <div className="h-px bg-white/10" />
+                          <div>
+                            <div className="text-2xl font-black italic tracking-tighter mb-1 text-emerald-100">
+                              R$ {formatNumber(portfolio.poValue)}
+                            </div>
+                            <div className="text-[9px] font-black uppercase tracking-widest opacity-50">Soma das Ordens de Compras Lancadas</div>
+                          </div>
+                          <div className="h-px bg-white/10" />
+                          <div>
+                            <div className="text-3xl font-black italic tracking-tighter mb-1 text-emerald-300">
+                              R$ {formatNumber(portfolio.realFreeBalance)}
+                            </div>
+                            <div className="text-[9px] font-black uppercase tracking-widest text-[#a8ffb2]">Saldo Livre Real</div>
                           </div>
                         </div>
                       </div>
@@ -942,7 +1061,7 @@ const CapexManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                         <span className="text-sm font-black text-slate-700">R$ {formatNumber(p.totalValue)}</span>
                       </div>
                       <div className="bg-blue-50 p-3 rounded-2xl border border-blue-100">
-                        <span className="text-[9px] font-black text-blue-400 uppercase block mb-1">Saldo Disponível</span>
+                        <span className="text-[9px] font-black text-blue-400 uppercase block mb-1">Saldo Livre</span>
                         <span className="text-sm font-black text-blue-700">R$ {formatNumber(p.balance)}</span>
                       </div>
                     </div>
@@ -1344,22 +1463,34 @@ const CapexManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                         </div>
                       )}
                     </div>
-                    <div className="grid grid-cols-2 gap-4 mb-4">
-                      <div className="bg-slate-50 p-3 rounded-2xl border border-slate-100">
-                        <span className="text-[9px] font-black text-slate-400 uppercase block mb-1">Valor Inicial CAPEX</span>
-                        <span className="text-sm font-black text-slate-700">R$ {formatNumber(proj.plannedValue)}</span>
+                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+                      <div className="bg-slate-50 p-2.5 rounded-2xl border border-slate-100">
+                        <span className="text-[8px] font-black text-slate-400 uppercase block mb-1">Valor Inicial CAPEX</span>
+                        <span className="text-xs font-black text-slate-700">R$ {formatNumber(proj.plannedValue)}</span>
                       </div>
-                      <div className="bg-emerald-50 p-3 rounded-2xl border border-emerald-100">
-                        <span className="text-[9px] font-black text-emerald-400 uppercase block mb-1">Saldo CAPEX</span>
-                        <span className="text-sm font-black text-emerald-700">R$ {formatNumber(proj.balance)}</span>
+                      <div className="bg-blue-50/50 p-2.5 rounded-2xl border border-blue-100/35">
+                        <span className="text-[8px] font-black text-blue-500 uppercase block mb-1">Executado (Notas)</span>
+                        <span className="text-xs font-black text-blue-700">R$ {formatNumber(proj.executedValue)}</span>
+                      </div>
+                      <div className="bg-amber-50/50 p-2.5 rounded-2xl border border-amber-100/35">
+                        <span className="text-[8px] font-black text-amber-600 uppercase block mb-1">Pedidos (OCs)</span>
+                        <span className="text-xs font-black text-amber-700">R$ {formatNumber(proj.purchaseOrdersValue)}</span>
+                      </div>
+                      <div className="bg-emerald-50 p-2.5 rounded-2xl border border-emerald-100">
+                        <span className="text-[8px] font-black text-emerald-500 uppercase block mb-1">Saldo CAPEX Livre</span>
+                        <span className="text-xs font-black text-emerald-700">R$ {formatNumber(proj.balance)}</span>
                       </div>
                     </div>
-                    <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
-                      <div className="h-full bg-emerald-500 transition-all duration-500" style={{ width: `${Math.min(100, proj.executionPercentage)}%` }} />
+                    <div className="w-full bg-slate-100 h-2.5 rounded-full overflow-hidden relative">
+                      <div className="h-full bg-amber-400/70 absolute left-0 top-0 transition-all duration-500 rounded-full" style={{ width: `${Math.min(100, proj.executionPercentageCommitted)}%` }} />
+                      <div className="h-full bg-emerald-500 absolute left-0 top-0 transition-all duration-500 rounded-full" style={{ width: `${Math.min(100, proj.executionPercentage)}%` }} />
                     </div>
                     <div className="flex justify-between items-center mt-2">
                       <span className="text-[9px] font-black text-slate-400 uppercase">Resp: {proj.responsible}</span>
-                      <span className="text-[9px] font-black text-emerald-600 uppercase">{formatNumber(proj.executionPercentage, 1)}% Utilizado</span>
+                      <div className="flex gap-3 text-[9px] font-black uppercase">
+                        <span className="text-emerald-600">{formatNumber(proj.executionPercentage, 1)}% Faturado</span>
+                        <span className="text-amber-600">{formatNumber(proj.executionPercentageCommitted, 1)}% Comprometido</span>
+                      </div>
                     </div>
 
                     {/* Stages view for everyone in Planning tab */}
@@ -1393,185 +1524,385 @@ const CapexManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
         </div>
       ) : (
         <div className="space-y-8">
-          {/* Cadastro de Nota Fiscal */}
-          <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200 max-w-4xl mx-auto">
-            <h3 className="text-lg font-black text-slate-800 mb-6 flex items-center gap-2 uppercase tracking-tighter italic">
-              <FileText className="w-5 h-5 text-amber-500" />
-              {editingInvoiceId ? 'Editar Nota Fiscal' : 'Lançamento Manual de Nota Fiscal'}
-            </h3>
-            <form onSubmit={handleSaveInvoice} className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="md:col-span-1">
-                <label className="block text-[10px] font-black text-slate-400 uppercase mb-1">Carteira de Investimento</label>
-                <select required className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none focus:ring-2 focus:ring-amber-500" value={invoiceForm.portfolioId} onChange={e => setInvoiceForm({...invoiceForm, portfolioId: e.target.value, projectId: ''})}>
-                  <option value="">Selecionar Carteira...</option>
-                  {(state.portfolios || []).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                </select>
-              </div>
-              <div className="md:col-span-1">
-                <label className="block text-[10px] font-black text-slate-400 uppercase mb-1">Projeto Vinculado</label>
-                <select required disabled={!invoiceForm.portfolioId} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none focus:ring-2 focus:ring-amber-500 disabled:opacity-50" value={invoiceForm.projectId} onChange={e => setInvoiceForm({...invoiceForm, projectId: e.target.value})}>
-                  <option value="">Selecionar Projeto...</option>
-                  {(state.capexProjects || []).filter(p => p.portfolioId === invoiceForm.portfolioId).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                </select>
-              </div>
-              <div className="md:col-span-1">
-                <label className="block text-[10px] font-black text-slate-400 uppercase mb-1">Número da Nota</label>
-                <input type="text" required className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none focus:ring-2 focus:ring-amber-500" value={invoiceForm.invoiceNumber} onChange={e => setInvoiceForm({...invoiceForm, invoiceNumber: e.target.value})} />
-              </div>
-
-              <div className="md:col-span-2">
-                <label className="block text-[10px] font-black text-slate-400 uppercase mb-1">Fornecedor / Razão Social</label>
-                <div className="relative">
-                  <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-300" />
-                  <input type="text" required className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none focus:ring-2 focus:ring-amber-500" value={invoiceForm.supplier} onChange={e => setInvoiceForm({...invoiceForm, supplier: e.target.value})} />
-                </div>
-              </div>
-              <div className="md:col-span-1">
-                <label className="block text-[10px] font-black text-slate-400 uppercase mb-1">CNPJ do Fornecedor</label>
-                <input type="text" required className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none focus:ring-2 focus:ring-amber-500" value={invoiceForm.cnpj} onChange={e => setInvoiceForm({...invoiceForm, cnpj: e.target.value})} />
-              </div>
-
-              <div className="md:col-span-3">
-                <label className="block text-[10px] font-black text-slate-400 uppercase mb-1">Itens da Nota (Resumo)</label>
-                <div className="relative">
-                  <ClipboardList className="absolute left-4 top-4 w-4 h-4 text-slate-300" />
-                  <textarea required rows={2} className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none focus:ring-2 focus:ring-amber-500" value={invoiceForm.items} onChange={e => setInvoiceForm({...invoiceForm, items: e.target.value})} />
-                </div>
-              </div>
-
-              <div className="md:col-span-1">
-                <label className="block text-[10px] font-black text-slate-400 uppercase mb-1">Tipo de Lançamento</label>
-                <div className="flex gap-2">
-                  <button 
-                    type="button"
-                    onClick={() => setInvoiceForm({...invoiceForm, type: 'Aquisição'})}
-                    className={`flex-1 py-3 rounded-2xl text-[10px] font-black uppercase tracking-tight transition-all border ${invoiceForm.type === 'Aquisição' ? 'bg-amber-100 border-amber-300 text-amber-700 shadow-sm' : 'bg-slate-50 border-slate-200 text-slate-400'}`}
-                  >
-                    Aquisição
-                  </button>
-                  <button 
-                    type="button"
-                    onClick={() => setInvoiceForm({...invoiceForm, type: 'Prestação de Serviço'})}
-                    className={`flex-1 py-3 rounded-2xl text-[10px] font-black uppercase tracking-tight transition-all border ${invoiceForm.type === 'Prestação de Serviço' ? 'bg-amber-100 border-amber-300 text-amber-700 shadow-sm' : 'bg-slate-50 border-slate-200 text-slate-400'}`}
-                  >
-                    Serviço
-                  </button>
-                </div>
-              </div>
-              <div className="md:col-span-1">
-                <label className="block text-[10px] font-black text-slate-400 uppercase mb-1">Valor Total (R$)</label>
-                <div className="relative">
-                  <DollarSign className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-300" />
-                  <input type="number" required className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none focus:ring-2 focus:ring-amber-500" value={invoiceForm.value} onChange={e => setInvoiceForm({...invoiceForm, value: e.target.value})} />
-                </div>
-              </div>
-              <div className="md:col-span-1">
-                <label className="block text-[10px] font-black text-slate-400 uppercase mb-1">Data de Emissão</label>
-                <input type="date" required className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none focus:ring-2 focus:ring-amber-500" value={invoiceForm.date} onChange={e => setInvoiceForm({...invoiceForm, date: e.target.value})} />
-              </div>
-
-              <div className="md:col-span-1">
-                <label className="block text-[10px] font-black text-slate-400 uppercase mb-1">Data de Entrega</label>
-                <div className="relative">
-                  <Truck className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-300" />
-                  <input type="date" required className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none focus:ring-2 focus:ring-amber-500" value={invoiceForm.deliveryDate} onChange={e => setInvoiceForm({...invoiceForm, deliveryDate: e.target.value})} />
-                </div>
-              </div>
-              <div className="md:col-span-2">
-                <label className="block text-[10px] font-black text-slate-400 uppercase mb-1">Observações Adicionais</label>
-                <input type="text" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none focus:ring-2 focus:ring-amber-500" value={invoiceForm.description} onChange={e => setInvoiceForm({...invoiceForm, description: e.target.value})} />
-              </div>
-
-              <button type="submit" className="md:col-span-3 py-4 bg-amber-600 text-white rounded-2xl font-black uppercase tracking-widest text-xs shadow-xl shadow-amber-600/20 active:scale-95 transition-all mt-2 flex items-center justify-center gap-2">
-                <CheckCircle2 className="w-4 h-4" />
-                {editingInvoiceId ? 'Salvar Alterações' : 'Confirmar Lançamento de Nota'}
-              </button>
-            </form>
+          {/* Alternar tipos de execução (Notas Fiscais vs Ordens de Compra) */}
+          <div className="flex bg-slate-250/60 p-1 rounded-2xl max-w-4xl mx-auto border border-slate-200 bg-slate-100">
+            <button
+              onClick={() => {
+                setExecutionType('invoice');
+                setEditingInvoiceId(null);
+                setEditingPurchaseOrderId(null);
+              }}
+              className={`flex-1 py-3 px-4 rounded-xl text-xs font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 ${
+                executionType === 'invoice'
+                  ? 'bg-amber-500 text-white shadow-md'
+                  : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'
+              }`}
+            >
+              <FileText className="w-4 h-4" />
+              Lançamento de Nota Fiscal
+            </button>
+            <button
+              onClick={() => {
+                setExecutionType('po');
+                setEditingInvoiceId(null);
+                setEditingPurchaseOrderId(null);
+              }}
+              className={`flex-1 py-3 px-4 rounded-xl text-xs font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 ${
+                executionType === 'po'
+                  ? 'bg-[#344434] text-white shadow-md'
+                  : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'
+              }`}
+            >
+              <ShoppingBag className="w-4 h-4" />
+              Lançamento de Ordem de Compra (OC / Pedido)
+            </button>
           </div>
 
-          {/* Relatório de Lançamentos */}
-          <div className="space-y-4">
-            <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] px-2">Histórico de Lançamentos</h4>
-            <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm overflow-x-auto">
-              <table className="w-full text-left min-w-[1000px]">
-                <thead className="bg-slate-50 text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                  <tr>
-                    <th className="px-6 py-4">Data Inclusão</th>
-                    <th className="px-6 py-4">Nota / Tipo</th>
-                    <th className="px-6 py-4">Fornecedor</th>
-                    <th className="px-6 py-4">Carteira / Projeto</th>
-                    <th className="px-6 py-4">Valor (R$)</th>
-                    <th className="px-6 py-4">Entrega</th>
-                    <th className="px-6 py-4">Usuário</th>
-                    <th className="px-6 py-4 text-center">Ações</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {(state.capexInvoices || []).sort((a, b) => b.timestamp.localeCompare(a.timestamp)).map(inv => {
-                    const portfolio = state.portfolios?.find(p => p.id === inv.portfolioId);
-                    const project = state.capexProjects?.find(p => p.id === inv.projectId);
-                    const user = state.users.find(u => u.id === inv.userId);
-                    return (
-                      <tr key={inv.id} className="hover:bg-slate-50 transition-colors">
-                        <td className="px-6 py-4 text-xs font-bold text-slate-500">
-                          {format(parseISO(inv.timestamp), 'dd/MM/yyyy HH:mm')}
-                        </td>
-                        <td className="px-6 py-4">
-                          <div className="font-black text-slate-800 uppercase tracking-tighter">NF {inv.invoiceNumber}</div>
-                          <div className={`text-[8px] font-black px-2 py-0.5 rounded-full w-fit uppercase tracking-widest ${inv.type === 'Aquisição' ? 'bg-blue-100 text-blue-600' : 'bg-purple-100 text-purple-600'}`}>
-                            {inv.type}
-                          </div>
-                        </td>
-                        <td className="px-6 py-4">
-                          <div className="font-black text-slate-700 uppercase tracking-tight text-[10px]">{inv.supplier}</div>
-                          <div className="text-[9px] font-bold text-slate-400 uppercase">{inv.cnpj}</div>
-                        </td>
-                        <td className="px-6 py-4">
-                          <div className="text-[10px] font-black text-blue-600 uppercase tracking-tight">{portfolio?.name}</div>
-                          <div className="text-[10px] font-black text-emerald-600 uppercase tracking-tight">{project?.name}</div>
-                        </td>
-                        <td className="px-6 py-4 font-black text-slate-800">
-                          R$ {formatNumber(inv.value)}
-                        </td>
-                        <td className="px-6 py-4 text-[10px] font-bold text-slate-500">
-                          {format(parseISO(inv.deliveryDate), 'dd/MM/yyyy')}
-                        </td>
-                        <td className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase">
-                          @{user?.username || '---'}
-                        </td>
-                        <td className="px-6 py-4 text-center">
-                          <div className="flex justify-center gap-1">
-                            <button onClick={() => { 
-                              setEditingInvoiceId(inv.id); 
-                              setInvoiceForm({
-                                portfolioId: inv.portfolioId, 
-                                projectId: inv.projectId, 
-                                invoiceNumber: inv.invoiceNumber, 
-                                supplier: inv.supplier,
-                                cnpj: inv.cnpj,
-                                items: inv.items,
-                                type: inv.type,
-                                value: inv.value.toString(), 
-                                date: inv.date, 
-                                deliveryDate: inv.deliveryDate,
-                                description: inv.description
-                              }); 
-                            }} className="p-2 text-slate-300 hover:text-amber-500 transition-colors"><Edit className="w-4 h-4" /></button>
-                            <button onClick={() => removeInvoice(inv.id)} className="p-2 text-slate-300 hover:text-red-500 transition-colors"><Trash2 className="w-4 h-4" /></button>
-                          </div>
-                        </td>
+          {executionType === 'invoice' ? (
+            <>
+              {/* Cadastro de Nota Fiscal */}
+              <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200 max-w-4xl mx-auto">
+                <h3 className="text-lg font-black text-slate-800 mb-6 flex items-center gap-2 uppercase tracking-tighter italic">
+                  <FileText className="w-5 h-5 text-amber-500" />
+                  {editingInvoiceId ? 'Editar Nota Fiscal' : 'Lançamento Manual de Nota Fiscal'}
+                </h3>
+                <form onSubmit={handleSaveInvoice} className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="md:col-span-1">
+                    <label className="block text-[10px] font-black text-slate-400 uppercase mb-1">Carteira de Investimento</label>
+                    <select required className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none focus:ring-2 focus:ring-amber-500" value={invoiceForm.portfolioId} onChange={e => setInvoiceForm({...invoiceForm, portfolioId: e.target.value, projectId: ''})}>
+                      <option value="">Selecionar Carteira...</option>
+                      {(state.portfolios || []).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                    </select>
+                  </div>
+                  <div className="md:col-span-1">
+                    <label className="block text-[10px] font-black text-slate-400 uppercase mb-1">Projeto Vinculado</label>
+                    <select required disabled={!invoiceForm.portfolioId} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none focus:ring-2 focus:ring-amber-500 disabled:opacity-50" value={invoiceForm.projectId} onChange={e => setInvoiceForm({...invoiceForm, projectId: e.target.value})}>
+                      <option value="">Selecionar Projeto...</option>
+                      {(state.capexProjects || []).filter(p => p.portfolioId === invoiceForm.portfolioId).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                    </select>
+                  </div>
+                  <div className="md:col-span-1">
+                    <label className="block text-[10px] font-black text-slate-400 uppercase mb-1">Número da Nota</label>
+                    <input type="text" required className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none focus:ring-2 focus:ring-amber-500" value={invoiceForm.invoiceNumber} onChange={e => setInvoiceForm({...invoiceForm, invoiceNumber: e.target.value})} />
+                  </div>
+
+                  <div className="md:col-span-2">
+                    <label className="block text-[10px] font-black text-slate-400 uppercase mb-1">Fornecedor / Razão Social</label>
+                    <div className="relative">
+                      <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-300" />
+                      <input type="text" required className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none focus:ring-2 focus:ring-amber-500" value={invoiceForm.supplier} onChange={e => setInvoiceForm({...invoiceForm, supplier: e.target.value})} />
+                    </div>
+                  </div>
+                  <div className="md:col-span-1">
+                    <label className="block text-[10px] font-black text-slate-400 uppercase mb-1">CNPJ do Fornecedor</label>
+                    <input type="text" required className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none focus:ring-2 focus:ring-amber-500" value={invoiceForm.cnpj} onChange={e => setInvoiceForm({...invoiceForm, cnpj: e.target.value})} />
+                  </div>
+
+                  <div className="md:col-span-3">
+                    <label className="block text-[10px] font-black text-slate-400 uppercase mb-1">Itens da Nota (Resumo)</label>
+                    <div className="relative">
+                      <ClipboardList className="absolute left-4 top-4 w-4 h-4 text-slate-300" />
+                      <textarea required rows={2} className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none focus:ring-2 focus:ring-amber-500" value={invoiceForm.items} onChange={e => setInvoiceForm({...invoiceForm, items: e.target.value})} />
+                    </div>
+                  </div>
+
+                  <div className="md:col-span-1">
+                    <label className="block text-[10px] font-black text-slate-400 uppercase mb-1">Tipo de Lançamento</label>
+                    <div className="flex gap-2">
+                      <button 
+                        type="button"
+                        onClick={() => setInvoiceForm({...invoiceForm, type: 'Aquisição'})}
+                        className={`flex-1 py-3 rounded-2xl text-[10px] font-black uppercase tracking-tight transition-all border ${invoiceForm.type === 'Aquisição' ? 'bg-amber-100 border-amber-300 text-amber-700 shadow-sm' : 'bg-slate-50 border-slate-200 text-slate-400'}`}
+                      >
+                        Aquisição
+                      </button>
+                      <button 
+                        type="button"
+                        onClick={() => setInvoiceForm({...invoiceForm, type: 'Prestação de Serviço'})}
+                        className={`flex-1 py-3 rounded-2xl text-[10px] font-black uppercase tracking-tight transition-all border ${invoiceForm.type === 'Prestação de Serviço' ? 'bg-amber-100 border-amber-300 text-amber-700 shadow-sm' : 'bg-slate-50 border-slate-200 text-slate-400'}`}
+                      >
+                        Serviço
+                      </button>
+                    </div>
+                  </div>
+                  <div className="md:col-span-1">
+                    <label className="block text-[10px] font-black text-slate-400 uppercase mb-1">Valor Total (R$)</label>
+                    <div className="relative">
+                      <DollarSign className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-300" />
+                      <input type="number" required className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none focus:ring-2 focus:ring-amber-500" value={invoiceForm.value} onChange={e => setInvoiceForm({...invoiceForm, value: e.target.value})} />
+                    </div>
+                  </div>
+                  <div className="md:col-span-1">
+                    <label className="block text-[10px] font-black text-slate-400 uppercase mb-1">Data de Emissão</label>
+                    <input type="date" required className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none focus:ring-2 focus:ring-amber-500" value={invoiceForm.date} onChange={e => setInvoiceForm({...invoiceForm, date: e.target.value})} />
+                  </div>
+
+                  <div className="md:col-span-1">
+                    <label className="block text-[10px] font-black text-slate-400 uppercase mb-1">Data de Entrega</label>
+                    <div className="relative">
+                      <Truck className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-300" />
+                      <input type="date" required className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none focus:ring-2 focus:ring-amber-500" value={invoiceForm.deliveryDate} onChange={e => setInvoiceForm({...invoiceForm, deliveryDate: e.target.value})} />
+                    </div>
+                  </div>
+                  <div className="md:col-span-2">
+                    <label className="block text-[10px] font-black text-slate-400 uppercase mb-1">Observações Adicionais</label>
+                    <input type="text" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none focus:ring-2 focus:ring-amber-500" value={invoiceForm.description} onChange={e => setInvoiceForm({...invoiceForm, description: e.target.value})} />
+                  </div>
+
+                  <button type="submit" className="md:col-span-3 py-4 bg-amber-600 text-white rounded-2xl font-black uppercase tracking-widest text-xs shadow-xl shadow-amber-600/20 active:scale-95 transition-all mt-2 flex items-center justify-center gap-2">
+                    <CheckCircle2 className="w-4 h-4" />
+                    {editingInvoiceId ? 'Salvar Alterações' : 'Confirmar Lançamento de Nota'}
+                  </button>
+                </form>
+              </div>
+
+              {/* Relatório de Lançamentos de Notas */}
+              <div className="space-y-4">
+                <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] px-2">Histórico de Lançamentos</h4>
+                <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm overflow-x-auto">
+                  <table className="w-full text-left min-w-[1000px]">
+                    <thead className="bg-slate-50 text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                      <tr>
+                        <th className="px-6 py-4">Data Inclusão</th>
+                        <th className="px-6 py-4">Nota / Tipo</th>
+                        <th className="px-6 py-4">Fornecedor</th>
+                        <th className="px-6 py-4">Carteira / Projeto</th>
+                        <th className="px-6 py-4">Valor (R$)</th>
+                        <th className="px-6 py-4">Entrega</th>
+                        <th className="px-6 py-4">Usuário</th>
+                        <th className="px-6 py-4 text-center">Ações</th>
                       </tr>
-                    );
-                  })}
-                  {(state.capexInvoices || []).length === 0 && (
-                    <tr>
-                      <td colSpan={7} className="px-6 py-10 text-center text-slate-400 font-bold uppercase text-[10px] tracking-widest italic">Nenhum lançamento de nota fiscal encontrado.</td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {(state.capexInvoices || []).sort((a, b) => b.timestamp.localeCompare(a.timestamp)).map(inv => {
+                        const portfolio = state.portfolios?.find(p => p.id === inv.portfolioId);
+                        const project = state.capexProjects?.find(p => p.id === inv.projectId);
+                        const user = state.users.find(u => u.id === inv.userId);
+                        return (
+                          <tr key={inv.id} className="hover:bg-slate-50 transition-colors">
+                            <td className="px-6 py-4 text-xs font-bold text-slate-500">
+                              {format(parseISO(inv.timestamp), 'dd/MM/yyyy HH:mm')}
+                            </td>
+                            <td className="px-6 py-4">
+                              <div className="font-black text-slate-800 uppercase tracking-tighter">NF {inv.invoiceNumber}</div>
+                              <div className={`text-[8px] font-black px-2 py-0.5 rounded-full w-fit uppercase tracking-widest ${inv.type === 'Aquisição' ? 'bg-blue-100 text-blue-600' : 'bg-purple-100 text-purple-600'}`}>
+                                {inv.type}
+                              </div>
+                            </td>
+                            <td className="px-6 py-4">
+                              <div className="font-black text-slate-700 uppercase tracking-tight text-[10px]">{inv.supplier}</div>
+                              <div className="text-[9px] font-bold text-slate-400 uppercase">{inv.cnpj}</div>
+                            </td>
+                            <td className="px-6 py-4">
+                              <div className="text-[10px] font-black text-blue-600 uppercase tracking-tight">{portfolio?.name}</div>
+                              <div className="text-[10px] font-black text-emerald-600 uppercase tracking-tight">{project?.name}</div>
+                            </td>
+                            <td className="px-6 py-4 font-black text-slate-800">
+                              R$ {formatNumber(inv.value)}
+                            </td>
+                            <td className="px-6 py-4 text-[10px] font-bold text-slate-500">
+                              {format(parseISO(inv.deliveryDate), 'dd/MM/yyyy')}
+                            </td>
+                            <td className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase">
+                              @{user?.username || '---'}
+                            </td>
+                            <td className="px-6 py-4 text-center">
+                              <div className="flex justify-center gap-1">
+                                <button onClick={() => { 
+                                  setEditingInvoiceId(inv.id); 
+                                  setInvoiceForm({
+                                    portfolioId: inv.portfolioId, 
+                                    projectId: inv.projectId, 
+                                    invoiceNumber: inv.invoiceNumber, 
+                                    supplier: inv.supplier,
+                                    cnpj: inv.cnpj,
+                                    items: inv.items,
+                                    type: inv.type,
+                                    value: inv.value.toString(), 
+                                    date: inv.date, 
+                                    deliveryDate: inv.deliveryDate,
+                                    description: inv.description
+                                  }); 
+                                }} className="p-2 text-slate-300 hover:text-amber-500 transition-colors"><Edit className="w-4 h-4" /></button>
+                                <button onClick={() => removeInvoice(inv.id)} className="p-2 text-slate-300 hover:text-red-500 transition-colors"><Trash2 className="w-4 h-4" /></button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                      {(state.capexInvoices || []).length === 0 && (
+                        <tr>
+                          <td colSpan={8} className="px-6 py-10 text-center text-slate-400 font-bold uppercase text-[10px] tracking-widest italic">Nenhum lançamento de nota fiscal encontrado.</td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </>
+          ) : (
+            <>
+              {/* Cadastro de Ordem de Compra */}
+              <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200 max-w-4xl mx-auto">
+                <h3 className="text-lg font-black text-slate-800 mb-6 flex items-center gap-2 uppercase tracking-tighter italic">
+                  <ShoppingBag className="w-5 h-5 text-emerald-600" />
+                  {editingPurchaseOrderId ? 'Editar Ordem de Compra (OC)' : 'Lançamento Manual de Ordem de Compra (OC)'}
+                </h3>
+                <form onSubmit={handleSavePurchaseOrder} className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="md:col-span-1">
+                    <label className="block text-[10px] font-black text-slate-400 uppercase mb-1">Carteira de Investimento</label>
+                    <select required className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none focus:ring-2 focus:ring-[#344434]" value={purchaseOrderForm.portfolioId} onChange={e => setPurchaseOrderForm({...purchaseOrderForm, portfolioId: e.target.value, projectId: ''})}>
+                      <option value="">Selecionar Carteira...</option>
+                      {(state.portfolios || []).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                    </select>
+                  </div>
+                  <div className="md:col-span-1">
+                    <label className="block text-[10px] font-black text-slate-400 uppercase mb-1">Projeto Vinculado</label>
+                    <select required disabled={!purchaseOrderForm.portfolioId} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none focus:ring-2 focus:ring-[#344434] disabled:opacity-50" value={purchaseOrderForm.projectId} onChange={e => setPurchaseOrderForm({...purchaseOrderForm, projectId: e.target.value})}>
+                      <option value="">Selecionar Projeto...</option>
+                      {(state.capexProjects || []).filter(p => p.portfolioId === purchaseOrderForm.portfolioId).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                    </select>
+                  </div>
+                  <div className="md:col-span-1">
+                    <label className="block text-[10px] font-black text-slate-400 uppercase mb-1">Número do Pedido (OC)</label>
+                    <input type="text" required className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none focus:ring-2 focus:ring-[#344434]" value={purchaseOrderForm.orderNumber} onChange={e => setPurchaseOrderForm({...purchaseOrderForm, orderNumber: e.target.value})} />
+                  </div>
+
+                  <div className="md:col-span-2">
+                    <label className="block text-[10px] font-black text-slate-400 uppercase mb-1">Fornecedor / Razão Social</label>
+                    <div className="relative">
+                      <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-300" />
+                      <input type="text" required className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none focus:ring-2 focus:ring-[#344434]" value={purchaseOrderForm.supplier} onChange={e => setPurchaseOrderForm({...purchaseOrderForm, supplier: e.target.value})} />
+                    </div>
+                  </div>
+                  <div className="md:col-span-1">
+                    <label className="block text-[10px] font-black text-slate-400 uppercase mb-1">CNPJ do Fornecedor</label>
+                    <input type="text" required className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none focus:ring-2 focus:ring-[#344434]" value={purchaseOrderForm.cnpj} onChange={e => setPurchaseOrderForm({...purchaseOrderForm, cnpj: e.target.value})} />
+                  </div>
+
+                  <div className="md:col-span-3">
+                    <label className="block text-[10px] font-black text-slate-400 uppercase mb-1">Itens do Pedido (Resumo/Especificação)</label>
+                    <div className="relative">
+                      <ClipboardList className="absolute left-4 top-4 w-4 h-4 text-slate-300" />
+                      <textarea required rows={2} className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none focus:ring-2 focus:ring-[#344434]" value={purchaseOrderForm.items} onChange={e => setPurchaseOrderForm({...purchaseOrderForm, items: e.target.value})} />
+                    </div>
+                  </div>
+
+                  <div className="md:col-span-1">
+                    <label className="block text-[10px] font-black text-slate-400 uppercase mb-1">Valor Total OC (R$)</label>
+                    <div className="relative">
+                      <DollarSign className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-300" />
+                      <input type="number" required className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none focus:ring-2 focus:ring-[#344434]" value={purchaseOrderForm.value} onChange={e => setPurchaseOrderForm({...purchaseOrderForm, value: e.target.value})} />
+                    </div>
+                  </div>
+                  <div className="md:col-span-1">
+                    <label className="block text-[10px] font-black text-slate-400 uppercase mb-1">Data de Emissão do Pedido</label>
+                    <input type="date" required className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none focus:ring-2 focus:ring-[#344434]" value={purchaseOrderForm.date} onChange={e => setPurchaseOrderForm({...purchaseOrderForm, date: e.target.value})} />
+                  </div>
+
+                  <div className="md:col-span-1">
+                    <label className="block text-[10px] font-black text-slate-400 uppercase mb-1">Previsão Estimada de Entrega</label>
+                    <div className="relative">
+                      <Truck className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-300" />
+                      <input type="date" required className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none focus:ring-2 focus:ring-[#344434]" value={purchaseOrderForm.deliveryDate} onChange={e => setPurchaseOrderForm({...purchaseOrderForm, deliveryDate: e.target.value})} />
+                    </div>
+                  </div>
+                  <div className="md:col-span-3">
+                    <label className="block text-[10px] font-black text-slate-400 uppercase mb-1">Observações Adicionais / Destino</label>
+                    <input type="text" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none focus:ring-2 focus:ring-[#344434]" value={purchaseOrderForm.description} onChange={e => setPurchaseOrderForm({...purchaseOrderForm, description: e.target.value})} />
+                  </div>
+
+                  <button type="submit" className="md:col-span-3 py-4 bg-[#344434] text-white rounded-2xl font-black uppercase tracking-widest text-xs shadow-xl shadow-emerald-900/20 active:scale-95 transition-all mt-2 flex items-center justify-center gap-2">
+                    <CheckCircle2 className="w-4 h-4" />
+                    {editingPurchaseOrderId ? 'Salvar Alterações da Ordem' : 'Confirmar Lançamento de Ordem de Compra'}
+                  </button>
+                </form>
+              </div>
+
+              {/* Relatório de Lançamentos de OCs */}
+              <div className="space-y-4">
+                <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] px-2">Histórico de Ordens de Compra</h4>
+                <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm overflow-x-auto">
+                  <table className="w-full text-left min-w-[1000px]">
+                    <thead className="bg-slate-50 text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                      <tr>
+                        <th className="px-6 py-4">Data Inclusão</th>
+                        <th className="px-6 py-4">Documento / OC</th>
+                        <th className="px-6 py-4">Fornecedor</th>
+                        <th className="px-6 py-4">Carteira / Projeto</th>
+                        <th className="px-6 py-4">Valor Reservado (R$)</th>
+                        <th className="px-6 py-4">Previsão Entrega</th>
+                        <th className="px-6 py-4">Usuário</th>
+                        <th className="px-6 py-4 text-center">Ações</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {(state.capexPurchaseOrders || []).sort((a, b) => b.timestamp.localeCompare(a.timestamp)).map(po => {
+                        const portfolio = state.portfolios?.find(p => p.id === po.portfolioId);
+                        const project = state.capexProjects?.find(p => p.id === po.projectId);
+                        const user = state.users.find(u => u.id === po.userId);
+                        return (
+                          <tr key={po.id} className="hover:bg-slate-50 transition-colors">
+                            <td className="px-6 py-4 text-xs font-bold text-slate-500">
+                              {format(parseISO(po.timestamp), 'dd/MM/yyyy HH:mm')}
+                            </td>
+                            <td className="px-6 py-4">
+                              <div className="font-black text-slate-800 uppercase tracking-tighter">OC {po.orderNumber}</div>
+                              <div className="text-[8px] font-black px-2 py-0.5 rounded-full w-fit uppercase tracking-widest bg-emerald-100 text-emerald-700">
+                                Emitida / Reservada
+                              </div>
+                            </td>
+                            <td className="px-6 py-4">
+                              <div className="font-black text-slate-700 uppercase tracking-tight text-[10px]">{po.supplier}</div>
+                              <div className="text-[9px] font-bold text-slate-400 uppercase">{po.cnpj}</div>
+                            </td>
+                            <td className="px-6 py-4">
+                              <div className="text-[10px] font-black text-blue-600 uppercase tracking-tight">{portfolio?.name}</div>
+                              <div className="text-[10px] font-black text-emerald-600 uppercase tracking-tight">{project?.name}</div>
+                            </td>
+                            <td className="px-6 py-4 font-black text-[#344434]">
+                              R$ {formatNumber(po.value)}
+                            </td>
+                            <td className="px-6 py-4 text-[10px] font-bold text-slate-500">
+                              {po.deliveryDate ? format(parseISO(po.deliveryDate), 'dd/MM/yyyy') : '---'}
+                            </td>
+                            <td className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase">
+                              @{user?.username || '---'}
+                            </td>
+                            <td className="px-6 py-4 text-center">
+                              <div className="flex justify-center gap-1">
+                                <button onClick={() => { 
+                                  setEditingPurchaseOrderId(po.id); 
+                                  setPurchaseOrderForm({
+                                    portfolioId: po.portfolioId, 
+                                    projectId: po.projectId, 
+                                    orderNumber: po.orderNumber, 
+                                    supplier: po.supplier,
+                                    cnpj: po.cnpj,
+                                    items: po.items,
+                                    value: po.value.toString(), 
+                                    date: po.date, 
+                                    deliveryDate: po.deliveryDate || new Date().toISOString().split('T')[0],
+                                    description: po.description
+                                  }); 
+                                }} className="p-2 text-slate-300 hover:text-emerald-500 transition-colors"><Edit className="w-4 h-4" /></button>
+                                <button onClick={() => removePurchaseOrder(po.id)} className="p-2 text-slate-300 hover:text-red-500 transition-colors"><Trash2 className="w-4 h-4" /></button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                      {(state.capexPurchaseOrders || []).length === 0 && (
+                        <tr>
+                          <td colSpan={8} className="px-6 py-10 text-center text-slate-400 font-bold uppercase text-[10px] tracking-widest italic">Nenhum lançamento de ordem de compra encontrado.</td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </>
+          )}
         </div>
       )}
     </div>

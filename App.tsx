@@ -135,6 +135,7 @@ const App: React.FC = () => {
         portfolios: inject(data.portfolios),
         capexProjects: inject(data.capexProjects),
         capexInvoices: inject(data.capexInvoices),
+        capexPurchaseOrders: inject(data.capexPurchaseOrders || []),
         costCenters: inject(data.costCenters || []),
         pcmEquipments: inject(data.pcmEquipments || []),
         pcmStoppageReasons: inject(data.pcmStoppageReasons || []),

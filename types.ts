@@ -350,6 +350,23 @@ export interface CapexInvoice {
   updatedAt?: number;
 }
 
+export interface CapexPurchaseOrder {
+  id: string;
+  portfolioId: string;
+  projectId: string;
+  orderNumber: string;
+  supplier: string;
+  cnpj: string;
+  items: string;
+  value: number;
+  date: string;
+  deliveryDate?: string;
+  description: string;
+  userId: string;
+  timestamp: string;
+  updatedAt?: number;
+}
+
 export interface HarvestSchedule {
   id: string;
   date: string;
@@ -561,6 +578,7 @@ export interface AppState {
   portfolios: InvestmentPortfolio[];
   capexProjects: CapexProject[];
   capexInvoices: CapexInvoice[];
+  capexPurchaseOrders?: CapexPurchaseOrder[];
   feedingTables?: FeedingTable[];
   costCenters?: CostCenter[];
   pcmEquipments?: PCMEquipment[];
