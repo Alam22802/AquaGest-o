@@ -29,6 +29,8 @@ const FeedingLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [selectedLogIds, setSelectedLogIds] = useState<Set<string>>(new Set());
+  const [isBulk, setIsBulk] = useState(false);
+  const [selectedCageIds, setSelectedCageIds] = useState<Set<string>>(new Set());
   const itemsPerPage = 50;
   
   const hasPermission = currentUser.isMaster || currentUser.canEdit;
@@ -45,11 +47,15 @@ const FeedingLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     if (!editingId) {
       setSelectedLineId('');
       setFormData(prev => ({ ...prev, cageId: '' }));
+      setSelectedCageIds(new Set());
     }
   }, [formBatchId]);
 
   useEffect(() => {
-    if (!editingId) setFormData(prev => ({ ...prev, cageId: '' }));
+    if (!editingId) {
+      setFormData(prev => ({ ...prev, cageId: '' }));
+      setSelectedCageIds(new Set());
+    }
   }, [selectedLineId]);
 
   const filteredLines = useMemo(() => {
@@ -167,7 +173,22 @@ const FeedingLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     e.preventDefault();
     if (!hasPermission) return;
     const amountNum = Number(formData.amount);
-    if (!formData.cageId || !formData.feedTypeId || isNaN(amountNum) || amountNum <= 0) {
+    
+    const isBulkMode = isBulk && !editingId;
+    
+    if (isBulkMode) {
+      if (selectedCageIds.size === 0) {
+        alert('Selecione pelo menos uma gaiola para o trato em massa.');
+        return;
+      }
+    } else {
+      if (!formData.cageId) {
+        alert('Selecione uma gaiola.');
+        return;
+      }
+    }
+
+    if (!formData.feedTypeId || isNaN(amountNum) || amountNum <= 0) {
       alert('Informe uma quantidade válida.');
       return;
     }
@@ -206,25 +227,28 @@ const FeedingLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       onUpdate({ ...state, feedingLogs: updatedLogs, feedTypes: updatedFeeds });
       setEditingId(null);
     } else {
-      const newLog: IFeedingLog = {
+      const cagesToProcess = isBulkMode ? Array.from(selectedCageIds) : [formData.cageId];
+      const newLogs: IFeedingLog[] = cagesToProcess.map(cageId => ({
         id: generateId(),
-        cageId: formData.cageId,
+        cageId,
         batchId: formBatchId,
         feedTypeId: formData.feedTypeId,
         amount: amountNum,
         timestamp: `${formData.date}T${formData.time}:00`,
         userId: currentUser.id,
         updatedAt: Date.now()
-      };
-      
+      }));
+
+      const totalDeduction = amountNum * cagesToProcess.length;
+
       const updatedFeeds = (state.feedTypes || []).map(f => {
-        if (f.id === formData.feedTypeId) return { ...f, totalStock: f.totalStock - amountNum, updatedAt: Date.now() };
+        if (f.id === formData.feedTypeId) return { ...f, totalStock: f.totalStock - totalDeduction, updatedAt: Date.now() };
         return f;
       });
 
       onUpdate({ 
         ...state, 
-        feedingLogs: [newLog, ...(state.feedingLogs || [])], 
+        feedingLogs: [...newLogs, ...(state.feedingLogs || [])], 
         feedTypes: updatedFeeds 
       });
     }
@@ -235,6 +259,8 @@ const FeedingLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     setEditingId(null);
     setFormBatchId('');
     setSelectedLineId('');
+    setIsBulk(false);
+    setSelectedCageIds(new Set());
     setFormData({ cageId: '', feedTypeId: '', amount: '', date: new Date().toISOString().split('T')[0], time: format(new Date(), 'HH:mm') });
   };
 
@@ -262,6 +288,8 @@ const FeedingLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     
     const [d, t] = log.timestamp.split('T');
     setEditingId(log.id);
+    setIsBulk(false);
+    setSelectedCageIds(new Set());
     setFormData({ 
       cageId: log.cageId, 
       feedTypeId: log.feedTypeId, 
@@ -311,10 +339,94 @@ const FeedingLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                 <option value="">Escolher Linha...</option>
                 {filteredLines.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
               </select>
-              <select required disabled={!selectedLineId} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none" value={formData.cageId} onChange={e => setFormData({...formData, cageId: e.target.value})}>
-                <option value="">Escolher Gaiola...</option>
-                {filteredCages.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-              </select>
+
+              {!editingId && (
+                <div className="flex items-center gap-2 py-1 px-1 border-b border-dashed border-slate-200">
+                  <input 
+                    type="checkbox" 
+                    id="isBulkCheck"
+                    className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                    checked={isBulk}
+                    onChange={e => {
+                      setIsBulk(e.target.checked);
+                      setSelectedCageIds(new Set());
+                    }}
+                  />
+                  <label htmlFor="isBulkCheck" className="text-xs font-black text-slate-600 uppercase tracking-widest cursor-pointer select-none">
+                    Trato em Massa
+                  </label>
+                </div>
+              )}
+
+              {isBulk && !editingId ? (
+                <div className="space-y-1.5">
+                  <div className="flex justify-between items-center px-1">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider">
+                      Gaiolas Selecionadas ({selectedCageIds.size})
+                    </label>
+                    {filteredCages.length > 0 && (
+                      <div className="flex gap-2 text-[10px] font-bold">
+                        <button
+                          type="button"
+                          className="text-blue-600 hover:underline"
+                          onClick={() => setSelectedCageIds(new Set(filteredCages.map(c => c.id)))}
+                        >
+                          Marcar Todas
+                        </button>
+                        <span className="text-slate-300">|</span>
+                        <button
+                          type="button"
+                          className="text-slate-400 hover:underline"
+                          onClick={() => setSelectedCageIds(new Set())}
+                        >
+                          Limpar
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                  <div className="max-h-48 overflow-y-auto border border-slate-200 rounded-2xl p-3 bg-slate-50 space-y-1.5">
+                    {filteredCages.length === 0 ? (
+                      <p className="text-[11px] font-bold text-slate-400 uppercase text-center py-4 italic">
+                        {!selectedLineId ? 'Escolha uma linha primeiro...' : 'Nenhuma gaiola encontrada.'}
+                      </p>
+                    ) : (
+                      filteredCages.map(c => {
+                        const isChecked = selectedCageIds.has(c.id);
+                        return (
+                          <label key={c.id} className="flex items-center gap-2.5 py-1 px-2 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer select-none">
+                            <input
+                              type="checkbox"
+                              className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                              checked={isChecked}
+                              onChange={() => {
+                                const newSet = new Set(selectedCageIds);
+                                if (newSet.has(c.id)) {
+                                  newSet.delete(c.id);
+                                } else {
+                                  newSet.add(c.id);
+                                }
+                                setSelectedCageIds(newSet);
+                              }}
+                            />
+                            <span className="text-xs font-black text-slate-700 uppercase">
+                              {c.name} <span className="text-[10px] text-slate-400 font-bold ml-1">({c.model || 'G70 - 3x3x3'})</span>
+                            </span>
+                          </label>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <select required disabled={!selectedLineId} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none" value={formData.cageId} onChange={e => setFormData({...formData, cageId: e.target.value})}>
+                  <option value="">Escolher Gaiola...</option>
+                  {filteredCages.map(c => (
+                    <option key={c.id} value={c.id}>
+                      {c.name} - ({c.model || 'G70 - 3x3x3'})
+                    </option>
+                  ))}
+                </select>
+              )}
               <select required className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none" value={formData.feedTypeId} onChange={e => setFormData({...formData, feedTypeId: e.target.value})}>
                 <option value="">Tipo de Ração...</option>
                 {(state.feedTypes || []).map(ft => <option key={ft.id} value={ft.id}>{ft.name} (Saldo: {formatNumber(ft.totalStock/1000, 1)}kg)</option>)}
@@ -442,7 +554,9 @@ const FeedingLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                       </td>
                     )}
                     <td className="px-6 py-4">
-                      <div className="font-black text-slate-800 uppercase">{cage?.name || '---'}</div>
+                      <div className="font-black text-slate-800 uppercase">
+                        {cage?.name || '---'} {cage?.model ? `(${cage.model})` : ''}
+                      </div>
                       <div className="text-[10px] font-bold text-blue-500 uppercase">{feed?.name || '---'}</div>
                     </td>
                     <td className="px-6 py-4 text-xs font-bold text-slate-600">
