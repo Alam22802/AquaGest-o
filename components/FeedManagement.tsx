@@ -660,6 +660,7 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
 
   const orderAggregation = useMemo(() => {
     const map = new Map<string, { feedName: string; totalKg: number }>();
+    const dailyMap = new Map<string, number>();
     let grandTotalKg = 0;
 
     planningRows.forEach(row => {
@@ -670,6 +671,10 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
         const current = map.get(calcs.feedTypeId) || { feedName, totalKg: 0 };
         current.totalKg += calcs.totalFeed;
         map.set(calcs.feedTypeId, current);
+
+        const currentDaily = dailyMap.get(calcs.feedTypeId) || 0;
+        dailyMap.set(calcs.feedTypeId, currentDaily + calcs.dailyFeed);
+
         grandTotalKg += calcs.totalFeed;
       }
     });
@@ -681,9 +686,59 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       const feed = feedMap.get(feedId);
       const stockKg = feed ? (feed.totalStock / 1000) : 0;
       const orderKg = Math.max(0, data.totalKg - stockKg);
+      const dailyFeedKg = dailyMap.get(feedId) || 0;
       
       grandTotalStockKg += stockKg;
       grandTotalOrderKg += orderKg;
+
+      let daysOfAutonomy = 0;
+      let autonomyText = '';
+      let depletionDate: Date | null = null;
+      let status: 'ok' | 'warning' | 'alert' = 'ok';
+
+      if (dailyFeedKg > 0) {
+        daysOfAutonomy = stockKg / dailyFeedKg;
+        if (stockKg <= 0) {
+          autonomyText = 'Sem estoque';
+          status = 'alert';
+        } else {
+          const date = new Date();
+          const offsetDays = Math.ceil(daysOfAutonomy) - 1;
+          date.setDate(date.getDate() + offsetDays);
+          depletionDate = date;
+          
+          if (daysOfAutonomy < 1) {
+            autonomyText = 'Acaba hoje';
+            status = 'alert';
+          } else if (daysOfAutonomy < 3) {
+            autonomyText = `Suporta ${formatNumber(daysOfAutonomy, 1)} ${daysOfAutonomy <= 1.1 ? 'dia' : 'dias'}`;
+            status = 'alert';
+          } else if (daysOfAutonomy < 7) {
+            autonomyText = `Suporta ${formatNumber(daysOfAutonomy, 1)} dias`;
+            status = 'warning';
+          } else {
+            autonomyText = `Suporta ${formatNumber(daysOfAutonomy, 1)} dias`;
+            status = 'ok';
+          }
+        }
+      } else {
+        autonomyText = stockKg > 0 ? 'Suficiente (sem consumo)' : 'Sem consumo / Sem estoque';
+        status = 'ok';
+      }
+
+      let autonomyDetailed = '';
+      if (dailyFeedKg > 0 && stockKg > 0) {
+        const formattedDate = depletionDate ? format(depletionDate, 'dd/MM/yyyy') : '';
+        if (daysOfAutonomy >= 1) {
+          autonomyDetailed = `Supre até dia ${formattedDate} (${formatNumber(daysOfAutonomy, 1)} dias)`;
+        } else {
+          autonomyDetailed = `Acaba hoje (${formatNumber(daysOfAutonomy, 1)} dia)`;
+        }
+      } else if (dailyFeedKg > 0 && stockKg <= 0) {
+        autonomyDetailed = 'Acaba hoje (Sem estoque)';
+      } else {
+        autonomyDetailed = stockKg > 0 ? 'Sem consumo planejado' : 'Sem consumo e sem estoque';
+      }
 
       return {
         feedId,
@@ -692,7 +747,13 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
         stockKg,                                   // Saldo no estoque (Kg)
         orderKg,                                   // Total real a pedir (Kg)
         bags25kg: Math.ceil(orderKg / 25),
-        percentage: grandTotalKg > 0 ? (data.totalKg / grandTotalKg) * 100 : 0
+        percentage: grandTotalKg > 0 ? (data.totalKg / grandTotalKg) * 100 : 0,
+        dailyFeedKg,
+        daysOfAutonomy,
+        autonomyText,
+        depletionDate,
+        autonomyStatus: status,
+        autonomyDetailed
       };
     });
 
@@ -805,12 +866,13 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       doc.setTextColor(22, 101, 52);
       doc.text('2. PEDIDO CONSOLIDADO PARA FORNECEDOR (DEPOIS DE ABATER ESTOQUE)', 15, nextY1);
 
-      const consolidatedHeaders = [['Modelo de Ração', 'Demanda Total (Kg)', 'Saldo Estoque (Kg)', 'A Pedir Real (Kg)']];
+      const consolidatedHeaders = [['Modelo de Ração', 'Demanda Total (Kg)', 'Saldo Estoque (Kg)', 'A Pedir Real (Kg)', 'Duração / Previsão']];
       const consolidatedRows = orderAggregation.items.map(item => [
         item.feedName.toUpperCase(),
         `${formatNumber(item.totalKg, 1)} kg`,
         `${formatNumber(item.stockKg, 1)} kg`,
-        `${formatNumber(item.orderKg, 1)} kg`
+        `${formatNumber(item.orderKg, 1)} kg`,
+        item.autonomyDetailed || 'N/A'
       ]);
 
       autoTable(doc, {
@@ -824,13 +886,15 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
           0: { fontStyle: 'bold' },
           1: { halign: 'right' },
           2: { halign: 'right' },
-          3: { halign: 'right', fontStyle: 'bold', textColor: [22, 101, 52] }
+          3: { halign: 'right', fontStyle: 'bold', textColor: [22, 101, 52] },
+          4: { halign: 'left', fontStyle: 'normal' }
         },
         foot: [[
           'TOTALIZADORES',
           `${formatNumber(orderAggregation.grandTotalKg, 1)} kg`,
           `${formatNumber(orderAggregation.grandTotalStockKg, 1)} kg`,
-          `${formatNumber(orderAggregation.grandTotalOrderKg, 1)} kg`
+          `${formatNumber(orderAggregation.grandTotalOrderKg, 1)} kg`,
+          ''
         ]],
         footStyles: { fillColor: [241, 245, 249], textColor: [15, 23, 42], fontStyle: 'bold', fontSize: 8.5 },
         margin: { left: 15, right: 15 }
@@ -890,6 +954,8 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       text += `🔹 *${item.feedName.toUpperCase()}*\n`;
       text += `   • Demanda Total: ${formatNumber(item.totalKg, 1)} kg\n`;
       text += `   • Saldo em Estoque: ${formatNumber(item.stockKg, 1)} kg\n`;
+      text += `   • Consumo Planejado: ${formatNumber(item.dailyFeedKg, 1)} kg/dia\n`;
+      text += `   • *Previsão: ${item.autonomyDetailed}*\n`;
       text += `   • *A ser pedido: ${formatNumber(item.orderKg, 1)} kg*\n\n`;
     });
 
@@ -1729,7 +1795,7 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
               </div>
 
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 font-sans">
-                <div className="lg:col-span-7 space-y-4">
+                <div className="lg:col-span-7 space-y-6">
                   <div className="overflow-x-auto border border-slate-100 rounded-2xl">
                     <table className="w-full text-left">
                       <thead className="bg-slate-50 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100">
@@ -1762,6 +1828,68 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                       </tfoot>
                     </table>
                   </div>
+
+                  {/* Stock Autonomy Diagnostic Card */}
+                  <div className="bg-slate-50 p-6 rounded-3xl border border-slate-200/60 space-y-4">
+                    <div className="flex items-center gap-2">
+                      <Calendar className="w-5 h-5 text-emerald-600 animate-pulse" />
+                      <h4 className="text-[12px] font-black text-slate-700 uppercase tracking-widest">
+                        📅 Diagnóstico de Autonomia do Estoque Físico
+                      </h4>
+                    </div>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tight">
+                      A calculadora estima até que dia o seu estoque físico atual consegue suprir a programação diária lançada.
+                    </p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      {orderAggregation.items.map(item => {
+                        let bgClass = 'bg-white border-slate-150';
+                        let testColorClass = 'text-slate-800';
+                        let subtitleClass = 'text-slate-400';
+                        let badgeBg = 'bg-slate-100 text-slate-600';
+
+                        if (item.autonomyStatus === 'alert') {
+                          bgClass = 'bg-red-50/40 border-red-100';
+                          testColorClass = 'text-red-900';
+                          subtitleClass = 'text-red-650/80';
+                          badgeBg = 'bg-red-100 text-red-700';
+                        } else if (item.autonomyStatus === 'warning') {
+                          bgClass = 'bg-amber-50/40 border-amber-100';
+                          testColorClass = 'text-amber-900';
+                          subtitleClass = 'text-amber-650/80';
+                          badgeBg = 'bg-amber-100 text-amber-750';
+                        } else if (item.autonomyStatus === 'ok') {
+                          bgClass = 'bg-emerald-50/40 border-emerald-100';
+                          testColorClass = 'text-emerald-900';
+                          subtitleClass = 'text-emerald-650/80';
+                          badgeBg = 'bg-emerald-100 text-emerald-700';
+                        }
+
+                        return (
+                          <div key={item.feedId} className={`p-4 rounded-2xl border ${bgClass} shadow-sm flex flex-col justify-between transition-all hover:shadow-md`}>
+                            <div className="flex items-start justify-between gap-2 mb-2">
+                              <div>
+                                <span className={`text-[11px] font-black uppercase tracking-wider block ${testColorClass}`}>
+                                  {item.feedName}
+                                </span>
+                                <span className={`text-[9px] font-bold uppercase tracking-tight block mt-0.5 ${subtitleClass}`}>
+                                  Consumo diário: {formatNumber(item.dailyFeedKg, 1)} kg/dia
+                                </span>
+                              </div>
+                              <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-lg ${badgeBg} tracking-wide shrink-0`}>
+                                {item.autonomyStatus === 'alert' ? 'Risco' : item.autonomyStatus === 'warning' ? 'Atenção' : 'Seguro'}
+                              </span>
+                            </div>
+                            <div className="mt-2 pt-2 border-t border-slate-100/85 flex items-center justify-between gap-2">
+                              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest shrink-0">Previsão:</span>
+                              <span className={`text-[10.5px] font-black uppercase tracking-tight text-right ${testColorClass}`}>
+                                {item.autonomyDetailed}
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
                 </div>
 
                 {/* Copiable Text Preview Box */}
@@ -1775,6 +1903,8 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                         text += `🔹 *${item.feedName.toUpperCase()}*\n`;
                         text += `   • Demanda Total: ${formatNumber(item.totalKg, 1)} kg\n`;
                         text += `   • Saldo em Estoque: ${formatNumber(item.stockKg, 1)} kg\n`;
+                        text += `   • Consumo Planejado: ${formatNumber(item.dailyFeedKg, 1)} kg/dia\n`;
+                        text += `   • *Previsão: ${item.autonomyDetailed}*\n`;
                         text += `   • *A ser pedido: ${formatNumber(item.orderKg, 1)} kg*\n\n`;
                       });
                       text += `----------------------------------\n`;
