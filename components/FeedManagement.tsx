@@ -104,6 +104,79 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
 
   const [editingTableId, setEditingTableId] = useState<string | null>(null);
 
+  const [selectedConsumptionMonth, setSelectedConsumptionMonth] = useState<string>('');
+
+  const monthlyConsumptionStats = useMemo(() => {
+    const logs = state.feedingLogs || [];
+    const monthsSet = new Set<string>();
+    
+    logs.forEach(log => {
+      if (log.timestamp) {
+        const monthKey = log.timestamp.slice(0, 7); // 'YYYY-MM'
+        if (/^\d{4}-\d{2}$/.test(monthKey)) {
+          monthsSet.add(monthKey);
+        }
+      }
+    });
+
+    const sortedMonths = Array.from(monthsSet).sort((a, b) => b.localeCompare(a));
+    return { sortedMonths };
+  }, [state.feedingLogs]);
+
+  const selectedMonthConsumption = useMemo(() => {
+    const logs = state.feedingLogs || [];
+    const activeMonth = selectedConsumptionMonth || (monthlyConsumptionStats.sortedMonths[0] || 'all');
+    
+    const filteredLogs = activeMonth === 'all' 
+      ? logs 
+      : logs.filter(log => log.timestamp && log.timestamp.startsWith(activeMonth));
+
+    const consumptionByFeedType: Record<string, number> = {};
+    let totalGrams = 0;
+
+    filteredLogs.forEach(log => {
+      consumptionByFeedType[log.feedTypeId] = (consumptionByFeedType[log.feedTypeId] || 0) + log.amount;
+      totalGrams += log.amount;
+    });
+
+    const breakdown = (state.feedTypes || []).map(feed => {
+      const g = consumptionByFeedType[feed.id] || 0;
+      return {
+        ...feed,
+        consumptionKg: g / 1000,
+        percentage: totalGrams > 0 ? (g / totalGrams) * 100 : 0
+      };
+    }).filter(item => item.consumptionKg > 0);
+
+    return {
+      activeMonth,
+      totalKg: totalGrams / 1000,
+      breakdown,
+    };
+  }, [state.feedingLogs, state.feedTypes, selectedConsumptionMonth, monthlyConsumptionStats.sortedMonths]);
+
+  const formatMonthKeyPt = (key: string) => {
+    if (key === 'all') return 'Todos os Meses (Total)';
+    const splitArr = key.split('-');
+    if (splitArr.length < 2) return key;
+    const [year, month] = splitArr;
+    const monthNamesPt: Record<string, string> = {
+      '01': 'Janeiro',
+      '02': 'Fevereiro',
+      '03': 'Março',
+      '04': 'Abril',
+      '05': 'Maio',
+      '06': 'Junho',
+      '07': 'Julho',
+      '08': 'Agosto',
+      '09': 'Setembro',
+      '10': 'Outubro',
+      '11': 'Novembro',
+      '12': 'Dezembro',
+    };
+    return `${monthNamesPt[month] || month} / ${year}`;
+  };
+
   const { userMap, feedMap } = useMemo(() => {
     const users = new Map((state.users || []).map(u => [u.id, u]));
     const feeds = new Map((state.feedTypes || []).map(f => [f.id, f]));
@@ -1072,6 +1145,103 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
           <p className="text-[9px] font-bold text-slate-400 uppercase">Você não possui permissão para gerenciar modelos ou estoque de ração.</p>
         </div>
       )}
+
+      {/* Indicador de Consumo Mensal com Seletor */}
+      <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200/90 space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-2.5">
+            <div className="p-2.5 bg-blue-50 text-blue-600 rounded-2xl">
+              <TrendingDown className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest italic">
+                Consumo Mensal de Ração
+              </h3>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tight">
+                Acompanhamento do volume de trato por período
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Período:</span>
+            <select
+              className="text-[11px] font-black uppercase text-slate-600 bg-slate-50 border border-slate-200 px-3 py-2 rounded-xl outline-none focus:ring-2 focus:ring-blue-500/20 cursor-pointer transition-all animate-none"
+              value={selectedMonthConsumption.activeMonth}
+              onChange={e => setSelectedConsumptionMonth(e.target.value)}
+            >
+              <option value="all">Todos os Meses (Total Geral)</option>
+              {monthlyConsumptionStats.sortedMonths.map(mKey => (
+                <option key={mKey} value={mKey}>
+                  {formatMonthKeyPt(mKey)}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-stretch">
+          {/* Cartão de Destaque */}
+          <div className="md:col-span-5 bg-gradient-to-br from-slate-50 to-slate-100 p-6 rounded-2xl border border-slate-150 text-center md:text-left flex flex-col justify-center">
+            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">
+              Consumo Total no Período
+            </span>
+            <h2 className="text-3xl font-black text-blue-600 tracking-tighter">
+              {formatNumber(selectedMonthConsumption.totalKg, 1)} <span className="text-lg font-black uppercase text-blue-400">kg</span>
+            </h2>
+            <p className="text-[9.5px] font-bold text-slate-400 uppercase tracking-wide mt-2 italic">
+              Soma de todos os tratos lançados no sistema para o período de {formatMonthKeyPt(selectedMonthConsumption.activeMonth).toLowerCase()}.
+            </p>
+          </div>
+
+          {/* Lista por Tipo */}
+          <div className="md:col-span-7 space-y-4 flex flex-col justify-center">
+            <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+              Consumo Detalhado por Modelo de Ração
+            </h4>
+            
+            {selectedMonthConsumption.breakdown.length === 0 ? (
+              <div className="py-6 text-center text-[10px] font-black text-slate-400 uppercase tracking-wider italic">
+                Nenhum consumo de ração registrado neste período.
+              </div>
+            ) : (
+              <div className="space-y-3.5 max-h-[160px] overflow-y-auto pr-1">
+                {selectedMonthConsumption.breakdown.map((item, index) => {
+                  const colors = [
+                    'bg-blue-500', 'bg-emerald-500', 'bg-amber-500', 'bg-purple-500', 
+                    'bg-teal-500', 'bg-rose-500', 'bg-indigo-500', 'bg-cyan-500'
+                  ];
+                  const colorClass = colors[index % colors.length];
+
+                  return (
+                    <div key={item.id} className="space-y-1">
+                      <div className="flex justify-between items-center text-xs">
+                        <span className="font-black text-slate-700 uppercase">
+                          {item.name}
+                        </span>
+                        <div className="flex items-center gap-1 font-bold">
+                          <span className="text-slate-800">
+                            {formatNumber(item.consumptionKg, 1)} kg
+                          </span>
+                          <span className="text-[10px] text-slate-400">
+                            ({formatNumber(item.percentage, 0)}%)
+                          </span>
+                        </div>
+                      </div>
+                      <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
+                        <div 
+                          className={`h-full ${colorClass} transition-all duration-500`}
+                          style={{ width: `${item.percentage}%` }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
 
       <div className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden">
         <div className="p-5 border-b border-slate-100 flex items-center gap-2 font-black text-slate-800 uppercase tracking-tighter italic">
