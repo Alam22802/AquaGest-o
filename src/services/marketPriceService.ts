@@ -43,7 +43,7 @@ export async function getTilapiaPriceMG(): Promise<MarketPrice> {
     }
     return data;
   } catch (error) {
-    console.error("Erro ao buscar preço da tilápia no cliente:", error);
+    console.warn("Informação: Buscando preço da tilápia no cliente em modo offline/seguro:", error);
     if (cached) {
       try { return JSON.parse(cached); } catch(e) {}
     }

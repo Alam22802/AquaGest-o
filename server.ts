@@ -77,122 +77,126 @@ async function startServer() {
   // Cache is valid for 12 hours (43200000 ms) because market prices change very infrequently (weekly basis)
   const CACHE_TTL = 12 * 60 * 60 * 1000;
 
+  let isFetchingPrice = false;
+
   // API Route
   app.get("/api/tilapia-price", async (req, res) => {
     const now = Date.now();
+
+    // Helper function to update the cache in the background
+    const fetchPriceInBackground = async () => {
+      if (isFetchingPrice) return;
+      isFetchingPrice = true;
+      try {
+        const key = process.env.GEMINI_API_KEY;
+        if (!key) {
+          console.warn("Using CEPEA simulation due to missing GEMINI_API_KEY inside background update.");
+          return;
+        }
+
+        const ai = new GoogleGenAI({
+          apiKey: key,
+          httpOptions: {
+            headers: {
+              'User-Agent': 'aistudio-build',
+            }
+          }
+        });
+
+        console.log("Fetching tilapia prices from CEPEA/Peixe BR via Gemini with Search Grounding (Background)...");
+        
+        const response = await ai.models.generateContent({
+          model: "gemini-3.5-flash",
+          contents: `Busque o preço médio ATUAL (do dia anterior ou da semana corrente) do quilo da tilápia (peixe vivo) nos indicadores CEPEA/Peixe BR para as seguintes regiões:
+          1. Triângulo Mineiro/Alto Paranaíba (VALOR PRINCIPAL)
+          2. Grandes Lagos (SP)
+          3. Morada Nova de Minas (MG)
+          4. Norte do Paraná (PR)
+          5. Oeste do Paraná (PR)
+
+          Use o Google Search para encontrar os preços correspondentes mais RECENTES disponíveis.
+          Retorne estritamente um JSON que se adapte ao padrão especificado no responseSchema.
+          A propriedade 'source' deve detalhar a data exata da cotação consultada, ex: "CEPEA (18/05/2026)" ou "CEPEA (18-22/05)".`,
+          config: {
+            tools: [{ googleSearch: {} }],
+            responseMimeType: "application/json",
+            responseSchema: {
+              type: Type.OBJECT,
+              properties: {
+                price: { type: Type.NUMBER, description: "Preço médio no Triângulo Mineiro/Alto Paranaíba (R$)" },
+                source: { type: Type.STRING, description: "Fonte e data correspondente da cotação (ex: CEPEA 11-15/05)" },
+                variation: { type: Type.NUMBER, description: "Variação diária (%)" },
+                weeklyVariation: { type: Type.NUMBER, description: "Variação semanal (%)" },
+                regions: {
+                  type: Type.ARRAY,
+                  items: {
+                    type: Type.OBJECT,
+                    properties: {
+                      name: { type: Type.STRING, description: "Nome da região" },
+                      price: { type: Type.NUMBER, description: "Preço médio (R$)" },
+                      variation: { type: Type.NUMBER, description: "Variação diária (%)" },
+                      weeklyVariation: { type: Type.NUMBER, description: "Variação semanal (%)" }
+                    },
+                    required: ["name", "price"]
+                  }
+                }
+              },
+              required: ["price", "source"]
+            }
+          }
+        });
+
+        if (response && response.text) {
+          const textToParse = response.text.trim();
+          console.log("Parsed response text (Background):", textToParse);
+          const data = JSON.parse(textToParse);
+          
+          const finalizedData = {
+            ...data,
+            lastUpdate: new Date().toISOString()
+          };
+
+          savePriceCacheToDisk(finalizedData, now, false, false);
+        } else {
+          throw new Error("No text response received from Gemini.");
+        }
+      } catch (error) {
+        const quotaExceeded = isQuotaExceeded(error);
+        if (priceCache) {
+          if (quotaExceeded) {
+            savePriceCacheToDisk(priceCache.data, now, !!priceCache.isFallback, true);
+          }
+        } else {
+          // If no cache, initialize with dynamic fallback
+          savePriceCacheToDisk(getDynamicFallback(), now, true, quotaExceeded);
+        }
+        console.warn("Background tilapia price fetch failed:", error);
+      } finally {
+        isFetchingPrice = false;
+      }
+    };
     
     // Serve from cache if it exists and hasn't expired.
     // If the cache was marked as quota-exhausted, still serve it to avoid spamming the Gemini API on every load.
-    if (priceCache && (now - priceCache.timestamp < CACHE_TTL)) {
-      console.log(`Serving Tilapia Price from persistent cache. IsFallback: ${!!priceCache.isFallback}, IsExhausted: ${!!priceCache.isExhausted}`);
+    if (priceCache) {
+      const isExpired = (now - priceCache.timestamp > CACHE_TTL);
+      if (isExpired) {
+        // Kick off background revalidation
+        fetchPriceInBackground().catch(e => console.error("Error triggering background revalidation:", e));
+      }
       return res.json(priceCache.data);
     }
 
-    const key = process.env.GEMINI_API_KEY;
-    if (!key) {
-      console.warn("Using CEPEA simulation due to missing GEMINI_API_KEY.");
-      return res.json(getDynamicFallback());
-    }
+    // No persistent cache exists: generate premium dynamic simulated fallback data immediately
+    const fallback = getDynamicFallback();
+    
+    // Warm up cache file on disk
+    savePriceCacheToDisk(fallback, now, true, false);
 
-    try {
-      const ai = new GoogleGenAI({
-        apiKey: key,
-        httpOptions: {
-          headers: {
-            'User-Agent': 'aistudio-build',
-          }
-        }
-      });
+    // Trigger async fetch to get actual price for future requests
+    fetchPriceInBackground().catch(e => console.error("Error triggering initial background fetch:", e));
 
-      console.log("Fetching tilapia prices from CEPEA/Peixe BR via Gemini with Search Grounding...");
-      
-      const response = await ai.models.generateContent({
-        model: "gemini-3.5-flash",
-        contents: `Busque o preço médio ATUAL (do dia anterior ou da semana corrente) do quilo da tilápia (peixe vivo) nos indicadores CEPEA/Peixe BR para as seguintes regiões:
-        1. Triângulo Mineiro/Alto Paranaíba (VALOR PRINCIPAL)
-        2. Grandes Lagos (SP)
-        3. Morada Nova de Minas (MG)
-        4. Norte do Paraná (PR)
-        5. Oeste do Paraná (PR)
-
-        Use o Google Search para encontrar os preços correspondentes mais RECENTES disponíveis.
-        Retorne estritamente um JSON que se adapte ao padrão especificado no responseSchema.
-        A propriedade 'source' deve detalhar a data exata da cotação consultada, ex: "CEPEA (18/05/2026)" ou "CEPEA (18-22/05)".`,
-        config: {
-          tools: [{ googleSearch: {} }],
-          responseMimeType: "application/json",
-          responseSchema: {
-            type: Type.OBJECT,
-            properties: {
-              price: { type: Type.NUMBER, description: "Preço médio no Triângulo Mineiro/Alto Paranaíba (R$)" },
-              source: { type: Type.STRING, description: "Fonte e data correspondente da cotação (ex: CEPEA 11-15/05)" },
-              variation: { type: Type.NUMBER, description: "Variação diária (%)" },
-              weeklyVariation: { type: Type.NUMBER, description: "Variação semanal (%)" },
-              regions: {
-                type: Type.ARRAY,
-                items: {
-                  type: Type.OBJECT,
-                  properties: {
-                    name: { type: Type.STRING, description: "Nome da região" },
-                    price: { type: Type.NUMBER, description: "Preço médio (R$)" },
-                    variation: { type: Type.NUMBER, description: "Variação diária (%)" },
-                    weeklyVariation: { type: Type.NUMBER, description: "Variação semanal (%)" }
-                  },
-                  required: ["name", "price"]
-                }
-              }
-            },
-            required: ["price", "source"]
-          }
-        }
-      });
-
-      if (response && response.text) {
-        const textToParse = response.text.trim();
-        console.log("Parsed response text:", textToParse);
-        const data = JSON.parse(textToParse);
-        
-        const finalizedData = {
-          ...data,
-          lastUpdate: new Date().toISOString()
-        };
-
-        // Cache the successful fetch to disk
-        savePriceCacheToDisk(finalizedData, now, false, false);
-
-        return res.json(finalizedData);
-      } else {
-        throw new Error("No text response received from Gemini.");
-      }
-    } catch (error) {
-      const quotaExceeded = isQuotaExceeded(error);
-      
-      if (quotaExceeded) {
-        console.warn("⚠️ Gemini API quota has been exhausted (code 429 RESOURCE_EXHAUSTED). Gracefully falling back to cached or simulated data to prevent visual disruptions.");
-      } else {
-        console.warn("Issue communicating with Gemini API services, checking cache or returning fallback.");
-      }
-      
-      // Serve expired/stale cache if we have it to avoid breaking or falling back to static
-      if (priceCache) {
-        console.log("Serving persistent data cache to safeguard frontend display continuity...");
-        
-        // If quota was exceeded, update cache timestamp on disk so we wait a comfortable CACHE_TTL before hammering Gemini again
-        if (quotaExceeded) {
-          savePriceCacheToDisk(priceCache.data, now, !!priceCache.isFallback, true);
-        }
-        
-        return res.json(priceCache.data);
-      }
-
-      // No persistent cache exists: generate premium dynamic simulated fallback data
-      const fallback = getDynamicFallback();
-      
-      // Register fallback data into cache and save to disk to prevent hitting Gemini again during the TTL
-      savePriceCacheToDisk(fallback, now, true, quotaExceeded);
-
-      return res.json(fallback);
-    }
+    return res.json(fallback);
   });
 
   // Weather API cache state
