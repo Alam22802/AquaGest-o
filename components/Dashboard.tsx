@@ -3,7 +3,7 @@ import React, { useMemo, useState, useEffect } from 'react';
 import { AppState } from '../types';
 import { 
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  BarChart, Bar, Cell
+  BarChart, Bar, Cell, AreaChart, Area
 } from 'recharts';
 import { formatNumber } from '../utils/formatters';
 import { Fish, Utensils, Scale, TrendingUp, FishOff, Calendar, Layers, Download, Info, AlertTriangle, PackageSearch, CloudSun, Droplets, Wind, CloudRain, Thermometer, Umbrella, Cloud, RefreshCw, ChevronDown, ClipboardCheck } from 'lucide-react';
@@ -801,6 +801,152 @@ const Dashboard: React.FC<Props> = ({ state }) => {
     return baseData;
   }, [state.biometryLogs, state.batches, state.cages, state.harvestLogs, state.protocols, state.standardCurves, selectedBatchIds, batchStats, showSupplierCurve, showStandardCurve, showContinueCurve]);
 
+  const biometryStdDevData = useMemo(() => {
+    const batchesToProcess = selectedBatchIds.length > 0 
+      ? filteredBatchStats.filter(b => selectedBatchIds.includes(b.id))
+      : filteredBatchStats;
+
+    const biometriesByBatch = new Map<string, typeof state.biometryLogs>();
+    const cageMap = new Map((state.cages || []).map(c => [c.id, c]));
+    const batchMap = new Map((state.batches || []).map(b => [b.id, b]));
+    const sortedHarvestLogs = [...(state.harvestLogs || [])].sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+    const harvestLogsByCage = new Map<string, typeof state.harvestLogs>();
+    sortedHarvestLogs.forEach(h => {
+      const list = harvestLogsByCage.get(h.cageId) || [];
+      list.push(h);
+      harvestLogsByCage.set(h.cageId, list);
+    });
+
+    (state.biometryLogs || []).forEach(b => {
+      let bId = b.batchId;
+      if (!bId && b.cageId) {
+        const hList = harvestLogsByCage.get(b.cageId);
+        const harvest = hList?.find(h => h.date >= b.date);
+        if (harvest) bId = harvest.batchId;
+        else {
+          const cage = cageMap.get(b.cageId);
+          if (cage?.batchId) {
+            const batch = batchMap.get(cage.batchId);
+            if (batch && b.date >= batch.settlementDate) bId = cage.batchId;
+          }
+        }
+      }
+      if (bId) {
+        const list = biometriesByBatch.get(bId) || [];
+        list.push(b);
+        biometriesByBatch.set(bId, list);
+      }
+    });
+
+    let allSamples: number[] = [];
+    const samplesByBatchDate: { [batchId: string]: { date: string, weights: number[] } } = {};
+
+    batchesToProcess.forEach(batch => {
+      const batchBiometries = biometriesByBatch.get(batch.id) || [];
+      if (batchBiometries.length > 0) {
+        const sorted = [...batchBiometries].sort((a, b) => b.date.localeCompare(a.date));
+        const lastDate = sorted[0].date;
+        const lastDayLogs = batchBiometries.filter(log => log.date === lastDate);
+        const weights = lastDayLogs.map(l => l.averageWeight);
+        if (weights.length > 0) {
+          samplesByBatchDate[batch.id] = { date: lastDate, weights };
+          allSamples = [...allSamples, ...weights];
+        }
+      }
+    });
+
+    if (allSamples.length === 0) {
+      return {
+        hasData: false,
+        mean: 0,
+        stdDev: 0,
+        cv: 0,
+        sampleCount: 0,
+        samples: [],
+        curveData: [],
+        rating: 'Sem dados',
+        ratingColor: 'text-slate-500',
+        ratingBg: 'bg-slate-50',
+        lastDate: ''
+      };
+    }
+
+    const n = allSamples.length;
+    const mean = allSamples.reduce((a, b) => a + b, 0) / n;
+    let variance = 0;
+    if (n > 1) {
+      variance = allSamples.reduce((acc, val) => acc + Math.pow(val - mean, 2), 0) / (n - 1);
+    } else {
+      variance = 0;
+    }
+    const stdDev = Math.sqrt(variance);
+    const cv = mean > 0 ? (stdDev / mean) * 100 : 0;
+
+    const activeStdDev = stdDev > 0 ? stdDev : (mean * 0.1 || 10);
+    const curvePointsCount = 30;
+    const minX = Math.max(0, mean - 3 * activeStdDev);
+    const maxX = mean + 3 * activeStdDev;
+    const step = (maxX - minX) / curvePointsCount;
+
+    const normalPdf = (x: number, m: number, sd: number) => {
+      return (1 / (sd * Math.sqrt(2 * Math.PI))) * Math.exp(-0.5 * Math.pow((x - m) / sd, 2));
+    };
+
+    const curveData = [];
+    for (let i = 0; i <= curvePointsCount; i++) {
+      const x = minX + i * step;
+      const y = normalPdf(x, mean, activeStdDev);
+      curveData.push({
+        weight: Math.round(x),
+        probability: y,
+        representativeProbability: Math.round(y * 100000000) / 100000
+      });
+    }
+
+    let latestDateStr = '';
+    const dates = Object.values(samplesByBatchDate).map(s => s.date);
+    if (dates.length > 0) {
+      latestDateStr = [...dates].sort().reverse()[0];
+    }
+
+    let rating = 'Sem dados';
+    let ratingColor = 'text-slate-500';
+    let ratingBg = 'bg-slate-50';
+    if (cv >= 0) {
+      if (cv < 5) {
+        rating = 'Excelente (Muito Uniforme)';
+        ratingColor = 'text-blue-600';
+        ratingBg = 'bg-blue-50';
+      } else if (cv <= 10) {
+        rating = 'Bom (Baixo Desvio)';
+        ratingColor = 'text-emerald-600';
+        ratingBg = 'bg-emerald-50';
+      } else if (cv <= 15) {
+        rating = 'Atenção (Desvio Médio)';
+        ratingColor = 'text-amber-600';
+        ratingBg = 'bg-amber-50';
+      } else {
+        rating = 'Alerta (Desvio Elevado)';
+        ratingColor = 'text-red-600';
+        ratingBg = 'bg-red-50';
+      }
+    }
+
+    return {
+      hasData: true,
+      mean,
+      stdDev,
+      cv,
+      sampleCount: n,
+      samples: allSamples,
+      curveData,
+      rating,
+      ratingColor,
+      ratingBg,
+      lastDate: latestDateStr
+    };
+  }, [state.batches, state.cages, state.biometryLogs, state.harvestLogs, selectedBatchIds, filteredBatchStats]);
+
   const mortalityEvolutionData = useMemo(() => {
     let logs: any[] = [];
 
@@ -1523,7 +1669,7 @@ const Dashboard: React.FC<Props> = ({ state }) => {
       </div>
 
       {/* Estatísticas Gerais do Lote */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
         <MiniStat label="Estoque Vivo Atual" value={<span className="text-xl font-black">{selectedBatchData.stock} un</span>} icon={<Fish className="w-5 h-5" />} color="text-blue-600" subtext="Peixes atualmente na água" />
         <MiniStat 
           label="Total Despescado" 
@@ -1555,6 +1701,26 @@ const Dashboard: React.FC<Props> = ({ state }) => {
             </div>
           } icon={<Utensils className="w-5 h-5" />} color="text-amber-600" />
         <MiniStat label="FCA (Conversão)" value={<span className="text-xl font-black">{selectedBatchData.fca}</span>} icon={<TrendingUp className="w-5 h-5" />} color="text-indigo-600" subtext="Baseado na biomassa atual" />
+        <MiniStat 
+          label="Desvio de Peso (DP)" 
+          value={
+            biometryStdDevData.hasData ? (
+              <div className="flex flex-col">
+                <span className="text-xl font-black text-slate-800 leading-none">
+                  ± {formatNumber(biometryStdDevData.stdDev, 1)}g
+                </span>
+                <span className="text-[10px] font-black text-slate-400 uppercase mt-1">
+                  CV: {formatNumber(biometryStdDevData.cv, 1)}%
+                </span>
+              </div>
+            ) : (
+              <span className="text-xl font-black text-slate-300">Sem dados</span>
+            )
+          } 
+          icon={<ClipboardCheck className={`w-5 h-5 ${biometryStdDevData.hasData ? biometryStdDevData.ratingColor : 'text-slate-400'}`} />} 
+          color={biometryStdDevData.hasData ? biometryStdDevData.ratingColor : 'text-slate-400'} 
+          subtext={biometryStdDevData.hasData ? biometryStdDevData.rating : 'Última biometria do lote'} 
+        />
       </div>
 
       {/* Gráficos Evolutivos */}
@@ -1697,6 +1863,91 @@ const Dashboard: React.FC<Props> = ({ state }) => {
             </ResponsiveContainer>
           </div>
         </div>
+
+        {biometryStdDevData.hasData && (
+          <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm transition-all hover:border-emerald-100">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-6">
+              <div className="flex flex-col">
+                <h3 className="text-sm font-black text-slate-400 uppercase tracking-widest flex items-center gap-2 italic">
+                  <Scale className="w-4 h-4 text-emerald-500" /> Curva de Distribuição e Variação de Peso (Bell Curve)
+                </h3>
+                <span className="text-[10px] font-bold text-slate-400 uppercase mt-0.5">
+                  Análise da última biometria ({biometryStdDevData.lastDate ? format(parseISO(biometryStdDevData.lastDate), 'dd/MM/yyyy') : ''}) • Amostragem de {biometryStdDevData.sampleCount} gaiola(s)
+                </span>
+              </div>
+              <div className={`px-3 py-1.5 rounded-2xl ${biometryStdDevData.ratingBg} ${biometryStdDevData.ratingColor} text-[10px] font-black uppercase tracking-widest border border-current/10`}>
+                {biometryStdDevData.rating}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-stretch">
+              {/* Painel lateral informativo / Estatísticas */}
+              <div className="bg-slate-50 rounded-2xl p-5 border border-slate-100 flex flex-col justify-center gap-4">
+                <div>
+                  <div className="text-[9px] font-black text-slate-400 uppercase tracking-wider mb-0.5">Peso Médio</div>
+                  <div className="text-2xl font-black text-slate-800 italic">{formatNumber(biometryStdDevData.mean, 1)}g</div>
+                </div>
+                <div className="grid grid-cols-2 gap-4 border-t border-slate-200/60 pt-4">
+                  <div>
+                    <div className="text-[9px] font-black text-slate-400 uppercase tracking-wider mb-0.5">Desvio Padrão</div>
+                    <div className="text-lg font-black text-slate-700 italic">± {formatNumber(biometryStdDevData.stdDev, 1)}g</div>
+                  </div>
+                  <div>
+                    <div className="text-[9px] font-black text-slate-400 uppercase tracking-wider mb-0.5">Coef. Variação (CV)</div>
+                    <div className="text-lg font-black text-slate-700 italic">{formatNumber(biometryStdDevData.cv, 1)}%</div>
+                  </div>
+                </div>
+                <div className="pt-4 border-t border-slate-200/60">
+                  <p className="text-[10px] font-bold text-slate-500 leading-relaxed uppercase tracking-tight">
+                    O <strong>C.V. (Coeficiente de Variação)</strong> ideal para tilápias na fase final deve estar abaixo de <strong>10%</strong>. Valores acima de 12% indicam necessidade de ajuste no manejo alimentar, distribuição de ração ou classificação do lote para garantir um crescimento homogêneo.
+                  </p>
+                </div>
+              </div>
+
+              {/* O gráfico em si (Bell Curve / Normal Distribution) */}
+              <div className="lg:col-span-2 h-[280px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={biometryStdDevData.curveData} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id="colorProb" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#10b981" stopOpacity={0.2}/>
+                        <stop offset="95%" stopColor="#10b981" stopOpacity={0.0}/>
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                    <XAxis 
+                      dataKey="weight" 
+                      type="number"
+                      domain={['dataMin - 10', 'dataMax + 10']}
+                      axisLine={false} 
+                      tickLine={false} 
+                      tick={{fontSize: 9, fontWeight: 700, fill: '#94a3b8'}} 
+                      unit="g"
+                    />
+                    <YAxis 
+                      axisLine={false} 
+                      tickLine={false} 
+                      tick={false}
+                    />
+                    <Tooltip 
+                      contentStyle={{ borderRadius: '1rem', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
+                      labelFormatter={(value) => `Peso de Amostra: ${value}g`}
+                      formatter={(value: any) => ['Concentração de Peixes Estimada', 'Probabilidade']}
+                    />
+                    <Area 
+                      type="monotone" 
+                      dataKey="representativeProbability" 
+                      stroke="#10b981" 
+                      strokeWidth={3} 
+                      fillOpacity={1} 
+                      fill="url(#colorProb)" 
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
