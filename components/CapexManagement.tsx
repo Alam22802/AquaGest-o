@@ -86,6 +86,7 @@ const CapexManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
   const [invoiceForm, setInvoiceForm] = useState({
     portfolioId: '',
     projectId: '',
+    purchaseOrderId: '',
     invoiceNumber: '',
     supplier: '',
     cnpj: '',
@@ -124,7 +125,14 @@ const CapexManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       
       const allocatedValue = portfolioProjects.reduce((acc, curr) => acc + curr.plannedValue, 0);
       const executedValue = portfolioInvoices.reduce((acc, curr) => acc + curr.value, 0);
-      const poValue = portfolioPOs.reduce((acc, curr) => acc + curr.value, 0);
+      
+      // Calculate effective remaining PO values (subtract linked Invoice entries)
+      const poValue = portfolioPOs.reduce((acc, curr) => {
+        const linkedInvoicesVal = invoices
+          .filter(inv => inv.purchaseOrderId === curr.id)
+          .reduce((sum, inv) => sum + inv.value, 0);
+        return acc + Math.max(0, curr.value - linkedInvoicesVal);
+      }, 0);
 
       const balance = p.totalValue - executedValue;
       const realFreeBalance = balance - poValue;
@@ -153,7 +161,15 @@ const CapexManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       const projectPurchaseOrders = purchaseOrders.filter(po => po.projectId === p.id);
 
       const executedValue = projectInvoices.reduce((acc, curr) => acc + curr.value, 0);
-      const purchaseOrdersValue = projectPurchaseOrders.reduce((acc, curr) => acc + curr.value, 0);
+      
+      // Calculate effective remaining PO values (subtract linked Invoice entries)
+      const purchaseOrdersValue = projectPurchaseOrders.reduce((acc, curr) => {
+        const linkedInvoicesVal = invoices
+          .filter(inv => inv.purchaseOrderId === curr.id)
+          .reduce((sum, inv) => sum + inv.value, 0);
+        return acc + Math.max(0, curr.value - linkedInvoicesVal);
+      }, 0);
+
       const balance = p.plannedValue - executedValue - purchaseOrdersValue;
       const executionPercentage = p.plannedValue > 0 ? (executedValue / p.plannedValue) * 100 : 0;
       const totalCommitted = executedValue + purchaseOrdersValue;
@@ -327,11 +343,20 @@ const CapexManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     const executedValue = otherInvoices.reduce((acc, curr) => acc + curr.value, 0);
 
     const projectPOs = (state.capexPurchaseOrders || []).filter(p => p.projectId === invoiceForm.projectId);
-    const purchaseOrdersValue = projectPOs.reduce((acc, curr) => acc + curr.value, 0);
+    
+    // Calculate effective project PO values, deducting any other invoices linked to them.
+    // Also deduct the current form's value if it is linked to a PO, preventing double counting.
+    const newValue = Number(invoiceForm.value);
+    const purchaseOrdersValue = projectPOs.reduce((acc, curr) => {
+      const linkedInvoicesVal = otherInvoices
+        .filter(inv => inv.purchaseOrderId === curr.id)
+        .reduce((sum, inv) => sum + inv.value, 0);
+      const isLinkedToCurrent = invoiceForm.purchaseOrderId === curr.id;
+      const currentInvoiceVal = isLinkedToCurrent ? newValue : 0;
+      return acc + Math.max(0, curr.value - linkedInvoicesVal - currentInvoiceVal);
+    }, 0);
 
     const availableBalance = project.plannedValue - executedValue - purchaseOrdersValue;
-
-    const newValue = Number(invoiceForm.value);
 
     // Verificar se há saldo no CAPEX
     if (newValue > availableBalance) {
@@ -343,6 +368,7 @@ const CapexManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       id: editingInvoiceId || generateId(),
       portfolioId: invoiceForm.portfolioId,
       projectId: invoiceForm.projectId,
+      purchaseOrderId: invoiceForm.purchaseOrderId || undefined,
       invoiceNumber: invoiceForm.invoiceNumber,
       supplier: invoiceForm.supplier,
       cnpj: invoiceForm.cnpj,
@@ -366,6 +392,7 @@ const CapexManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     setInvoiceForm({ 
       portfolioId: '', 
       projectId: '', 
+      purchaseOrderId: '',
       invoiceNumber: '', 
       supplier: '', 
       cnpj: '', 
@@ -1664,6 +1691,75 @@ const CapexManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                   {editingInvoiceId ? 'Editar Nota Fiscal' : 'Lançamento Manual de Nota Fiscal'}
                 </h3>
                 <form onSubmit={handleSaveInvoice} className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {/* Vincular Ordem de Compra (OC / Pedido) */}
+                  <div className="md:col-span-3 bg-slate-50 p-4 rounded-2xl border border-slate-200/60 mb-2">
+                    <label className="block text-[10px] font-black text-slate-500 uppercase mb-2 flex items-center gap-1">
+                      <ShoppingBag className="w-3.5 h-3.5 text-amber-500" />
+                      Importar / Vincular de Ordem de Compra (OC / Pedido)
+                    </label>
+                    <select 
+                      className="w-full px-4 py-3 bg-white border border-slate-200 rounded-2xl font-bold text-sm outline-none focus:ring-2 focus:ring-amber-500"
+                      value={invoiceForm.purchaseOrderId} 
+                      onChange={e => {
+                        const poId = e.target.value;
+                        if (poId) {
+                          const po = (state.capexPurchaseOrders || []).find(p => p.id === poId);
+                          if (po) {
+                            // Find linked invoices to see remaining value
+                            const linkedInvoicesList = (state.capexInvoices || []).filter(inv => inv.purchaseOrderId === po.id && inv.id !== editingInvoiceId);
+                            const linkedSum = linkedInvoicesList.reduce((sum, inv) => sum + inv.value, 0);
+                            const remainingVal = Math.max(0, po.value - linkedSum);
+                            
+                            setInvoiceForm({
+                              ...invoiceForm,
+                              purchaseOrderId: poId,
+                              portfolioId: po.portfolioId,
+                              projectId: po.projectId,
+                              supplier: po.supplier,
+                              cnpj: po.cnpj,
+                              items: po.items,
+                              value: remainingVal.toString(),
+                              description: `Importado de OC #${po.orderNumber}${po.description ? ' - ' + po.description : ''}`
+                            });
+                          }
+                        } else {
+                          setInvoiceForm({
+                            ...invoiceForm,
+                            purchaseOrderId: '',
+                            portfolioId: '',
+                            projectId: '',
+                            supplier: '',
+                            cnpj: '',
+                            items: '',
+                            value: '',
+                            description: ''
+                          });
+                        }
+                      }}
+                    >
+                      <option value="">Lançamento Avulso (Sem Ordem de Compra)</option>
+                      {(state.capexPurchaseOrders || []).map(po => {
+                        const proj = (state.capexProjects || []).find(p => p.id === po.projectId);
+                        const linkedInvoicesList = (state.capexInvoices || []).filter(inv => inv.purchaseOrderId === po.id && inv.id !== editingInvoiceId);
+                        const linkedSum = linkedInvoicesList.reduce((sum, inv) => sum + inv.value, 0);
+                        const remainingVal = Math.max(0, po.value - linkedSum);
+                        
+                        if (remainingVal <= 0 && po.id !== invoiceForm.purchaseOrderId) {
+                          return null; // OC already fully invoiced and we are not editing an invoice that is linked to it
+                        }
+
+                        return (
+                          <option key={po.id} value={po.id}>
+                            OC #{po.orderNumber} - {po.supplier} (Projeto: {proj?.name || '---'} | Valor Restante: R$ {formatNumber(remainingVal)})
+                          </option>
+                        );
+                      })}
+                    </select>
+                    <p className="text-[9px] font-medium text-slate-400 mt-1.5 uppercase">
+                      Ao selecionar uma Ordem de Compra, o sistema preenche os dados automaticamente e transfere / abate o valor da OC correspondente, evitando a duplicação no cálculo total do projeto.
+                    </p>
+                  </div>
+
                   <div className="md:col-span-1">
                     <label className="block text-[10px] font-black text-slate-400 uppercase mb-1">Carteira de Investimento</label>
                     <select required className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none focus:ring-2 focus:ring-amber-500" value={invoiceForm.portfolioId} onChange={e => setInvoiceForm({...invoiceForm, portfolioId: e.target.value, projectId: ''})}>
@@ -1782,8 +1878,18 @@ const CapexManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                             </td>
                             <td className="px-6 py-4">
                               <div className="font-black text-slate-800 uppercase tracking-tighter">NF {inv.invoiceNumber}</div>
-                              <div className={`text-[8px] font-black px-2 py-0.5 rounded-full w-fit uppercase tracking-widest ${inv.type === 'Aquisição' ? 'bg-blue-100 text-blue-600' : 'bg-purple-100 text-purple-600'}`}>
-                                {inv.type}
+                              <div className="flex flex-wrap gap-1 mt-0.5">
+                                <span className={`text-[8px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest ${inv.type === 'Aquisição' ? 'bg-blue-100 text-blue-600' : 'bg-purple-100 text-purple-600'}`}>
+                                  {inv.type}
+                                </span>
+                                {inv.purchaseOrderId && (() => {
+                                  const po = (state.capexPurchaseOrders || []).find(p => p.id === inv.purchaseOrderId);
+                                  return po ? (
+                                    <span className="text-[8px] font-black px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 uppercase tracking-widest flex items-center gap-0.5">
+                                      <ShoppingBag className="w-2 h-2" /> OC #{po.orderNumber}
+                                    </span>
+                                  ) : null;
+                                })()}
                               </div>
                             </td>
                             <td className="px-6 py-4">
@@ -1810,6 +1916,7 @@ const CapexManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                                   setInvoiceForm({
                                     portfolioId: inv.portfolioId, 
                                     projectId: inv.projectId, 
+                                    purchaseOrderId: inv.purchaseOrderId || '',
                                     invoiceNumber: inv.invoiceNumber, 
                                     supplier: inv.supplier,
                                     cnpj: inv.cnpj,

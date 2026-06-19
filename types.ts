@@ -336,6 +336,7 @@ export interface CapexInvoice {
   id: string;
   portfolioId: string;
   projectId: string;
+  purchaseOrderId?: string;
   invoiceNumber: string;
   supplier: string;
   cnpj: string;
