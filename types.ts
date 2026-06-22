@@ -56,7 +56,19 @@ export interface Batch {
   isClosed?: boolean;
   closedAt?: string;
   userId?: string;
+  supplierCnpj?: string;
+  supplierName?: string;
+  invoiceValue?: number;
+  invoices?: BatchInvoice[];
   updatedAt?: number;
+}
+
+export interface BatchInvoice {
+  id: string;
+  invoiceNumber?: string;
+  supplierCnpj?: string;
+  supplierName?: string;
+  invoiceValue: number;
 }
 
 export type CageStatus = 'Disponível' | 'Ocupada' | 'Manutenção' | 'Limpeza' | 'Avaliação' | 'Sucata';
@@ -289,6 +301,10 @@ export interface FeedStockLog {
   type: FeedStockLogType;
   timestamp: string;
   userId: string;
+  invoiceNumber?: string;
+  supplierCnpj?: string;
+  supplierName?: string;
+  unitPrice?: number;
   updatedAt?: number;
 }
 

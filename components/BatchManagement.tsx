@@ -59,6 +59,7 @@ const BatchManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     null,
   );
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [formInvoices, setFormInvoices] = useState<any[]>([]);
   const [filterMonth, setFilterMonth] = useState("");
   const [filterType, setFilterType] = useState<"settlement" | "harvest">(
     "settlement",
@@ -70,14 +71,54 @@ const BatchManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     initialUnitWeight: "",
     protocolId: "",
     expectedHarvestDate: "",
+    invoiceNumber: "",
+    supplierCnpj: "",
+    supplierName: "",
+    invoiceValue: "",
   });
 
   const hasPermission = currentUser.isMaster || currentUser.canEdit;
+
+  const handleAddFormInvoice = () => {
+    if (!formData.invoiceValue || Number(formData.invoiceValue) <= 0) {
+      alert("Por favor, preencha o valor da nota fiscal.");
+      return;
+    }
+    const newInvoice = {
+      id: generateId(),
+      invoiceNumber: formData.invoiceNumber || undefined,
+      supplierCnpj: formData.supplierCnpj || undefined,
+      supplierName: formData.supplierName || undefined,
+      invoiceValue: Number(formData.invoiceValue)
+    };
+    setFormInvoices([...formInvoices, newInvoice]);
+    setFormData({
+      ...formData,
+      invoiceNumber: "",
+      supplierCnpj: "",
+      supplierName: "",
+      invoiceValue: ""
+    });
+  };
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
     if (!hasPermission) return;
     if (!formData.name || !formData.initialQuantity) return;
+
+    let finalInvoices = [...formInvoices];
+    if (formData.invoiceValue && Number(formData.invoiceValue) > 0) {
+      finalInvoices.push({
+        id: generateId(),
+        invoiceNumber: formData.invoiceNumber || undefined,
+        supplierCnpj: formData.supplierCnpj || undefined,
+        supplierName: formData.supplierName || undefined,
+        invoiceValue: Number(formData.invoiceValue),
+      });
+    }
+
+    const totalInvoiceVal = finalInvoices.reduce((sum, inv) => sum + inv.invoiceValue, 0);
+    const primaryInvoice = finalInvoices[0] || {};
 
     if (editingId) {
       const updatedBatches = (state.batches || []).map((b) =>
@@ -90,6 +131,10 @@ const BatchManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
               initialUnitWeight: Number(formData.initialUnitWeight),
               protocolId: formData.protocolId,
               expectedHarvestDate: formData.expectedHarvestDate || undefined,
+              supplierCnpj: primaryInvoice.supplierCnpj || undefined,
+              supplierName: primaryInvoice.supplierName || undefined,
+              invoiceValue: totalInvoiceVal > 0 ? totalInvoiceVal : undefined,
+              invoices: finalInvoices.length > 0 ? finalInvoices : undefined,
               updatedAt: Date.now(),
             }
           : b,
@@ -105,11 +150,16 @@ const BatchManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
         initialUnitWeight: Number(formData.initialUnitWeight),
         protocolId: formData.protocolId,
         expectedHarvestDate: formData.expectedHarvestDate || undefined,
+        supplierCnpj: primaryInvoice.supplierCnpj || undefined,
+        supplierName: primaryInvoice.supplierName || undefined,
+        invoiceValue: totalInvoiceVal > 0 ? totalInvoiceVal : undefined,
+        invoices: finalInvoices.length > 0 ? finalInvoices : undefined,
         updatedAt: Date.now(),
       };
       onUpdate({ ...state, batches: [...(state.batches || []), newBatch] });
     }
 
+    setFormInvoices([]);
     setFormData({
       name: "",
       settlementDate: new Date().toISOString().split("T")[0],
@@ -117,12 +167,29 @@ const BatchManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       initialUnitWeight: "",
       protocolId: "",
       expectedHarvestDate: "",
+      invoiceNumber: "",
+      supplierCnpj: "",
+      supplierName: "",
+      invoiceValue: "",
     });
   };
 
   const startEdit = (batch: Batch) => {
     if (!hasPermission) return;
     setEditingId(batch.id);
+    
+    const invoicesToSet = batch.invoices && batch.invoices.length > 0
+      ? batch.invoices
+      : (batch.invoiceValue ? [{
+          id: generateId(),
+          invoiceNumber: "",
+          supplierCnpj: batch.supplierCnpj || "",
+          supplierName: batch.supplierName || "",
+          invoiceValue: batch.invoiceValue
+        }] : []);
+    
+    setFormInvoices(invoicesToSet);
+
     setFormData({
       name: batch.name,
       settlementDate: batch.settlementDate,
@@ -130,6 +197,10 @@ const BatchManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       initialUnitWeight: batch.initialUnitWeight.toString(),
       protocolId: batch.protocolId || "",
       expectedHarvestDate: batch.expectedHarvestDate || "",
+      invoiceNumber: "",
+      supplierCnpj: "",
+      supplierName: "",
+      invoiceValue: "",
     });
   };
 
@@ -773,6 +844,9 @@ const BatchManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                           initialUnitWeight: "",
                           protocolId: "",
                           expectedHarvestDate: "",
+                          supplierCnpj: "",
+                          supplierName: "",
+                          invoiceValue: "",
                         });
                       }}
                       className="text-slate-400 hover:text-slate-600"
@@ -891,6 +965,137 @@ const BatchManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                         }
                       />
                     </div>
+                  </div>
+
+                  {/* Detalhes do Povoamento e Fornecedor */}
+                  <div className="bg-slate-50/50 p-4 rounded-2xl border border-slate-200/60 space-y-3">
+                    <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-1.5 italic">
+                      <FileText className="w-3.5 h-3.5 text-blue-500" />
+                      Fornecedor e Nota Fiscal (Opcional)
+                    </span>
+                    
+                    <div className="space-y-3">
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-[10px] font-black text-slate-400 uppercase mb-1 tracking-wider">
+                            Nº da Nota
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="Ex: 50422"
+                            className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 font-bold text-xs"
+                            value={formData.invoiceNumber}
+                            onChange={(e) =>
+                              setFormData({
+                                ...formData,
+                                invoiceNumber: e.target.value,
+                              })
+                            }
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-black text-slate-400 uppercase mb-1 tracking-wider">
+                            Valor da Nota (R$)
+                          </label>
+                          <input
+                            type="number"
+                            placeholder="0,00"
+                            className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 font-bold text-xs"
+                            value={formData.invoiceValue}
+                            onChange={(e) =>
+                              setFormData({
+                                ...formData,
+                                invoiceValue: e.target.value,
+                              })
+                            }
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-[10px] font-black text-slate-400 uppercase mb-1 tracking-wider">
+                            CNPJ Fornecedor
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="00.000.000/0000-00"
+                            className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 font-bold text-xs"
+                            value={formData.supplierCnpj}
+                            onChange={(e) =>
+                              setFormData({
+                                ...formData,
+                                supplierCnpj: e.target.value,
+                              })
+                            }
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-black text-slate-400 uppercase mb-1 tracking-wider">
+                            Razão Social
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="Ex: Piscicultura Vale Azul"
+                            className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 font-bold text-xs"
+                            value={formData.supplierName}
+                            onChange={(e) =>
+                              setFormData({
+                                ...formData,
+                                supplierName: e.target.value,
+                              })
+                            }
+                          />
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={handleAddFormInvoice}
+                        className="w-full py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl font-bold text-[10px] uppercase tracking-widest flex items-center justify-center gap-1.5 transition-colors active:scale-95"
+                      >
+                        <Plus className="w-3.5 h-3.5" /> Adicionar Nota à Lista
+                      </button>
+                    </div>
+
+                    {/* Exibição das Notas já adicionadas */}
+                    {formInvoices.length > 0 && (
+                      <div className="bg-white border border-slate-100 rounded-xl p-3 space-y-2 max-h-48 overflow-y-auto mt-2">
+                        <span className="text-[9px] font-black text-slate-400 uppercase tracking-wider block">
+                          Lista de Notas ({formInvoices.length})
+                        </span>
+                        <div className="space-y-1.5">
+                          {formInvoices.map((inv, index) => (
+                            <div key={inv.id} className="flex justify-between items-center bg-slate-50/50 p-2 rounded-lg border border-slate-100">
+                              <div className="text-[9px] font-bold text-slate-600 space-y-0.5 leading-tight">
+                                <span className="font-black text-slate-800 uppercase block truncate max-w-[150px]">
+                                  {index + 1}. {inv.supplierName || "Fornecedor"}
+                                </span>
+                                <div className="flex gap-2 text-slate-400 font-medium">
+                                  {inv.invoiceNumber && <span>Nº: {inv.invoiceNumber}</span>}
+                                  {inv.supplierCnpj && <span>CNPJ: {inv.supplierCnpj}</span>}
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs font-black text-blue-600">
+                                  R$ {formatNumber(inv.invoiceValue)}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => setFormInvoices(formInvoices.filter(item => item.id !== inv.id))}
+                                  className="text-red-400 hover:text-red-600 p-1"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                        <div className="text-right pt-1.5 border-t border-dashed border-slate-150 text-[10px] font-black text-slate-700">
+                          Total Acumulado: R$ {formatNumber(formInvoices.reduce((sum, item) => sum + item.invoiceValue, 0))}
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   <button
@@ -1554,6 +1759,60 @@ const BatchManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                             </div>
                           )}
                         </div>
+
+                        {/* Detalhes do Fornecedor e de Nota Fiscal */}
+                        {((batch.invoices && batch.invoices.length > 0) || batch.supplierName || batch.supplierCnpj || (batch.invoiceValue !== undefined && batch.invoiceValue > 0)) && (
+                          <div className="bg-slate-50 p-3 rounded-2xl border border-slate-100 space-y-1 text-[10px] font-bold">
+                            <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1">
+                              <FileText className="w-3 h-3 text-blue-500" /> Detalhes do Povoamento
+                            </span>
+                            {batch.invoices && batch.invoices.length > 0 ? (
+                              <div className="space-y-1.5 pt-1.5">
+                                {batch.invoices.map((inv, idx) => (
+                                  <div key={inv.id || idx} className="border-b border-dashed border-slate-200/50 pb-1.5 last:border-0 last:pb-0">
+                                    <div className="flex justify-between font-black text-slate-700 uppercase mb-0.5">
+                                      <span className="truncate max-w-[150px]">{idx + 1}. {inv.supplierName || 'FORNECEDOR'}</span>
+                                      <span className="text-blue-600">R$ {formatNumber(inv.invoiceValue)}</span>
+                                    </div>
+                                    <div className="flex gap-2 text-[8px] font-bold text-slate-400">
+                                      {inv.invoiceNumber && <span>Nota nº: {inv.invoiceNumber}</span>}
+                                      {inv.supplierCnpj && <span>CNPJ: {inv.supplierCnpj}</span>}
+                                    </div>
+                                  </div>
+                                ))}
+                                <div className="flex justify-between items-center pt-1.5 border-t border-dashed border-slate-200 mt-1 font-black text-slate-800">
+                                  <span className="uppercase text-[9px] text-slate-400">Total das Notas:</span>
+                                  <span className="text-xs text-blue-600 font-extrabold">
+                                    R$ {formatNumber(batch.invoices.reduce((sum, inv) => sum + inv.invoiceValue, 0))}
+                                  </span>
+                                </div>
+                              </div>
+                            ) : (
+                              <>
+                                {batch.supplierName && (
+                                  <div className="flex justify-between">
+                                    <span className="text-slate-400 uppercase">Fornecedor:</span>
+                                    <span className="text-slate-700 uppercase font-black">{batch.supplierName}</span>
+                                  </div>
+                                )}
+                                {batch.supplierCnpj && (
+                                  <div className="flex justify-between">
+                                    <span className="text-slate-400 uppercase">CNPJ:</span>
+                                    <span className="text-slate-700 font-black">{batch.supplierCnpj}</span>
+                                  </div>
+                                )}
+                                {batch.invoiceValue !== undefined && batch.invoiceValue > 0 && (
+                                  <div className="flex justify-between items-center pt-1 border-t border-dashed border-slate-200 mt-1">
+                                    <span className="text-slate-400 uppercase">Valor da Nota:</span>
+                                    <span className="text-xs font-black text-blue-600">
+                                      R$ {formatNumber(batch.invoiceValue)}
+                                    </span>
+                                  </div>
+                                )}
+                              </>
+                            )}
+                          </div>
+                        )}
 
                         {/* Barra de Progresso da Assertividade */}
                         <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden mt-2">

@@ -222,7 +222,10 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     const revenues = (state.batchRevenues || [])
       .filter(r => r.batchId === batch.id);
     
-    const totalExpenses = expenses.reduce((acc, curr) => acc + curr.value, 0);
+    const supplierInvoiceVal = batch.invoices && batch.invoices.length > 0
+      ? batch.invoices.reduce((sum, inv) => sum + inv.invoiceValue, 0)
+      : (batch.invoiceValue || 0);
+    const totalExpenses = expenses.reduce((acc, curr) => acc + curr.value, 0) + supplierInvoiceVal;
     const totalRevenue = revenues.length > 0 
       ? revenues.reduce((acc, curr) => acc + (curr.receptionWeight * curr.unitPrice), 0)
       : harvestsByBatch.reduce((acc, curr) => acc + (curr.totalWeight * (curr.unitPrice || 0)), 0);
@@ -230,11 +233,41 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     const totalReceptionWeight = revenues.reduce((acc, curr) => acc + curr.receptionWeight, 0);
     const totalProfit = totalRevenue - totalExpenses;
 
-    const categories = Array.from(new Set((state.batchExpenses || []).map(e => e.category))).sort();
-    const items = Array.from(new Set((state.batchExpenses || []).map(e => e.description))).sort();
+    const supplierCategories = supplierInvoiceVal > 0 ? ['Alevinos/Povoamento'] : [];
+    const categories = Array.from(new Set([...((state.batchExpenses || []).map(e => e.category)), ...supplierCategories])).sort();
+
+    const supplierItems = batch.invoices && batch.invoices.length > 0
+      ? batch.invoices.map(inv => `Aquisição de Juvenis/Alevinos - ${inv.supplierName || 'Povoamento'}${inv.invoiceNumber ? ' (Nº: ' + inv.invoiceNumber + ')' : ''}`)
+      : (supplierInvoiceVal > 0 ? [`Aquisição de Juvenis/Alevinos - ${batch.supplierName || 'Povoamento'}`] : []);
+    const items = Array.from(new Set([...((state.batchExpenses || []).map(e => e.description)), ...supplierItems])).sort();
+
+    const settlementInvoiceEntries = batch.invoices && batch.invoices.length > 0 
+      ? batch.invoices.map((inv, idx) => ({
+          id: `settlement-invoice-virtual-${inv.id || idx}`,
+          batchId: batch.id,
+          description: `Aquisição de Juvenis/Alevinos - ${inv.supplierName || 'Povoamento'}${inv.invoiceNumber ? ' (Nº: ' + inv.invoiceNumber + ')' : ''}`,
+          category: 'Alevinos/Povoamento',
+          value: inv.invoiceValue,
+          date: batch.settlementDate,
+          userId: batch.userId || 'system',
+          type: 'expense' as const,
+          isVirtual: true
+        }))
+      : (supplierInvoiceVal > 0 ? [{
+          id: 'settlement-invoice-virtual-legacy',
+          batchId: batch.id,
+          description: `Aquisição de Juvenis/Alevinos - ${batch.supplierName || 'Povoamento'}`,
+          category: 'Alevinos/Povoamento',
+          value: supplierInvoiceVal,
+          date: batch.settlementDate,
+          userId: batch.userId || 'system',
+          type: 'expense' as const,
+          isVirtual: true
+        }] : []);
 
     const allEntries = [
-      ...expenses.map(e => ({ ...e, type: 'expense' as const })),
+      ...settlementInvoiceEntries,
+      ...expenses.map(e => ({ ...e, type: 'expense' as const, isVirtual: false })),
       ...revenues.map(r => ({ 
         id: r.id, 
         batchId: r.batchId, 
@@ -243,7 +276,8 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
         value: 0,
         date: r.date,
         userId: r.userId,
-        type: 'revenue' as const
+        type: 'revenue' as const,
+        isVirtual: false
       }))
     ];
 
@@ -1215,22 +1249,28 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                             {isRevenue ? '+' : ''}{formatCurrency(entry.value)}
                           </td>
                           <td className="py-4 text-right print:hidden">
-                            <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-all">
-                              <button 
-                                onClick={() => startEditExpense(entry)}
-                                className="p-2 text-slate-300 hover:text-blue-500 transition-colors"
-                                title="Editar"
-                              >
-                                <Edit2 className="w-4 h-4" />
-                              </button>
-                              <button 
-                                onClick={() => removeExpense(entry.id, entry.type)}
-                                className="p-2 text-slate-300 hover:text-red-500 transition-colors"
-                                title="Excluir"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </button>
-                            </div>
+                            {!entry.isVirtual ? (
+                              <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-all">
+                                <button 
+                                  onClick={() => startEditExpense(entry)}
+                                  className="p-2 text-slate-300 hover:text-blue-500 transition-colors"
+                                  title="Editar"
+                                >
+                                  <Edit2 className="w-4 h-4" />
+                                </button>
+                                <button 
+                                  onClick={() => removeExpense(entry.id, entry.type)}
+                                  className="p-2 text-slate-300 hover:text-red-500 transition-colors"
+                                  title="Excluir"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              </div>
+                            ) : (
+                              <span className="text-[9px] font-black text-blue-500 uppercase italic tracking-widest">
+                                Povoamento
+                              </span>
+                            )}
                           </td>
                         </tr>
                       );

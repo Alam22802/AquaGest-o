@@ -80,7 +80,11 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
   const [entryData, setEntryData] = useState({ 
     feedId: '', 
     amount: '', 
-    date: new Date().toISOString().split('T')[0] 
+    date: new Date().toISOString().split('T')[0],
+    invoiceNumber: '',
+    supplierCnpj: '',
+    supplierName: '',
+    unitPrice: '',
   });
 
   const createEmptyRows = (count: number, startWeek: number) => {
@@ -201,7 +205,7 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
             name: formData.name,
             maxCapacity: Number(formData.maxCapacity),
             minStockPercentage: Number(formData.minStockPercentage),
-            totalStock: newStockGrams,
+            totalStock: currentUser.isMaster ? newStockGrams : f.totalStock,
             updatedAt: Date.now()
           };
         }
@@ -209,7 +213,7 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       });
 
       const newLogs = [...(state.feedStockLogs || [])];
-      if (diff !== 0) {
+      if (currentUser.isMaster && diff !== 0) {
         newLogs.unshift({
           id: generateId(),
           feedTypeId: editingId,
@@ -225,21 +229,22 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       setEditingId(null);
     } else {
       const newId = generateId();
+      const initialStock = currentUser.isMaster ? newStockGrams : 0;
       const newFeed: FeedType = {
         id: newId,
         name: formData.name,
-        totalStock: newStockGrams,
+        totalStock: initialStock,
         maxCapacity: Number(formData.maxCapacity),
         minStockPercentage: Number(formData.minStockPercentage),
         updatedAt: Date.now()
       };
 
       const newLogs = [...(state.feedStockLogs || [])];
-      if (newStockGrams > 0) {
+      if (currentUser.isMaster && initialStock > 0) {
         newLogs.unshift({
           id: generateId(),
           feedTypeId: newId,
-          amount: newStockGrams,
+          amount: initialStock,
           type: 'Entrada',
           timestamp: new Date().toISOString(),
           userId: currentUser.id,
@@ -300,6 +305,10 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       type: 'Entrada',
       timestamp: `${entryData.date}T${format(new Date(), 'HH:mm:ss')}`,
       userId: currentUser.id,
+      invoiceNumber: entryData.invoiceNumber || undefined,
+      supplierCnpj: entryData.supplierCnpj || undefined,
+      supplierName: entryData.supplierName || undefined,
+      unitPrice: entryData.unitPrice ? Number(entryData.unitPrice) : undefined,
       updatedAt: Date.now()
     };
 
@@ -308,7 +317,15 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       feedTypes: updatedFeeds, 
       feedStockLogs: [newLog, ...(state.feedStockLogs || [])] 
     });
-    setEntryData({ feedId: '', amount: '', date: new Date().toISOString().split('T')[0] });
+    setEntryData({ 
+      feedId: '', 
+      amount: '', 
+      date: new Date().toISOString().split('T')[0],
+      invoiceNumber: '',
+      supplierCnpj: '',
+      supplierName: '',
+      unitPrice: ''
+    });
   };
 
   const feedStats = useMemo(() => {
@@ -1101,8 +1118,19 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
               </div>
               <div>
                 <label className="block text-[10px] font-black text-slate-400 uppercase mb-1 tracking-widest">Saldo Atual (Kg)</label>
-                <input type="number" required className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none focus:ring-2 focus:ring-amber-500/20" value={formData.currentStockKg} onChange={(e) => setFormData({ ...formData, currentStockKg: e.target.value })} />
-                <p className="text-[10px] text-slate-400 mt-2 font-bold uppercase tracking-tight leading-relaxed italic opacity-70">O ajuste manual do saldo gerará um registro de "Ajuste" no histórico.</p>
+                <input 
+                  type="number" 
+                  required 
+                  disabled={!currentUser.isMaster}
+                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none focus:ring-2 focus:ring-amber-500/20 disabled:opacity-50 disabled:cursor-not-allowed" 
+                  value={formData.currentStockKg} 
+                  onChange={(e) => setFormData({ ...formData, currentStockKg: e.target.value })} 
+                />
+                {currentUser.isMaster ? (
+                  <p className="text-[10px] text-slate-400 mt-2 font-bold uppercase tracking-tight leading-relaxed italic opacity-70">O ajuste manual do saldo gerará um registro de "Ajuste" no histórico.</p>
+                ) : (
+                  <p className="text-[10px] text-red-500/80 mt-2 font-bold uppercase tracking-tight leading-relaxed italic">O ajuste direto do saldo de estoque está disponível apenas para o usuário Administrador.</p>
+                )}
               </div>
               <button type="submit" className={`w-full py-4 rounded-2xl font-black uppercase tracking-widest text-xs text-white shadow-xl transition-all active:scale-95 ${editingId ? 'bg-amber-600 shadow-amber-600/20' : 'bg-blue-600 shadow-blue-600/20'}`}>
                 {editingId ? 'Atualizar Modelo' : 'Cadastrar Modelo'}
@@ -1130,6 +1158,53 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                 <div>
                   <label className="block text-[10px] font-black text-slate-400 uppercase mb-1 tracking-widest">Data</label>
                   <input type="date" required className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none" value={entryData.date} onChange={(e) => setEntryData({...entryData, date: e.target.value})} />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[10px] font-black text-slate-400 uppercase mb-1 tracking-widest flex items-center gap-1">
+                    <FileText className="w-3.5 h-3.5 text-emerald-500" /> Número da Nota
+                  </label>
+                  <input 
+                    type="text" 
+                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none focus:ring-2 focus:ring-emerald-500/20" 
+                    placeholder="Ex: 50422"
+                    value={entryData.invoiceNumber} 
+                    onChange={(e) => setEntryData({...entryData, invoiceNumber: e.target.value})} 
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-black text-slate-400 uppercase mb-1 tracking-widest">Valor Unitário (R$/Kg)</label>
+                  <input 
+                    type="number" 
+                    step="0.01"
+                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none focus:ring-2 focus:ring-emerald-500/20" 
+                    placeholder="Ex: 4.80"
+                    value={entryData.unitPrice} 
+                    onChange={(e) => setEntryData({...entryData, unitPrice: e.target.value})} 
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[10px] font-black text-slate-400 uppercase mb-1 tracking-widest">CNPJ Fornecedor</label>
+                  <input 
+                    type="text" 
+                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none focus:ring-2 focus:ring-emerald-500/20" 
+                    placeholder="00.000.000/0000-00"
+                    value={entryData.supplierCnpj} 
+                    onChange={(e) => setEntryData({...entryData, supplierCnpj: e.target.value})} 
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-black text-slate-400 uppercase mb-1 tracking-widest">Razão Social</label>
+                  <input 
+                    type="text" 
+                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none focus:ring-2 focus:ring-emerald-500/20" 
+                    placeholder="Ex: Piscicultura NutriPeixe Ltda."
+                    value={entryData.supplierName} 
+                    onChange={(e) => setEntryData({...entryData, supplierName: e.target.value})} 
+                  />
                 </div>
               </div>
               <button type="submit" className="w-full bg-emerald-600 text-white py-4 rounded-2xl font-black uppercase tracking-widest text-xs shadow-xl shadow-emerald-500/20 transition-all active:scale-95">
@@ -1397,6 +1472,37 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                         {log.type}
                       </div>
                       <div className="font-black text-slate-800 uppercase">{feed?.name || '---'}</div>
+                      
+                      {(log.invoiceNumber || log.supplierName || log.supplierCnpj || (log.unitPrice !== undefined && log.unitPrice > 0)) && (
+                        <div className="mt-2 p-2 bg-slate-50 border border-slate-200/60 rounded-xl space-y-1 text-[10px] text-slate-500 font-bold max-w-xs shadow-sm">
+                          {log.invoiceNumber && (
+                            <div className="flex justify-between items-center">
+                              <span className="text-slate-400 uppercase font-black text-[9px] flex items-center gap-1">
+                                <FileText className="w-3 h-3 text-emerald-500" /> Nota Fiscal:
+                              </span>
+                              <span className="text-slate-700 font-black">{log.invoiceNumber}</span>
+                            </div>
+                          )}
+                          {log.supplierName && (
+                            <div className="flex justify-between items-start gap-2">
+                              <span className="text-slate-400 uppercase font-black text-[9px] shrink-0">Razão Social:</span>
+                              <span className="text-slate-700 uppercase font-black text-right line-clamp-1">{log.supplierName}</span>
+                            </div>
+                          )}
+                          {log.supplierCnpj && (
+                            <div className="flex justify-between items-center">
+                              <span className="text-slate-400 uppercase font-black text-[9px]">CNPJ Fornecedor:</span>
+                              <span className="text-slate-600 font-medium">{log.supplierCnpj}</span>
+                            </div>
+                          )}
+                          {log.unitPrice !== undefined && log.unitPrice > 0 && (
+                            <div className="flex justify-between items-center pt-1 border-t border-dashed border-slate-200 mt-1">
+                              <span className="text-slate-400 uppercase font-black text-[9px]">Preço Unitário:</span>
+                              <span className="text-emerald-700 font-black text-xs">R$ {formatNumber(log.unitPrice)} / Kg</span>
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </td>
                     <td className="px-6 py-4 text-xs font-bold text-slate-600">
                       <div className="flex items-center gap-1"><Calendar className="w-3 h-3 opacity-30" /> {format(parseISO(log.timestamp), 'dd/MM/yyyy')}</div>
