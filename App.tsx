@@ -166,14 +166,12 @@ const App: React.FC = () => {
       
       const savedUser = getSession();
       if (savedUser) {
-        const updatedUser = data.users.find(u => u.id === savedUser.id) || savedUser;
+        const updatedUser = data.users.find(u => u.id === savedUser.id);
         if (updatedUser && (updatedUser.isApproved || updatedUser.isMaster)) {
           setCurrentUser(updatedUser);
-        } else if (updatedUser && !updatedUser.isApproved) {
+        } else {
           setCurrentUser(null);
           saveSession(null);
-        } else {
-          setCurrentUser(savedUser);
         }
       }
     } catch (err) {
@@ -281,7 +279,10 @@ const App: React.FC = () => {
   useEffect(() => {
     if (state && currentUser) {
       const updatedUser = state.users.find(u => u.id === currentUser.id);
-      if (updatedUser && JSON.stringify(updatedUser) !== JSON.stringify(currentUser)) {
+      if (!updatedUser || !updatedUser.isApproved) {
+        handleLogout();
+        alert("Sua sessão foi encerrada porque sua conta foi excluída ou desativada no sistema.");
+      } else if (JSON.stringify(updatedUser) !== JSON.stringify(currentUser)) {
         setCurrentUser(updatedUser);
         saveSession(updatedUser);
       }
