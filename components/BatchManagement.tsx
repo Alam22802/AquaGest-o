@@ -28,6 +28,8 @@ import { ptBR } from "date-fns/locale";
 import { formatNumber } from "../utils/formatters";
 import HarvestManagement from "./HarvestManagement";
 import BatchClosing from "./BatchClosing";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 
 interface Props {
   state: AppState;
@@ -60,6 +62,7 @@ const BatchManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
   );
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formInvoices, setFormInvoices] = useState<any[]>([]);
+  const [selectedBatchIds, setSelectedBatchIds] = useState<string[]>([]);
   const [filterMonth, setFilterMonth] = useState("");
   const [filterType, setFilterType] = useState<"settlement" | "harvest">(
     "settlement",
@@ -698,6 +701,160 @@ const BatchManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       }
     });
   }, [batchStats, filterMonth, filterType]);
+
+  const handleGeneratePDF = () => {
+    const selectedBatches = filteredBatchStats.filter((b) =>
+      selectedBatchIds.includes(b.id)
+    );
+    if (selectedBatches.length === 0) return;
+
+    const doc = new jsPDF({ orientation: "landscape", format: "a4" });
+
+    // Title & Context
+    doc.setFontSize(16);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(51, 65, 85);
+    doc.text("AQUAGESTÃO - DETALHAMENTO DE ESTOQUE DOS LOTES", 14, 15);
+
+    doc.setFontSize(9);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(100, 116, 139);
+    doc.text(
+      `Relatório gerado em: ${format(new Date(), "dd/MM/yyyy HH:mm")}`,
+      14,
+      21
+    );
+
+    const filterInfo = filterMonth
+      ? `Filtro aplicado: ${format(parseISO(filterMonth + "-01"), "MMMM yyyy", { locale: ptBR })} (${filterType === "settlement" ? "Povoamento" : "Despesca"})`
+      : "Filtro aplicado: Todos os lotes ativos";
+    doc.text(filterInfo, 14, 25);
+
+    // Compute Totals over selected batches
+    const totalInitialQuantity = selectedBatches.reduce(
+      (sum, b) => sum + b.initialQuantity,
+      0
+    );
+    const totalLiveFish = selectedBatches.reduce((sum, b) => sum + b.liveFish, 0);
+    const averageSurvival =
+      selectedBatches.length > 0
+        ? selectedBatches.reduce((sum, b) => sum + b.yieldPercentage, 0) /
+          selectedBatches.length
+        : 0;
+    const totalFeedConsumed =
+      selectedBatches.reduce((sum, b) => sum + b.totalFeed, 0) / 1000;
+    const totalProducedBiomass = selectedBatches.reduce(
+      (sum, b) => sum + b.totalProducedBiomassKg,
+      0
+    );
+    const overallFca =
+      totalProducedBiomass > 0 ? totalFeedConsumed / totalProducedBiomass : 0;
+
+    // Table Data
+    const tableHead = [
+      [
+        "Lote",
+        "Fornecedor & Notas Fiscais",
+        "Povoamento",
+        "Peixes Atuais / Vivos",
+        "Pesos Médios (g)",
+        "FCA",
+        "Ração Total",
+        "Biomassa Total",
+      ],
+    ];
+
+    const tableRows = selectedBatches.map((batch) => {
+      // Invoices list format
+      let invDetails = "";
+      if (batch.invoices && batch.invoices.length > 0) {
+        invDetails = batch.invoices
+          .map(
+            (inv, idx) =>
+              `${idx + 1}. ${inv.supplierName || "FORNECEDOR"} (NF: ${inv.invoiceNumber || "S/N"})\n   Valor: R$ ${formatNumber(inv.invoiceValue)}`
+          )
+          .join("\n");
+      } else if (batch.invoiceValue) {
+        invDetails = `${batch.supplierName || "Fornecedor"} (CNPJ: ${batch.supplierCnpj || "M.I."})\n   Valor: R$ ${formatNumber(batch.invoiceValue)}`;
+      } else {
+        invDetails = "Sem Notas Registradas";
+      }
+
+      const settlementDateStr = batch.settlementDate
+        ? format(new Date(batch.settlementDate + "T12:00:00"), "dd/MM/yyyy")
+        : "---";
+      const expHarvestDateStr = batch.expectedHarvestDate
+        ? `\n(Prev: ${format(new Date(batch.expectedHarvestDate + "T12:00:00"), "dd/MM/yyyy")})`
+        : "";
+
+      return [
+        batch.name + (batch.protocol ? `\nProtocolo: ${batch.protocol.name}` : ""),
+        invDetails,
+        `${settlementDateStr}\nQtde: ${formatNumber(batch.initialQuantity)} un${expHarvestDateStr}`,
+        `${formatNumber(batch.liveFish)} un\nSobrev.: ${formatNumber(batch.yieldPercentage, 1)}%`,
+        `Inicial: ${formatNumber(batch.initialUnitWeight, 1)}g\nAtual: ${formatNumber(batch.currentAvgWeight, 1)}g`,
+        formatNumber(batch.fca, 2),
+        `${formatNumber(batch.totalFeed / 1000, 1)} kg`,
+        `${formatNumber(batch.totalProducedBiomassKg, 1)} kg`,
+      ];
+    });
+
+    const tableFoot = [
+      [
+        "TOTAIS",
+        "-",
+        `Qtde Inicial Total:\n${formatNumber(totalInitialQuantity)} un`,
+        `Total Vivos:\n${formatNumber(totalLiveFish)} un (Sobrev. Média: ${formatNumber(averageSurvival, 1)}%)`,
+        "-",
+        `FCA Médio:\n${formatNumber(overallFca, 2)}`,
+        `Consumo total:\n${formatNumber(totalFeedConsumed, 1)} kg`,
+        `Biomassa total:\n${formatNumber(totalProducedBiomass, 1)} kg`,
+      ],
+    ];
+
+    autoTable(doc, {
+      startY: 32,
+      head: tableHead,
+      body: tableRows,
+      foot: tableFoot,
+      theme: "striped",
+      headStyles: {
+        fillColor: [52, 68, 52], // bg-[#344434] matching company theme
+        textColor: [255, 255, 255],
+        fontSize: 8,
+        fontStyle: "bold",
+        halign: "left",
+        valign: "middle",
+      },
+      styles: {
+        fontSize: 8,
+        cellPadding: 3,
+        valign: "middle",
+        halign: "left",
+      },
+      footStyles: {
+        fillColor: [241, 245, 249],
+        textColor: [15, 23, 42],
+        fontSize: 8,
+        fontStyle: "bold",
+        valign: "middle",
+        halign: "left",
+      },
+      columnStyles: {
+        0: { fontStyle: "bold", cellWidth: 35 },
+        1: { cellWidth: 60 },
+        2: { cellWidth: 40 },
+        3: { cellWidth: 38 },
+        4: { cellWidth: 32 },
+        5: { cellWidth: 15, halign: "center" },
+        6: { cellWidth: 25, halign: "right" },
+        7: { cellWidth: 25, halign: "right" },
+      },
+      margin: { left: 14, right: 14 },
+    });
+
+    doc.save(`estoque-lotes-${format(new Date(), "yyyy-MM-dd-HHmm")}.pdf`);
+  };
 
   const planningCages = useMemo(() => {
     if (!selectedPlanningBatchId) return [];
@@ -1660,6 +1817,49 @@ const BatchManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                 </div>
               </div>
 
+              {/* Barra de Seleção para PDF */}
+              <div className="bg-slate-50 border border-slate-200 p-4 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <input
+                    type="checkbox"
+                    id="select-all-batches"
+                    checked={
+                      filteredBatchStats.length > 0 &&
+                      filteredBatchStats.every((b) => selectedBatchIds.includes(b.id))
+                    }
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        setSelectedBatchIds(filteredBatchStats.map((b) => b.id));
+                      } else {
+                        setSelectedBatchIds([]);
+                      }
+                    }}
+                    className="w-4.5 h-4.5 text-blue-600 border-slate-300 rounded focus:ring-blue-500 cursor-pointer"
+                  />
+                  <label
+                    htmlFor="select-all-batches"
+                    className="text-[10px] font-black text-slate-500 uppercase tracking-widest cursor-pointer select-none"
+                  >
+                    Selecionar Todos ({filteredBatchStats.length} Lote{filteredBatchStats.length !== 1 ? "s" : ""})
+                  </label>
+                </div>
+
+                <div className="flex items-center gap-3 self-end sm:self-auto">
+                  {selectedBatchIds.length > 0 && (
+                    <span className="text-[10px] font-black text-blue-600 uppercase tracking-widest bg-blue-50 border border-blue-200/55 px-2.5 py-1 rounded-lg">
+                      {selectedBatchIds.length} selecionado{selectedBatchIds.length > 1 ? "s" : ""}
+                    </span>
+                  )}
+                  <button
+                    onClick={handleGeneratePDF}
+                    disabled={selectedBatchIds.length === 0}
+                    className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-200 disabled:text-slate-400 text-white rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 transition-all shadow-md hover:shadow-lg disabled:shadow-none active:scale-95 duration-150"
+                  >
+                    <FileText className="w-4 h-4" /> Gerar PDF do Cenário Atual
+                  </button>
+                </div>
+              </div>
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {filteredBatchStats.map((batch) => {
                   return (
@@ -1668,11 +1868,27 @@ const BatchManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                       className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden hover:border-blue-200 transition-all"
                     >
                       <div className="p-4 bg-slate-50 border-b border-slate-100 flex justify-between items-center">
-                        <div className="flex items-center gap-2">
-                          <Tag className="w-5 h-5 text-blue-500" />
-                          <span className="font-black text-slate-800 uppercase tracking-tighter">
-                            {batch.name}
-                          </span>
+                        <div className="flex items-center gap-3">
+                          <input
+                            type="checkbox"
+                            checked={selectedBatchIds.includes(batch.id)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setSelectedBatchIds([...selectedBatchIds, batch.id]);
+                              } else {
+                                setSelectedBatchIds(
+                                  selectedBatchIds.filter((id) => id !== batch.id)
+                                );
+                              }
+                            }}
+                            className="w-4 h-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500 cursor-pointer"
+                          />
+                          <div className="flex items-center gap-2">
+                            <Tag className="w-4 h-4 text-blue-500" />
+                            <span className="font-black text-slate-800 uppercase tracking-tighter">
+                              {batch.name}
+                            </span>
+                          </div>
                         </div>
                         {hasPermission && (
                           <div className="flex gap-1">
