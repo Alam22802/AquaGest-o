@@ -170,7 +170,11 @@ async function startServer() {
           // If no cache, initialize with dynamic fallback
           savePriceCacheToDisk(getDynamicFallback(), now, true, quotaExceeded);
         }
-        console.warn("Background tilapia price fetch failed:", error);
+        if (quotaExceeded) {
+          console.log("Tilapia price background update: Gemini API rate limit or quota exceeded. Successfully fell back to cached/default tilapia data.");
+        } else {
+          console.log("Background tilapia price fetch info:", error instanceof Error ? error.message : error);
+        }
       } finally {
         isFetchingPrice = false;
       }

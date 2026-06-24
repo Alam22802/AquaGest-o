@@ -404,9 +404,16 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       feedStockLogs: (state.feedStockLogs || []).filter(l => !selectedLogIds.has(l.id)),
       feedTypes: (state.feedTypes || []).map(f => {
         const adjustment = feedUpdates.get(f.id);
-        if (adjustment) return { ...f, totalStock: f.totalStock - adjustment };
+        if (adjustment !== undefined) {
+          return { 
+            ...f, 
+            totalStock: Math.max(0, f.totalStock - adjustment),
+            updatedAt: Date.now()
+          };
+        }
         return f;
-      })
+      }),
+      deletedIds: [...(state.deletedIds || []), ...Array.from(selectedLogIds)]
     });
     setSelectedLogIds(new Set());
   };
