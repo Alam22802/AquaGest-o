@@ -1885,9 +1885,14 @@ const CapexManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                                 {inv.purchaseOrderId && (() => {
                                   const po = (state.capexPurchaseOrders || []).find(p => p.id === inv.purchaseOrderId);
                                   return po ? (
-                                    <span className="text-[8px] font-black px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 uppercase tracking-widest flex items-center gap-0.5">
-                                      <ShoppingBag className="w-2 h-2" /> OC #{po.orderNumber}
-                                    </span>
+                                    <div className="flex flex-wrap gap-1">
+                                      <span className="text-[8px] font-black px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 uppercase tracking-widest flex items-center gap-0.5">
+                                        <ShoppingBag className="w-2 h-2" /> OC #{po.orderNumber}
+                                      </span>
+                                      <span className="text-[8px] font-black px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 border border-blue-200 uppercase tracking-widest">
+                                        Baixada
+                                      </span>
+                                    </div>
                                   ) : null;
                                 })()}
                               </div>
@@ -2052,9 +2057,47 @@ const CapexManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                             </td>
                             <td className="px-6 py-4">
                               <div className="font-black text-slate-800 uppercase tracking-tighter">OC {po.orderNumber}</div>
-                              <div className="text-[8px] font-black px-2 py-0.5 rounded-full w-fit uppercase tracking-widest bg-emerald-100 text-emerald-700">
-                                Emitida / Reservada
-                              </div>
+                              {(() => {
+                                const linkedInvoices = (state.capexInvoices || []).filter(inv => inv.purchaseOrderId === po.id);
+                                const totalLinkedValue = linkedInvoices.reduce((sum, inv) => sum + inv.value, 0);
+                                const isLinked = linkedInvoices.length > 0;
+                                const isFullyInvoiced = totalLinkedValue >= po.value;
+
+                                if (isLinked) {
+                                  if (isFullyInvoiced) {
+                                    return (
+                                      <div className="flex flex-col gap-1 mt-1">
+                                        <span className="text-[8px] font-black px-2 py-0.5 rounded-full w-fit uppercase tracking-widest bg-blue-100 text-blue-700 border border-blue-200">
+                                          Baixada (Total)
+                                        </span>
+                                        <div className="text-[8px] text-slate-400 font-bold uppercase tracking-tight">
+                                          NF: {linkedInvoices.map(inv => inv.invoiceNumber).join(', ')}
+                                        </div>
+                                      </div>
+                                    );
+                                  } else {
+                                    return (
+                                      <div className="flex flex-col gap-1 mt-1">
+                                        <span className="text-[8px] font-black px-2 py-0.5 rounded-full w-fit uppercase tracking-widest bg-amber-100 text-amber-700 border border-amber-200">
+                                          Baixada Parcial
+                                        </span>
+                                        <div className="text-[8px] text-slate-400 font-bold uppercase tracking-tight">
+                                          Faturado: R$ {formatNumber(totalLinkedValue)} / R$ {formatNumber(po.value)}
+                                        </div>
+                                        <div className="text-[8px] text-slate-400 font-bold uppercase tracking-tight">
+                                          NF: {linkedInvoices.map(inv => inv.invoiceNumber).join(', ')}
+                                        </div>
+                                      </div>
+                                    );
+                                  }
+                                }
+
+                                return (
+                                  <span className="text-[8px] font-black px-2 py-0.5 rounded-full w-fit uppercase tracking-widest bg-emerald-100 text-emerald-700 block mt-1">
+                                    Emitida / Reservada
+                                  </span>
+                                );
+                              })()}
                             </td>
                             <td className="px-6 py-4">
                               <div className="font-black text-slate-700 uppercase tracking-tight text-[10px]">{po.supplier}</div>
