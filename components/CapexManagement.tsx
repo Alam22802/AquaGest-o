@@ -25,6 +25,14 @@ const generateId = () => {
   }
 };
 
+const formatCostCenter = (cc: string) => {
+  if (!cc) return '';
+  const trimmed = cc.trim();
+  if (trimmed === '100') return '100 AVIVAR FILIAL 2017';
+  if (trimmed === '200') return '200 DB LEMES FRIGORIFICO';
+  return trimmed;
+};
+
 const CapexManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
   const [activeSubTab, setActiveSubTab] = useState<'overview' | 'planning' | 'execution'>('overview');
   const [planningSubPage, setPlanningSubPage] = useState<'register' | 'active'>('register');
@@ -655,7 +663,7 @@ const CapexManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
 
             <div>
               <label className="block text-[10px] font-black text-slate-400 uppercase mb-2 ml-1 tracking-widest">
-                Filtrar por Centro de Custo {selectedCostCenter && `(${selectedCostCenter})`}
+                Filtrar por Centro de Custo {selectedCostCenter && `(${formatCostCenter(selectedCostCenter)})`}
               </label>
               <select 
                 className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl font-black text-sm outline-none focus:ring-2 focus:ring-[#344434] transition-all"
@@ -673,7 +681,7 @@ const CapexManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                 }}
               >
                 <option value="">Todos os Centros de Custo</option>
-                {uniqueCostCenters.map(cc => <option key={cc} value={cc}>{cc}</option>)}
+                {uniqueCostCenters.map(cc => <option key={cc} value={cc}>{formatCostCenter(cc)}</option>)}
               </select>
             </div>
 
@@ -731,7 +739,7 @@ const CapexManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                                 {project.investmentArea}
                               </span>
                               <h2 className="text-3xl font-black text-slate-800 uppercase tracking-tighter italic leading-none">{project.name}</h2>
-                              <p className="text-xs font-bold text-slate-400 uppercase mt-2">Centro de Custo: {project.costCenter} • Responsável: {project.responsible}</p>
+                              <p className="text-xs font-bold text-slate-400 uppercase mt-2">Centro de Custo: {formatCostCenter(project.costCenter)} • Responsável: {project.responsible}</p>
                               
                               <div className="flex flex-wrap gap-6 mt-4 pt-4 border-t border-slate-100">
                                 <div className="flex items-center gap-2">
@@ -1007,7 +1015,7 @@ const CapexManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
 
                 if (selectedPortfolioId && selectedCostCenter) {
                   badgeText = "Consolidado: Carteira e Centro de Custo";
-                  titleText = `${portfolio?.name || ''} • ${selectedCostCenter}`;
+                  titleText = `${portfolio?.name || ''} • ${formatCostCenter(selectedCostCenter)}`;
                   subtitleText = `${projects.length} Projetos Encontrados nesta Carteira e Centro de Custo`;
                 } else if (selectedPortfolioId) {
                   badgeText = "Consolidado: Carteira de Investimento";
@@ -1015,7 +1023,7 @@ const CapexManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                   subtitleText = `Gestor: ${portfolio?.manager || ''} • ${projects.length} Projetos Ativos`;
                 } else if (selectedCostCenter) {
                   badgeText = "Consolidado: Centro de Custo";
-                  titleText = selectedCostCenter;
+                  titleText = formatCostCenter(selectedCostCenter);
                   subtitleText = `${projects.length} Projetos Vinculados a este Centro de Custo`;
                 }
 
@@ -1104,7 +1112,7 @@ const CapexManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                                 <div className="flex justify-between items-start mb-2">
                                   <div className="truncate pr-2">
                                     <h4 className="text-xs font-black text-slate-800 uppercase truncate">{proj.name}</h4>
-                                    <span className="text-[8px] font-bold text-slate-400 uppercase tracking-wider block mt-0.5">CC: {proj.costCenter}</span>
+                                    <span className="text-[8px] font-bold text-slate-400 uppercase tracking-wider block mt-0.5">CC: {formatCostCenter(proj.costCenter)}</span>
                                   </div>
                                   <ChevronRight className="w-4 h-4 text-slate-300" />
                                 </div>
@@ -1135,7 +1143,7 @@ const CapexManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                           <h3 className="text-xs font-black uppercase tracking-[0.2em] opacity-60">Resumo Consolidado</h3>
                           {selectedCostCenter && (
                             <div className="mt-2 text-sm font-black text-emerald-300 uppercase tracking-wide">
-                              CC: {selectedCostCenter}
+                              CC: {formatCostCenter(selectedCostCenter)}
                             </div>
                           )}
                         </div>
@@ -1312,7 +1320,18 @@ const CapexManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                       </div>
                       <div className="col-span-1 md:col-span-3">
                         <label className="block text-[10px] font-black text-slate-400 uppercase mb-1">Centro de Custo</label>
-                        <input type="text" required className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none focus:ring-2 focus:ring-emerald-500" value={projectForm.costCenter} onChange={e => setProjectForm({...projectForm, costCenter: e.target.value})} />
+                        <input 
+                          list="cost-centers" 
+                          type="text" 
+                          required 
+                          className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none focus:ring-2 focus:ring-emerald-500" 
+                          value={projectForm.costCenter} 
+                          onChange={e => setProjectForm({...projectForm, costCenter: e.target.value})} 
+                        />
+                        <datalist id="cost-centers">
+                          <option value="100">100 AVIVAR FILIAL 2017</option>
+                          <option value="200">200 DB LEMES FRIGORIFICO</option>
+                        </datalist>
                       </div>
                       <div className="col-span-1 md:col-span-3">
                         <label className="block text-[10px] font-black text-slate-400 uppercase mb-1">Valor do CAPEX (R$)</label>
@@ -1689,7 +1708,7 @@ const CapexManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                             <div className="flex items-start justify-between">
                               <div className="flex items-center gap-2 mb-1 flex-wrap">
                                 <h5 className="font-semibold text-slate-800 uppercase tracking-tight text-sm">{proj.name}</h5>
-                                <span className="text-[8px] font-bold bg-slate-100 text-slate-505 text-slate-500 px-2 py-0.5 rounded-full uppercase tracking-widest">{proj.costCenter}</span>
+                                <span className="text-[8px] font-bold bg-slate-100 text-slate-505 text-slate-500 px-2 py-0.5 rounded-full uppercase tracking-widest">{formatCostCenter(proj.costCenter)}</span>
                               </div>
                               {currentUser.isMaster && (
                                 <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity xl:-mr-2">
