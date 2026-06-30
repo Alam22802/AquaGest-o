@@ -1051,14 +1051,14 @@ const CapexManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                             <div className="bg-slate-50 p-5 rounded-3xl border border-slate-100">
                               <div className="flex items-center gap-2 mb-2">
                                 <Layers className="w-4 h-4 text-slate-400" />
-                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Total Alocado</span>
+                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Total Estimado</span>
                               </div>
                               <div className="text-lg font-black text-slate-800">R$ {formatNumber(totalPlanned)}</div>
                             </div>
                             <div className="bg-slate-50 p-5 rounded-3xl border border-slate-100">
                               <div className="flex items-center gap-2 mb-2">
                                 <Briefcase className="w-4 h-4 text-emerald-500" />
-                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Total Executado (NF)</span>
+                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Total Executado NF</span>
                               </div>
                               <div className="text-lg font-black text-emerald-600">R$ {formatNumber(totalExecuted)}</div>
                             </div>
@@ -1067,7 +1067,7 @@ const CapexManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                                 <DollarSign className="w-4 h-4 text-blue-500" />
                                 <span className="text-[10px] font-black text-blue-500 uppercase tracking-widest">Saldo Livre Real</span>
                               </div>
-                              <div className="text-lg font-black text-blue-600">R$ {formatNumber(portfolioBalance)}</div>
+                              <div className="text-lg font-black text-blue-600">R$ {formatNumber(totalPortfolioBudget - totalExecuted)}</div>
                             </div>
                           </div>
 
@@ -1140,43 +1140,32 @@ const CapexManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                           )}
                         </div>
                         <div className="space-y-6">
-                          {selectedPortfolioId && (
-                            <>
-                              <div>
-                                <div className="text-2xl font-black italic tracking-tighter mb-1 text-blue-200">
-                                  R$ {formatNumber(totalPortfolioBudget)}
-                                </div>
-                                <div className="text-[9px] font-black uppercase tracking-widest opacity-50">CAPEX Liberado (Carteira)</div>
-                              </div>
-                              <div className="h-px bg-white/10" />
-                            </>
-                          )}
                           <div>
-                            <div className="text-3xl font-black italic tracking-tighter mb-1">
-                              R$ {formatNumber(totalPlanned)}
+                            <div className="text-2xl font-black italic tracking-tighter mb-1 text-blue-200">
+                              R$ {formatNumber(totalPortfolioBudget)}
                             </div>
-                            <div className="text-[9px] font-black uppercase tracking-widest opacity-50">Orçamento Previsto (Alocado)</div>
+                            <div className="text-[9px] font-black uppercase tracking-widest opacity-50">CAPEX Liberado</div>
                           </div>
                           <div className="h-px bg-white/10" />
                           <div>
                             <div className="text-2xl font-black italic tracking-tighter mb-1 text-slate-200">
                               R$ {formatNumber(totalExecuted)}
                             </div>
-                            <div className="text-[9px] font-black uppercase tracking-widest opacity-50">Soma das Notas Fiscais</div>
+                            <div className="text-[9px] font-black uppercase tracking-widest opacity-50">Soma das Notas</div>
                           </div>
                           <div className="h-px bg-white/10" />
                           <div>
                             <div className="text-2xl font-black italic tracking-tighter mb-1 text-amber-200">
                               R$ {formatNumber(totalPOsValue)}
                             </div>
-                            <div className="text-[9px] font-black uppercase tracking-widest opacity-50">Ordens de Compra em Aberto</div>
+                            <div className="text-[9px] font-black uppercase tracking-widest opacity-50">Soma das OC</div>
                           </div>
                           <div className="h-px bg-white/10" />
                           <div>
                             <div className="text-3xl font-black italic tracking-tighter mb-1 text-emerald-300">
-                              R$ {formatNumber(selectedPortfolioId ? portfolioBalance : totalBalance)}
+                              R$ {formatNumber(portfolioBalance)}
                             </div>
-                            <div className="text-[9px] font-black uppercase tracking-widest text-[#a8ffb2]">Saldo Livre Real</div>
+                            <div className="text-[9px] font-black uppercase tracking-widest text-[#a8ffb2]">Saldo Estimado</div>
                           </div>
                         </div>
                       </div>
