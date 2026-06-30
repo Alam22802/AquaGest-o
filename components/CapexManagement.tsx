@@ -237,7 +237,12 @@ const CapexManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       return sum + Math.max(0, po.value - linkedInvoicesVal);
     }, 0);
 
+    const totalPortfolioBudget = selectedPortfolioId 
+      ? (state.portfolios || []).filter(p => p.id === selectedPortfolioId).reduce((sum, p) => sum + p.totalValue, 0)
+      : (state.portfolios || []).reduce((sum, p) => sum + p.totalValue, 0);
+
     const totalBalance = totalPlanned - totalExecuted - totalPOsValue;
+    const portfolioBalance = totalPortfolioBudget - totalExecuted - totalPOsValue;
     const executionPercentage = totalPlanned > 0 ? (totalExecuted / totalPlanned) * 100 : 0;
     const realFreeBalance = totalPlanned - totalExecuted;
 
@@ -245,14 +250,16 @@ const CapexManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       projects: targetProjects,
       invoices: targetInvoices,
       purchaseOrders: targetPOs,
+      totalPortfolioBudget,
       totalPlanned,
       totalExecuted,
       totalPOsValue,
       totalBalance,
+      portfolioBalance,
       executionPercentage,
       realFreeBalance
     };
-  }, [state.capexProjects, state.capexInvoices, state.capexPurchaseOrders, selectedPortfolioId, selectedCostCenter]);
+  }, [state.portfolios, state.capexProjects, state.capexInvoices, state.capexPurchaseOrders, selectedPortfolioId, selectedCostCenter]);
 
   // Handlers
   const handleSavePortfolio = (e: React.FormEvent) => {
@@ -616,7 +623,9 @@ const CapexManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
           {/* Seleção de Filtros */}
           <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200 max-w-5xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-6">
             <div>
-              <label className="block text-[10px] font-black text-slate-400 uppercase mb-2 ml-1 tracking-widest">Filtrar por Carteira</label>
+              <label className="block text-[10px] font-black text-slate-400 uppercase mb-2 ml-1 tracking-widest">
+                Filtrar por Carteira {selectedPortfolioId && `(${state.portfolios?.find(p => p.id === selectedPortfolioId)?.name})`}
+              </label>
               <select 
                 className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl font-black text-sm outline-none focus:ring-2 focus:ring-[#344434] transition-all"
                 value={selectedPortfolioId}
@@ -645,7 +654,9 @@ const CapexManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
             </div>
 
             <div>
-              <label className="block text-[10px] font-black text-slate-400 uppercase mb-2 ml-1 tracking-widest">Filtrar por Centro de Custo</label>
+              <label className="block text-[10px] font-black text-slate-400 uppercase mb-2 ml-1 tracking-widest">
+                Filtrar por Centro de Custo {selectedCostCenter && `(${selectedCostCenter})`}
+              </label>
               <select 
                 className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl font-black text-sm outline-none focus:ring-2 focus:ring-[#344434] transition-all"
                 value={selectedCostCenter}
@@ -667,7 +678,9 @@ const CapexManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
             </div>
 
             <div>
-              <label className="block text-[10px] font-black text-slate-400 uppercase mb-2 ml-1 tracking-widest">Filtrar por Projeto</label>
+              <label className="block text-[10px] font-black text-slate-400 uppercase mb-2 ml-1 tracking-widest">
+                Filtrar por Projeto {selectedProjectId && `(${state.capexProjects?.find(p => p.id === selectedProjectId)?.name})`}
+              </label>
               <select 
                 className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl font-black text-sm outline-none focus:ring-2 focus:ring-[#344434] transition-all"
                 value={selectedProjectId}
@@ -1025,27 +1038,34 @@ const CapexManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                             </div>
                           </div>
 
-                          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                            <div className="bg-slate-50 p-6 rounded-3xl border border-slate-100">
+                          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                            <div className="bg-slate-50 p-5 rounded-3xl border border-slate-100">
                               <div className="flex items-center gap-2 mb-2">
-                                <Wallet className="w-4 h-4 text-slate-400" />
-                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Orçamento Previsto</span>
+                                <Wallet className="w-4 h-4 text-blue-500" />
+                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">CAPEX Liberado</span>
                               </div>
-                              <div className="text-2xl font-black text-slate-800">R$ {formatNumber(totalPlanned)}</div>
+                              <div className="text-lg font-black text-slate-800">R$ {formatNumber(totalPortfolioBudget)}</div>
                             </div>
-                            <div className="bg-slate-50 p-6 rounded-3xl border border-slate-100">
+                            <div className="bg-slate-50 p-5 rounded-3xl border border-slate-100">
+                              <div className="flex items-center gap-2 mb-2">
+                                <Layers className="w-4 h-4 text-slate-400" />
+                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Total Alocado</span>
+                              </div>
+                              <div className="text-lg font-black text-slate-800">R$ {formatNumber(totalPlanned)}</div>
+                            </div>
+                            <div className="bg-slate-50 p-5 rounded-3xl border border-slate-100">
                               <div className="flex items-center gap-2 mb-2">
                                 <Briefcase className="w-4 h-4 text-emerald-500" />
                                 <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Total Executado (NF)</span>
                               </div>
-                              <div className="text-2xl font-black text-emerald-600">R$ {formatNumber(totalExecuted)}</div>
+                              <div className="text-lg font-black text-emerald-600">R$ {formatNumber(totalExecuted)}</div>
                             </div>
-                            <div className="bg-blue-50 p-6 rounded-3xl border border-blue-100">
+                            <div className="bg-blue-50 p-5 rounded-3xl border border-blue-100">
                               <div className="flex items-center gap-2 mb-2">
-                                <DollarSign className="w-4 h-4 text-blue-400" />
-                                <span className="text-[10px] font-black text-blue-400 uppercase tracking-widest">Saldo Livre</span>
+                                <DollarSign className="w-4 h-4 text-blue-500" />
+                                <span className="text-[10px] font-black text-blue-500 uppercase tracking-widest">Saldo Livre Real</span>
                               </div>
-                              <div className="text-2xl font-black text-blue-600">R$ {formatNumber(totalBalance)}</div>
+                              <div className="text-lg font-black text-blue-600">R$ {formatNumber(portfolioBalance)}</div>
                             </div>
                           </div>
 
@@ -1109,13 +1129,31 @@ const CapexManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                     <div className="space-y-6">
                       {/* Resumo Financeiro */}
                       <div className="bg-[#344434] p-8 rounded-[2.5rem] shadow-xl text-white">
-                        <h3 className="text-xs font-black uppercase tracking-[0.2em] mb-6 opacity-60">Resumo Consolidado</h3>
+                        <div className="mb-6">
+                          <h3 className="text-xs font-black uppercase tracking-[0.2em] opacity-60">Resumo Consolidado</h3>
+                          {selectedCostCenter && (
+                            <div className="mt-2 text-sm font-black text-emerald-300 uppercase tracking-wide">
+                              CC: {selectedCostCenter}
+                            </div>
+                          )}
+                        </div>
                         <div className="space-y-6">
+                          {selectedPortfolioId && (
+                            <>
+                              <div>
+                                <div className="text-2xl font-black italic tracking-tighter mb-1 text-blue-200">
+                                  R$ {formatNumber(totalPortfolioBudget)}
+                                </div>
+                                <div className="text-[9px] font-black uppercase tracking-widest opacity-50">CAPEX Liberado (Carteira)</div>
+                              </div>
+                              <div className="h-px bg-white/10" />
+                            </>
+                          )}
                           <div>
                             <div className="text-3xl font-black italic tracking-tighter mb-1">
                               R$ {formatNumber(totalPlanned)}
                             </div>
-                            <div className="text-[9px] font-black uppercase tracking-widest opacity-50">Orçamento Previsto</div>
+                            <div className="text-[9px] font-black uppercase tracking-widest opacity-50">Orçamento Previsto (Alocado)</div>
                           </div>
                           <div className="h-px bg-white/10" />
                           <div>
@@ -1134,7 +1172,7 @@ const CapexManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                           <div className="h-px bg-white/10" />
                           <div>
                             <div className="text-3xl font-black italic tracking-tighter mb-1 text-emerald-300">
-                              R$ {formatNumber(totalBalance)}
+                              R$ {formatNumber(selectedPortfolioId ? portfolioBalance : totalBalance)}
                             </div>
                             <div className="text-[9px] font-black uppercase tracking-widest text-[#a8ffb2]">Saldo Livre Real</div>
                           </div>
