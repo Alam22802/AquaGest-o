@@ -440,10 +440,9 @@ const CapexManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
 
     const availableBalance = project.plannedValue - executedValue - purchaseOrdersValue;
 
-    // Verificar se há saldo no CAPEX
+    // Verificar se há saldo no CAPEX (Apenas alerta, mas permite o lançamento conforme solicitado)
     if (newValue > availableBalance) {
-      alert(`Saldo insuficiente no CAPEX! Saldo disponível (livre): R$ ${formatNumber(availableBalance)}`);
-      return;
+      alert(`Atenção: Saldo insuficiente no CAPEX do projeto! O lançamento da nota fiscal será efetuado, mas o projeto ficará com saldo excedente de R$ ${formatNumber(newValue - availableBalance)}. Necessita de aporte/saldo.`);
     }
 
     const newInvoice: CapexInvoice = {
@@ -792,12 +791,19 @@ const CapexManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                               </div>
                               <div className="text-xl font-black text-amber-600">R$ {formatNumber(project.purchaseOrdersValue)}</div>
                             </div>
-                            <div className={`p-5 rounded-3xl border ${project.balance < 0 ? 'bg-red-50 border-red-100' : 'bg-emerald-50 border-emerald-100'}`}>
+                            <div className={`p-5 rounded-3xl border ${project.balance < 0 ? 'bg-red-50 border-red-200' : 'bg-emerald-50 border-emerald-100'}`}>
                               <div className="flex items-center gap-2 mb-2">
-                                <Wallet className={`w-4 h-4 ${project.balance < 0 ? 'text-red-400' : 'text-emerald-400'}`} />
-                                <span className={`text-[10px] font-black uppercase tracking-widest ${project.balance < 0 ? 'text-red-400' : 'text-emerald-400'}`}>Saldo Disponível</span>
+                                <Wallet className={`w-4 h-4 ${project.balance < 0 ? 'text-red-500 animate-pulse' : 'text-emerald-400'}`} />
+                                <span className={`text-[10px] font-black uppercase tracking-widest ${project.balance < 0 ? 'text-red-500' : 'text-emerald-400'}`}>
+                                  {project.balance < 0 ? 'Saldo Insuficiente' : 'Saldo Disponível'}
+                                </span>
                               </div>
                               <div className={`text-xl font-black ${project.balance < 0 ? 'text-red-600' : 'text-emerald-600'}`}>R$ {formatNumber(project.balance)}</div>
+                              {project.balance < 0 && (
+                                <div className="text-[9px] font-bold text-red-500 mt-1 uppercase tracking-tight">
+                                  ⚠️ Necessita de Saldo!
+                                </div>
+                              )}
                             </div>
                           </div>
 
@@ -808,7 +814,7 @@ const CapexManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                                   <TrendingDown className="w-4 h-4" /> Aderência Orçamentária
                                 </span>
                                 <span className={`text-xs font-black ${project.executionPercentage > 100 ? 'text-red-500' : 'text-emerald-500'}`}>
-                                  {formatNumber(project.executionPercentage, 1)}% Utilizado
+                                  {formatNumber(project.executionPercentage, 1)}% Utilizado {project.executionPercentage > 100 && `(${formatNumber(project.executionPercentage - 100, 1)}% acima do planejado - Necessita de Saldo)`}
                                 </span>
                               </div>
                               <div className="h-4 bg-slate-100 rounded-full overflow-hidden border border-slate-200 p-0.5">
@@ -1125,9 +1131,17 @@ const CapexManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                                   </div>
                                   <div className="text-right">
                                     <div className="text-[9px] font-black text-slate-400 uppercase">Execução</div>
-                                    <div className="text-xs font-black text-emerald-600">{formatNumber(stats?.executionPercentage || 0, 1)}%</div>
+                                    <div className={`text-xs font-black ${stats && stats.executionPercentage > 100 ? 'text-red-500 font-extrabold animate-pulse' : 'text-emerald-600'}`}>
+                                      {formatNumber(stats?.executionPercentage || 0, 1)}%
+                                    </div>
                                   </div>
                                 </div>
+                                {stats && stats.executionPercentage > 100 && (
+                                  <div className="mt-1.5 pt-1.5 border-t border-red-100 text-[8px] font-black text-red-500 uppercase tracking-wide flex justify-between items-center">
+                                    <span>⚠️ Necessita de Saldo</span>
+                                    <span>+{formatNumber(stats.executionPercentage - 100, 1)}% acima</span>
+                                  </div>
+                                )}
                               </div>
                             );
                           })}
@@ -1740,7 +1754,12 @@ const CapexManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                             <div className="flex items-start justify-between">
                               <div className="flex items-center gap-2 mb-1 flex-wrap">
                                 <h5 className="font-semibold text-slate-800 uppercase tracking-tight text-sm">{proj.name}</h5>
-                                <span className="text-[8px] font-bold bg-slate-100 text-slate-505 text-slate-500 px-2 py-0.5 rounded-full uppercase tracking-widest">{formatCostCenter(proj.costCenter)}</span>
+                                <span className="text-[8px] font-bold bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full uppercase tracking-widest">{formatCostCenter(proj.costCenter)}</span>
+                                {proj.executionPercentage > 100 && (
+                                  <span className="text-[8px] font-black bg-red-100 text-red-600 px-2.5 py-0.5 rounded-full uppercase tracking-widest animate-pulse">
+                                    ⚠️ Necessita de Saldo (+{formatNumber(proj.executionPercentage - 100, 1)}%)
+                                  </span>
+                                )}
                               </div>
                               {currentUser.isMaster && (
                                 <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity xl:-mr-2">
@@ -1797,9 +1816,11 @@ const CapexManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                             <span className="text-[8px] font-black text-amber-600 uppercase block mb-1">Pedidos (OCs)</span>
                             <span className="text-xs font-black text-amber-700">R$ {formatNumber(proj.purchaseOrdersValue)}</span>
                           </div>
-                          <div className="bg-emerald-50 p-3 rounded-2xl border border-emerald-100 flex flex-col justify-between h-full">
-                            <span className="text-[8px] font-black text-emerald-500 uppercase block mb-1">Saldo CAPEX Livre</span>
-                            <span className="text-xs font-black text-emerald-700">R$ {formatNumber(proj.balance)}</span>
+                          <div className={`p-3 rounded-2xl border flex flex-col justify-between h-full ${proj.balance < 0 ? 'bg-red-50 border-red-200' : 'bg-emerald-50 border-emerald-100'}`}>
+                            <span className={`text-[8px] font-black uppercase block mb-1 ${proj.balance < 0 ? 'text-red-500' : 'text-emerald-500'}`}>
+                              {proj.balance < 0 ? 'Saldo Insuficiente' : 'Saldo CAPEX Livre'}
+                            </span>
+                            <span className={`text-xs font-black ${proj.balance < 0 ? 'text-red-600' : 'text-emerald-700'}`}>R$ {formatNumber(proj.balance)}</span>
                           </div>
                         </div>
 
@@ -1811,10 +1832,15 @@ const CapexManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                             <div className="h-full bg-emerald-500 absolute left-0 top-0 transition-all duration-500 rounded-full" style={{ width: `${Math.min(100, proj.executionPercentage)}%` }} />
                           </div>
                           <div className="flex justify-between xl:flex-col xl:gap-1 mt-3 text-[9px] font-black uppercase text-center xl:text-left">
-                            <span className="text-emerald-600 flex items-center justify-center xl:justify-start gap-1">
-                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 block" />
+                            <span className={`${proj.executionPercentage > 100 ? 'text-red-500 animate-pulse font-extrabold' : 'text-emerald-600'} flex items-center justify-center xl:justify-start gap-1`}>
+                              <span className={`w-1.5 h-1.5 rounded-full ${proj.executionPercentage > 100 ? 'bg-red-500' : 'bg-emerald-500'} block`} />
                               {formatNumber(proj.executionPercentage, 1)}% Faturado
                             </span>
+                            {proj.executionPercentage > 100 && (
+                              <span className="text-red-500 font-extrabold text-[8px] flex items-center justify-center xl:justify-start gap-1 mt-0.5">
+                                ⚠️ {formatNumber(proj.executionPercentage - 100, 1)}% acima do planejado!
+                              </span>
+                            )}
                             <span className="text-amber-600 flex items-center justify-center xl:justify-start gap-1 mt-0.5">
                               <span className="w-1.5 h-1.5 rounded-full bg-amber-400 block" />
                               {formatNumber(proj.executionPercentageCommitted, 1)}% Comprometido
