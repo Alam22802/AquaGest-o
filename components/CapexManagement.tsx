@@ -1191,10 +1191,21 @@ const CapexManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                           </div>
                           <div className="h-px bg-white/10" />
                           <div>
-                            <div className="text-3xl font-black italic tracking-tighter mb-1 text-emerald-300">
-                              R$ {formatNumber(portfolioBalance)}
-                            </div>
-                            <div className="text-[9px] font-black uppercase tracking-widest text-[#a8ffb2]">Saldo Estimado</div>
+                            {selectedCostCenter ? (
+                              <>
+                                <div className="text-3xl font-black italic tracking-tighter mb-1 text-amber-300">
+                                  R$ {formatNumber(totalExecuted + totalPOsValue)}
+                                </div>
+                                <div className="text-[9px] font-black uppercase tracking-widest text-[#ffe3a8]">Total Planejado (Soma das Notas + OC em Aberto)</div>
+                              </>
+                            ) : (
+                              <>
+                                <div className="text-3xl font-black italic tracking-tighter mb-1 text-emerald-300">
+                                  R$ {formatNumber(portfolioBalance)}
+                                </div>
+                                <div className="text-[9px] font-black uppercase tracking-widest text-[#a8ffb2]">Saldo Estimado</div>
+                              </>
+                            )}
                           </div>
                         </div>
                       </div>
