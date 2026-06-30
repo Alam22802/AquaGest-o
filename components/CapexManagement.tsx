@@ -1048,14 +1048,16 @@ const CapexManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                             </div>
                           </div>
 
-                          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                            <div className="bg-slate-50 p-5 rounded-3xl border border-slate-100">
-                              <div className="flex items-center gap-2 mb-2">
-                                <Wallet className="w-4 h-4 text-blue-500" />
-                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">CAPEX Liberado</span>
+                          <div className={`grid grid-cols-2 ${selectedCostCenter ? 'lg:grid-cols-3' : 'lg:grid-cols-4'} gap-4`}>
+                            {!selectedCostCenter && (
+                              <div className="bg-slate-50 p-5 rounded-3xl border border-slate-100">
+                                <div className="flex items-center gap-2 mb-2">
+                                  <Wallet className="w-4 h-4 text-blue-500" />
+                                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">CAPEX Liberado</span>
+                                </div>
+                                <div className="text-lg font-black text-slate-800">R$ {formatNumber(totalPortfolioBudget)}</div>
                               </div>
-                              <div className="text-lg font-black text-slate-800">R$ {formatNumber(totalPortfolioBudget)}</div>
-                            </div>
+                            )}
                             <div className="bg-slate-50 p-5 rounded-3xl border border-slate-100">
                               <div className="flex items-center gap-2 mb-2">
                                 <Layers className="w-4 h-4 text-slate-400" />
@@ -1075,7 +1077,7 @@ const CapexManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                                 <DollarSign className="w-4 h-4 text-blue-500" />
                                 <span className="text-[10px] font-black text-blue-500 uppercase tracking-widest">Saldo Livre Real</span>
                               </div>
-                              <div className="text-lg font-black text-blue-600">R$ {formatNumber(totalPortfolioBudget - totalExecuted)}</div>
+                              <div className="text-lg font-black text-blue-600">R$ {formatNumber(selectedCostCenter ? (totalPlanned - totalExecuted) : (totalPortfolioBudget - totalExecuted))}</div>
                             </div>
                           </div>
 
@@ -1155,6 +1157,25 @@ const CapexManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                             <div className="text-[9px] font-black uppercase tracking-widest opacity-50">CAPEX Liberado</div>
                           </div>
                           <div className="h-px bg-white/10" />
+                          <div className="grid grid-cols-2 gap-4">
+                            <div>
+                              <div className="text-xl font-black italic tracking-tighter mb-1 text-emerald-300">
+                                {totalPortfolioBudget > 0 ? formatNumber((totalPlanned / totalPortfolioBudget) * 100, 1) : '0'}%
+                              </div>
+                              <div className="text-[9px] font-black uppercase tracking-widest opacity-50">
+                                {selectedCostCenter ? '% Consumo CC (Estimado)' : '% Consumo Geral (Estimado)'}
+                              </div>
+                            </div>
+                            <div>
+                              <div className="text-xl font-black italic tracking-tighter mb-1 text-teal-300">
+                                {totalPortfolioBudget > 0 ? formatNumber((totalExecuted / totalPortfolioBudget) * 100, 1) : '0'}%
+                              </div>
+                              <div className="text-[9px] font-black uppercase tracking-widest opacity-50">
+                                {selectedCostCenter ? '% Consumo CC (Realizado)' : '% Consumo Geral (Realizado)'}
+                              </div>
+                            </div>
+                          </div>
+                          <div className="h-px bg-white/10" />
                           <div>
                             <div className="text-2xl font-black italic tracking-tighter mb-1 text-slate-200">
                               R$ {formatNumber(totalExecuted)}
@@ -1166,7 +1187,7 @@ const CapexManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                             <div className="text-2xl font-black italic tracking-tighter mb-1 text-amber-200">
                               R$ {formatNumber(totalPOsValue)}
                             </div>
-                            <div className="text-[9px] font-black uppercase tracking-widest opacity-50">Soma das OC</div>
+                            <div className="text-[9px] font-black uppercase tracking-widest opacity-50">Soma das OC Abertas</div>
                           </div>
                           <div className="h-px bg-white/10" />
                           <div>
