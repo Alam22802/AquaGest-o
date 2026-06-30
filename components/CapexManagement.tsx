@@ -29,6 +29,7 @@ const CapexManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
   const [activeSubTab, setActiveSubTab] = useState<'overview' | 'planning' | 'execution'>('overview');
   const [planningSubPage, setPlanningSubPage] = useState<'register' | 'active'>('register');
   const [selectedPortfolioId, setSelectedPortfolioId] = useState<string>('');
+  const [selectedCostCenter, setSelectedCostCenter] = useState<string>('');
   const [selectedProjectId, setSelectedProjectId] = useState<string>('');
   const [editingPortfolioId, setEditingPortfolioId] = useState<string | null>(null);
   const [editingProjectId, setEditingProjectId] = useState<string | null>(null);
@@ -186,6 +187,72 @@ const CapexManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       };
     });
   }, [state.capexProjects, state.capexInvoices, state.capexPurchaseOrders]);
+
+  const uniqueCostCenters = useMemo(() => {
+    const projects = state.capexProjects || [];
+    const filtered = selectedPortfolioId 
+      ? projects.filter(p => p.portfolioId === selectedPortfolioId)
+      : projects;
+    const centers = filtered.map(p => p.costCenter).filter(Boolean);
+    return Array.from(new Set(centers)).sort();
+  }, [state.capexProjects, selectedPortfolioId]);
+
+  const filteredProjectsDropdown = useMemo(() => {
+    let list = state.capexProjects || [];
+    if (selectedPortfolioId) {
+      list = list.filter(p => p.portfolioId === selectedPortfolioId);
+    }
+    if (selectedCostCenter) {
+      list = list.filter(p => p.costCenter === selectedCostCenter);
+    }
+    return list;
+  }, [state.capexProjects, selectedPortfolioId, selectedCostCenter]);
+
+  const filteredSummaryStats = useMemo(() => {
+    const projects = state.capexProjects || [];
+    const invoices = state.capexInvoices || [];
+    const purchaseOrders = state.capexPurchaseOrders || [];
+
+    // Apply filters
+    let targetProjects = projects;
+    if (selectedPortfolioId) {
+      targetProjects = targetProjects.filter(p => p.portfolioId === selectedPortfolioId);
+    }
+    if (selectedCostCenter) {
+      targetProjects = targetProjects.filter(p => p.costCenter === selectedCostCenter);
+    }
+
+    const projectIds = new Set(targetProjects.map(p => p.id));
+    const targetInvoices = invoices.filter(inv => projectIds.has(inv.projectId));
+    const targetPOs = purchaseOrders.filter(po => projectIds.has(po.projectId));
+
+    const totalPlanned = targetProjects.reduce((sum, p) => sum + p.plannedValue, 0);
+    const totalExecuted = targetInvoices.reduce((sum, inv) => sum + inv.value, 0);
+    
+    // Calculate effective remaining PO values (subtract linked Invoice entries)
+    const totalPOsValue = targetPOs.reduce((sum, po) => {
+      const linkedInvoicesVal = invoices
+        .filter(inv => inv.purchaseOrderId === po.id)
+        .reduce((s, inv) => s + inv.value, 0);
+      return sum + Math.max(0, po.value - linkedInvoicesVal);
+    }, 0);
+
+    const totalBalance = totalPlanned - totalExecuted - totalPOsValue;
+    const executionPercentage = totalPlanned > 0 ? (totalExecuted / totalPlanned) * 100 : 0;
+    const realFreeBalance = totalPlanned - totalExecuted;
+
+    return {
+      projects: targetProjects,
+      invoices: targetInvoices,
+      purchaseOrders: targetPOs,
+      totalPlanned,
+      totalExecuted,
+      totalPOsValue,
+      totalBalance,
+      executionPercentage,
+      realFreeBalance
+    };
+  }, [state.capexProjects, state.capexInvoices, state.capexPurchaseOrders, selectedPortfolioId, selectedCostCenter]);
 
   // Handlers
   const handleSavePortfolio = (e: React.FormEvent) => {
@@ -547,31 +614,78 @@ const CapexManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       {activeSubTab === 'overview' ? (
         <div className="space-y-8">
           {/* Seleção de Filtros */}
-          <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200 max-w-4xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200 max-w-5xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-6">
             <div>
               <label className="block text-[10px] font-black text-slate-400 uppercase mb-2 ml-1 tracking-widest">Filtrar por Carteira</label>
               <select 
                 className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl font-black text-sm outline-none focus:ring-2 focus:ring-[#344434] transition-all"
                 value={selectedPortfolioId}
                 onChange={(e) => {
-                  setSelectedPortfolioId(e.target.value);
-                  setSelectedProjectId('');
+                  const pId = e.target.value;
+                  setSelectedPortfolioId(pId);
+                  // Verify if current project is still valid under new portfolio
+                  if (selectedProjectId) {
+                    const proj = state.capexProjects?.find(p => p.id === selectedProjectId);
+                    if (proj && pId && proj.portfolioId !== pId) {
+                      setSelectedProjectId('');
+                    }
+                  }
+                  // Verify if current cost center is still valid under new portfolio
+                  if (selectedCostCenter && pId) {
+                    const hasCostCenter = state.capexProjects?.some(p => p.portfolioId === pId && p.costCenter === selectedCostCenter);
+                    if (!hasCostCenter) {
+                      setSelectedCostCenter('');
+                    }
+                  }
                 }}
               >
                 <option value="">Todas as Carteiras</option>
                 {state.portfolios?.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
               </select>
             </div>
+
+            <div>
+              <label className="block text-[10px] font-black text-slate-400 uppercase mb-2 ml-1 tracking-widest">Filtrar por Centro de Custo</label>
+              <select 
+                className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl font-black text-sm outline-none focus:ring-2 focus:ring-[#344434] transition-all"
+                value={selectedCostCenter}
+                onChange={(e) => {
+                  const cc = e.target.value;
+                  setSelectedCostCenter(cc);
+                  // Verify if current project is still valid under new cost center
+                  if (selectedProjectId) {
+                    const proj = state.capexProjects?.find(p => p.id === selectedProjectId);
+                    if (proj && cc && proj.costCenter !== cc) {
+                      setSelectedProjectId('');
+                    }
+                  }
+                }}
+              >
+                <option value="">Todos os Centros de Custo</option>
+                {uniqueCostCenters.map(cc => <option key={cc} value={cc}>{cc}</option>)}
+              </select>
+            </div>
+
             <div>
               <label className="block text-[10px] font-black text-slate-400 uppercase mb-2 ml-1 tracking-widest">Filtrar por Projeto</label>
               <select 
-                className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl font-black text-sm outline-none focus:ring-2 focus:ring-[#344434] transition-all disabled:opacity-50"
+                className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl font-black text-sm outline-none focus:ring-2 focus:ring-[#344434] transition-all"
                 value={selectedProjectId}
-                disabled={!selectedPortfolioId}
-                onChange={(e) => setSelectedProjectId(e.target.value)}
+                onChange={(e) => {
+                  const pId = e.target.value;
+                  setSelectedProjectId(pId);
+                  // Auto-select portfolio and cost center if a project is selected
+                  if (pId) {
+                    const proj = state.capexProjects?.find(p => p.id === pId);
+                    if (proj) {
+                      setSelectedPortfolioId(proj.portfolioId);
+                      setSelectedCostCenter(proj.costCenter);
+                    }
+                  }
+                }}
               >
                 <option value="">Todos os Projetos</option>
-                {state.capexProjects?.filter(p => p.portfolioId === selectedPortfolioId).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                {filteredProjectsDropdown.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
               </select>
             </div>
           </div>
@@ -854,14 +968,41 @@ const CapexManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                 );
               })()}
             </div>
-          ) : selectedPortfolioId ? (
+          ) : (
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-              {/* Card de Resumo da Carteira */}
+              {/* Card de Resumo Consolidado */}
               {(() => {
-                const portfolio = portfolioStats.find(p => p.id === selectedPortfolioId);
-                const projects = (state.capexProjects || []).filter(p => p.portfolioId === selectedPortfolioId);
-                const invoices = (state.capexInvoices || []).filter(i => i.portfolioId === selectedPortfolioId);
-                if (!portfolio) return null;
+                const {
+                  projects,
+                  invoices,
+                  purchaseOrders,
+                  totalPlanned,
+                  totalExecuted,
+                  totalPOsValue,
+                  totalBalance,
+                  executionPercentage
+                } = filteredSummaryStats;
+
+                const portfolio = state.portfolios?.find(p => p.id === selectedPortfolioId);
+
+                // Build title and subtitle dynamically
+                let badgeText = "Consolidado Global: Todos os Projetos";
+                let titleText = "Todos os Investimentos CAPEX";
+                let subtitleText = `${state.portfolios?.length || 0} Carteiras • ${projects.length} Projetos Ativos`;
+
+                if (selectedPortfolioId && selectedCostCenter) {
+                  badgeText = "Consolidado: Carteira e Centro de Custo";
+                  titleText = `${portfolio?.name || ''} • ${selectedCostCenter}`;
+                  subtitleText = `${projects.length} Projetos Encontrados nesta Carteira e Centro de Custo`;
+                } else if (selectedPortfolioId) {
+                  badgeText = "Consolidado: Carteira de Investimento";
+                  titleText = portfolio?.name || '';
+                  subtitleText = `Gestor: ${portfolio?.manager || ''} • ${projects.length} Projetos Ativos`;
+                } else if (selectedCostCenter) {
+                  badgeText = "Consolidado: Centro de Custo";
+                  titleText = selectedCostCenter;
+                  subtitleText = `${projects.length} Projetos Vinculados a este Centro de Custo`;
+                }
 
                 return (
                   <>
@@ -871,15 +1012,15 @@ const CapexManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                           <div className="flex justify-between items-start mb-8">
                             <div>
                               <span className="text-[10px] font-black bg-blue-100 text-blue-600 px-3 py-1 rounded-full uppercase tracking-widest mb-2 inline-block">
-                                Carteira de Investimento
+                                {badgeText}
                               </span>
-                              <h2 className="text-3xl font-black text-slate-800 uppercase tracking-tighter italic leading-none">{portfolio.name}</h2>
-                              <p className="text-xs font-bold text-slate-400 uppercase mt-2">Gestor: {portfolio.manager} • {portfolio.projectsCount} Projetos Ativos</p>
+                              <h2 className="text-3xl font-black text-slate-800 uppercase tracking-tighter italic leading-none">{titleText}</h2>
+                              <p className="text-xs font-bold text-slate-400 uppercase mt-2">{subtitleText}</p>
                             </div>
                             <div className="text-right">
-                              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Execução Global</p>
+                              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Execução Média</p>
                               <div className="text-sm font-black text-blue-600 uppercase italic">
-                                {formatNumber(portfolio.executionPercentage, 1)}% Realizado
+                                {formatNumber(executionPercentage, 1)}% Realizado
                               </div>
                             </div>
                           </div>
@@ -888,51 +1029,47 @@ const CapexManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                             <div className="bg-slate-50 p-6 rounded-3xl border border-slate-100">
                               <div className="flex items-center gap-2 mb-2">
                                 <Wallet className="w-4 h-4 text-slate-400" />
-                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Orçamento Inicial</span>
+                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Orçamento Previsto</span>
                               </div>
-                              <div className="text-2xl font-black text-slate-800">R$ {formatNumber(portfolio.totalValue)}</div>
+                              <div className="text-2xl font-black text-slate-800">R$ {formatNumber(totalPlanned)}</div>
                             </div>
                             <div className="bg-slate-50 p-6 rounded-3xl border border-slate-100">
                               <div className="flex items-center gap-2 mb-2">
                                 <Briefcase className="w-4 h-4 text-emerald-500" />
-                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Total Alocado</span>
+                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Total Executado (NF)</span>
                               </div>
-                              <div className="text-2xl font-black text-emerald-600">R$ {formatNumber(portfolio.allocatedValue)}</div>
+                              <div className="text-2xl font-black text-emerald-600">R$ {formatNumber(totalExecuted)}</div>
                             </div>
                             <div className="bg-blue-50 p-6 rounded-3xl border border-blue-100">
                               <div className="flex items-center gap-2 mb-2">
                                 <DollarSign className="w-4 h-4 text-blue-400" />
                                 <span className="text-[10px] font-black text-blue-400 uppercase tracking-widest">Saldo Livre</span>
                               </div>
-                              <div className="text-2xl font-black text-blue-600">R$ {formatNumber(portfolio.balance)}</div>
+                              <div className="text-2xl font-black text-blue-600">R$ {formatNumber(totalBalance)}</div>
                             </div>
                           </div>
 
                           <div className="mt-8">
                             <div className="flex justify-between items-end mb-2">
                               <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                                <TrendingUp className="w-4 h-4" /> Progresso Financeiro da Carteira
+                                <TrendingUp className="w-4 h-4" /> Progresso Financeiro Consolidado
                               </span>
                               <span className="text-xs font-black text-blue-600">
-                                R$ {formatNumber(portfolio.executedValue)} Executados
+                                R$ {formatNumber(totalExecuted)} Executados
                               </span>
                             </div>
                             <div className="h-4 bg-slate-100 rounded-full overflow-hidden border border-slate-200 p-0.5">
                               <div 
                                 className="h-full bg-blue-500 rounded-full transition-all duration-1000" 
-                                style={{ width: `${Math.min(100, portfolio.executionPercentage)}%` }} 
+                                style={{ width: `${Math.min(100, executionPercentage)}%` }} 
                               />
-                            </div>
-                            <div className="flex justify-between mt-2 text-[9px] font-black text-slate-400 uppercase">
-                              <span>Início: {format(parseISO(portfolio.startDate), 'dd/MM/yyyy')}</span>
-                              <span>Fim: {portfolio.endDate ? format(parseISO(portfolio.endDate), 'dd/MM/yyyy') : 'Indeterminado'}</span>
                             </div>
                           </div>
                         </div>
                         <Building2 className="absolute -right-10 -bottom-10 w-64 h-64 text-slate-50 opacity-[0.03] pointer-events-none" />
                       </div>
 
-                      {/* Lista de Projetos da Carteira */}
+                      {/* Lista de Projetos Filtrados */}
                       <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm">
                         <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest mb-6 flex items-center gap-2 italic">
                           <Layers className="w-5 h-5 text-emerald-500" /> Projetos Vinculados
@@ -943,10 +1080,13 @@ const CapexManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                             return (
                               <div key={proj.id} className="p-4 bg-slate-50 rounded-2xl border border-slate-100 hover:border-emerald-200 transition-all cursor-pointer" onClick={() => setSelectedProjectId(proj.id)}>
                                 <div className="flex justify-between items-start mb-2">
-                                  <h4 className="text-xs font-black text-slate-800 uppercase truncate pr-2">{proj.name}</h4>
+                                  <div className="truncate pr-2">
+                                    <h4 className="text-xs font-black text-slate-800 uppercase truncate">{proj.name}</h4>
+                                    <span className="text-[8px] font-bold text-slate-400 uppercase tracking-wider block mt-0.5">CC: {proj.costCenter}</span>
+                                  </div>
                                   <ChevronRight className="w-4 h-4 text-slate-300" />
                                 </div>
-                                <div className="flex justify-between items-end">
+                                <div className="flex justify-between items-end mt-2">
                                   <div>
                                     <div className="text-[9px] font-black text-slate-400 uppercase">Alocado</div>
                                     <div className="text-xs font-black text-slate-700">R$ {formatNumber(proj.plannedValue)}</div>
@@ -960,7 +1100,7 @@ const CapexManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                             );
                           })}
                           {projects.length === 0 && (
-                            <div className="col-span-2 text-center py-10 text-slate-400 font-bold uppercase text-[10px] tracking-widest italic">Nenhum projeto cadastrado nesta carteira.</div>
+                            <div className="col-span-2 text-center py-10 text-slate-400 font-bold uppercase text-[10px] tracking-widest italic">Nenhum projeto encontrado.</div>
                           )}
                         </div>
                       </div>
@@ -968,51 +1108,54 @@ const CapexManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
 
                     <div className="space-y-6">
                       {/* Resumo Financeiro */}
-                      <div className="bg-blue-600 p-8 rounded-[2.5rem] shadow-xl text-white">
-                        <h3 className="text-xs font-black uppercase tracking-[0.2em] mb-6 opacity-60">Resumo Financeiro</h3>
+                      <div className="bg-[#344434] p-8 rounded-[2.5rem] shadow-xl text-white">
+                        <h3 className="text-xs font-black uppercase tracking-[0.2em] mb-6 opacity-60">Resumo Consolidado</h3>
                         <div className="space-y-6">
                           <div>
                             <div className="text-3xl font-black italic tracking-tighter mb-1">
-                              R$ {formatNumber(portfolio.totalValue)}
+                              R$ {formatNumber(totalPlanned)}
                             </div>
-                            <div className="text-[9px] font-black uppercase tracking-widest opacity-50">Valor da Carteira</div>
+                            <div className="text-[9px] font-black uppercase tracking-widest opacity-50">Orçamento Previsto</div>
                           </div>
                           <div className="h-px bg-white/10" />
                           <div>
-                            <div className="text-2xl font-black italic tracking-tighter mb-1 text-blue-100">
-                              R$ {formatNumber(portfolio.executedValue)}
+                            <div className="text-2xl font-black italic tracking-tighter mb-1 text-slate-200">
+                              R$ {formatNumber(totalExecuted)}
                             </div>
-                            <div className="text-[9px] font-black uppercase tracking-widest opacity-50">Soma das Notas</div>
+                            <div className="text-[9px] font-black uppercase tracking-widest opacity-50">Soma das Notas Fiscais</div>
                           </div>
                           <div className="h-px bg-white/10" />
                           <div>
-                            <div className="text-2xl font-black italic tracking-tighter mb-1 text-emerald-100">
-                              R$ {formatNumber(portfolio.poValue)}
+                            <div className="text-2xl font-black italic tracking-tighter mb-1 text-amber-200">
+                              R$ {formatNumber(totalPOsValue)}
                             </div>
-                            <div className="text-[9px] font-black uppercase tracking-widest opacity-50">Soma das Ordens de Compras Lancadas</div>
+                            <div className="text-[9px] font-black uppercase tracking-widest opacity-50">Ordens de Compra em Aberto</div>
                           </div>
                           <div className="h-px bg-white/10" />
                           <div>
                             <div className="text-3xl font-black italic tracking-tighter mb-1 text-emerald-300">
-                              R$ {formatNumber(portfolio.realFreeBalance)}
+                              R$ {formatNumber(totalBalance)}
                             </div>
                             <div className="text-[9px] font-black uppercase tracking-widest text-[#a8ffb2]">Saldo Livre Real</div>
                           </div>
                         </div>
                       </div>
 
-                      {/* Notas Recentes da Carteira */}
+                      {/* Notas Recentes */}
                       <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm">
-                        <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-6">Últimas Notas (Carteira)</h3>
+                        <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-6">Últimos Lançamentos</h3>
                         <div className="space-y-3">
-                              {invoices.slice(0, 3).map(inv => (
+                              {invoices.slice(0, 5).map(inv => (
                                 <div key={inv.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-xl border border-slate-100">
-                                  <div className="text-[10px] font-black text-slate-800 uppercase truncate max-w-[100px]">{inv.supplier}</div>
+                                  <div className="truncate max-w-[140px]">
+                                    <div className="text-[10px] font-black text-slate-800 uppercase truncate">{inv.supplier}</div>
+                                    <div className="text-[8px] text-slate-400 font-bold uppercase">{format(parseISO(inv.date), 'dd/MM/yy')}</div>
+                                  </div>
                                   <div className="text-[10px] font-black text-blue-600">R$ {formatNumber(inv.value)}</div>
                                 </div>
                               ))}
                           {invoices.length === 0 && (
-                            <div className="text-center py-4 text-slate-400 font-bold uppercase text-[8px] tracking-widest italic">Sem lançamentos.</div>
+                            <div className="text-center py-4 text-slate-400 font-bold uppercase text-[8px] tracking-widest italic">Sem lançamentos recentes.</div>
                           )}
                         </div>
                       </div>
@@ -1020,14 +1163,6 @@ const CapexManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                   </>
                 );
               })()}
-            </div>
-          ) : (
-            <div className="flex flex-col items-center justify-center py-20 text-center space-y-4 bg-white rounded-[3rem] border border-dashed border-slate-200">
-              <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mb-2">
-                <Search className="w-10 h-10 text-slate-200" />
-              </div>
-              <h3 className="text-xl font-black text-slate-400 uppercase tracking-widest italic">Aguardando Seleção</h3>
-              <p className="text-slate-400 font-bold uppercase text-[10px] max-w-xs">Selecione uma carteira e um projeto acima para visualizar o compilado de informações e a aderência.</p>
             </div>
           )}
         </div>
