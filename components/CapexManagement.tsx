@@ -989,10 +989,12 @@ const CapexManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                   projects,
                   invoices,
                   purchaseOrders,
+                  totalPortfolioBudget,
                   totalPlanned,
                   totalExecuted,
                   totalPOsValue,
                   totalBalance,
+                  portfolioBalance,
                   executionPercentage
                 } = filteredSummaryStats;
 
@@ -1113,7 +1115,7 @@ const CapexManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                                   </div>
                                   <div className="text-right">
                                     <div className="text-[9px] font-black text-slate-400 uppercase">Execução</div>
-                                    <div className="text-xs font-black text-emerald-600">{formatNumber(stats?.executionPercentage, 1)}%</div>
+                                    <div className="text-xs font-black text-emerald-600">{formatNumber(stats?.executionPercentage || 0, 1)}%</div>
                                   </div>
                                 </div>
                               </div>
