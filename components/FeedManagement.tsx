@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { AppState, FeedType, FeedStockLog, User } from '../types';
-import { Plus, Package, TrendingDown, AlertCircle, Calendar, Settings2, Edit, Trash2, X, ArrowUpDown, Clock, User as UserIcon, Filter, CheckSquare, Square, Info, FileText, Copy, RotateCcw, FileDown, Box } from 'lucide-react';
+import { Plus, Package, TrendingDown, AlertCircle, Calendar, Settings2, Edit, Trash2, X, ArrowUpDown, Clock, User as UserIcon, Filter, CheckSquare, Square, Info, FileText, Copy, RotateCcw, FileDown, Box, ChevronDown, ChevronUp } from 'lucide-react';
 import { subDays, format, parseISO } from 'date-fns';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -117,6 +117,14 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
   });
 
   const [editingTableId, setEditingTableId] = useState<string | null>(null);
+  const [collapsedRows, setCollapsedRows] = useState<Record<string, boolean>>({});
+
+  const toggleCollapseRow = (rowId: string) => {
+    setCollapsedRows(prev => ({
+      ...prev,
+      [rowId]: !prev[rowId]
+    }));
+  };
 
   const [indicationRows, setIndicationRows] = useState<IndicationRow[]>(() => {
     const saved = localStorage.getItem('feed_indication_rows');
@@ -2422,19 +2430,39 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                           <React.Fragment key={row.id}>
                             <tr className="hover:bg-white/5 transition-colors group">
                               <td className="py-4 px-2">
-                                <select
-                                  className="w-full px-2 py-2 bg-black/35 border border-white/10 rounded-xl font-bold text-xs outline-none text-white focus:ring-1 focus:ring-blue-500 cursor-pointer"
-                                  value={row.batchId}
-                                  onChange={(e) => handleIndicationRowBatchChange(row.id, e.target.value)}
-                                >
-                                  <option value="">Selecione...</option>
-                                  {[...(state.batches || [])]
-                                    .filter(b => !b.isClosed)
-                                    .sort((a, b) => (a.name || '').localeCompare(b.name || '', 'pt-BR', { sensitivity: 'base' }))
-                                    .map(b => (
-                                      <option key={b.id} value={b.id}>{b.name}</option>
-                                    ))}
-                                </select>
+                                <div className="flex items-center gap-2">
+                                  <select
+                                    className="w-full px-2 py-2 bg-black/35 border border-white/10 rounded-xl font-bold text-xs outline-none text-white focus:ring-1 focus:ring-blue-500 cursor-pointer"
+                                    value={row.batchId}
+                                    onChange={(e) => handleIndicationRowBatchChange(row.id, e.target.value)}
+                                  >
+                                    <option value="">Selecione...</option>
+                                    {[...(state.batches || [])]
+                                      .filter(b => !b.isClosed)
+                                      .sort((a, b) => (a.name || '').localeCompare(b.name || '', 'pt-BR', { sensitivity: 'base' }))
+                                      .map(b => (
+                                        <option key={b.id} value={b.id}>{b.name}</option>
+                                      ))}
+                                  </select>
+                                  {row.batchId && (
+                                    <button
+                                      type="button"
+                                      onClick={() => toggleCollapseRow(row.id)}
+                                      className={`p-2 rounded-xl border transition-colors shrink-0 flex items-center justify-center ${
+                                        collapsedRows[row.id]
+                                          ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/20"
+                                          : "bg-white/5 border-white/10 text-slate-400 hover:bg-white/15 hover:text-white"
+                                      }`}
+                                      title={collapsedRows[row.id] ? "Mostrar detalhamento por gaiola" : "Recolher detalhamento por gaiola"}
+                                    >
+                                      {collapsedRows[row.id] ? (
+                                        <ChevronDown className="w-4 h-4" />
+                                      ) : (
+                                        <ChevronUp className="w-4 h-4" />
+                                      )}
+                                    </button>
+                                  )}
+                                </div>
                               </td>
                               <td className="py-4 px-2">
                                 <select
@@ -2517,7 +2545,7 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                             </tr>
 
                             {/* Nested Cages Stratification */}
-                            {row.batchId && (
+                            {row.batchId && !collapsedRows[row.id] && (
                               <tr>
                                 <td colSpan={8} className="pb-4 px-2 border-none">
                                   <div className="bg-black/25 border border-white/10 rounded-2xl p-4 font-sans space-y-3 shadow-inner">
@@ -2533,9 +2561,19 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                                           </p>
                                         </div>
                                       </div>
-                                      <span className="text-[9px] bg-emerald-500/15 text-emerald-400 px-2 py-0.5 rounded font-black uppercase tracking-wider">
-                                        {row.dailyFeedingsCount || 3} Tratos Diários
-                                      </span>
+                                      <div className="flex items-center gap-2">
+                                        <span className="text-[9px] bg-emerald-500/15 text-emerald-400 px-2 py-0.5 rounded font-black uppercase tracking-wider">
+                                          {row.dailyFeedingsCount || 3} Tratos Diários
+                                        </span>
+                                        <button
+                                          type="button"
+                                          onClick={() => toggleCollapseRow(row.id)}
+                                          className="text-[9px] bg-white/10 hover:bg-white/15 text-slate-300 px-2.5 py-1 rounded font-black uppercase tracking-wider flex items-center gap-1 transition-colors border border-white/5"
+                                          title="Minimizar detalhamento das gaiolas"
+                                        >
+                                          <ChevronUp className="w-3 h-3 text-slate-400" /> Minimizar
+                                        </button>
+                                      </div>
                                     </div>
                                     
                                     {calcs.cagesData.length === 0 ? (
