@@ -145,6 +145,30 @@ const CageManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     return occupiedCages.filter(c => c.batchId === filterBatchId);
   }, [occupiedCages, filterBatchId]);
 
+  const batchStratification = useMemo(() => {
+    if (filterBatchId === 'all') return null;
+    const cagesInBatch = (state.cages || []).filter(c => c.batchId === filterBatchId && c.status === 'Ocupada');
+    
+    // Group by model
+    const counts: { [key: string]: number } = {};
+    cagesInBatch.forEach(c => {
+      counts[c.model] = (counts[c.model] || 0) + 1;
+    });
+    
+    const modelList = Object.entries(counts)
+      .map(([model, count]) => ({ model, count }))
+      .sort((a, b) => b.count - a.count);
+
+    const totalCages = cagesInBatch.length;
+    const totalFish = cagesInBatch.reduce((sum, c) => sum + (c.initialFishCount || 0), 0);
+
+    return {
+      totalCages,
+      totalFish,
+      models: modelList
+    };
+  }, [state.cages, filterBatchId]);
+
   const toggleSelectCage = (id: string) => {
     setSelectedCages(prev => 
       prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
@@ -414,6 +438,52 @@ const CageManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                   <Save className="w-4 h-4" /> Aplicar Alterações
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {batchStratification && (
+        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-6 rounded-[2rem] border border-blue-100 shadow-sm flex flex-col md:flex-row justify-between items-stretch gap-6 animate-in fade-in duration-300">
+          <div className="flex flex-col justify-center min-w-[240px]">
+            <span className="text-[10px] font-black text-blue-600 uppercase tracking-widest block mb-1">Resumo do Lote Selecionado</span>
+            <h4 className="text-2xl font-black text-slate-800 uppercase tracking-tight italic">
+              {(() => {
+                const b = (state.batches || []).find(batch => batch.id === filterBatchId);
+                return b ? b.name : '---';
+              })()}
+            </h4>
+            <div className="flex gap-4 mt-3">
+              <div className="bg-white/65 px-4 py-2 rounded-xl border border-blue-200/50">
+                <span className="text-[8px] font-black text-slate-400 uppercase tracking-wider block">Total de Gaiolas</span>
+                <span className="text-lg font-black text-slate-800">{batchStratification.totalCages}</span>
+              </div>
+              <div className="bg-white/65 px-4 py-2 rounded-xl border border-blue-200/50">
+                <span className="text-[8px] font-black text-slate-400 uppercase tracking-wider block">Estoque Inicial Total</span>
+                <span className="text-lg font-black text-blue-700">{batchStratification.totalFish.toLocaleString('pt-BR')} peixes</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex-1 flex flex-col justify-center">
+            <span className="text-xs font-black text-slate-700 uppercase tracking-widest block mb-2.5">Modelos de Gaiola no Lote</span>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              {batchStratification.models.map(({ model, count }) => (
+                <div key={model} className="bg-white p-3.5 rounded-2xl border border-blue-100 shadow-sm flex items-center gap-3">
+                  <div className="w-9 h-9 bg-indigo-50 rounded-lg flex items-center justify-center text-indigo-600 shrink-0">
+                    <Box className="w-5 h-5" />
+                  </div>
+                  <div className="min-w-0">
+                    <span className="text-[11px] font-black text-slate-800 uppercase block tracking-wider">Modelo {model}</span>
+                    <span className="text-base font-black text-indigo-700">{count} {count === 1 ? 'gaiola' : 'gaiolas'}</span>
+                  </div>
+                </div>
+              ))}
+              {batchStratification.models.length === 0 && (
+                <div className="col-span-full py-4 text-center text-[10px] font-bold text-slate-400 uppercase tracking-widest bg-white/50 rounded-2xl">
+                  Nenhuma gaiola povoada neste lote.
+                </div>
+              )}
             </div>
           </div>
         </div>
