@@ -1,7 +1,7 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { AppState, FeedType, FeedStockLog, User } from '../types';
-import { Plus, Package, TrendingDown, AlertCircle, Calendar, Settings2, Edit, Trash2, X, ArrowUpDown, Clock, User as UserIcon, Filter, CheckSquare, Square, Info, FileText, Copy, RotateCcw, FileDown } from 'lucide-react';
+import { Plus, Package, TrendingDown, AlertCircle, Calendar, Settings2, Edit, Trash2, X, ArrowUpDown, Clock, User as UserIcon, Filter, CheckSquare, Square, Info, FileText, Copy, RotateCcw, FileDown, Box } from 'lucide-react';
 import { subDays, format, parseISO } from 'date-fns';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -31,8 +31,17 @@ interface PlanningRow {
   calculationDays: string;
 }
 
+interface IndicationRow {
+  id: string;
+  tableId: string;
+  batchId: string;
+  currentWeek: string;
+  manuallyOverridden?: boolean;
+}
+
 const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
   const [activeSubTab, setActiveSubTab] = useState<'stock' | 'recommended' | 'planning'>('stock');
+  const [recommendedSubPage, setRecommendedSubPage] = useState<'tables' | 'indication'>('tables');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formData, setFormData] = useState({ 
     name: '',
@@ -107,6 +116,48 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
   });
 
   const [editingTableId, setEditingTableId] = useState<string | null>(null);
+
+  const [indicationRows, setIndicationRows] = useState<IndicationRow[]>(() => {
+    const saved = localStorage.getItem('feed_indication_rows');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      } catch (e) {}
+    }
+    return [
+      {
+        id: generateId(),
+        tableId: '',
+        batchId: '',
+        currentWeek: '1'
+      }
+    ];
+  });
+
+  const saveIndicationRowsToLocals = (rows: IndicationRow[]) => {
+    localStorage.setItem('feed_indication_rows', JSON.stringify(rows));
+  };
+
+  useEffect(() => {
+    if (!state.batches || !state.feedingTables) return;
+    let changed = false;
+    const updatedRows = indicationRows.map(row => {
+      if (row.batchId && row.tableId && !row.manuallyOverridden) {
+        const avgWeight = resolveBatchBiometryWeight(row.batchId);
+        const closestWeek = findClosestWeek(avgWeight, row.tableId);
+        if (closestWeek !== null && row.currentWeek !== closestWeek.toString()) {
+          changed = true;
+          return { ...row, currentWeek: closestWeek.toString() };
+        }
+      }
+      return row;
+    });
+    if (changed) {
+      setIndicationRows(updatedRows);
+      saveIndicationRowsToLocals(updatedRows);
+    }
+  }, [state.batches, state.feedingTables, state.biometryLogs]);
 
   const [selectedConsumptionMonth, setSelectedConsumptionMonth] = useState<string>('');
 
@@ -663,7 +714,7 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
           ...row,
           batchId,
           tableId,
-          fishCount: liveFish.toString(),
+          fishCount: batch.initialQuantity.toString(),
           averageWeight: roundedAvgWeight.toString(),
           currentWeek: weekStr
         };
@@ -717,6 +768,539 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     });
     setPlanningRows(newRows);
     saveRowsToLocals(newRows);
+  };
+
+  const handleAddNewIndicationRow = () => {
+    const tId = state.feedingTables?.[0]?.id || '';
+    const newRows = [
+      ...indicationRows,
+      {
+        id: generateId(),
+        tableId: tId,
+        batchId: '',
+        currentWeek: '1'
+      }
+    ];
+    setIndicationRows(newRows);
+    saveIndicationRowsToLocals(newRows);
+  };
+
+  const handleRemoveIndicationRow = (id: string) => {
+    if (indicationRows.length <= 1) return;
+    const newRows = indicationRows.filter(r => r.id !== id);
+    setIndicationRows(newRows);
+    saveIndicationRowsToLocals(newRows);
+  };
+
+  const handleResetIndication = () => {
+    if (!confirm('Deseja limpar todos os lotes e iniciar uma nova indicação?')) return;
+    const tId = state.feedingTables?.[0]?.id || '';
+    const resetRows = [
+      {
+        id: generateId(),
+        tableId: tId,
+        batchId: '',
+        currentWeek: '1'
+      }
+    ];
+    setIndicationRows(resetRows);
+    saveIndicationRowsToLocals(resetRows);
+  };
+
+  const handleIndicationRowFieldChange = (rowId: string, field: keyof IndicationRow, value: any) => {
+    const newRows = indicationRows.map(row => {
+      if (row.id === rowId) {
+        return { 
+          ...row, 
+          [field]: value,
+          ...(field === 'currentWeek' ? { manuallyOverridden: true } : {})
+        };
+      }
+      return row;
+    });
+    setIndicationRows(newRows);
+    saveIndicationRowsToLocals(newRows);
+  };
+
+  const resolveBatchBiometryWeight = (batchId: string) => {
+    const batch = (state.batches || []).find(b => b.id === batchId);
+    if (!batch) return 0;
+
+    const cagesMap = new Map((state.cages || []).map(c => [c.id, c]));
+    const batchBiometries = (state.biometryLogs || []).filter(b => {
+      let bId = b.batchId;
+      if (!bId && b.cageId) {
+        const harvest = (state.harvestLogs || []).find(
+          h => h.cageId === b.cageId && h.date >= (b.date || "")
+        );
+        if (harvest) {
+          bId = harvest.batchId;
+        } else {
+          const cage = cagesMap.get(b.cageId);
+          if (cage?.batchId) {
+            const bt = (state.batches || []).find(x => x.id === cage.batchId);
+            if (bt && b.date >= bt.settlementDate) {
+              bId = cage.batchId;
+            }
+          }
+        }
+      }
+      return bId === batchId;
+    });
+
+    let avgWeight = batch.initialUnitWeight;
+    if (batchBiometries.length > 0) {
+      const lastDate = batchBiometries.reduce((max, log) => (log.date > max ? log.date : max), "");
+      const lastDayLogs = batchBiometries.filter(log => log.date === lastDate);
+      if (lastDayLogs.length > 0) {
+        avgWeight = lastDayLogs.reduce((acc, log) => acc + log.averageWeight, 0) / lastDayLogs.length;
+      }
+    }
+    return Math.round(avgWeight * 10) / 10;
+  };
+
+  const resolveCageBiometryWeight = (cageId: string, batchId: string) => {
+    const batch = (state.batches || []).find(b => b.id === batchId);
+    if (!batch) return 0;
+
+    const cagesMap = new Map((state.cages || []).map(c => [c.id, c]));
+
+    // 1. Look for biometry of this specific cage belonging strictly to this batch
+    const cageBiometries = (state.biometryLogs || []).filter(b => {
+      if (b.cageId !== cageId) return false;
+
+      let bId = b.batchId;
+      if (!bId) {
+        const harvest = (state.harvestLogs || []).find(
+          h => h.cageId === b.cageId && h.date >= (b.date || "")
+        );
+        if (harvest) {
+          bId = harvest.batchId;
+        } else {
+          const cage = cagesMap.get(b.cageId);
+          if (cage?.batchId) {
+            bId = cage.batchId;
+          }
+        }
+      }
+      return bId === batchId;
+    });
+
+    if (cageBiometries.length > 0) {
+      const lastDate = cageBiometries.reduce((max, log) => (log.date > max ? log.date : max), "");
+      const lastDayLogs = cageBiometries.filter(b => b.date === lastDate);
+      if (lastDayLogs.length > 0) {
+        return lastDayLogs.reduce((acc, log) => acc + log.averageWeight, 0) / lastDayLogs.length;
+      }
+    }
+
+    // 2. Direct Fallback to the batch biometry average weight (instead of initial unit weight)
+    const batchAvgWeight = resolveBatchBiometryWeight(batchId);
+    if (batchAvgWeight > 0) {
+      return batchAvgWeight;
+    }
+
+    // 3. Fallback to batch initial weight
+    return batch.initialUnitWeight;
+  };
+
+  const handleIndicationRowBatchChange = (rowId: string, batchId: string) => {
+    const batch = (state.batches || []).find(b => b.id === batchId);
+    if (!batch) {
+      const newRows = indicationRows.map(row => {
+        if (row.id === rowId) {
+          return { ...row, batchId: '', currentWeek: '1', manuallyOverridden: false };
+        }
+        return row;
+      });
+      setIndicationRows(newRows);
+      saveIndicationRowsToLocals(newRows);
+      return;
+    }
+
+    const avgWeight = resolveBatchBiometryWeight(batchId);
+    const currentRow = indicationRows.find(r => r.id === rowId);
+    const tableId = currentRow?.tableId || (state.feedingTables || [])[0]?.id || '';
+
+    let weekStr = '1';
+    if (tableId) {
+      const closestWeek = findClosestWeek(avgWeight, tableId);
+      if (closestWeek !== null) {
+        weekStr = closestWeek.toString();
+      }
+    }
+
+    const newRows = indicationRows.map(row => {
+      if (row.id === rowId) {
+        return {
+          ...row,
+          batchId,
+          tableId,
+          currentWeek: weekStr,
+          manuallyOverridden: false
+        };
+      }
+      return row;
+    });
+    setIndicationRows(newRows);
+    saveIndicationRowsToLocals(newRows);
+  };
+
+  const handleIndicationRowTableChange = (rowId: string, tableId: string) => {
+    const newRows = indicationRows.map(row => {
+      if (row.id === rowId) {
+        let newWeek = row.currentWeek;
+        const avgWeight = resolveBatchBiometryWeight(row.batchId);
+        if (tableId) {
+          const closestWeek = findClosestWeek(avgWeight, tableId);
+          if (closestWeek !== null) {
+            newWeek = closestWeek.toString();
+          }
+        }
+        return {
+          ...row,
+          tableId,
+          currentWeek: newWeek,
+          manuallyOverridden: false
+        };
+      }
+      return row;
+    });
+    setIndicationRows(newRows);
+    saveIndicationRowsToLocals(newRows);
+  };
+
+  const getIndicationRowCalculations = (row: IndicationRow) => {
+    const batch = (state.batches || []).find(b => b.id === row.batchId);
+    const table = (state.feedingTables || []).find(t => t.id === row.tableId);
+    
+    if (!batch || !table) {
+      return { 
+        cagesData: [], 
+        totalDailyFeed: 0, 
+        feedTypeId: '', 
+        feedPercentPV: 0,
+        batchLiveFish: 0,
+        batchAvgWeight: 0
+      };
+    }
+
+    const week = Number(row.currentWeek);
+    const allTableRows = [
+      ...table.recriaInicial,
+      ...table.recriaFinal,
+      ...table.crescimento,
+      ...table.terminacao
+    ];
+    const tableWeekRow = allTableRows.find(item => item.week === week);
+    const feedPercentPV = tableWeekRow?.feedPercentagePV || 0;
+    const feedTypeId = tableWeekRow?.feedTypeId || '';
+
+    const batchLiveFish = batch.initialQuantity;
+    const batchAvgWeight = resolveBatchBiometryWeight(row.batchId);
+
+    // Resolve cages belonging to this batch
+    const batchCages = (state.cages || []).filter(c => c.batchId === row.batchId && c.status === 'Ocupada');
+
+    const cagesData = batchCages.map(cage => {
+      const cageWeight = batchAvgWeight; // Use the batch's latest biometry average weight consistently for all structures
+      const initialCount = cage.initialFishCount || 0;
+      const dailyFeed = (initialCount * cageWeight / 1000) * (feedPercentPV / 100);
+
+      return {
+        cage,
+        initialCount,
+        cageWeight,
+        dailyFeed
+      };
+    });
+
+    // Always calculate total daily feed at the batch level based on stocking/povoamento quantity and batch latest average weight
+    const totalDailyFeed = (batch.initialQuantity * batchAvgWeight / 1000) * (feedPercentPV / 100);
+
+    return {
+      cagesData,
+      totalDailyFeed,
+      feedTypeId,
+      feedPercentPV,
+      batchLiveFish,
+      batchAvgWeight
+    };
+  };
+
+  const indicationAggregation = useMemo(() => {
+    const map = new Map<string, { feedName: string; dailyKg: number }>();
+    let grandTotalDailyKg = 0;
+
+    indicationRows.forEach(row => {
+      const calcs = getIndicationRowCalculations(row);
+      if (calcs.totalDailyFeed > 0 && calcs.feedTypeId) {
+        const feed = feedMap.get(calcs.feedTypeId);
+        const feedName = feed ? feed.name : 'Ração não especificada';
+        const current = map.get(calcs.feedTypeId) || { feedName, dailyKg: 0 };
+        current.dailyKg += calcs.totalDailyFeed;
+        map.set(calcs.feedTypeId, current);
+
+        grandTotalDailyKg += calcs.totalDailyFeed;
+      }
+    });
+
+    const items = Array.from(map.entries()).map(([feedId, data]) => {
+      const feed = feedMap.get(feedId);
+      const stockKg = feed ? (feed.totalStock / 1000) : 0;
+      
+      return {
+        feedId,
+        feedName: data.feedName,
+        dailyKg: data.dailyKg,
+        stockKg,
+        bagsNeeded: data.dailyKg / 25
+      };
+    });
+
+    return {
+      items,
+      grandTotalDailyKg
+    };
+  }, [indicationRows, feedMap, state.feedingTables, state.biometryLogs, state.batches, state.cages, state.mortalityLogs, state.harvestLogs]);
+
+  const handleDownloadIndicationPDF = () => {
+    if (indicationAggregation.items.length === 0) return;
+
+    try {
+      const doc = new jsPDF();
+      
+      // Theme colors
+      const primaryColor = [29, 78, 216];
+      
+      // Header Banner
+      doc.setFillColor(29, 78, 216); 
+      doc.rect(0, 0, 210, 36, 'F');
+
+      // Title text inside banner
+      doc.setTextColor(255, 255, 255);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(18);
+      doc.text('AQUAGESTAO PISCICULTURA', 15, 15);
+      
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(10);
+      doc.setTextColor(219, 234, 254);
+      doc.text('Indicacao de Trato Diario Consolidado e Estratificado por Gaiola', 15, 22);
+      
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(8);
+      doc.text(`Data de Emissao: ${format(new Date(), 'dd/MM/yyyy HH:mm:ss')}`, 15, 29);
+
+      // Metadata card
+      doc.setFillColor(241, 245, 249);
+      doc.rect(15, 42, 180, 26, 'F');
+      
+      doc.setTextColor(30, 41, 59);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(9);
+      doc.text('METADADOS DA INDICACAO DE TRATO', 20, 48);
+      
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8.5);
+      doc.setTextColor(71, 85, 105);
+      doc.text(`Responsavel Clinico: ${currentUser?.username || 'Nao especificado'}`, 20, 54);
+      doc.text(`Base de Calculo: Peso medio da ultima biometria registrada e tabela de trato recomendada`, 20, 59);
+      doc.text(`Prazo: Trato diario baseado em um periodo de 1 dia de arracoamento`, 20, 64);
+
+      // Section 1: Detailed Batches feeding table
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(10);
+      doc.setTextColor(29, 78, 216);
+      doc.text('1. DIMENSIONAMENTO POR LOTE E ESTRATIFICACAO POR GAIOLA', 15, 76);
+
+      let currentY = 82;
+
+      indicationRows.forEach((row, index) => {
+        const batch = (state.batches || []).find(b => b.id === row.batchId);
+        const table = (state.feedingTables || []).find(t => t.id === row.tableId);
+        const calcs = getIndicationRowCalculations(row);
+        
+        if (!batch) return;
+
+        // Draw a small header for the batch
+        doc.setFillColor(248, 250, 252);
+        doc.rect(15, currentY, 180, 8, 'F');
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(8.5);
+        doc.setTextColor(15, 23, 42);
+        doc.text(`LOTE: ${batch.name.toUpperCase()}  |  TABELA: ${table ? table.name.toUpperCase() : 'N/A'} (SEMANA ${row.currentWeek})`, 18, currentY + 5.5);
+        
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(71, 85, 105);
+        const rightText = `Consumo Total Lote: ${formatNumber(calcs.totalDailyFeed, 1)} kg/dia (${formatNumber(calcs.feedPercentPV, 2)}% PV)`;
+        doc.text(rightText, 192, currentY + 5.5, { align: 'right' });
+
+        currentY += 10;
+
+        // Render cage details table
+        const headers = [['Gaiola', 'Modelo', 'Data Povoamento', 'Qtd Povoada', 'Ultimo Peso Medio', 'Trato Diario (Kg)']];
+        const rows = calcs.cagesData.map(cData => [
+          cData.cage.name.toUpperCase(),
+          cData.cage.model,
+          cData.cage.settlementDate ? format(parseISO(cData.cage.settlementDate), 'dd/MM/yyyy') : 'N/A',
+          `${formatNumber(cData.initialCount, 0)} peixes`,
+          `${formatNumber(cData.cageWeight, 1)}g`,
+          `${formatNumber(cData.dailyFeed, 2)} kg/dia`
+        ]);
+
+        if (rows.length === 0) {
+          rows.push([
+            'SEM GAIOLAS INDIVIDUAIS',
+            'N/A',
+            'N/A',
+            `${formatNumber(calcs.batchLiveFish, 0)} peixes`,
+            `${formatNumber(calcs.batchAvgWeight, 1)}g`,
+            `${formatNumber(calcs.totalDailyFeed, 2)} kg/dia`
+          ]);
+        }
+
+        autoTable(doc, {
+          startY: currentY,
+          head: headers,
+          body: rows,
+          theme: 'striped',
+          headStyles: { fillColor: [51, 65, 85], fontStyle: 'bold', fontSize: 7.5 },
+          bodyStyles: { fontSize: 7 },
+          columnStyles: {
+            0: { fontStyle: 'bold' },
+            3: { halign: 'right' },
+            4: { halign: 'right' },
+            5: { halign: 'right', fontStyle: 'bold' }
+          },
+          margin: { left: 15, right: 15 }
+        });
+
+        currentY = (doc as any).lastAutoTable.finalY + 8;
+
+        if (currentY > 250 && index < indicationRows.length - 1) {
+          doc.addPage();
+          currentY = 20;
+        }
+      });
+
+      // Section 2: Daily Consolidation
+      if (currentY > 220) {
+        doc.addPage();
+        currentY = 20;
+      }
+
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(10);
+      doc.setTextColor(29, 78, 216);
+      doc.text('2. CONSOLIDACAO DIARIA DO CONSUMO DE RACOO', 15, currentY);
+
+      const consolidatedHeaders = [['Modelo de Racao', 'Consumo Diario Planejado (Kg)', 'Saldo Atual Estoque (Kg)', 'Sacos Equivalentes (25Kg/Saco)']];
+      const consolidatedRows = indicationAggregation.items.map(item => [
+        item.feedName.toUpperCase(),
+        `${formatNumber(item.dailyKg, 1)} kg/dia`,
+        `${formatNumber(item.stockKg, 1)} kg`,
+        `${formatNumber(item.bagsNeeded, 1)} sacos`
+      ]);
+
+      autoTable(doc, {
+        startY: currentY + 4,
+        head: consolidatedHeaders,
+        body: consolidatedRows,
+        theme: 'grid',
+        headStyles: { fillColor: [29, 78, 216], fontStyle: 'bold', fontSize: 8 },
+        bodyStyles: { fontSize: 8 },
+        columnStyles: {
+          0: { fontStyle: 'bold' },
+          1: { halign: 'right', fontStyle: 'bold', textColor: [29, 78, 216] },
+          2: { halign: 'right' },
+          3: { halign: 'right' }
+        },
+        foot: [[
+          'TOTAL DIARIO GERAL',
+          `${formatNumber(indicationAggregation.grandTotalDailyKg, 1)} kg/dia`,
+          '',
+          `${formatNumber(indicationAggregation.grandTotalDailyKg / 25, 1)} sacos`
+        ]],
+        footStyles: { fillColor: [241, 245, 249], textColor: [15, 23, 42], fontStyle: 'bold', fontSize: 8.5 },
+        margin: { left: 15, right: 15 }
+      });
+
+      let nextY2 = (doc as any).lastAutoTable.finalY + 18;
+
+      if (nextY2 > 255) {
+        doc.addPage();
+        nextY2 = 25;
+      }
+
+      // Divider and signature areas
+      doc.setLineWidth(0.4);
+      doc.setDrawColor(203, 213, 225);
+      doc.line(15, nextY2, 95, nextY2);
+      doc.line(115, nextY2, 195, nextY2);
+
+      // Signatures
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8);
+      doc.setTextColor(100, 116, 139);
+      doc.text('Responsavel Tecnico / Emissor', 15, nextY2 + 4);
+      doc.setFont('helvetica', 'bold');
+      doc.text(currentUser?.username || 'Nao especificado', 15, nextY2 + 8);
+
+      doc.text('Confirmacao Operacional (Tratador)', 115, nextY2 + 4);
+      doc.text('Assinatura / Visto', 115, nextY2 + 8);
+      doc.text('Data: ____ / ____ / ________', 115, nextY2 + 12);
+
+      // Footer notes
+      doc.setFont('helvetica', 'italic');
+      doc.setFontSize(7.5);
+      doc.setTextColor(148, 163, 184);
+      doc.text('AquaGestao Piscicultura Inteligente. Impresso via modulo de Indicacao de Trato Diario.', 15, 288);
+
+      // Save the file
+      const dateStr = format(new Date(), 'dd-MM-yyyy_HHmm');
+      doc.save(`Indicacao_Trato_AquaGestao_${dateStr}.pdf`);
+    } catch (error) {
+      console.error('Falha ao gerar o PDF de Indicacao:', error);
+      alert('Houve um erro ao processar a geracao do PDF. Por favor, tente novamente.');
+    }
+  };
+
+  const handleCopyIndicationText = () => {
+    if (indicationAggregation.items.length === 0) return;
+    let text = `📋 *INDICAÇÃO DE TRATO DIÁRIO CONSOLIDADO*\n`;
+    text += `-------------------------------------------\n\n`;
+    
+    indicationRows.forEach((row, index) => {
+      const batch = (state.batches || []).find(b => b.id === row.batchId);
+      const calcs = getIndicationRowCalculations(row);
+      if (!batch) return;
+
+      text += `🐟 *Lote: ${batch.name.toUpperCase()}*\n`;
+      text += `   • Semana: S${row.currentWeek}\n`;
+      text += `   • Total Lote: *${formatNumber(calcs.totalDailyFeed, 1)} kg/dia*\n`;
+      
+      if (calcs.cagesData.length > 0) {
+        calcs.cagesData.forEach(cData => {
+          text += `     - ${cData.cage.name} [${cData.cage.model}]: ${formatNumber(cData.initialCount, 0)} peix. | PM: ${formatNumber(cData.cageWeight, 1)}g | *${formatNumber(cData.dailyFeed, 2)} kg/dia*\n`;
+        });
+      }
+      text += `\n`;
+    });
+
+    text += `-------------------------------------------\n`;
+    text += `📋 *RESUMO GERAL DO TRATO (DIÁRIO)*\n`;
+    indicationAggregation.items.forEach(item => {
+      text += `🔹 *${item.feedName.toUpperCase()}*: *${formatNumber(item.dailyKg, 1)} kg/dia* (${formatNumber(item.bagsNeeded, 1)} sacos/dia)\n`;
+    });
+    text += `\nTotal Diário Geral: *${formatNumber(indicationAggregation.grandTotalDailyKg, 1)} kg/dia*\n`;
+    text += `Gerado em: ${format(new Date(), 'dd/MM/yyyy HH:mm')}`;
+
+    navigator.clipboard.writeText(text).then(() => {
+      alert('Indicação de trato diário copiada com sucesso!');
+    }).catch(err => {
+      console.error('Falha ao copiar:', err);
+    });
   };
 
   const getRowCalculations = (row: PlanningRow) => {
@@ -1558,202 +2142,578 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     </React.Fragment>
   ) : activeSubTab === 'recommended' ? (
         <div className="space-y-8 animate-in fade-in duration-500">
-          {hasPermission ? (
-            <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-200">
-              <h3 className="text-lg font-black text-slate-800 mb-8 flex items-center gap-3 uppercase tracking-tighter italic">
-                <Settings2 className="w-6 h-6 text-blue-500" />
-                {editingTableId ? 'Editar Tabela de Trato' : 'Nova Tabela de Trato Indicado'}
-              </h3>
-              <form onSubmit={handleSaveFeedingTable} className="space-y-10">
-                <div className="grid grid-cols-1 gap-6">
-                  <div>
-                    <label className="block text-[10px] font-black text-slate-400 uppercase mb-2 tracking-widest">Nome da Tabela</label>
-                    <input
-                      type="text"
-                      required
-                      placeholder="Ex: Tilápia Ciclo Verão"
-                      className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none focus:ring-2 focus:ring-blue-500/20"
-                      value={tableFormData.name}
-                      onChange={(e) => setTableFormData({ ...tableFormData, name: e.target.value })}
-                    />
-                  </div>
-                </div>
+          <div className="flex flex-wrap bg-blue-50/50 p-1.5 rounded-2xl w-fit mb-4 gap-1.5 border border-blue-100/40">
+            <button
+              onClick={() => setRecommendedSubPage('tables')}
+              className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${recommendedSubPage === 'tables' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-500 hover:text-slate-700'}`}
+            >
+              Cadastro de Tabelas
+            </button>
+            <button
+              onClick={() => setRecommendedSubPage('indication')}
+              className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${recommendedSubPage === 'indication' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-500 hover:text-slate-700'}`}
+            >
+              Indicação de Trato
+            </button>
+          </div>
 
-                {/* Phases */}
-                {[
-                  { id: 'recriaInicial' as const, label: 'RECRIA INICIAL', rows: 3 },
-                  { id: 'recriaFinal' as const, label: 'RECRIA FINAL', rows: 4 },
-                  { id: 'crescimento' as const, label: 'CRESCIMENTO', rows: 5 },
-                  { id: 'terminacao' as const, label: 'TERMINAÇÃO', rows: 14 }
-                ].map(phase => (
-                  <div key={phase.id} className="space-y-4">
-                    <h4 className="text-xs font-black text-blue-600 uppercase tracking-widest border-l-4 border-blue-600 pl-3">{phase.label}</h4>
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-left min-w-[800px]">
-                        <thead className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
-                          <tr>
-                            <th className="px-2 py-2 w-24">Semana</th>
-                            <th className="px-2 py-2">Ração</th>
-                            <th className="px-2 py-2">Peso Médio (g)</th>
-                            <th className="px-2 py-2">GPD (g/dia)</th>
-                            <th className="px-2 py-2">Trato Diário (% PV)</th>
-                            <th className="px-2 py-2">Tratos/Dia</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100">
-                          {tableFormData[phase.id].map((row: any, idx: number) => (
-                            <tr key={idx}>
-                              <td className="px-2 py-2 w-24">
-                                <input
-                                  type="number"
-                                  className="w-full px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg font-bold text-xs outline-none"
-                                  value={row.week}
-                                  onChange={(e) => updateRow(phase.id, idx, 'week', e.target.value)}
-                                />
-                              </td>
-                              <td className="px-2 py-2">
-                                <select
-                                  className="w-full px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg font-bold text-[10px] outline-none"
-                                  value={row.feedTypeId || ''}
-                                  onChange={(e) => updateRow(phase.id, idx, 'feedTypeId', e.target.value)}
-                                >
-                                  <option value="">Selecione...</option>
-                                  {(state.feedTypes || []).map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
-                                </select>
-                              </td>
-                              <td className="px-2 py-2">
-                                <input
-                                  type="number"
-                                  step="0.1"
-                                  className="w-full px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg font-bold text-xs outline-none"
-                                  value={row.averageWeight || ''}
-                                  onChange={(e) => updateRow(phase.id, idx, 'averageWeight', e.target.value)}
-                                />
-                              </td>
-                              <td className="px-2 py-2">
-                                <input
-                                  type="number"
-                                  step="0.01"
-                                  className="w-full px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg font-bold text-xs outline-none"
-                                  value={row.gpd || ''}
-                                  onChange={(e) => updateRow(phase.id, idx, 'gpd', e.target.value)}
-                                />
-                              </td>
-                              <td className="px-2 py-2">
-                                <div className="relative">
-                                  <input
-                                    type="number"
-                                    step="0.01"
-                                    className="w-full px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg font-bold text-xs outline-none pr-6"
-                                    value={row.feedPercentagePV || ''}
-                                    onChange={(e) => updateRow(phase.id, idx, 'feedPercentagePV', e.target.value)}
-                                  />
-                                  <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400">%</span>
+          {recommendedSubPage === 'tables' ? (
+            <React.Fragment>
+              {hasPermission ? (
+                <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-200">
+                  <h3 className="text-lg font-black text-slate-800 mb-8 flex items-center gap-3 uppercase tracking-tighter italic">
+                    <Settings2 className="w-6 h-6 text-blue-500" />
+                    {editingTableId ? 'Editar Tabela de Trato' : 'Nova Tabela de Trato Indicado'}
+                  </h3>
+                  <form onSubmit={handleSaveFeedingTable} className="space-y-10">
+                    <div className="grid grid-cols-1 gap-6">
+                      <div>
+                        <label className="block text-[10px] font-black text-slate-400 uppercase mb-2 tracking-widest">Nome da Tabela</label>
+                        <input
+                          type="text"
+                          required
+                          placeholder="Ex: Tilápia Ciclo Verão"
+                          className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none focus:ring-2 focus:ring-blue-500/20"
+                          value={tableFormData.name}
+                          onChange={(e) => setTableFormData({ ...tableFormData, name: e.target.value })}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Phases */}
+                    {[
+                      { id: 'recriaInicial' as const, label: 'RECRIA INICIAL', rows: 3 },
+                      { id: 'recriaFinal' as const, label: 'RECRIA FINAL', rows: 4 },
+                      { id: 'crescimento' as const, label: 'CRESCIMENTO', rows: 5 },
+                      { id: 'terminacao' as const, label: 'TERMINAÇÃO', rows: 14 }
+                    ].map(phase => (
+                      <div key={phase.id} className="space-y-4">
+                        <h4 className="text-xs font-black text-blue-600 uppercase tracking-widest border-l-4 border-blue-600 pl-3">{phase.label}</h4>
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-left min-w-[800px]">
+                            <thead className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
+                              <tr>
+                                <th className="px-2 py-2 w-24">Semana</th>
+                                <th className="px-2 py-2">Ração</th>
+                                <th className="px-2 py-2">Peso Médio (g)</th>
+                                <th className="px-2 py-2">GPD (g/dia)</th>
+                                <th className="px-2 py-2">Trato Diário (% PV)</th>
+                                <th className="px-2 py-2">Tratos/Dia</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100">
+                              {tableFormData[phase.id].map((row: any, idx: number) => (
+                                <tr key={idx}>
+                                  <td className="px-2 py-2 w-24">
+                                    <input
+                                      type="number"
+                                      className="w-full px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg font-bold text-xs outline-none"
+                                      value={row.week}
+                                      onChange={(e) => updateRow(phase.id, idx, 'week', e.target.value)}
+                                    />
+                                  </td>
+                                  <td className="px-2 py-2">
+                                    <select
+                                      className="w-full px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg font-bold text-[10px] outline-none"
+                                      value={row.feedTypeId || ''}
+                                      onChange={(e) => updateRow(phase.id, idx, 'feedTypeId', e.target.value)}
+                                    >
+                                      <option value="">Selecione...</option>
+                                      {(state.feedTypes || []).map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
+                                    </select>
+                                  </td>
+                                  <td className="px-2 py-2">
+                                    <input
+                                      type="number"
+                                      step="0.1"
+                                      className="w-full px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg font-bold text-xs outline-none"
+                                      value={row.averageWeight || ''}
+                                      onChange={(e) => updateRow(phase.id, idx, 'averageWeight', e.target.value)}
+                                    />
+                                  </td>
+                                  <td className="px-2 py-2">
+                                    <input
+                                      type="number"
+                                      step="0.01"
+                                      className="w-full px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg font-bold text-xs outline-none"
+                                      value={row.gpd || ''}
+                                      onChange={(e) => updateRow(phase.id, idx, 'gpd', e.target.value)}
+                                    />
+                                  </td>
+                                  <td className="px-2 py-2">
+                                    <div className="relative">
+                                      <input
+                                        type="number"
+                                        step="0.01"
+                                        className="w-full px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg font-bold text-xs outline-none pr-6"
+                                        value={row.feedPercentagePV || ''}
+                                        onChange={(e) => updateRow(phase.id, idx, 'feedPercentagePV', e.target.value)}
+                                      />
+                                      <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400">%</span>
+                                    </div>
+                                  </td>
+                                  <td className="px-2 py-2">
+                                    <input
+                                      type="number"
+                                      className="w-full px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg font-bold text-xs outline-none"
+                                      value={row.feedingsPerDay || ''}
+                                      onChange={(e) => updateRow(phase.id, idx, 'feedingsPerDay', e.target.value)}
+                                    />
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    ))}
+
+                    <div className="flex justify-end gap-3 pt-4">
+                      {editingTableId && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditingTableId(null);
+                            setTableFormData({
+                              name: '',
+                              recriaInicial: createEmptyRows(3, 1),
+                              recriaFinal: createEmptyRows(4, 4),
+                              crescimento: createEmptyRows(5, 8),
+                              terminacao: createEmptyRows(14, 13)
+                            });
+                          }}
+                          className="px-8 py-4 bg-slate-100 text-slate-600 rounded-2xl font-black uppercase tracking-widest text-xs hover:bg-slate-200 transition-all"
+                        >
+                          Cancelar
+                        </button>
+                      )}
+                      <button
+                        type="submit"
+                        className="px-12 py-4 bg-blue-600 text-white rounded-2xl font-black uppercase tracking-widest text-xs shadow-xl shadow-blue-500/20 hover:bg-blue-700 transition-all active:scale-95"
+                      >
+                        {editingTableId ? 'Atualizar Tabela' : 'Salvar Tabela'}
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              ) : (
+                <div className="bg-slate-100 p-8 rounded-3xl border border-dashed border-slate-300 flex flex-col items-center gap-4 text-center">
+                  <Info className="w-10 h-10 text-slate-300" />
+                  <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-400">Modo Leitura Ativo</h4>
+                  <p className="text-[9px] font-bold text-slate-400 uppercase">Você não possui permissão para gerenciar tabelas de trato.</p>
+                </div>
+              )}
+
+              <div className="bg-white rounded-[2.5rem] shadow-sm border border-slate-200 overflow-hidden">
+                <div className="p-6 border-b border-slate-100 flex items-center justify-between">
+                  <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest italic flex items-center gap-2">
+                    <FileText className="w-5 h-5 text-blue-500" />
+                    Tabelas de Trato Cadastradas
+                  </h3>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left">
+                    <thead className="bg-slate-50 text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                      <tr>
+                        <th className="px-6 py-4">Nome da Tabela</th>
+                        <th className="px-6 py-4">Total Semanas</th>
+                        <th className="px-6 py-4">Última Atualização</th>
+                        {hasPermission && <th className="px-6 py-4 text-center">Ações</th>}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {(state.feedingTables || []).map(table => {
+                        const totalWeeks = table.terminacao.length > 0 ? table.terminacao[table.terminacao.length - 1].week : 0;
+                        return (
+                          <tr key={table.id} className="hover:bg-slate-50 transition-colors">
+                            <td className="px-6 py-4 font-black text-slate-800 uppercase">{table.name}</td>
+                            <td className="px-6 py-4 text-xs font-bold text-slate-600">{totalWeeks} semanas</td>
+                            <td className="px-6 py-4 text-xs font-bold text-slate-400">
+                              {table.updatedAt ? format(table.updatedAt, 'dd/MM/yyyy HH:mm') : '---'}
+                            </td>
+                            {hasPermission && (
+                              <td className="px-6 py-4 text-center">
+                                <div className="flex justify-center gap-2">
+                                  <button onClick={() => startEditTable(table)} className="p-2 text-slate-300 hover:text-blue-500 transition-colors">
+                                    <Edit className="w-4 h-4" />
+                                  </button>
+                                  <button onClick={() => removeFeedingTable(table.id)} className="p-2 text-slate-300 hover:text-red-500 transition-colors">
+                                    <Trash2 className="w-4 h-4" />
+                                  </button>
                                 </div>
                               </td>
-                              <td className="px-2 py-2">
-                                <input
-                                  type="number"
-                                  className="w-full px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg font-bold text-xs outline-none"
-                                  value={row.feedingsPerDay || ''}
-                                  onChange={(e) => updateRow(phase.id, idx, 'feedingsPerDay', e.target.value)}
-                                />
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
+                            )}
+                          </tr>
+                        );
+                      })}
+                      {(state.feedingTables || []).length === 0 && (
+                        <tr>
+                          <td colSpan={5} className="px-6 py-10 text-center text-slate-400 font-bold uppercase text-[10px] tracking-widest italic">Nenhuma tabela cadastrada.</td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </React.Fragment>
+          ) : (
+            <div className="space-y-8 animate-in fade-in duration-500">
+              <div className="bg-[#344434] p-8 rounded-[2.5rem] shadow-2xl text-[#e4e4d4] font-sans">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+                  <div>
+                    <h3 className="text-xl font-black flex items-center gap-3 uppercase tracking-tighter italic text-white">
+                      <TrendingDown className="w-6 h-6 text-blue-300" />
+                      Indicação de Trato Diário (Arraçoamento)
+                    </h3>
+                    <p className="text-xs text-[#e4e4d4]/70 mt-1">
+                      Configure a indicação diária de trato por lote. O sistema consolidará o pedido de arraçoamento.
+                    </p>
                   </div>
-                ))}
-
-                <div className="flex justify-end gap-3 pt-4">
-                  {editingTableId && (
+                  <div className="flex gap-2">
                     <button
                       type="button"
-                      onClick={() => {
-                        setEditingTableId(null);
-                        setTableFormData({
-                          name: '',
-                          recriaInicial: createEmptyRows(3, 1),
-                          recriaFinal: createEmptyRows(4, 4),
-                          crescimento: createEmptyRows(5, 8),
-                          terminacao: createEmptyRows(14, 13)
-                        });
-                      }}
-                      className="px-8 py-4 bg-slate-100 text-slate-600 rounded-2xl font-black uppercase tracking-widest text-xs hover:bg-slate-200 transition-all"
+                      onClick={handleAddNewIndicationRow}
+                      className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-black uppercase tracking-wider flex items-center gap-2 shadow-lg shadow-emerald-600/30 transition-all active:scale-95"
                     >
-                      Cancelar
+                      <Plus className="w-4 h-4" /> Adicionar Lote
                     </button>
-                  )}
-                  <button
-                    type="submit"
-                    className="px-12 py-4 bg-blue-600 text-white rounded-2xl font-black uppercase tracking-widest text-xs shadow-xl shadow-blue-500/20 hover:bg-blue-700 transition-all active:scale-95"
-                  >
-                    {editingTableId ? 'Atualizar Tabela' : 'Salvar Tabela'}
-                  </button>
+                    <button
+                      type="button"
+                      onClick={handleResetIndication}
+                      className="px-5 py-2.5 bg-white/10 hover:bg-white/20 text-white rounded-xl text-xs font-black uppercase tracking-wider flex items-center gap-2 border border-white/10 transition-all active:scale-95"
+                    >
+                      <RotateCcw className="w-4 h-4" /> Limpar
+                    </button>
+                  </div>
                 </div>
-              </form>
-            </div>
-          ) : (
-            <div className="bg-slate-100 p-8 rounded-3xl border border-dashed border-slate-300 flex flex-col items-center gap-4 text-center">
-              <Info className="w-10 h-10 text-slate-300" />
-              <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-400">Modo Leitura Ativo</h4>
-              <p className="text-[9px] font-bold text-slate-400 uppercase">Você não possui permissão para gerenciar tabelas de trato.</p>
+
+                {/* Table View */}
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse min-w-[700px]">
+                    <thead>
+                      <tr className="border-b border-white/10 text-[10px] font-black text-[#e4e4d4]/60 uppercase tracking-widest">
+                        <th className="py-3 px-2">Lote</th>
+                        <th className="py-3 px-2">Tabela Referência</th>
+                        <th className="py-3 px-2 text-center">Qtd Povoada</th>
+                        <th className="py-3 px-2 text-center">Peso Médio (Biometria)</th>
+                        <th className="py-3 px-2 text-center w-32">Semana Indicada</th>
+                        <th className="py-3 px-2 text-center w-24">Dias</th>
+                        <th className="py-3 px-2 text-right">Trato 1 Dia</th>
+                        <th className="py-3 px-2 w-12 text-center"></th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-white/5">
+                      {indicationRows.map((row) => {
+                        const calcs = getIndicationRowCalculations(row);
+                        const table = (state.feedingTables || []).find(t => t.id === row.tableId);
+                        const allTableWeeks = table ? [
+                          ...table.recriaInicial,
+                          ...table.recriaFinal,
+                          ...table.crescimento,
+                          ...table.terminacao
+                        ].map(r => r.week) : [];
+
+                        return (
+                          <React.Fragment key={row.id}>
+                            <tr className="hover:bg-white/5 transition-colors group">
+                              <td className="py-4 px-2">
+                                <select
+                                  className="w-full px-2 py-2 bg-black/35 border border-white/10 rounded-xl font-bold text-xs outline-none text-white focus:ring-1 focus:ring-blue-500 cursor-pointer"
+                                  value={row.batchId}
+                                  onChange={(e) => handleIndicationRowBatchChange(row.id, e.target.value)}
+                                >
+                                  <option value="">Selecione...</option>
+                                  {[...(state.batches || [])]
+                                    .filter(b => !b.isClosed)
+                                    .sort((a, b) => (a.name || '').localeCompare(b.name || '', 'pt-BR', { sensitivity: 'base' }))
+                                    .map(b => (
+                                      <option key={b.id} value={b.id}>{b.name}</option>
+                                    ))}
+                                </select>
+                              </td>
+                              <td className="py-4 px-2">
+                                <select
+                                  className="w-full px-2 py-2 bg-black/35 border border-white/10 rounded-xl font-bold text-xs outline-none text-white focus:ring-1 focus:ring-blue-500 cursor-pointer"
+                                  value={row.tableId}
+                                  onChange={(e) => handleIndicationRowTableChange(row.id, e.target.value)}
+                                >
+                                  <option value="">Selecione...</option>
+                                  {(state.feedingTables || []).map(t => (
+                                    <option key={t.id} value={t.id}>{t.name}</option>
+                                  ))}
+                                </select>
+                              </td>
+                              <td className="py-4 px-2 text-center">
+                                <div className="text-xs font-black text-white">
+                                  {row.batchId ? formatNumber(calcs.batchLiveFish, 0) : '---'}
+                                </div>
+                                <div className="text-[9px] text-[#e4e4d4]/50 uppercase font-bold">Povoamento</div>
+                              </td>
+                              <td className="py-4 px-2 text-center">
+                                <div className="text-xs font-black text-white">
+                                  {row.batchId ? `${formatNumber(calcs.batchAvgWeight, 1)}g` : '---'}
+                                </div>
+                                <div className="text-[9px] text-[#e4e4d4]/50 uppercase font-bold">Biometria Recente</div>
+                              </td>
+                              <td className="py-4 px-2 text-center">
+                                {allTableWeeks.length > 0 ? (
+                                  <select
+                                    className="w-full px-2 py-2 bg-black/35 border border-white/10 rounded-xl font-bold text-xs outline-none text-white text-center cursor-pointer"
+                                    value={row.currentWeek}
+                                    onChange={(e) => handleIndicationRowFieldChange(row.id, 'currentWeek', e.target.value)}
+                                  >
+                                    {allTableWeeks.map(wk => (
+                                      <option key={wk} value={wk}>Semana {wk}</option>
+                                    ))}
+                                  </select>
+                                ) : (
+                                  <div className="text-xs font-bold text-slate-400 py-2 text-center bg-black/10 rounded-xl border border-white/5">
+                                    {row.currentWeek || '---'}
+                                  </div>
+                                )}
+                              </td>
+                              <td className="py-4 px-2 text-center">
+                                <span className="px-2.5 py-1 bg-black/35 text-slate-300 text-[10px] font-black uppercase rounded-lg border border-white/10">
+                                  1 Dia
+                                </span>
+                              </td>
+                              <td className="py-4 px-2 text-right">
+                                <div className="font-extrabold text-white text-sm">
+                                  {formatNumber(calcs.totalDailyFeed, 1)} kg
+                                </div>
+                                <div className="text-[9px] text-[#e4e4d4]/50 font-bold uppercase">
+                                  {calcs.feedPercentPV > 0 ? `${formatNumber(calcs.feedPercentPV, 2)}% PV` : '---'}
+                                  {calcs.feedTypeId && (() => {
+                                    const fType = feedMap.get(calcs.feedTypeId);
+                                    return fType ? ` • ${fType.name}` : '';
+                                  })()}
+                                </div>
+                              </td>
+                              <td className="py-4 px-2 text-center">
+                                {indicationRows.length > 1 && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleRemoveIndicationRow(row.id)}
+                                    className="p-1.5 text-[#e4e4d4]/40 hover:text-red-400 rounded-lg hover:bg-red-500/10 transition-colors"
+                                  >
+                                    <X className="w-4 h-4" />
+                                  </button>
+                                )}
+                              </td>
+                            </tr>
+
+                            {/* Nested Cages Stratification */}
+                            {row.batchId && (
+                              <tr>
+                                <td colSpan={8} className="pb-4 px-2 border-none">
+                                  <div className="bg-black/20 border border-white/10 rounded-2xl p-4 font-sans flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-inner">
+                                    <div className="flex items-center gap-3">
+                                      <Box className="w-5 h-5 text-[#e4e4d4]/80" />
+                                      <div>
+                                        <div className="text-xs font-black text-white uppercase tracking-tight">
+                                          Gaiolas Vinculadas ao Lote
+                                        </div>
+                                        <p className="text-[10px] text-[#e4e4d4]/60 font-bold uppercase mt-0.5">
+                                          Quantidade e modelo das estruturas de cultivo associadas a este lote
+                                        </p>
+                                      </div>
+                                    </div>
+                                    <div className="flex gap-4 self-stretch sm:self-auto justify-between sm:justify-start">
+                                      <div className="text-right">
+                                        <span className="text-[9px] text-[#e4e4d4]/50 uppercase font-black block">Estruturas Vinculadas</span>
+                                        <span className="text-xs font-black text-white block mt-0.5">
+                                          {(() => {
+                                            if (calcs.cagesData.length === 0) return 'Nenhuma gaiola vinculada';
+                                            const modelCounts = calcs.cagesData.reduce((acc, cData) => {
+                                              const modelName = cData.cage.model || 'Não especificado';
+                                              acc[modelName] = (acc[modelName] || 0) + 1;
+                                              return acc;
+                                            }, {} as Record<string, number>);
+
+                                            return Object.entries(modelCounts)
+                                              .map(([model, count]) => `modelo ${model} - ${count} ${count === 1 ? 'gaiola' : 'gaiolas'}`)
+                                              .join(', ');
+                                          })()}
+                                        </span>
+                                      </div>
+                                    </div>
+                                  </div>
+                                </td>
+                              </tr>
+                            )}
+                          </React.Fragment>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Aggregated Daily Indication Summary */}
+              {indicationAggregation.items.length > 0 && (
+                <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-200">
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 pb-4 border-b border-slate-100 font-sans">
+                    <div className="flex items-center gap-3">
+                      <div className="p-3 bg-blue-50 text-blue-600 rounded-2xl">
+                        <Package className="w-6 h-6" />
+                      </div>
+                      <div>
+                        <h3 className="text-lg font-black text-slate-800 uppercase tracking-tighter italic">
+                          Resumo da Indicação (Trato Diário Consolidado)
+                        </h3>
+                        <p className="text-xs text-slate-400 font-bold uppercase tracking-tight">
+                          Consolidação das rações indicadas para o trato diário de 1 dia de arraçoamento
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap gap-3">
+                      <button
+                        onClick={handleDownloadIndicationPDF}
+                        className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl font-black uppercase text-xs tracking-wider flex items-center justify-center gap-2 shadow-xl shadow-blue-500/25 transition-all active:scale-95"
+                      >
+                        <FileDown className="w-4 h-4" /> PDF da Indicação
+                      </button>
+                      <button
+                        onClick={handleCopyIndicationText}
+                        className="px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl font-black uppercase text-xs tracking-wider flex items-center justify-center gap-2 shadow-xl shadow-emerald-500/25 transition-all active:scale-95"
+                      >
+                        <Copy className="w-4 h-4" /> Copiar (WhatsApp)
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 font-sans">
+                    <div className="lg:col-span-7 space-y-6">
+                      <div className="overflow-x-auto border border-slate-100 rounded-2xl">
+                        <table className="w-full text-left">
+                          <thead className="bg-slate-50 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100">
+                            <tr>
+                              <th className="px-5 py-3.5">Modelo de Ração</th>
+                              <th className="px-3 py-3.5 text-right font-black">Demanda Diária (Kg)</th>
+                              <th className="px-3 py-3.5 text-right font-black">Estoque Atual (Kg)</th>
+                              <th className="px-3 py-3.5 text-right font-black text-blue-600">Sacos Equiv. (25kg)</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100">
+                            {indicationAggregation.items.map(item => (
+                              <tr key={item.feedId} className="hover:bg-slate-50 transition-colors">
+                                <td className="px-5 py-4 font-black text-slate-800 uppercase">{item.feedName}</td>
+                                <td className="px-3 py-4 text-right font-extrabold text-blue-600">{formatNumber(item.dailyKg, 1)} kg/dia</td>
+                                <td className="px-3 py-4 text-right font-bold text-slate-400">{formatNumber(item.stockKg, 1)} kg</td>
+                                <td className="px-3 py-4 text-right font-black text-slate-700 text-sm">
+                                  {formatNumber(item.bagsNeeded, 1)} sacos
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                          <tfoot>
+                            <tr className="bg-slate-50 font-black text-slate-800 border-t border-slate-100">
+                              <td className="px-5 py-4 uppercase">Total Diário Geral</td>
+                              <td className="px-3 py-4 text-right text-blue-600">{formatNumber(indicationAggregation.grandTotalDailyKg, 1)} kg/dia</td>
+                              <td className="px-3 py-4 text-right text-slate-500"></td>
+                              <td className="px-3 py-4 text-right text-slate-700 text-sm">{formatNumber(indicationAggregation.grandTotalDailyKg / 25, 1)} sacos</td>
+                            </tr>
+                          </tfoot>
+                        </table>
+                      </div>
+
+                      {/* Stock Autonomy warning */}
+                      <div className="bg-slate-50 p-6 rounded-3xl border border-slate-200/60 space-y-4">
+                        <div className="flex items-center gap-2">
+                          <Calendar className="w-5 h-5 text-emerald-600" />
+                          <h4 className="text-[12px] font-black text-slate-700 uppercase tracking-widest">
+                            Autonomia do Estoque Físico Baseada no Trato Diário
+                          </h4>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          {indicationAggregation.items.map(item => {
+                            const daysAutonomy = item.dailyKg > 0 ? (item.stockKg / item.dailyKg) : 0;
+                            let autonomyText = 'Estoque esgotado';
+                            let bgClass = 'bg-red-50/45 border-red-100 text-red-900';
+                            let badgeText = 'Risco Crítico';
+                            let badgeBg = 'bg-red-100 text-red-700';
+
+                            if (daysAutonomy >= 7) {
+                              autonomyText = `${formatNumber(daysAutonomy, 0)} dias de autonomia`;
+                              bgClass = 'bg-emerald-50/45 border-emerald-100 text-emerald-900';
+                              badgeText = 'Seguro';
+                              badgeBg = 'bg-emerald-100 text-emerald-700';
+                            } else if (daysAutonomy > 0) {
+                              autonomyText = `${formatNumber(daysAutonomy, 0)} dias de autonomia`;
+                              bgClass = 'bg-amber-50/45 border-amber-100 text-amber-900';
+                              badgeText = 'Atenção';
+                              badgeBg = 'bg-amber-100 text-amber-700';
+                            }
+
+                            return (
+                              <div key={item.feedId} className={`p-4 rounded-2xl border ${bgClass} shadow-sm flex flex-col justify-between`}>
+                                <div className="flex items-start justify-between gap-2 mb-2">
+                                  <div>
+                                    <span className="text-[11px] font-black uppercase tracking-wider block">
+                                      {item.feedName}
+                                    </span>
+                                    <span className="text-[9px] font-bold uppercase tracking-tight block mt-0.5 opacity-80">
+                                      Gasto diário: {formatNumber(item.dailyKg, 1)} kg/dia
+                                    </span>
+                                  </div>
+                                  <span className={`text-[8.5px] font-black uppercase px-2 py-0.5 rounded-lg ${badgeBg} tracking-wide shrink-0`}>
+                                    {badgeText}
+                                  </span>
+                                </div>
+                                <div className="mt-2 pt-2 border-t border-slate-100/50 flex items-center justify-between gap-2 text-[10px]">
+                                  <span className="font-black uppercase tracking-widest shrink-0 opacity-70">Previsão:</span>
+                                  <span className="font-black uppercase tracking-tight text-right">
+                                    {autonomyText}
+                                  </span>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Copy Box */}
+                    <div className="lg:col-span-5 flex flex-col h-full">
+                      <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Visualização do Texto para Envio</label>
+                      <div className="flex-1 min-h-[220px] bg-slate-50 border border-slate-100 rounded-2xl p-4 font-mono text-[11px] text-slate-700 overflow-y-auto leading-relaxed border-dashed whitespace-pre-wrap">
+                        {(() => {
+                          let text = `📋 *INDICAÇÃO DE TRATO DIÁRIO CONSOLIDADO*\n`;
+                          text += `-------------------------------------------\n\n`;
+                          
+                          indicationRows.forEach((row, index) => {
+                            const batch = (state.batches || []).find(b => b.id === row.batchId);
+                            const calcs = getIndicationRowCalculations(row);
+                            if (!batch) return;
+
+                            text += `🐟 *Lote: ${batch.name.toUpperCase()}*\n`;
+                            text += `   • Semana: S${row.currentWeek}\n`;
+                            text += `   • Total Lote: *${formatNumber(calcs.totalDailyFeed, 1)} kg/dia*\n`;
+                            
+                            if (calcs.cagesData.length > 0) {
+                              calcs.cagesData.forEach(cData => {
+                                text += `     - ${cData.cage.name} [${cData.cage.model}]: ${formatNumber(cData.initialCount, 0)} peix. | PM: ${formatNumber(cData.cageWeight, 1)}g | *${formatNumber(cData.dailyFeed, 2)} kg/dia*\n`;
+                              });
+                            }
+                            text += `\n`;
+                          });
+
+                          text += `-------------------------------------------\n`;
+                          text += `📋 *RESUMO GERAL DO TRATO (DIÁRIO)*\n`;
+                          indicationAggregation.items.forEach(item => {
+                            text += `🔹 *${item.feedName.toUpperCase()}*: *${formatNumber(item.dailyKg, 1)} kg/dia* (${formatNumber(item.bagsNeeded, 1)} sacos/dia)\n`;
+                          });
+                          text += `\nTotal Diário Geral: *${formatNumber(indicationAggregation.grandTotalDailyKg, 1)} kg/dia*\n`;
+                          text += `Gerado em: ${format(new Date(), 'dd/MM/yyyy HH:mm')}`;
+                          return text;
+                        })()}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           )}
-
-          <div className="bg-white rounded-[2.5rem] shadow-sm border border-slate-200 overflow-hidden">
-            <div className="p-6 border-b border-slate-100 flex items-center justify-between">
-              <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest italic flex items-center gap-2">
-                <FileText className="w-5 h-5 text-blue-500" />
-                Tabelas de Trato Cadastradas
-              </h3>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-left">
-                <thead className="bg-slate-50 text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                  <tr>
-                    <th className="px-6 py-4">Nome da Tabela</th>
-                    <th className="px-6 py-4">Total Semanas</th>
-                    <th className="px-6 py-4">Última Atualização</th>
-                    {hasPermission && <th className="px-6 py-4 text-center">Ações</th>}
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {(state.feedingTables || []).map(table => {
-                    const totalWeeks = table.terminacao.length > 0 ? table.terminacao[table.terminacao.length - 1].week : 0;
-                    return (
-                      <tr key={table.id} className="hover:bg-slate-50 transition-colors">
-                        <td className="px-6 py-4 font-black text-slate-800 uppercase">{table.name}</td>
-                        <td className="px-6 py-4 text-xs font-bold text-slate-600">{totalWeeks} semanas</td>
-                        <td className="px-6 py-4 text-xs font-bold text-slate-400">
-                          {table.updatedAt ? format(table.updatedAt, 'dd/MM/yyyy HH:mm') : '---'}
-                        </td>
-                        {hasPermission && (
-                          <td className="px-6 py-4 text-center">
-                            <div className="flex justify-center gap-2">
-                              <button onClick={() => startEditTable(table)} className="p-2 text-slate-300 hover:text-blue-500 transition-colors">
-                                <Edit className="w-4 h-4" />
-                              </button>
-                              <button onClick={() => removeFeedingTable(table.id)} className="p-2 text-slate-300 hover:text-red-500 transition-colors">
-                                <Trash2 className="w-4 h-4" />
-                              </button>
-                            </div>
-                          </td>
-                        )}
-                      </tr>
-                    );
-                  })}
-                  {(state.feedingTables || []).length === 0 && (
-                    <tr>
-                      <td colSpan={5} className="px-6 py-10 text-center text-slate-400 font-bold uppercase text-[10px] tracking-widest italic">Nenhuma tabela cadastrada.</td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
         </div>
       ) : null}
 
