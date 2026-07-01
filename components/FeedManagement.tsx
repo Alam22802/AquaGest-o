@@ -37,6 +37,7 @@ interface IndicationRow {
   batchId: string;
   currentWeek: string;
   manuallyOverridden?: boolean;
+  dailyFeedingsCount?: number;
 }
 
 const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
@@ -122,7 +123,12 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed.map(r => ({
+            ...r,
+            dailyFeedingsCount: r.dailyFeedingsCount || 3
+          }));
+        }
       } catch (e) {}
     }
     return [
@@ -130,7 +136,8 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
         id: generateId(),
         tableId: '',
         batchId: '',
-        currentWeek: '1'
+        currentWeek: '1',
+        dailyFeedingsCount: 3
       }
     ];
   });
@@ -778,7 +785,8 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
         id: generateId(),
         tableId: tId,
         batchId: '',
-        currentWeek: '1'
+        currentWeek: '1',
+        dailyFeedingsCount: 3
       }
     ];
     setIndicationRows(newRows);
@@ -800,7 +808,8 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
         id: generateId(),
         tableId: tId,
         batchId: '',
-        currentWeek: '1'
+        currentWeek: '1',
+        dailyFeedingsCount: 3
       }
     ];
     setIndicationRows(resetRows);
@@ -1129,24 +1138,25 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
         doc.setFont('helvetica', 'bold');
         doc.setFontSize(8.5);
         doc.setTextColor(15, 23, 42);
+        const feedings = row.dailyFeedingsCount || 3;
         doc.text(`LOTE: ${batch.name.toUpperCase()}  |  TABELA: ${table ? table.name.toUpperCase() : 'N/A'} (SEMANA ${row.currentWeek})`, 18, currentY + 5.5);
         
         doc.setFont('helvetica', 'normal');
         doc.setTextColor(71, 85, 105);
-        const rightText = `Consumo Total Lote: ${formatNumber(calcs.totalDailyFeed, 1)} kg/dia (${formatNumber(calcs.feedPercentPV, 2)}% PV)`;
+        const rightText = `Consumo: ${formatNumber(calcs.totalDailyFeed, 1)} kg/dia (${feedings}x de ${formatNumber(calcs.totalDailyFeed / feedings, 2)} kg)  |  ${formatNumber(calcs.feedPercentPV, 2)}% PV`;
         doc.text(rightText, 192, currentY + 5.5, { align: 'right' });
 
         currentY += 10;
 
         // Render cage details table
-        const headers = [['Gaiola', 'Modelo', 'Data Povoamento', 'Qtd Povoada', 'Ultimo Peso Medio', 'Trato Diario (Kg)']];
+        const headers = [['Gaiola', 'Modelo', 'Data Povoamento', 'Qtd Povoada', 'Ultimo Peso Medio', 'Trato Diario / Por Trato']];
         const rows = calcs.cagesData.map(cData => [
           cData.cage.name.toUpperCase(),
           cData.cage.model,
           cData.cage.settlementDate ? format(parseISO(cData.cage.settlementDate), 'dd/MM/yyyy') : 'N/A',
           `${formatNumber(cData.initialCount, 0)} peixes`,
           `${formatNumber(cData.cageWeight, 1)}g`,
-          `${formatNumber(cData.dailyFeed, 2)} kg/dia`
+          `${formatNumber(cData.dailyFeed, 1)} kg/dia\n(${feedings}x de ${formatNumber(cData.dailyFeed / feedings, 2)} kg)`
         ]);
 
         if (rows.length === 0) {
@@ -1156,7 +1166,7 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
             'N/A',
             `${formatNumber(calcs.batchLiveFish, 0)} peixes`,
             `${formatNumber(calcs.batchAvgWeight, 1)}g`,
-            `${formatNumber(calcs.totalDailyFeed, 2)} kg/dia`
+            `${formatNumber(calcs.totalDailyFeed, 1)} kg/dia\n(${feedings}x de ${formatNumber(calcs.totalDailyFeed / feedings, 2)} kg)`
           ]);
         }
 
@@ -1195,12 +1205,10 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       doc.setTextColor(29, 78, 216);
       doc.text('2. CONSOLIDACAO DIARIA DO CONSUMO DE RACOO', 15, currentY);
 
-      const consolidatedHeaders = [['Modelo de Racao', 'Consumo Diario Planejado (Kg)', 'Saldo Atual Estoque (Kg)', 'Sacos Equivalentes (25Kg/Saco)']];
+      const consolidatedHeaders = [['Modelo de Racao', 'Consumo Diario Planejado (Kg)']];
       const consolidatedRows = indicationAggregation.items.map(item => [
         item.feedName.toUpperCase(),
-        `${formatNumber(item.dailyKg, 1)} kg/dia`,
-        `${formatNumber(item.stockKg, 1)} kg`,
-        `${formatNumber(item.bagsNeeded, 1)} sacos`
+        `${formatNumber(item.dailyKg, 1)} kg/dia`
       ]);
 
       autoTable(doc, {
@@ -1212,15 +1220,11 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
         bodyStyles: { fontSize: 8 },
         columnStyles: {
           0: { fontStyle: 'bold' },
-          1: { halign: 'right', fontStyle: 'bold', textColor: [29, 78, 216] },
-          2: { halign: 'right' },
-          3: { halign: 'right' }
+          1: { halign: 'right', fontStyle: 'bold', textColor: [29, 78, 216] }
         },
         foot: [[
           'TOTAL DIARIO GERAL',
-          `${formatNumber(indicationAggregation.grandTotalDailyKg, 1)} kg/dia`,
-          '',
-          `${formatNumber(indicationAggregation.grandTotalDailyKg / 25, 1)} sacos`
+          `${formatNumber(indicationAggregation.grandTotalDailyKg, 1)} kg/dia`
         ]],
         footStyles: { fillColor: [241, 245, 249], textColor: [15, 23, 42], fontStyle: 'bold', fontSize: 8.5 },
         margin: { left: 15, right: 15 }
@@ -1276,13 +1280,14 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       const calcs = getIndicationRowCalculations(row);
       if (!batch) return;
 
+      const feedings = row.dailyFeedingsCount || 3;
       text += `🐟 *Lote: ${batch.name.toUpperCase()}*\n`;
       text += `   • Semana: S${row.currentWeek}\n`;
-      text += `   • Total Lote: *${formatNumber(calcs.totalDailyFeed, 1)} kg/dia*\n`;
+      text += `   • Total Lote: *${formatNumber(calcs.totalDailyFeed, 1)} kg/dia* (${feedings}x de ${formatNumber(calcs.totalDailyFeed / feedings, 2)} kg)\n`;
       
       if (calcs.cagesData.length > 0) {
         calcs.cagesData.forEach(cData => {
-          text += `     - ${cData.cage.name} [${cData.cage.model}]: ${formatNumber(cData.initialCount, 0)} peix. | PM: ${formatNumber(cData.cageWeight, 1)}g | *${formatNumber(cData.dailyFeed, 2)} kg/dia*\n`;
+          text += `     - ${cData.cage.name} [${cData.cage.model}]: ${formatNumber(cData.initialCount, 0)} peix. | PM: ${formatNumber(cData.cageWeight, 1)}g | *${formatNumber(cData.dailyFeed, 1)} kg/dia* (${feedings}x de ${formatNumber(cData.dailyFeed / feedings, 2)} kg)\n`;
         });
       }
       text += `\n`;
@@ -1291,7 +1296,7 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     text += `-------------------------------------------\n`;
     text += `📋 *RESUMO GERAL DO TRATO (DIÁRIO)*\n`;
     indicationAggregation.items.forEach(item => {
-      text += `🔹 *${item.feedName.toUpperCase()}*: *${formatNumber(item.dailyKg, 1)} kg/dia* (${formatNumber(item.bagsNeeded, 1)} sacos/dia)\n`;
+      text += `🔹 *${item.feedName.toUpperCase()}*: *${formatNumber(item.dailyKg, 1)} kg/dia*\n`;
     });
     text += `\nTotal Diário Geral: *${formatNumber(indicationAggregation.grandTotalDailyKg, 1)} kg/dia*\n`;
     text += `Gerado em: ${format(new Date(), 'dd/MM/yyyy HH:mm')}`;
@@ -2397,8 +2402,8 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                         <th className="py-3 px-2 text-center">Qtd Povoada</th>
                         <th className="py-3 px-2 text-center">Peso Médio (Biometria)</th>
                         <th className="py-3 px-2 text-center w-32">Semana Indicada</th>
-                        <th className="py-3 px-2 text-center w-24">Dias</th>
-                        <th className="py-3 px-2 text-right">Trato 1 Dia</th>
+                        <th className="py-3 px-2 text-center w-32">Tratos/Dia</th>
+                        <th className="py-3 px-2 text-right">Trato Diário Total</th>
                         <th className="py-3 px-2 w-12 text-center"></th>
                       </tr>
                     </thead>
@@ -2473,15 +2478,24 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                                 )}
                               </td>
                               <td className="py-4 px-2 text-center">
-                                <span className="px-2.5 py-1 bg-black/35 text-slate-300 text-[10px] font-black uppercase rounded-lg border border-white/10">
-                                  1 Dia
-                                </span>
+                                <select
+                                  className="w-full px-2 py-2 bg-[#1e2d1e] border border-white/15 rounded-xl font-bold text-xs outline-none text-white text-center cursor-pointer focus:ring-1 focus:ring-blue-500"
+                                  value={row.dailyFeedingsCount || 3}
+                                  onChange={(e) => handleIndicationRowFieldChange(row.id, 'dailyFeedingsCount', Number(e.target.value))}
+                                >
+                                  {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(n => (
+                                    <option key={n} value={n} className="bg-slate-800 text-white">{n}x ao dia</option>
+                                  ))}
+                                </select>
                               </td>
                               <td className="py-4 px-2 text-right">
                                 <div className="font-extrabold text-white text-sm">
-                                  {formatNumber(calcs.totalDailyFeed, 1)} kg
+                                  {formatNumber(calcs.totalDailyFeed, 1)} kg/dia
                                 </div>
-                                <div className="text-[9px] text-[#e4e4d4]/50 font-bold uppercase">
+                                <div className="text-emerald-400 font-extrabold text-xs mt-0.5">
+                                  {formatNumber(calcs.totalDailyFeed / (row.dailyFeedingsCount || 3), 2)} kg/trato
+                                </div>
+                                <div className="text-[9px] text-[#e4e4d4]/50 font-bold uppercase mt-1">
                                   {calcs.feedPercentPV > 0 ? `${formatNumber(calcs.feedPercentPV, 2)}% PV` : '---'}
                                   {calcs.feedTypeId && (() => {
                                     const fType = feedMap.get(calcs.feedTypeId);
@@ -2506,37 +2520,53 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                             {row.batchId && (
                               <tr>
                                 <td colSpan={8} className="pb-4 px-2 border-none">
-                                  <div className="bg-black/20 border border-white/10 rounded-2xl p-4 font-sans flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-inner">
-                                    <div className="flex items-center gap-3">
-                                      <Box className="w-5 h-5 text-[#e4e4d4]/80" />
-                                      <div>
-                                        <div className="text-xs font-black text-white uppercase tracking-tight">
-                                          Gaiolas Vinculadas ao Lote
+                                  <div className="bg-black/25 border border-white/10 rounded-2xl p-4 font-sans space-y-3 shadow-inner">
+                                    <div className="flex items-center justify-between border-b border-white/5 pb-2">
+                                      <div className="flex items-center gap-3">
+                                        <Box className="w-5 h-5 text-emerald-400" />
+                                        <div>
+                                          <div className="text-xs font-black text-white uppercase tracking-tight">
+                                            Detalhamento de Trato por Gaiola Vinculada
+                                          </div>
+                                          <p className="text-[9px] text-[#e4e4d4]/60 font-bold uppercase mt-0.5">
+                                            Quantidade de ração dividida em {row.dailyFeedingsCount || 3} tratos diários
+                                          </p>
                                         </div>
-                                        <p className="text-[10px] text-[#e4e4d4]/60 font-bold uppercase mt-0.5">
-                                          Quantidade e modelo das estruturas de cultivo associadas a este lote
-                                        </p>
                                       </div>
+                                      <span className="text-[9px] bg-emerald-500/15 text-emerald-400 px-2 py-0.5 rounded font-black uppercase tracking-wider">
+                                        {row.dailyFeedingsCount || 3} Tratos Diários
+                                      </span>
                                     </div>
-                                    <div className="flex gap-4 self-stretch sm:self-auto justify-between sm:justify-start">
-                                      <div className="text-right">
-                                        <span className="text-[9px] text-[#e4e4d4]/50 uppercase font-black block">Estruturas Vinculadas</span>
-                                        <span className="text-xs font-black text-white block mt-0.5">
-                                          {(() => {
-                                            if (calcs.cagesData.length === 0) return 'Nenhuma gaiola vinculada';
-                                            const modelCounts = calcs.cagesData.reduce((acc, cData) => {
-                                              const modelName = cData.cage.model || 'Não especificado';
-                                              acc[modelName] = (acc[modelName] || 0) + 1;
-                                              return acc;
-                                            }, {} as Record<string, number>);
-
-                                            return Object.entries(modelCounts)
-                                              .map(([model, count]) => `modelo ${model} - ${count} ${count === 1 ? 'gaiola' : 'gaiolas'}`)
-                                              .join(', ');
-                                          })()}
-                                        </span>
+                                    
+                                    {calcs.cagesData.length === 0 ? (
+                                      <div className="text-xs text-[#e4e4d4]/50 italic uppercase font-bold py-1">Nenhuma gaiola vinculada a este lote.</div>
+                                    ) : (
+                                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                                        {calcs.cagesData.map(cData => {
+                                          const perFeeding = cData.dailyFeed / (row.dailyFeedingsCount || 3);
+                                          return (
+                                            <div key={cData.cage.id} className="bg-black/20 p-3 rounded-xl border border-white/5 flex items-center justify-between gap-4">
+                                              <div>
+                                                <span className="text-[11px] font-black text-white uppercase block">
+                                                  {cData.cage.name} <span className="text-slate-400 font-medium">[{cData.cage.model}]</span>
+                                                </span>
+                                                <span className="text-[9px] text-[#e4e4d4]/50 font-bold uppercase block mt-0.5">
+                                                  {formatNumber(cData.initialCount, 0)} peix. • {formatNumber(cData.cageWeight, 1)}g
+                                                </span>
+                                              </div>
+                                              <div className="text-right">
+                                                <span className="text-[11px] font-black text-blue-400 block">
+                                                  {formatNumber(cData.dailyFeed, 1)} kg/dia
+                                                </span>
+                                                <span className="text-[11px] font-extrabold text-emerald-400 block mt-0.5">
+                                                  {formatNumber(perFeeding, 2)} kg/trato
+                                                </span>
+                                              </div>
+                                            </div>
+                                          );
+                                        })}
                                       </div>
-                                    </div>
+                                    )}
                                   </div>
                                 </td>
                               </tr>
@@ -2590,8 +2620,6 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                             <tr>
                               <th className="px-5 py-3.5">Modelo de Ração</th>
                               <th className="px-3 py-3.5 text-right font-black">Demanda Diária (Kg)</th>
-                              <th className="px-3 py-3.5 text-right font-black">Estoque Atual (Kg)</th>
-                              <th className="px-3 py-3.5 text-right font-black text-blue-600">Sacos Equiv. (25kg)</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-slate-100">
@@ -2599,10 +2627,6 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                               <tr key={item.feedId} className="hover:bg-slate-50 transition-colors">
                                 <td className="px-5 py-4 font-black text-slate-800 uppercase">{item.feedName}</td>
                                 <td className="px-3 py-4 text-right font-extrabold text-blue-600">{formatNumber(item.dailyKg, 1)} kg/dia</td>
-                                <td className="px-3 py-4 text-right font-bold text-slate-400">{formatNumber(item.stockKg, 1)} kg</td>
-                                <td className="px-3 py-4 text-right font-black text-slate-700 text-sm">
-                                  {formatNumber(item.bagsNeeded, 1)} sacos
-                                </td>
                               </tr>
                             ))}
                           </tbody>
@@ -2610,66 +2634,9 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                             <tr className="bg-slate-50 font-black text-slate-800 border-t border-slate-100">
                               <td className="px-5 py-4 uppercase">Total Diário Geral</td>
                               <td className="px-3 py-4 text-right text-blue-600">{formatNumber(indicationAggregation.grandTotalDailyKg, 1)} kg/dia</td>
-                              <td className="px-3 py-4 text-right text-slate-500"></td>
-                              <td className="px-3 py-4 text-right text-slate-700 text-sm">{formatNumber(indicationAggregation.grandTotalDailyKg / 25, 1)} sacos</td>
                             </tr>
                           </tfoot>
                         </table>
-                      </div>
-
-                      {/* Stock Autonomy warning */}
-                      <div className="bg-slate-50 p-6 rounded-3xl border border-slate-200/60 space-y-4">
-                        <div className="flex items-center gap-2">
-                          <Calendar className="w-5 h-5 text-emerald-600" />
-                          <h4 className="text-[12px] font-black text-slate-700 uppercase tracking-widest">
-                            Autonomia do Estoque Físico Baseada no Trato Diário
-                          </h4>
-                        </div>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                          {indicationAggregation.items.map(item => {
-                            const daysAutonomy = item.dailyKg > 0 ? (item.stockKg / item.dailyKg) : 0;
-                            let autonomyText = 'Estoque esgotado';
-                            let bgClass = 'bg-red-50/45 border-red-100 text-red-900';
-                            let badgeText = 'Risco Crítico';
-                            let badgeBg = 'bg-red-100 text-red-700';
-
-                            if (daysAutonomy >= 7) {
-                              autonomyText = `${formatNumber(daysAutonomy, 0)} dias de autonomia`;
-                              bgClass = 'bg-emerald-50/45 border-emerald-100 text-emerald-900';
-                              badgeText = 'Seguro';
-                              badgeBg = 'bg-emerald-100 text-emerald-700';
-                            } else if (daysAutonomy > 0) {
-                              autonomyText = `${formatNumber(daysAutonomy, 0)} dias de autonomia`;
-                              bgClass = 'bg-amber-50/45 border-amber-100 text-amber-900';
-                              badgeText = 'Atenção';
-                              badgeBg = 'bg-amber-100 text-amber-700';
-                            }
-
-                            return (
-                              <div key={item.feedId} className={`p-4 rounded-2xl border ${bgClass} shadow-sm flex flex-col justify-between`}>
-                                <div className="flex items-start justify-between gap-2 mb-2">
-                                  <div>
-                                    <span className="text-[11px] font-black uppercase tracking-wider block">
-                                      {item.feedName}
-                                    </span>
-                                    <span className="text-[9px] font-bold uppercase tracking-tight block mt-0.5 opacity-80">
-                                      Gasto diário: {formatNumber(item.dailyKg, 1)} kg/dia
-                                    </span>
-                                  </div>
-                                  <span className={`text-[8.5px] font-black uppercase px-2 py-0.5 rounded-lg ${badgeBg} tracking-wide shrink-0`}>
-                                    {badgeText}
-                                  </span>
-                                </div>
-                                <div className="mt-2 pt-2 border-t border-slate-100/50 flex items-center justify-between gap-2 text-[10px]">
-                                  <span className="font-black uppercase tracking-widest shrink-0 opacity-70">Previsão:</span>
-                                  <span className="font-black uppercase tracking-tight text-right">
-                                    {autonomyText}
-                                  </span>
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
                       </div>
                     </div>
 
@@ -2686,13 +2653,14 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                             const calcs = getIndicationRowCalculations(row);
                             if (!batch) return;
 
+                            const feedings = row.dailyFeedingsCount || 3;
                             text += `🐟 *Lote: ${batch.name.toUpperCase()}*\n`;
                             text += `   • Semana: S${row.currentWeek}\n`;
-                            text += `   • Total Lote: *${formatNumber(calcs.totalDailyFeed, 1)} kg/dia*\n`;
+                            text += `   • Total Lote: *${formatNumber(calcs.totalDailyFeed, 1)} kg/dia* (${feedings}x de ${formatNumber(calcs.totalDailyFeed / feedings, 2)} kg)\n`;
                             
                             if (calcs.cagesData.length > 0) {
                               calcs.cagesData.forEach(cData => {
-                                text += `     - ${cData.cage.name} [${cData.cage.model}]: ${formatNumber(cData.initialCount, 0)} peix. | PM: ${formatNumber(cData.cageWeight, 1)}g | *${formatNumber(cData.dailyFeed, 2)} kg/dia*\n`;
+                                text += `     - ${cData.cage.name} [${cData.cage.model}]: ${formatNumber(cData.initialCount, 0)} peix. | PM: ${formatNumber(cData.cageWeight, 1)}g | *${formatNumber(cData.dailyFeed, 1)} kg/dia* (${feedings}x de ${formatNumber(cData.dailyFeed / feedings, 2)} kg)\n`;
                               });
                             }
                             text += `\n`;
@@ -2701,7 +2669,7 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                           text += `-------------------------------------------\n`;
                           text += `📋 *RESUMO GERAL DO TRATO (DIÁRIO)*\n`;
                           indicationAggregation.items.forEach(item => {
-                            text += `🔹 *${item.feedName.toUpperCase()}*: *${formatNumber(item.dailyKg, 1)} kg/dia* (${formatNumber(item.bagsNeeded, 1)} sacos/dia)\n`;
+                            text += `🔹 *${item.feedName.toUpperCase()}*: *${formatNumber(item.dailyKg, 1)} kg/dia*\n`;
                           });
                           text += `\nTotal Diário Geral: *${formatNumber(indicationAggregation.grandTotalDailyKg, 1)} kg/dia*\n`;
                           text += `Gerado em: ${format(new Date(), 'dd/MM/yyyy HH:mm')}`;
