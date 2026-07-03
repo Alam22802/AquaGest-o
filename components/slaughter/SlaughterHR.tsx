@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { AppState, SlaughterEmployee, SlaughterHRIndicator, SlaughterHREntry, SlaughterHRVacancy, User } from '../../types';
-import { Users, UserPlus, Trash2, Edit3, X, Calendar, Search, TrendingUp, Heart, AlertCircle, Briefcase, BarChart as BarChartIcon, CheckSquare, Square, Plus, Layout } from 'lucide-react';
+import { Users, UserPlus, UserMinus, Trash2, Edit3, X, Calendar, Search, TrendingUp, Heart, AlertCircle, Briefcase, BarChart as BarChartIcon, CheckSquare, Square, Plus, Layout } from 'lucide-react';
 import { format, parseISO, differenceInDays, addDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
@@ -291,6 +291,36 @@ const SlaughterHR: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       };
     });
 
+    const turnoverData = last6Months.map(m => {
+      const mStart = new Date(m.year, m.month - 1, 1);
+      const mEnd = new Date(m.year, m.month, 0);
+
+      const mEntries = entries.filter(e => {
+        const d = parseISO(e.date);
+        const mVal = d.getMonth() + 1;
+        const yVal = d.getFullYear();
+        const matchesDate = (mVal === m.month && yVal === m.year);
+        const matchesEmployee = filterEmployeeId === 'all' || e.employeeIds.includes(filterEmployeeId);
+        return matchesDate && matchesEmployee && e.type.toLowerCase().includes('turnover');
+      });
+
+      const mTurnoverCount = mEntries.reduce((acc, e) => acc + (filterEmployeeId === 'all' ? e.employeeIds.length : 1), 0);
+
+      const mActiveCount = filterEmployeeId === 'all' 
+        ? employees.filter(e => {
+            const admission = parseISO(e.admissionDate);
+            const monthEnd = new Date(m.year, m.month, 0);
+            return admission <= monthEnd && e.status === 'Ativo';
+          }).length
+        : 1;
+
+      const mRate = mActiveCount > 0 ? (mTurnoverCount / mActiveCount) * 100 : 0;
+      return {
+        name: `${format(new Date(2000, m.month - 1), 'MMM', { locale: ptBR })}/${m.year}`,
+        value: mRate
+      };
+    });
+
     // Headcount data (active employees per sector vs vacancies)
     const headcountData = departments.map(dept => {
       const occupied = activeEmployees.filter(e => e.department === dept).length;
@@ -324,6 +354,7 @@ const SlaughterHR: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       }, 
       filteredEntries, 
       absenteeismData, 
+      turnoverData,
       headcountData,
       birthdays
     };
@@ -1558,6 +1589,33 @@ const SlaughterHR: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                       formatter={(value: number) => [formatNumber(value, 1) + '%', "Absenteísmo"]}
                     />
                     <Bar dataKey="value" name="Absenteísmo" fill="#344434" radius={[6, 6, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+
+            <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-200">
+              <div className="flex items-center gap-3 mb-8">
+                <div className="p-3 bg-[#e4e4d4] text-[#344434] rounded-2xl shadow-sm">
+                  <UserMinus className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-black text-slate-800 uppercase tracking-tighter italic leading-none">Turnover (%)</h3>
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">Histórico dos últimos 6 meses</p>
+                </div>
+              </div>
+              <div className="h-[250px] w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={stats.turnoverData}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                    <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 9, fontWeight: 900, fill: '#64748b'}} />
+                    <YAxis axisLine={false} tickLine={false} tick={{fontSize: 9, fontWeight: 900, fill: '#64748b'}} />
+                    <Tooltip 
+                      cursor={{fill: '#f8fafc'}} 
+                      contentStyle={{borderRadius: '20px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)'}} 
+                      formatter={(value: number) => [formatNumber(value, 1) + '%', "Turnover"]}
+                    />
+                    <Bar dataKey="value" name="Turnover" fill="#b45309" radius={[6, 6, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
