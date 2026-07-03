@@ -377,7 +377,22 @@ const SlaughterHR: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       ? entries.map(ent => ent.id === editingEntryId ? newEntry : ent)
       : [...entries, newEntry];
 
-    onUpdate({ ...state, slaughterHREntries: updatedEntries });
+    // Se o tipo do lançamento for Turnover, altera o status do colaborador para 'Inativo'
+    let updatedEmployees = employees;
+    if (newEntry.type.toLowerCase().includes('turnover')) {
+      updatedEmployees = employees.map(emp => {
+        if (newEntry.employeeIds.includes(emp.id)) {
+          return { ...emp, status: 'Inativo' };
+        }
+        return emp;
+      });
+    }
+
+    onUpdate({ 
+      ...state, 
+      slaughterHREntries: updatedEntries,
+      slaughterEmployees: updatedEmployees
+    });
     setEditingEntryId(null);
     setEntryForm({
       employeeIds: [],
