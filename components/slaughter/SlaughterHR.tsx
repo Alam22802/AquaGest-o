@@ -1615,7 +1615,7 @@ const SlaughterHR: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                       contentStyle={{borderRadius: '20px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)'}} 
                       formatter={(value: number) => [formatNumber(value, 1) + '%', "Turnover"]}
                     />
-                    <Bar dataKey="value" name="Turnover" fill="#b45309" radius={[6, 6, 0, 0]} />
+                    <Bar dataKey="value" name="Turnover" fill="#344434" radius={[6, 6, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
