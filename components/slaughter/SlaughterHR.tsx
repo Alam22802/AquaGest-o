@@ -111,7 +111,49 @@ const SlaughterHR: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
   const [peopleStatusFilter, setPeopleStatusFilter] = useState<'all' | 'Ativo' | 'Inativo'>('all');
   const [peopleSearch, setPeopleSearch] = useState('');
 
-  const employees = useMemo(() => state.slaughterEmployees || [], [state.slaughterEmployees]);
+  useEffect(() => {
+    const rawEmployees = state.slaughterEmployees || [];
+    const rawEntries = state.slaughterHREntries || [];
+    
+    const turnoverEmployeeIds = new Set(
+      rawEntries
+        .filter(entry => entry.type.toLowerCase().includes('turnover'))
+        .flatMap(entry => entry.employeeIds)
+    );
+    
+    const needsUpdate = rawEmployees.some(emp => turnoverEmployeeIds.has(emp.id) && emp.status !== 'Inativo');
+    
+    if (needsUpdate) {
+      const updatedEmployees = rawEmployees.map(emp => {
+        if (turnoverEmployeeIds.has(emp.id) && emp.status !== 'Inativo') {
+          return { ...emp, status: 'Inativo' as const, updatedAt: Date.now() };
+        }
+        return emp;
+      });
+      onUpdate({
+        ...state,
+        slaughterEmployees: updatedEmployees
+      });
+    }
+  }, [state.slaughterEmployees, state.slaughterHREntries, onUpdate, state]);
+
+  const employees = useMemo(() => {
+    const rawEmployees = state.slaughterEmployees || [];
+    const rawEntries = state.slaughterHREntries || [];
+    
+    const turnoverEmployeeIds = new Set(
+      rawEntries
+        .filter(entry => entry.type.toLowerCase().includes('turnover'))
+        .flatMap(entry => entry.employeeIds)
+    );
+    
+    return rawEmployees.map(emp => {
+      if (turnoverEmployeeIds.has(emp.id) && emp.status !== 'Inativo') {
+        return { ...emp, status: 'Inativo' as const };
+      }
+      return emp;
+    });
+  }, [state.slaughterEmployees, state.slaughterHREntries]);
 
   const filteredEmployees = useMemo(() => {
     return employees.filter(emp => {
@@ -378,11 +420,23 @@ const SlaughterHR: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       : [...entries, newEntry];
 
     // Se o tipo do lançamento for Turnover, altera o status do colaborador para 'Inativo'
+    // Se o tipo do lançamento foi alterado DE Turnover para outra coisa, ou se salvamos um novo, sincronizamos o status
+    const oldEntry = editingEntryId ? entries.find(e => e.id === editingEntryId) : null;
     let updatedEmployees = employees;
     if (newEntry.type.toLowerCase().includes('turnover')) {
       updatedEmployees = employees.map(emp => {
         if (newEntry.employeeIds.includes(emp.id)) {
-          return { ...emp, status: 'Inativo' };
+          return { ...emp, status: 'Inativo' as const, updatedAt: Date.now() };
+        }
+        return emp;
+      });
+    } else if (oldEntry && oldEntry.type.toLowerCase().includes('turnover')) {
+      updatedEmployees = employees.map(emp => {
+        if (oldEntry.employeeIds.includes(emp.id)) {
+          const otherTurnovers = updatedEntries.filter(e => e.id !== newEntry.id && e.employeeIds.includes(emp.id) && e.type.toLowerCase().includes('turnover'));
+          if (otherTurnovers.length === 0) {
+            return { ...emp, status: 'Ativo' as const, updatedAt: Date.now() };
+          }
         }
         return emp;
       });
@@ -407,9 +461,25 @@ const SlaughterHR: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
 
   const removeEntry = (id: string) => {
     if (!confirm('Deseja excluir este lançamento?')) return;
+    
+    const entryToDelete = entries.find(e => e.id === id);
+    let updatedEmployees = employees;
+    if (entryToDelete && entryToDelete.type.toLowerCase().includes('turnover')) {
+      updatedEmployees = employees.map(emp => {
+        if (entryToDelete.employeeIds.includes(emp.id)) {
+          const otherTurnovers = entries.filter(e => e.id !== id && e.employeeIds.includes(emp.id) && e.type.toLowerCase().includes('turnover'));
+          if (otherTurnovers.length === 0) {
+            return { ...emp, status: 'Ativo' as const, updatedAt: Date.now() };
+          }
+        }
+        return emp;
+      });
+    }
+
     onUpdate({ 
       ...state, 
       slaughterHREntries: (state.slaughterHREntries || []).filter(e => e.id !== id),
+      slaughterEmployees: updatedEmployees,
       deletedIds: Array.from(new Set([...(state.deletedIds || []), id]))
     });
   };
