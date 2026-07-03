@@ -108,8 +108,22 @@ const SlaughterHR: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     }
   }, [entryForm.date, entryForm.endDate, entryForm.type]);
   const [employeeSearch, setEmployeeSearch] = useState('');
+  const [peopleStatusFilter, setPeopleStatusFilter] = useState<'all' | 'Ativo' | 'Inativo'>('all');
+  const [peopleSearch, setPeopleSearch] = useState('');
 
   const employees = useMemo(() => state.slaughterEmployees || [], [state.slaughterEmployees]);
+
+  const filteredEmployees = useMemo(() => {
+    return employees.filter(emp => {
+      const matchesStatus = peopleStatusFilter === 'all' || emp.status === peopleStatusFilter;
+      const matchesSearch = !peopleSearch.trim() || 
+        emp.name.toLowerCase().includes(peopleSearch.toLowerCase()) ||
+        emp.registrationNumber.toLowerCase().includes(peopleSearch.toLowerCase()) ||
+        emp.role.toLowerCase().includes(peopleSearch.toLowerCase()) ||
+        emp.department.toLowerCase().includes(peopleSearch.toLowerCase());
+      return matchesStatus && matchesSearch;
+    });
+  }, [employees, peopleStatusFilter, peopleSearch]);
   const indicators = useMemo(() => state.slaughterHRIndicators || [], [state.slaughterHRIndicators]);
   const entries = useMemo(() => state.slaughterHREntries || [], [state.slaughterHREntries]);
   const vacancies = useMemo(() => state.slaughterHRVacancies || [], [state.slaughterHRVacancies]);
@@ -641,6 +655,32 @@ const SlaughterHR: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
 
           <div className="lg:col-span-2">
             <div className="bg-white border border-slate-200 rounded-[2.5rem] overflow-hidden shadow-sm">
+              {/* Filtro de Status e Busca */}
+              <div className="p-6 border-b border-slate-100 bg-slate-50/50 flex flex-col sm:flex-row items-center gap-4">
+                <div className="relative flex-1 w-full">
+                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                  <input
+                    type="text"
+                    placeholder="Buscar colaborador por nome, cargo, setor ou matrícula..."
+                    className="w-full pl-11 pr-4 py-3 bg-white border border-slate-200 rounded-2xl font-bold outline-none text-xs text-slate-700 shadow-sm focus:border-slate-300 transition-all placeholder:text-slate-400"
+                    value={peopleSearch}
+                    onChange={(e) => setPeopleSearch(e.target.value)}
+                  />
+                </div>
+                <div className="flex items-center gap-2 w-full sm:w-auto shrink-0">
+                  <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 whitespace-nowrap ml-1">Status:</span>
+                  <select
+                    className="w-full sm:w-40 px-4 py-3 bg-white border border-slate-200 rounded-2xl font-bold outline-none text-xs text-slate-700 shadow-sm focus:border-slate-300 transition-all cursor-pointer"
+                    value={peopleStatusFilter}
+                    onChange={(e) => setPeopleStatusFilter(e.target.value as any)}
+                  >
+                    <option value="all">Todos</option>
+                    <option value="Ativo">Ativos</option>
+                    <option value="Inativo">Inativos</option>
+                  </select>
+                </div>
+              </div>
+
               <table className="w-full text-left border-collapse">
                 <thead className="bg-slate-50 text-[10px] font-black text-slate-400 uppercase tracking-widest">
                   <tr>
@@ -653,7 +693,7 @@ const SlaughterHR: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {employees.map(emp => (
+                  {filteredEmployees.map(emp => (
                     <tr key={emp.id} className="hover:bg-slate-50/50 transition-colors">
                       <td className="px-8 py-6">
                         <div className="text-xs font-black text-slate-400 tracking-widest uppercase">{emp.registrationNumber}</div>
@@ -690,10 +730,10 @@ const SlaughterHR: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                       </td>
                     </tr>
                   ))}
-                  {employees.length === 0 && (
+                  {filteredEmployees.length === 0 && (
                     <tr>
-                      <td colSpan={5} className="px-8 py-12 text-center text-slate-400 text-xs font-bold uppercase tracking-widest">
-                        Nenhum colaborador cadastrado.
+                      <td colSpan={6} className="px-8 py-12 text-center text-slate-400 text-xs font-bold uppercase tracking-widest">
+                        {employees.length === 0 ? 'Nenhum colaborador cadastrado.' : 'Nenhum colaborador encontrado para os filtros aplicados.'}
                       </td>
                     </tr>
                   )}
