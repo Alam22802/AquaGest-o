@@ -2145,7 +2145,7 @@ const BatchManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                         <div className="grid grid-cols-2 gap-4 pt-3 border-t border-slate-50">
                           <div className="flex flex-col">
                             <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1">
-                              <ShoppingCart className="w-2.5 h-2.5 text-emerald-500" /> Custo Kg/Produzido
+                              <ShoppingCart className="w-2.5 h-2.5 text-emerald-500" /> CUSTO VAR/KG ESTIMADO
                             </span>
                             <span className="text-lg font-black text-emerald-700 leading-none mt-1">
                               R$ {formatNumber(batch.custoKgProduzido || 0, 2)}
@@ -2153,7 +2153,7 @@ const BatchManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                           </div>
                           <div className="flex flex-col items-end">
                             <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1">
-                              <ShoppingCart className="w-2.5 h-2.5 text-slate-400" /> Custo Total Lote
+                              <ShoppingCart className="w-2.5 h-2.5 text-slate-400" /> CUSTO VAR/ESTIMADO DO LOTE
                             </span>
                             <span className="text-lg font-black text-slate-700 leading-none mt-1">
                               R$ {formatNumber(batch.totalCost || 0, 2)}
