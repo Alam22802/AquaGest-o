@@ -59,20 +59,20 @@ export async function getTilapiaPriceMG(): Promise<MarketPrice> {
     const monday = new Date(mondayMs);
     const friday = new Date(mondayMs + 4 * 24 * 3600 * 1000);
     const pad = (n: number) => String(n).padStart(2, '0');
-    const sourceRange = "CEPEA (18/05 a 22/05)";
+    const sourceRange = "CEPEA (03/07)";
 
     return {
-      price: 10.24,
+      price: 10.14,
       source: sourceRange,
       lastUpdate: now.toISOString(),
-      variation: 0.18,
-      weeklyVariation: 0.58,
+      variation: -0.98,
+      weeklyVariation: -0.98,
       regions: [
-        { name: "Triângulo Mineiro", price: 10.24, variation: 0.18, weeklyVariation: 0.58 },
-        { name: "Grandes Lagos", price: 10.32, variation: 0.22, weeklyVariation: 0.48 },
-        { name: "Norte do Paraná", price: 10.45, variation: -0.05, weeklyVariation: 0.25 },
-        { name: "Morada Nova", price: 10.18, variation: 0.00, weeklyVariation: 0.20 },
-        { name: "Oeste do Paraná", price: 9.85, variation: 0.35, weeklyVariation: 0.70 }
+        { name: "Triângulo Mineiro", price: 10.14, variation: -0.98, weeklyVariation: -0.98 },
+        { name: "Grandes Lagos", price: 9.88, variation: -0.68, weeklyVariation: -0.68 },
+        { name: "Norte do Paraná", price: 10.40, variation: -0.96, weeklyVariation: -0.96 },
+        { name: "Morada Nova", price: 9.51, variation: -0.78, weeklyVariation: -0.78 },
+        { name: "Oeste do Paraná", price: 8.73, variation: 0.72, weeklyVariation: 0.72 }
       ]
     };
   }
