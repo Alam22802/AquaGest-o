@@ -85,6 +85,19 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
   const [selectedLogIds, setSelectedLogIds] = useState<Set<string>>(new Set());
   const itemsPerPage = 20;
 
+  const [editingLogId, setEditingLogId] = useState<string | null>(null);
+  const [logFormData, setLogFormData] = useState({
+    type: 'Entrada' as 'Entrada' | 'Ajuste',
+    feedTypeId: '',
+    amount: '',
+    date: '',
+    time: '',
+    invoiceNumber: '',
+    supplierCnpj: '',
+    supplierName: '',
+    unitPrice: '',
+  });
+
   const hasPermission = currentUser.isMaster || currentUser.canEdit;
 
   const [entryData, setEntryData] = useState({ 
@@ -392,6 +405,67 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       supplierName: '',
       unitPrice: ''
     });
+  };
+
+  const startEditLog = (log: FeedStockLog) => {
+    if (!currentUser.isMaster) return;
+    setEditingLogId(log.id);
+    const datePart = log.timestamp.split('T')[0];
+    const timePart = log.timestamp.split('T')[1]?.slice(0, 5) || '12:00';
+    setLogFormData({
+      type: log.type,
+      feedTypeId: log.feedTypeId,
+      amount: (log.amount / 1000).toString(),
+      date: datePart,
+      time: timePart,
+      invoiceNumber: log.invoiceNumber || '',
+      supplierCnpj: log.supplierCnpj || '',
+      supplierName: log.supplierName || '',
+      unitPrice: log.unitPrice ? log.unitPrice.toString() : '',
+    });
+  };
+
+  const handleSaveEditedLog = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!currentUser.isMaster || !editingLogId) return;
+
+    const oldLog = (state.feedStockLogs || []).find(l => l.id === editingLogId);
+    if (!oldLog) return;
+
+    const newAmountGrams = Number(logFormData.amount) * 1000;
+    
+    // Update feedTypes stock
+    const updatedFeeds = (state.feedTypes || []).map(f => {
+      let stock = f.totalStock;
+      if (f.id === oldLog.feedTypeId) {
+        stock -= oldLog.amount;
+      }
+      if (f.id === logFormData.feedTypeId) {
+        stock += newAmountGrams;
+      }
+      return { ...f, totalStock: Math.max(0, stock), updatedAt: Date.now() };
+    });
+
+    const updatedLog: FeedStockLog = {
+      ...oldLog,
+      feedTypeId: logFormData.feedTypeId,
+      amount: newAmountGrams,
+      type: logFormData.type,
+      timestamp: `${logFormData.date}T${logFormData.time}:00`,
+      invoiceNumber: logFormData.type === 'Entrada' && logFormData.invoiceNumber ? logFormData.invoiceNumber : undefined,
+      supplierCnpj: logFormData.type === 'Entrada' && logFormData.supplierCnpj ? logFormData.supplierCnpj : undefined,
+      supplierName: logFormData.type === 'Entrada' && logFormData.supplierName ? logFormData.supplierName : undefined,
+      unitPrice: logFormData.type === 'Entrada' && logFormData.unitPrice ? Number(logFormData.unitPrice) : undefined,
+      updatedAt: Date.now()
+    };
+
+    onUpdate({
+      ...state,
+      feedTypes: updatedFeeds,
+      feedStockLogs: (state.feedStockLogs || []).map(l => l.id === editingLogId ? updatedLog : l)
+    });
+
+    setEditingLogId(null);
   };
 
   const feedStats = useMemo(() => {
@@ -1668,6 +1742,162 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
 
   return (
     <div className="space-y-8">
+      {editingLogId && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="bg-white w-full max-w-lg rounded-[2.5rem] shadow-2xl overflow-hidden border border-slate-200">
+            <div className="p-8">
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-lg font-black text-slate-800 flex items-center gap-3 uppercase tracking-tighter italic">
+                  <Edit className="w-6 h-6 text-amber-500" /> Editar Lançamento
+                </h3>
+                <button onClick={() => setEditingLogId(null)} className="p-2 bg-slate-50 rounded-full text-slate-400 hover:text-red-500 transition-all">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <form onSubmit={handleSaveEditedLog} className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-[10px] font-black text-slate-400 uppercase mb-1.5 ml-1 tracking-widest">Tipo de Lançamento</label>
+                    <select 
+                      className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none focus:ring-2 focus:ring-amber-500/20"
+                      value={logFormData.type}
+                      onChange={(e) => setLogFormData({ ...logFormData, type: e.target.value as 'Entrada' | 'Ajuste' })}
+                    >
+                      <option value="Entrada">Entrada</option>
+                      <option value="Ajuste">Ajuste</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-black text-slate-400 uppercase mb-1.5 ml-1 tracking-widest">Modelo de Ração</label>
+                    <select 
+                      required
+                      className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none focus:ring-2 focus:ring-amber-500/20"
+                      value={logFormData.feedTypeId}
+                      onChange={(e) => setLogFormData({ ...logFormData, feedTypeId: e.target.value })}
+                    >
+                      <option value="">Selecione...</option>
+                      {(state.feedTypes || []).map(f => (
+                        <option key={f.id} value={f.id}>{f.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-3 gap-4">
+                  <div className="col-span-1">
+                    <label className="block text-[10px] font-black text-slate-400 uppercase mb-1.5 ml-1 tracking-widest">Qtd (Kg)</label>
+                    <input 
+                      type="number" 
+                      step="any"
+                      required
+                      className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none focus:ring-2 focus:ring-amber-500/20"
+                      value={logFormData.amount}
+                      onChange={(e) => setLogFormData({ ...logFormData, amount: e.target.value })}
+                    />
+                  </div>
+                  <div className="col-span-1">
+                    <label className="block text-[10px] font-black text-slate-400 uppercase mb-1.5 ml-1 tracking-widest">Data</label>
+                    <input 
+                      type="date" 
+                      required
+                      className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none focus:ring-2 focus:ring-amber-500/20"
+                      value={logFormData.date}
+                      onChange={(e) => setLogFormData({ ...logFormData, date: e.target.value })}
+                    />
+                  </div>
+                  <div className="col-span-1">
+                    <label className="block text-[10px] font-black text-slate-400 uppercase mb-1.5 ml-1 tracking-widest">Hora</label>
+                    <input 
+                      type="time" 
+                      required
+                      className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none focus:ring-2 focus:ring-amber-500/20"
+                      value={logFormData.time}
+                      onChange={(e) => setLogFormData({ ...logFormData, time: e.target.value })}
+                    />
+                  </div>
+                </div>
+
+                {logFormData.type === 'Entrada' && (
+                  <React.Fragment>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-[10px] font-black text-slate-400 uppercase mb-1.5 ml-1 tracking-widest flex items-center gap-1">
+                          <FileText className="w-3.5 h-3.5 text-emerald-500" /> Número da Nota
+                        </label>
+                        <input 
+                          type="text" 
+                          className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none focus:ring-2 focus:ring-amber-500/20"
+                          placeholder="Ex: 50422"
+                          value={logFormData.invoiceNumber}
+                          onChange={(e) => setLogFormData({ ...logFormData, invoiceNumber: e.target.value })}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-black text-slate-400 uppercase mb-1.5 ml-1 tracking-widest">Preço Unitário (R$/Kg)</label>
+                        <input 
+                          type="number" 
+                          step="0.01"
+                          className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none focus:ring-2 focus:ring-amber-500/20"
+                          placeholder="Ex: 4.80"
+                          value={logFormData.unitPrice}
+                          onChange={(e) => setLogFormData({ ...logFormData, unitPrice: e.target.value })}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-[10px] font-black text-slate-400 uppercase mb-1.5 ml-1 tracking-widest">Razão Social Fornecedor</label>
+                        <input 
+                          type="text" 
+                          className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none focus:ring-2 focus:ring-amber-500/20"
+                          placeholder="Ex: Nutrição S/A"
+                          value={logFormData.supplierName}
+                          onChange={(e) => setLogFormData({ ...logFormData, supplierName: e.target.value })}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-black text-slate-400 uppercase mb-1.5 ml-1 tracking-widest">CNPJ Fornecedor</label>
+                        <input 
+                          type="text" 
+                          className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none focus:ring-2 focus:ring-amber-500/20"
+                          placeholder="00.000.000/0000-00"
+                          value={logFormData.supplierCnpj}
+                          onChange={(e) => setLogFormData({ ...logFormData, supplierCnpj: e.target.value })}
+                        />
+                      </div>
+                    </div>
+                  </React.Fragment>
+                )}
+
+                {logFormData.type === 'Ajuste' && (
+                  <p className="text-[10px] text-amber-600 font-bold uppercase tracking-tight leading-relaxed italic bg-amber-50 p-3 rounded-2xl border border-amber-100">
+                    Ajustes aceitam valores positivos (para somar ao estoque) ou negativos (para subtrair do estoque, ex: -10).
+                  </p>
+                )}
+
+                <div className="flex gap-4 pt-4">
+                  <button 
+                    type="button"
+                    onClick={() => setEditingLogId(null)}
+                    className="flex-1 py-3.5 bg-slate-100 text-slate-500 rounded-2xl font-black uppercase tracking-widest text-xs hover:bg-slate-200 transition-colors"
+                  >
+                    Cancelar
+                  </button>
+                  <button 
+                    type="submit"
+                    className="flex-1 py-3.5 bg-amber-600 text-white rounded-2xl font-black uppercase tracking-widest text-xs hover:bg-amber-700 shadow-xl shadow-amber-600/20 transition-all active:scale-95"
+                  >
+                    Salvar Alterações
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="flex flex-wrap bg-slate-100 p-1 rounded-2xl w-fit mb-4 gap-1">
         <button
           onClick={() => setActiveSubTab('stock')}
@@ -2052,6 +2282,9 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                 <th className="px-6 py-4">Data/Hora</th>
                 <th className="px-6 py-4">Quantidade</th>
                 <th className="px-6 py-4">Lançado por</th>
+                {currentUser.isMaster && (
+                  <th className="px-6 py-4 text-center w-20">Ações</th>
+                )}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -2118,12 +2351,23 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                     <td className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase">
                       <div className="flex items-center gap-1"><UserIcon className="w-3 h-3 opacity-30" /> @{user?.username || '---'}</div>
                     </td>
+                    {currentUser.isMaster && (
+                      <td className="px-6 py-4 text-center">
+                        <button 
+                          onClick={() => startEditLog(log)}
+                          className="p-2 text-slate-300 hover:text-blue-500 transition-colors"
+                          title="Editar lançamento"
+                        >
+                          <Edit className="w-4 h-4" />
+                        </button>
+                      </td>
+                    )}
                   </tr>
                 );
               })}
               {paginatedLogs.length === 0 && (
                 <tr>
-                  <td colSpan={hasPermission ? 5 : 4} className="px-6 py-10 text-center text-slate-400 font-bold uppercase text-[10px] tracking-widest italic">Nenhum lançamento registrado.</td>
+                  <td colSpan={hasPermission ? (currentUser.isMaster ? 6 : 5) : 4} className="px-6 py-10 text-center text-slate-400 font-bold uppercase text-[10px] tracking-widest italic">Nenhum lançamento registrado.</td>
                 </tr>
               )}
             </tbody>

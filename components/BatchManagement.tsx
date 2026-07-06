@@ -407,7 +407,32 @@ const BatchManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       }
     });
 
+    // Pre-calculate the average price for each feed model (by feedTypeId) from feed stock entries (type === 'Entrada')
+    const feedTypePrices = new Map<string, number>();
+    (state.feedTypes || []).forEach(feedType => {
+      const entries = (state.feedStockLogs || []).filter(
+        log => log.feedTypeId === feedType.id && 
+               log.type === 'Entrada' && 
+               log.unitPrice !== undefined && 
+               log.unitPrice > 0
+      );
+      if (entries.length === 0) {
+        feedTypePrices.set(feedType.id, 0);
+        return;
+      }
+      let totalCost = 0;
+      let totalKg = 0;
+      entries.forEach(log => {
+        const amountKg = log.amount / 1000;
+        totalCost += (log.unitPrice || 0) * amountKg;
+        totalKg += amountKg;
+      });
+      const avgPrice = totalKg > 0 ? (totalCost / totalKg) : (entries.reduce((acc, log) => acc + (log.unitPrice || 0), 0) / entries.length);
+      feedTypePrices.set(feedType.id, avgPrice);
+    });
+
     const feedingByBatch = new Map<string, number>();
+    const feedingCostByBatch = new Map<string, number>();
     (state.feedingLogs || []).forEach((f) => {
       let bId = f.batchId;
       if (!bId && f.cageId) {
@@ -434,6 +459,12 @@ const BatchManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
 
       if (bId) {
         feedingByBatch.set(bId, (feedingByBatch.get(bId) || 0) + f.amount);
+
+        // Calculate and add feed cost for this feeding log based on average model price
+        const pricePerKg = feedTypePrices.get(f.feedTypeId) || 0;
+        const amountKg = f.amount / 1000;
+        const logCost = amountKg * pricePerKg;
+        feedingCostByBatch.set(bId, (feedingCostByBatch.get(bId) || 0) + logCost);
       }
     });
 
@@ -634,6 +665,12 @@ const BatchManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
         }
       }
 
+      // Calculate the batch financial costs
+      const feedCost = feedingCostByBatch.get(batch.id) || 0;
+      const stockingCost = batch.invoiceValue || 0;
+      const totalCost = stockingCost + feedCost;
+      const custoKgProduzido = totalProducedBiomassKg > 0 ? (totalCost / totalProducedBiomassKg) : 0;
+
       return {
         ...batch,
         batchCages,
@@ -653,6 +690,10 @@ const BatchManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
         settlementAlert,
         accuracy,
         isFinalized,
+        feedCost,
+        stockingCost,
+        totalCost,
+        custoKgProduzido,
       };
     }).sort((a, b) => a.name.localeCompare(b.name));
   }, [
@@ -662,6 +703,9 @@ const BatchManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     state.biometryLogs,
     state.protocols,
     state.harvestLogs,
+    state.feedingLogs,
+    state.feedStockLogs,
+    state.feedTypes,
   ]);
 
   const availableMonths = useMemo(() => {
@@ -2094,6 +2138,25 @@ const BatchManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                             </span>
                             <span className="text-lg font-black text-slate-700 leading-none mt-1">
                               {formatNumber(batch.totalProducedCount)} un
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4 pt-3 border-t border-slate-50">
+                          <div className="flex flex-col">
+                            <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1">
+                              <ShoppingCart className="w-2.5 h-2.5 text-emerald-500" /> Custo Kg/Produzido
+                            </span>
+                            <span className="text-lg font-black text-emerald-700 leading-none mt-1">
+                              R$ {formatNumber(batch.custoKgProduzido || 0, 2)}
+                            </span>
+                          </div>
+                          <div className="flex flex-col items-end">
+                            <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1">
+                              <ShoppingCart className="w-2.5 h-2.5 text-slate-400" /> Custo Total Lote
+                            </span>
+                            <span className="text-lg font-black text-slate-700 leading-none mt-1">
+                              R$ {formatNumber(batch.totalCost || 0, 2)}
                             </span>
                           </div>
                         </div>
