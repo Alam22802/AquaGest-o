@@ -24,7 +24,7 @@
   "start_url": "/?v=12",
   "scope": "/",
   "display": "standalone",
-  "orientation": "portrait",
+  "orientation": "any",
   "background_color": "#344434",
   "theme_color": "#344434"
 }
