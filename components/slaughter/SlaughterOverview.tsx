@@ -323,9 +323,15 @@ const SlaughterChart = React.memo(({ data, month, year, onMonthChange, onYearCha
                  ))}
                  <LabelList 
                    dataKey={dataKey} 
-                   position="top" 
+                   position={dataKey === 'yield' ? 'top' : 'insideTop'}
+                   angle={dataKey === 'yield' ? 0 : -90}
+                   offset={dataKey === 'yield' ? 5 : 20}
                    formatter={(val: number) => val > 0 ? `${formatNumber(val, unit === '%' ? 1 : 0)}${unit}` : ''}
-                   style={{ fontSize: 8, fontWeight: 900, fill: '#64748b' }}
+                   style={{ 
+                     fontSize: dataKey === 'yield' ? 9 : 11, 
+                     fontWeight: 800, 
+                     fill: dataKey === 'yield' ? '#1e293b' : '#ffffff' 
+                   }}
                  />
                </Bar>
             </BarChart>
