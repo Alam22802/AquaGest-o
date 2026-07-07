@@ -2,7 +2,7 @@
 import React, { useState, useMemo } from 'react';
 import { AppState, SlaughterLog, User } from '../../types';
 import { formatNumber } from '../../utils/formatters';
-import { Factory, Trash2, Edit3, X, ArrowUpDown, Calendar, Clock, Scale, ClipboardCheck, User as UserIcon, Search, CheckCircle, TrendingUp, ChevronDown, BarChart as BarChartIcon } from 'lucide-react';
+import { Factory, Trash2, Edit3, X, ArrowUpDown, Calendar, Clock, ClipboardCheck, User as UserIcon, Search, CheckCircle, TrendingUp, ChevronDown, BarChart as BarChartIcon } from 'lucide-react';
 import { format, isWithinInterval, parseISO, startOfDay, endOfDay, subDays, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, differenceInDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { 
@@ -232,33 +232,9 @@ const SlaughterChart = React.memo(({ data, month, year, onMonthChange, onYearCha
   color: string,
   unit: string
 }) => {
-  const [autoAdjust, setAutoAdjust] = useState(true);
-  const [windowWidth, setWindowWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1200);
-
-  React.useEffect(() => {
-    const handleResize = () => setWindowWidth(window.innerWidth);
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
-
-  const isMobile = windowWidth < 768;
-  const isSmallMobile = windowWidth < 480;
-
-  // Dynamic font sizing
-  const fontSize = autoAdjust 
-    ? (dataKey === 'yield' 
-        ? (isSmallMobile ? 6.5 : (isMobile ? 8 : 10)) 
-        : (isSmallMobile ? 7.5 : (isMobile ? 9 : 11)))
-    : (dataKey === 'yield' ? 9 : 11);
-
-  // Adjust label offset
-  const labelOffset = dataKey === 'yield' 
-    ? (isSmallMobile ? 3 : 5) 
-    : (isSmallMobile ? 12 : 20);
-
   return (
-    <div className="bg-white p-4 sm:p-8 rounded-[2.5rem] shadow-sm border border-slate-200">
-      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-8">
+    <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-200">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
          <div className="flex items-center gap-3">
             <div className={`p-3 rounded-2xl shadow-sm ${color === '#344434' ? 'bg-slate-50 text-slate-600' : 'bg-blue-50 text-blue-600'}`}>
                <TrendingUp className="w-6 h-6" />
@@ -269,37 +245,22 @@ const SlaughterChart = React.memo(({ data, month, year, onMonthChange, onYearCha
             </div>
          </div>
 
-         <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto">
-            <button
-              onClick={() => setAutoAdjust(!autoAdjust)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-wider transition-all border ${
-                autoAdjust 
-                  ? 'bg-emerald-950 text-emerald-400 border-emerald-900/30' 
-                  : 'bg-slate-50 text-slate-400 border-slate-200 hover:bg-slate-100'
-              }`}
-              title="Ajustar automaticamente o tamanho dos números com base no tamanho da tela"
-            >
-              <Scale className="w-3.5 h-3.5" />
-              <span>Ajustar Números: {autoAdjust ? 'Auto' : 'Fixo'}</span>
-            </button>
-
-            <div className="flex items-center gap-2 bg-slate-50 p-1.5 rounded-xl border border-slate-100">
-              <select 
-                value={month} 
-                onChange={e => onMonthChange(Number(e.target.value))}
-                className="bg-transparent border-none text-[10px] font-black uppercase outline-none focus:ring-0 cursor-pointer text-slate-600 px-2 py-0.5"
-              >
-                {months.map((m, i) => <option key={m} value={i}>{m}</option>)}
-              </select>
-              <div className="w-[1px] h-4 bg-slate-200"></div>
-              <select 
-                value={year} 
-                onChange={e => onYearChange(Number(e.target.value))}
-                className="bg-transparent border-none text-[10px] font-black uppercase outline-none focus:ring-0 cursor-pointer text-slate-600 px-2 py-0.5"
-              >
-                {years.map(y => <option key={y} value={y}>{y}</option>)}
-              </select>
-            </div>
+         <div className="flex items-center gap-2 bg-slate-50 p-2 rounded-2xl border border-slate-100">
+           <select 
+             value={month} 
+             onChange={e => onMonthChange(Number(e.target.value))}
+             className="bg-transparent border-none text-[10px] font-black uppercase outline-none focus:ring-0 cursor-pointer text-slate-600 px-3"
+           >
+             {months.map((m, i) => <option key={m} value={i}>{m}</option>)}
+           </select>
+           <div className="w-[1px] h-4 bg-slate-200"></div>
+           <select 
+             value={year} 
+             onChange={e => onYearChange(Number(e.target.value))}
+             className="bg-transparent border-none text-[10px] font-black uppercase outline-none focus:ring-0 cursor-pointer text-slate-600 px-3"
+           >
+             {years.map(y => <option key={y} value={y}>{y}</option>)}
+           </select>
          </div>
       </div>
 
@@ -317,7 +278,7 @@ const SlaughterChart = React.memo(({ data, month, year, onMonthChange, onYearCha
                      value: 'META: 33%', 
                      position: 'right', 
                      fill: '#ef4444', 
-                     fontSize: isSmallMobile ? 8 : 10, 
+                     fontSize: 10, 
                      fontWeight: 900 
                    }} 
                  />
@@ -364,17 +325,10 @@ const SlaughterChart = React.memo(({ data, month, year, onMonthChange, onYearCha
                    dataKey={dataKey} 
                    position={dataKey === 'yield' ? 'top' : 'insideTop'}
                    angle={dataKey === 'yield' ? 0 : -90}
-                   offset={labelOffset}
-                   formatter={(val: number, entry: any, index: number) => {
-                     if (val <= 0) return '';
-                     if (autoAdjust && isMobile && data.length > 12) {
-                       const skipFactor = isSmallMobile ? 3 : 2;
-                       if (index % skipFactor !== 0) return '';
-                     }
-                     return `${formatNumber(val, unit === '%' ? 1 : 0)}${unit}`;
-                   }}
+                   offset={dataKey === 'yield' ? 5 : 20}
+                   formatter={(val: number) => val > 0 ? `${formatNumber(val, unit === '%' ? 1 : 0)}${unit}` : ''}
                    style={{ 
-                     fontSize: fontSize, 
+                     fontSize: dataKey === 'yield' ? 9 : 11, 
                      fontWeight: 800, 
                      fill: dataKey === 'yield' ? '#1e293b' : '#ffffff' 
                    }}
