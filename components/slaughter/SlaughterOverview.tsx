@@ -6,7 +6,7 @@ import { Factory, Trash2, Edit3, X, ArrowUpDown, Calendar, Clock, Scale, Clipboa
 import { format, isWithinInterval, parseISO, startOfDay, endOfDay, subDays, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, differenceInDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { 
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, LabelList
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, LabelList, ReferenceLine
 } from 'recharts';
 
 interface Props {
@@ -266,8 +266,23 @@ const SlaughterChart = React.memo(({ data, month, year, onMonthChange, onYearCha
 
       <div className="h-[300px] w-full">
          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={data} margin={{ top: 20, right: 10, left: 10, bottom: 5 }}>
+            <BarChart data={data} margin={{ top: 20, right: dataKey === 'yield' ? 60 : 10, left: 10, bottom: 5 }}>
                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+               {dataKey === 'yield' && (
+                 <ReferenceLine 
+                   y={33} 
+                   stroke="#ef4444" 
+                   strokeWidth={2}
+                   strokeDasharray="5 5"
+                   label={{ 
+                     value: 'META: 33%', 
+                     position: 'right', 
+                     fill: '#ef4444', 
+                     fontSize: 10, 
+                     fontWeight: 900 
+                   }} 
+                 />
+               )}
                <XAxis 
                  dataKey="name" 
                  axisLine={false} 
