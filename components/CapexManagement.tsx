@@ -45,6 +45,18 @@ const CapexManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
   const [editingPurchaseOrderId, setEditingPurchaseOrderId] = useState<string | null>(null);
   const [executionType, setExecutionType] = useState<'invoice' | 'po'>('invoice');
 
+  // Filter & Search states for Invoice History
+  const [invoiceSearch, setInvoiceSearch] = useState('');
+  const [invoicePortfolioFilter, setInvoicePortfolioFilter] = useState('');
+  const [invoiceProjectFilter, setInvoiceProjectFilter] = useState('');
+  const [invoiceTypeFilter, setInvoiceTypeFilter] = useState('');
+
+  // Filter & Search states for PO History
+  const [poSearch, setPoSearch] = useState('');
+  const [poPortfolioFilter, setPoPortfolioFilter] = useState('');
+  const [poProjectFilter, setPoProjectFilter] = useState('');
+  const [poStatusFilter, setPoStatusFilter] = useState('');
+
   const hasPermission = currentUser.isMaster || currentUser.canEdit;
 
   const calculateDateProgress = (startDate: string, endDate: string) => {
@@ -282,6 +294,76 @@ const CapexManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
   const previousLinkedInvoicesSumInForm = useMemo(() => {
     return previousLinkedInvoicesInForm.reduce((sum, inv) => sum + inv.value, 0);
   }, [previousLinkedInvoicesInForm]);
+
+  const filteredInvoices = useMemo(() => {
+    let list = state.capexInvoices || [];
+    
+    if (invoiceSearch.trim()) {
+      const searchLower = invoiceSearch.toLowerCase();
+      list = list.filter(inv => 
+        (inv.invoiceNumber && inv.invoiceNumber.toLowerCase().includes(searchLower)) ||
+        (inv.supplier && inv.supplier.toLowerCase().includes(searchLower)) ||
+        (inv.cnpj && inv.cnpj.toLowerCase().includes(searchLower)) ||
+        (inv.description && inv.description.toLowerCase().includes(searchLower))
+      );
+    }
+    
+    if (invoicePortfolioFilter) {
+      list = list.filter(inv => inv.portfolioId === invoicePortfolioFilter);
+    }
+    
+    if (invoiceProjectFilter) {
+      list = list.filter(inv => inv.projectId === invoiceProjectFilter);
+    }
+    
+    if (invoiceTypeFilter) {
+      list = list.filter(inv => inv.type === invoiceTypeFilter);
+    }
+    
+    return list.sort((a, b) => b.timestamp.localeCompare(a.timestamp));
+  }, [state.capexInvoices, invoiceSearch, invoicePortfolioFilter, invoiceProjectFilter, invoiceTypeFilter]);
+
+  const filteredPurchaseOrders = useMemo(() => {
+    let list = state.capexPurchaseOrders || [];
+    
+    if (poSearch.trim()) {
+      const searchLower = poSearch.toLowerCase();
+      list = list.filter(po => 
+        (po.orderNumber && po.orderNumber.toLowerCase().includes(searchLower)) ||
+        (po.supplier && po.supplier.toLowerCase().includes(searchLower)) ||
+        (po.cnpj && po.cnpj.toLowerCase().includes(searchLower)) ||
+        (po.description && po.description.toLowerCase().includes(searchLower))
+      );
+    }
+    
+    if (poPortfolioFilter) {
+      list = list.filter(po => po.portfolioId === poPortfolioFilter);
+    }
+    
+    if (poProjectFilter) {
+      list = list.filter(po => po.projectId === poProjectFilter);
+    }
+    
+    if (poStatusFilter) {
+      list = list.filter(po => {
+        const linkedInvoices = (state.capexInvoices || []).filter(inv => inv.purchaseOrderId === po.id);
+        const totalLinkedValue = linkedInvoices.reduce((sum, inv) => sum + inv.value, 0);
+        const isLinked = linkedInvoices.length > 0;
+        const isFullyInvoiced = totalLinkedValue >= po.value;
+        
+        if (poStatusFilter === 'emitted') {
+          return !isLinked;
+        } else if (poStatusFilter === 'partial') {
+          return isLinked && !isFullyInvoiced;
+        } else if (poStatusFilter === 'total') {
+          return isLinked && isFullyInvoiced;
+        }
+        return true;
+      });
+    }
+    
+    return list.sort((a, b) => b.timestamp.localeCompare(a.timestamp));
+  }, [state.capexPurchaseOrders, state.capexInvoices, poSearch, poPortfolioFilter, poProjectFilter, poStatusFilter]);
 
   // Handlers
   const handleSavePortfolio = (e: React.FormEvent) => {
@@ -2195,7 +2277,94 @@ const CapexManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
 
               {/* Relatório de Lançamentos de Notas */}
               <div className="space-y-4">
-                <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] px-2">Histórico de Lançamentos</h4>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-2">
+                  <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Histórico de Lançamentos</h4>
+                  <span className="text-[10px] font-bold text-slate-500 uppercase">
+                    {filteredInvoices.length} {filteredInvoices.length === 1 ? 'lançamento encontrado' : 'lançamentos encontrados'}
+                  </span>
+                </div>
+
+                {/* Filtros e Busca de Notas */}
+                <div className="bg-slate-50 p-4 rounded-3xl border border-slate-200/80 space-y-3">
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                    {/* Campo de Busca */}
+                    <div className="md:col-span-1 relative">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                      <input
+                        type="text"
+                        placeholder="Buscar por NF, Fornecedor, CNPJ..."
+                        className="w-full pl-9 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl font-bold text-xs outline-none focus:ring-2 focus:ring-amber-500 placeholder:text-slate-400 text-slate-700"
+                        value={invoiceSearch}
+                        onChange={e => setInvoiceSearch(e.target.value)}
+                      />
+                    </div>
+
+                    {/* Filtro por Carteira */}
+                    <div className="md:col-span-1">
+                      <select
+                        className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-xl font-bold text-xs outline-none focus:ring-2 focus:ring-amber-500 text-slate-700"
+                        value={invoicePortfolioFilter}
+                        onChange={e => {
+                          setInvoicePortfolioFilter(e.target.value);
+                          setInvoiceProjectFilter(''); // Reset project filter if portfolio changes
+                        }}
+                      >
+                        <option value="">Todas as Carteiras</option>
+                        {(state.portfolios || []).map(p => (
+                          <option key={p.id} value={p.id}>{p.name}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Filtro por Projeto */}
+                    <div className="md:col-span-1">
+                      <select
+                        className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-xl font-bold text-xs outline-none focus:ring-2 focus:ring-amber-500 text-slate-700 disabled:opacity-60"
+                        value={invoiceProjectFilter}
+                        onChange={e => setInvoiceProjectFilter(e.target.value)}
+                        disabled={!invoicePortfolioFilter}
+                      >
+                        <option value="">Todos os Projetos</option>
+                        {(state.capexProjects || [])
+                          .filter(p => !invoicePortfolioFilter || p.portfolioId === invoicePortfolioFilter)
+                          .map(p => (
+                            <option key={p.id} value={p.id}>{p.name}</option>
+                          ))}
+                      </select>
+                    </div>
+
+                    {/* Filtro por Tipo */}
+                    <div className="md:col-span-1">
+                      <select
+                        className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-xl font-bold text-xs outline-none focus:ring-2 focus:ring-amber-500 text-slate-700"
+                        value={invoiceTypeFilter}
+                        onChange={e => setInvoiceTypeFilter(e.target.value)}
+                      >
+                        <option value="">Todos os Tipos de Lançamento</option>
+                        <option value="Aquisição">Aquisição</option>
+                        <option value="Prestação de Serviço">Prestação de Serviço</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Botão de Limpar Filtros */}
+                  {(invoiceSearch || invoicePortfolioFilter || invoiceProjectFilter || invoiceTypeFilter) && (
+                    <div className="flex justify-end pt-1">
+                      <button
+                        onClick={() => {
+                          setInvoiceSearch('');
+                          setInvoicePortfolioFilter('');
+                          setInvoiceProjectFilter('');
+                          setInvoiceTypeFilter('');
+                        }}
+                        className="flex items-center gap-1.5 px-3 py-1 bg-slate-200/60 hover:bg-slate-200 text-slate-600 rounded-lg text-[10px] font-black uppercase tracking-tight transition-colors"
+                      >
+                        <X className="w-3 h-3" /> Limpar Filtros
+                      </button>
+                    </div>
+                  )}
+                </div>
+
                 <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm overflow-x-auto">
                   <table className="w-full text-left min-w-[1000px]">
                     <thead className="bg-slate-50 text-[10px] font-black text-slate-400 uppercase tracking-widest">
@@ -2211,7 +2380,7 @@ const CapexManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
-                      {(state.capexInvoices || []).sort((a, b) => b.timestamp.localeCompare(a.timestamp)).map(inv => {
+                      {filteredInvoices.map(inv => {
                         const portfolio = state.portfolios?.find(p => p.id === inv.portfolioId);
                         const project = state.capexProjects?.find(p => p.id === inv.projectId);
                         const user = state.users.find(u => u.id === inv.userId);
@@ -2283,9 +2452,13 @@ const CapexManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                           </tr>
                         );
                       })}
-                      {(state.capexInvoices || []).length === 0 && (
+                      {filteredInvoices.length === 0 && (
                         <tr>
-                          <td colSpan={8} className="px-6 py-10 text-center text-slate-400 font-bold uppercase text-[10px] tracking-widest italic">Nenhum lançamento de nota fiscal encontrado.</td>
+                          <td colSpan={8} className="px-6 py-10 text-center text-slate-400 font-bold uppercase text-[10px] tracking-widest italic">
+                            {(state.capexInvoices || []).length > 0 
+                              ? "Nenhum lançamento corresponde aos filtros aplicados." 
+                              : "Nenhum lançamento de nota fiscal encontrado."}
+                          </td>
                         </tr>
                       )}
                     </tbody>
@@ -2374,7 +2547,95 @@ const CapexManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
 
               {/* Relatório de Lançamentos de OCs */}
               <div className="space-y-4">
-                <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] px-2">Histórico de Ordens de Compra</h4>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-2">
+                  <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Histórico de Ordens de Compra</h4>
+                  <span className="text-[10px] font-bold text-slate-500 uppercase">
+                    {filteredPurchaseOrders.length} {filteredPurchaseOrders.length === 1 ? 'ordem encontrada' : 'ordens encontradas'}
+                  </span>
+                </div>
+
+                {/* Filtros e Busca de OCs */}
+                <div className="bg-slate-50 p-4 rounded-3xl border border-slate-200/80 space-y-3">
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                    {/* Campo de Busca */}
+                    <div className="md:col-span-1 relative">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                      <input
+                        type="text"
+                        placeholder="Buscar por OC, Fornecedor, CNPJ..."
+                        className="w-full pl-9 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl font-bold text-xs outline-none focus:ring-2 focus:ring-[#344434] placeholder:text-slate-400 text-slate-700"
+                        value={poSearch}
+                        onChange={e => setPoSearch(e.target.value)}
+                      />
+                    </div>
+
+                    {/* Filtro por Carteira */}
+                    <div className="md:col-span-1">
+                      <select
+                        className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-xl font-bold text-xs outline-none focus:ring-2 focus:ring-[#344434] text-slate-700"
+                        value={poPortfolioFilter}
+                        onChange={e => {
+                          setPoPortfolioFilter(e.target.value);
+                          setPoProjectFilter(''); // Reset project filter if portfolio changes
+                        }}
+                      >
+                        <option value="">Todas as Carteiras</option>
+                        {(state.portfolios || []).map(p => (
+                          <option key={p.id} value={p.id}>{p.name}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Filtro por Projeto */}
+                    <div className="md:col-span-1">
+                      <select
+                        className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-xl font-bold text-xs outline-none focus:ring-2 focus:ring-[#344434] text-slate-700 disabled:opacity-60"
+                        value={poProjectFilter}
+                        onChange={e => setPoProjectFilter(e.target.value)}
+                        disabled={!poPortfolioFilter}
+                      >
+                        <option value="">Todos os Projetos</option>
+                        {(state.capexProjects || [])
+                          .filter(p => !poPortfolioFilter || p.portfolioId === poPortfolioFilter)
+                          .map(p => (
+                            <option key={p.id} value={p.id}>{p.name}</option>
+                          ))}
+                      </select>
+                    </div>
+
+                    {/* Filtro por Status */}
+                    <div className="md:col-span-1">
+                      <select
+                        className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-xl font-bold text-xs outline-none focus:ring-2 focus:ring-[#344434] text-slate-700"
+                        value={poStatusFilter}
+                        onChange={e => setPoStatusFilter(e.target.value)}
+                      >
+                        <option value="">Todos os Status</option>
+                        <option value="emitted">Emitida / Reservada</option>
+                        <option value="partial">Baixada Parcial</option>
+                        <option value="total">Baixada (Total)</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Botão de Limpar Filtros */}
+                  {(poSearch || poPortfolioFilter || poProjectFilter || poStatusFilter) && (
+                    <div className="flex justify-end pt-1">
+                      <button
+                        onClick={() => {
+                          setPoSearch('');
+                          setPoPortfolioFilter('');
+                          setPoProjectFilter('');
+                          setPoStatusFilter('');
+                        }}
+                        className="flex items-center gap-1.5 px-3 py-1 bg-slate-200/60 hover:bg-slate-200 text-slate-600 rounded-lg text-[10px] font-black uppercase tracking-tight transition-colors"
+                      >
+                        <X className="w-3 h-3" /> Limpar Filtros
+                      </button>
+                    </div>
+                  )}
+                </div>
+
                 <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm overflow-x-auto">
                   <table className="w-full text-left min-w-[1000px]">
                     <thead className="bg-slate-50 text-[10px] font-black text-slate-400 uppercase tracking-widest">
@@ -2390,7 +2651,7 @@ const CapexManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
-                      {(state.capexPurchaseOrders || []).sort((a, b) => b.timestamp.localeCompare(a.timestamp)).map(po => {
+                      {filteredPurchaseOrders.map(po => {
                         const portfolio = state.portfolios?.find(p => p.id === po.portfolioId);
                         const project = state.capexProjects?.find(p => p.id === po.projectId);
                         const user = state.users.find(u => u.id === po.userId);
@@ -2483,9 +2744,13 @@ const CapexManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                           </tr>
                         );
                       })}
-                      {(state.capexPurchaseOrders || []).length === 0 && (
+                      {filteredPurchaseOrders.length === 0 && (
                         <tr>
-                          <td colSpan={8} className="px-6 py-10 text-center text-slate-400 font-bold uppercase text-[10px] tracking-widest italic">Nenhum lançamento de ordem de compra encontrado.</td>
+                          <td colSpan={8} className="px-6 py-10 text-center text-slate-400 font-bold uppercase text-[10px] tracking-widest italic">
+                            {(state.capexPurchaseOrders || []).length > 0
+                              ? "Nenhum lançamento corresponde aos filtros aplicados."
+                              : "Nenhum lançamento de ordem de compra encontrado."}
+                          </td>
                         </tr>
                       )}
                     </tbody>
