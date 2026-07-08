@@ -269,6 +269,20 @@ const CapexManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     };
   }, [state.portfolios, state.capexProjects, state.capexInvoices, state.capexPurchaseOrders, selectedPortfolioId, selectedCostCenter]);
 
+  const selectedPoInForm = useMemo(() => {
+    if (!invoiceForm.purchaseOrderId) return null;
+    return (state.capexPurchaseOrders || []).find(p => p.id === invoiceForm.purchaseOrderId) || null;
+  }, [invoiceForm.purchaseOrderId, state.capexPurchaseOrders]);
+
+  const previousLinkedInvoicesInForm = useMemo(() => {
+    if (!selectedPoInForm) return [];
+    return (state.capexInvoices || []).filter(inv => inv.purchaseOrderId === selectedPoInForm.id && inv.id !== editingInvoiceId);
+  }, [selectedPoInForm, state.capexInvoices, editingInvoiceId]);
+
+  const previousLinkedInvoicesSumInForm = useMemo(() => {
+    return previousLinkedInvoicesInForm.reduce((sum, inv) => sum + inv.value, 0);
+  }, [previousLinkedInvoicesInForm]);
+
   // Handlers
   const handleSavePortfolio = (e: React.FormEvent) => {
     e.preventDefault();
@@ -1999,6 +2013,95 @@ const CapexManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                     <p className="text-[9px] font-medium text-slate-400 mt-1.5 uppercase">
                       Ao selecionar uma Ordem de Compra, o sistema preenche os dados automaticamente e transfere / abate o valor da OC correspondente, evitando a duplicação no cálculo total do projeto.
                     </p>
+
+                    {selectedPoInForm && (
+                      <div className="mt-4 pt-4 border-t border-slate-200/60 space-y-3">
+                        <div className="text-xs font-black text-slate-700 uppercase tracking-tight">
+                          Opções de Faturamento / Recebimento da OC
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const linkedSum = previousLinkedInvoicesSumInForm;
+                              const remainingVal = Math.max(0, selectedPoInForm.value - linkedSum);
+                              setInvoiceForm({
+                                ...invoiceForm,
+                                value: remainingVal.toString()
+                              });
+                            }}
+                            className="p-3 bg-white hover:bg-slate-50 border border-slate-200 rounded-xl text-left transition-all active:scale-95 flex flex-col justify-between"
+                          >
+                            <span className="text-[10px] font-black text-slate-800 uppercase">Faturar Saldo Total</span>
+                            <span className="text-[9px] text-slate-500 mt-1 font-medium leading-relaxed normal-case">
+                              Preenche o valor total restante da OC para encerramento do pedido.
+                            </span>
+                            <span className="text-[11px] font-black text-blue-600 mt-2 block">
+                              R$ {formatNumber(Math.max(0, selectedPoInForm.value - previousLinkedInvoicesSumInForm))}
+                            </span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setInvoiceForm({
+                                ...invoiceForm,
+                                value: ''
+                              });
+                            }}
+                            className="p-3 bg-white hover:bg-slate-50 border border-slate-200 rounded-xl text-left transition-all active:scale-95 flex flex-col justify-between"
+                          >
+                            <span className="text-[10px] font-black text-slate-800 uppercase">Digitar Valor Parcial</span>
+                            <span className="text-[9px] text-slate-500 mt-1 font-medium leading-relaxed normal-case">
+                              Zera o campo de valor para que você insira o valor parcial da nota entregue.
+                            </span>
+                            <span className="text-[11px] font-black text-amber-600 mt-2 block">
+                              Definir valor customizado
+                            </span>
+                          </button>
+                        </div>
+
+                        {/* Live calculation preview block */}
+                        <div className="p-4 bg-amber-50/40 rounded-2xl border border-amber-200/40 text-xs space-y-2">
+                          <div className="font-black text-[10px] text-amber-800 uppercase tracking-wider flex items-center gap-1">
+                            <CheckCircle2 className="w-3.5 h-3.5 text-amber-600" />
+                            Demonstrativo de Abate Financeiro (Tempo Real)
+                          </div>
+                          
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5 pt-1">
+                            <div className="bg-white p-2.5 rounded-xl border border-slate-200/50">
+                              <span className="text-[8px] text-slate-400 font-bold uppercase block">Valor Total OC</span>
+                              <span className="text-xs font-black text-slate-700">R$ {formatNumber(selectedPoInForm.value)}</span>
+                            </div>
+                            <div className="bg-white p-2.5 rounded-xl border border-slate-200/50">
+                              <span className="text-[8px] text-slate-400 font-bold uppercase block">Faturado Anterior</span>
+                              <span className="text-xs font-black text-slate-500">R$ {formatNumber(previousLinkedInvoicesSumInForm)}</span>
+                            </div>
+                            <div className="bg-amber-100/40 p-2.5 rounded-xl border border-amber-200/50">
+                              <span className="text-[8px] text-amber-700 font-bold uppercase block">Valor Desta Nota</span>
+                              <span className="text-xs font-black text-amber-700">R$ {formatNumber(Number(invoiceForm.value) || 0)}</span>
+                            </div>
+                            <div className="bg-emerald-50 p-2.5 rounded-xl border border-emerald-100">
+                              <span className="text-[8px] text-emerald-600 font-bold uppercase block">Novo Saldo da OC</span>
+                              <span className="text-xs font-black text-emerald-700">
+                                R$ {formatNumber(Math.max(0, selectedPoInForm.value - previousLinkedInvoicesSumInForm - (Number(invoiceForm.value) || 0)))}
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="text-[9px] text-slate-500 font-medium pt-1.5 border-t border-slate-200/40 uppercase space-y-1">
+                            <div className="flex justify-between">
+                              <span>• Valor da nota parcial transferido para execução:</span>
+                              <strong className="text-slate-700">R$ {formatNumber(Number(invoiceForm.value) || 0)}</strong>
+                            </div>
+                            <div className="flex justify-between">
+                              <span>• Saldo restante que permanece na OC:</span>
+                              <strong className="text-blue-600">R$ {formatNumber(Math.max(0, selectedPoInForm.value - previousLinkedInvoicesSumInForm - (Number(invoiceForm.value) || 0)))}</strong>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   <div className="md:col-span-1">
