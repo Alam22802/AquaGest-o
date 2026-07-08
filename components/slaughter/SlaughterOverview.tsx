@@ -325,8 +325,12 @@ const SlaughterChart = React.memo(({ data, month, year, onMonthChange, onYearCha
                    dataKey={dataKey} 
                    position={dataKey === 'yield' ? 'top' : 'insideTop'}
                    angle={dataKey === 'yield' ? 0 : -90}
-                   offset={dataKey === 'yield' ? 5 : 20}
-                   formatter={(val: number) => val > 0 ? `${formatNumber(val, unit === '%' ? 1 : 0)}${unit}` : ''}
+                   offset={dataKey === 'yield' ? 12 : 20}
+                   formatter={(val: number) => {
+                     if (val <= 0) return '';
+                     if (unit === 'kg') return formatNumber(val, 0);
+                     return `${formatNumber(val, unit === '%' ? 1 : 0)}${unit}`;
+                   }}
                    style={{ 
                      fontSize: dataKey === 'yield' ? 9 : 11, 
                      fontWeight: 800, 
