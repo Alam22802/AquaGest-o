@@ -2786,6 +2786,12 @@ const CapexManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                         const portfolio = state.portfolios?.find(p => p.id === po.portfolioId);
                         const project = state.capexProjects?.find(p => p.id === po.projectId);
                         const user = state.users.find(u => u.id === po.userId);
+                        
+                        const linkedInvoices = (state.capexInvoices || []).filter(inv => inv.purchaseOrderId === po.id);
+                        const totalLinkedValue = linkedInvoices.reduce((sum, inv) => sum + inv.value, 0);
+                        const isLinked = linkedInvoices.length > 0;
+                        const isFullyInvoiced = totalLinkedValue >= po.value;
+
                         return (
                           <tr key={po.id} className="hover:bg-slate-50 transition-colors">
                             <td className="px-6 py-4 text-xs font-bold text-slate-500">
@@ -2794,11 +2800,6 @@ const CapexManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                             <td className="px-6 py-4">
                               <div className="font-black text-slate-800 uppercase tracking-tighter">OC {po.orderNumber}</div>
                               {(() => {
-                                const linkedInvoices = (state.capexInvoices || []).filter(inv => inv.purchaseOrderId === po.id);
-                                const totalLinkedValue = linkedInvoices.reduce((sum, inv) => sum + inv.value, 0);
-                                const isLinked = linkedInvoices.length > 0;
-                                const isFullyInvoiced = totalLinkedValue >= po.value;
-
                                 if (isLinked) {
                                   if (isFullyInvoiced) {
                                     return (
@@ -2844,7 +2845,12 @@ const CapexManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                               <div className="text-[10px] font-black text-emerald-600 uppercase tracking-tight">{project?.name}</div>
                             </td>
                             <td className="px-6 py-4 font-black text-[#344434]">
-                              R$ {formatNumber(po.value)}
+                              <div className="text-slate-800 font-extrabold">R$ {formatNumber(Math.max(0, po.value - totalLinkedValue))}</div>
+                              {totalLinkedValue > 0 && (
+                                <div className="text-[9px] font-bold text-slate-400 mt-0.5 uppercase">
+                                  Original: R$ {formatNumber(po.value)}
+                                </div>
+                              )}
                             </td>
                             <td className="px-6 py-4 text-[10px] font-bold text-slate-500">
                               {po.deliveryDate ? format(parseISO(po.deliveryDate), 'dd/MM/yyyy') : '---'}
