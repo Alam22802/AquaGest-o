@@ -1336,7 +1336,7 @@ const CapexManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                                 <div className="text-3xl font-black italic tracking-tighter mb-1 text-emerald-300">
                                   R$ {formatNumber(portfolioBalance)}
                                 </div>
-                                <div className="text-[9px] font-black uppercase tracking-widest text-[#a8ffb2]">Saldo Compromisado</div>
+                                <div className="text-[9px] font-black uppercase tracking-widest text-[#a8ffb2]">Saldo Compromissado</div>
                               </>
                             )}
                           </div>
