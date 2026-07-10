@@ -2,7 +2,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { AppState, FeedType, FeedStockLog, User } from '../types';
 import { Plus, Package, TrendingDown, AlertCircle, Calendar, Settings2, Edit, Trash2, X, ArrowUpDown, Clock, User as UserIcon, Filter, CheckSquare, Square, Info, FileText, Copy, RotateCcw, FileDown, Box, ChevronDown, ChevronUp } from 'lucide-react';
-import { subDays, format, parseISO } from 'date-fns';
+import { subDays, format, parseISO, differenceInDays, addDays } from 'date-fns';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { formatNumber } from '../utils/formatters';
@@ -29,6 +29,7 @@ interface PlanningRow {
   averageWeight: string;
   currentWeek: string;
   calculationDays: string;
+  useProjection?: boolean;
 }
 
 interface IndicationRow {
@@ -39,6 +40,44 @@ interface IndicationRow {
   manuallyOverridden?: boolean;
   dailyFeedingsCount?: number;
 }
+
+const getInterpolatedStandardCurvePoints = (standardCurves: any[], avgInitial: number) => {
+  const curves = (standardCurves || []).filter(sc => sc.curve && sc.curve.some((p: any) => p.weight > 0));
+  if (curves.length === 0) {
+    const pts = [];
+    for (let i = 0; i <= 210; i += 15) {
+      pts.push({ day: i, weight: avgInitial + (i * 5.4) });
+    }
+    return pts;
+  }
+  
+  const allWeeks = Array.from(new Set(curves.flatMap(sc => sc.curve.map((p: any) => p.day)))).sort((a, b) => a - b);
+  return allWeeks.map(week => {
+    let sumWeight = 0;
+    let count = 0;
+    curves.forEach(sc => {
+      const c = sc.curve.filter((p: any) => p.weight > 0).sort((a: any, b: any) => a.day - b.day);
+      const nextIdx = c.findIndex((p: any) => p.day >= week);
+      if (nextIdx === 0) {
+        sumWeight += c[0].weight;
+        count++;
+      } else if (nextIdx !== -1) {
+        const p1 = c[nextIdx - 1];
+        const p2 = c[nextIdx];
+        const w = p1.weight + (p2.weight - p1.weight) * (week - p1.day) / (p2.day - p1.day);
+        sumWeight += w;
+        count++;
+      } else {
+        const last = c[c.length - 1];
+        if (week <= last.day + 2) {
+          sumWeight += last.weight;
+          count++;
+        }
+      }
+    });
+    return { day: week * 7, weight: count > 0 ? sumWeight / count : 0 };
+  }).filter(p => p.weight > 0);
+};
 
 const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
   const [activeSubTab, setActiveSubTab] = useState<'stock' | 'recommended' | 'planning'>('stock');
@@ -787,11 +826,14 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     const roundedAvgWeight = Math.round(avgWeight * 10) / 10;
 
     const currentRow = planningRows.find(r => r.id === rowId);
+    const useProjection = !!currentRow?.useProjection;
+    const finalAvgWeight = useProjection ? getProjectedWeightForBatch(batchId) : roundedAvgWeight;
+
     const tableId = currentRow?.tableId || (state.feedingTables?.[0]?.id || '');
     
     let weekStr = '1';
     if (tableId) {
-      const closestWeek = findClosestWeek(roundedAvgWeight, tableId);
+      const closestWeek = findClosestWeek(finalAvgWeight, tableId);
       if (closestWeek !== null) {
         weekStr = closestWeek.toString();
       }
@@ -804,7 +846,7 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
           batchId,
           tableId,
           fishCount: batch.initialQuantity.toString(),
-          averageWeight: roundedAvgWeight.toString(),
+          averageWeight: finalAvgWeight.toString(),
           currentWeek: weekStr
         };
       }
@@ -828,7 +870,41 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
         return {
           ...row,
           averageWeight: weightStr,
-          currentWeek: newWeek
+          currentWeek: newWeek,
+          useProjection: false
+        };
+      }
+      return row;
+    });
+    setPlanningRows(newRows);
+    saveRowsToLocals(newRows);
+  };
+
+  const handleToggleRowProjection = (rowId: string) => {
+    const newRows = planningRows.map(row => {
+      if (row.id === rowId) {
+        const useProjection = !row.useProjection;
+        let avgWeight = row.averageWeight;
+        if (useProjection && row.batchId) {
+          avgWeight = getProjectedWeightForBatch(row.batchId).toString();
+        } else if (!useProjection && row.batchId) {
+          avgWeight = resolveBatchBiometryWeight(row.batchId).toString();
+        }
+        
+        let weekStr = row.currentWeek;
+        const tableId = row.tableId || (state.feedingTables?.[0]?.id || '');
+        if (tableId && avgWeight) {
+          const closestWeek = findClosestWeek(Number(avgWeight), tableId);
+          if (closestWeek !== null) {
+            weekStr = closestWeek.toString();
+          }
+        }
+
+        return {
+          ...row,
+          useProjection,
+          averageWeight: avgWeight,
+          currentWeek: weekStr
         };
       }
       return row;
@@ -948,6 +1024,152 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       }
     }
     return Math.round(avgWeight * 10) / 10;
+  };
+
+  const getProjectedWeightForBatch = (batchId: string): number => {
+    const batch = (state.batches || []).find(b => b.id === batchId);
+    if (!batch) return 0;
+
+    const start = parseISO(batch.settlementDate);
+    const initialWeight = batch.initialUnitWeight;
+    const protocol = (state.protocols || []).find(p => p.id === batch.protocolId);
+
+    const cagesMap = new Map((state.cages || []).map(c => [c.id, c]));
+    const batchBiometries = (state.biometryLogs || []).filter(b => {
+      let bId = b.batchId;
+      if (!bId && b.cageId) {
+        const harvest = (state.harvestLogs || []).find(
+          h => h.cageId === b.cageId && h.date >= (b.date || "")
+        );
+        if (harvest) {
+          bId = harvest.batchId;
+        } else {
+          const cage = cagesMap.get(b.cageId);
+          if (cage?.batchId) {
+            const bt = (state.batches || []).find(x => x.id === cage.batchId);
+            if (bt && b.date >= bt.settlementDate) {
+              bId = cage.batchId;
+            }
+          }
+        }
+      }
+      return bId === batchId;
+    });
+
+    const uniqueDates = Array.from(new Set(batchBiometries.map(l => l.date))).sort();
+    
+    const actualData = uniqueDates.map(currentDate => {
+      const dayLogs = batchBiometries.filter(l => l.date === currentDate);
+      const avgWeight = dayLogs.reduce((acc, log) => acc + log.averageWeight, 0) / dayLogs.length;
+      return {
+        fullDate: currentDate,
+        weight: Math.round(avgWeight)
+      };
+    });
+
+    const dataForProjection = [
+      { fullDate: batch.settlementDate, weight: Math.round(initialWeight) },
+      ...actualData
+    ].filter(d => d.weight !== undefined);
+
+    const standardCurvePoints = getInterpolatedStandardCurvePoints(state.standardCurves || [], initialWeight);
+
+    let supplierCurvePoints: { day: number; weight: number }[] = [];
+    if (protocol?.supplierCurve && protocol.supplierCurve.some(p => p.weight > 0)) {
+      const sortedPoints = [...protocol.supplierCurve]
+        .filter(p => p.weight > 0)
+        .sort((a, b) => a.day - b.day);
+      
+      supplierCurvePoints = sortedPoints.map(p => ({
+        day: p.day * 7,
+        weight: p.weight
+      }));
+    }
+
+    const getWeightAtDay = (points: {day: number; weight: number}[], targetDay: number) => {
+      if (points.length === 0) return null;
+      const nextIdx = points.findIndex(p => p.day >= targetDay);
+      if (nextIdx === 0) return points[0].weight;
+      if (nextIdx === -1) {
+        const p1 = points[points.length - 2];
+        const p2 = points[points.length - 1];
+        const rate = (p2.weight - p1.weight) / Math.max(1, p2.day - p1.day);
+        return p2.weight + rate * (targetDay - p2.day);
+      }
+      const p1 = points[nextIdx - 1];
+      const p2 = points[nextIdx];
+      return p1.weight + (p2.weight - p1.weight) * (targetDay - p1.day) / Math.max(1, p2.day - p1.day);
+    };
+
+    let currentBatchRate = 0;
+    let lastActualDay = 0;
+    let lastWeight = initialWeight;
+    if (dataForProjection.length > 0) {
+      const lastActual = dataForProjection[dataForProjection.length - 1];
+      lastWeight = lastActual.weight;
+      lastActualDay = Math.floor((parseISO(lastActual.fullDate).getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+      
+      const lastTwo = dataForProjection.slice(-2);
+      if (lastTwo.length === 2) {
+        const p1 = lastTwo[0];
+        const p2 = lastTwo[1];
+        const d1 = Math.floor((parseISO(p1.fullDate).getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+        const d2 = Math.floor((parseISO(p2.fullDate).getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+        currentBatchRate = (p2.weight - p1.weight) / Math.max(1, d2 - d1);
+      } else {
+        const firstActual = dataForProjection[0];
+        const firstActualDay = Math.floor((parseISO(firstActual.fullDate).getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+        currentBatchRate = (lastActual.weight - firstActual.weight) / Math.max(1, lastActualDay - firstActualDay);
+      }
+    }
+
+    const totalDays = 180;
+    const allDates: string[] = [];
+    for (let i = 0; i <= totalDays; i += 7) {
+      allDates.push(format(addDays(start, i), 'yyyy-MM-dd'));
+    }
+    if (batch.expectedHarvestDate && !allDates.includes(batch.expectedHarvestDate)) {
+      allDates.push(batch.expectedHarvestDate);
+    }
+    if (batch.settlementDate && !allDates.includes(batch.settlementDate)) {
+      allDates.push(batch.settlementDate);
+    }
+    uniqueDates.forEach(d => {
+      if (!allDates.includes(d)) {
+        allDates.push(d);
+      }
+    });
+    allDates.sort();
+
+    const today = new Date();
+    const todayStr = format(today, 'yyyy-MM-dd');
+    let closestDateStr = "";
+    const futureDates = allDates.filter(d => d >= todayStr);
+    if (futureDates.length > 0) {
+      closestDateStr = futureDates[0];
+    } else {
+      closestDateStr = allDates[allDates.length - 1];
+    }
+
+    const day = Math.max(0, differenceInDays(parseISO(closestDateStr), start));
+
+    if (day >= lastActualDay) {
+      const stdWeightAtStart = getWeightAtDay(standardCurvePoints, lastActualDay) || 0;
+      const supWeightAtStart = getWeightAtDay(supplierCurvePoints, lastActualDay) || 0;
+
+      const gainBatch = currentBatchRate * (day - lastActualDay);
+      const gainStd = (getWeightAtDay(standardCurvePoints, day) || 0) - stdWeightAtStart;
+      const gainSup = (getWeightAtDay(supplierCurvePoints, day) || 0) - supWeightAtStart;
+      
+      const projectedWeight = lastWeight + (gainBatch + gainStd + gainSup) / 3;
+      return Math.round(projectedWeight * 10) / 10;
+    } else {
+      const actualOnDate = actualData.find(ad => ad.fullDate === closestDateStr);
+      if (actualOnDate) {
+        return Math.round(actualOnDate.weight * 10) / 10;
+      }
+      return Math.round(lastWeight * 10) / 10;
+    }
   };
 
   const resolveCageBiometryWeight = (cageId: string, batchId: string) => {
@@ -3062,13 +3284,28 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                           />
                         </td>
                         <td className="py-3 px-2">
-                          <input
-                            type="number"
-                            step="0.1"
-                            className="w-full px-2 py-2 bg-black/35 border border-white/10 rounded-xl font-bold text-xs outline-none text-white text-center"
-                            value={row.averageWeight}
-                            onChange={(e) => handleRowWeightChange(row.id, e.target.value)}
-                          />
+                          <div className="flex flex-col gap-1 items-center">
+                            <input
+                              type="number"
+                              step="0.1"
+                              className="w-full px-2 py-2 bg-black/35 border border-white/10 rounded-xl font-bold text-xs outline-none text-white text-center"
+                              value={row.averageWeight}
+                              onChange={(e) => handleRowWeightChange(row.id, e.target.value)}
+                            />
+                            {row.batchId && (
+                              <button
+                                type="button"
+                                onClick={() => handleToggleRowProjection(row.id)}
+                                className={`text-[8px] font-black uppercase px-2 py-0.5 rounded-md transition-all tracking-wider select-none ${
+                                  row.useProjection
+                                    ? 'bg-blue-600/30 text-blue-300 border border-blue-500/40 hover:bg-blue-600/40'
+                                    : 'bg-white/5 text-[#e4e4d4]/60 border border-white/10 hover:bg-white/10 hover:text-white'
+                                }`}
+                              >
+                                {row.useProjection ? '📈 Projeção' : '⚖️ Biometria'}
+                              </button>
+                            )}
+                          </div>
                         </td>
                         <td className="py-3 px-2">
                           {allTableWeeks.length > 0 ? (
@@ -3196,13 +3433,28 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                       </div>
                       <div>
                         <label className="block text-[9px] font-bold text-[#e4e4d4]/50 uppercase tracking-wider mb-1">Peso Médio (g)</label>
-                        <input
-                          type="number"
-                          step="0.1"
-                          className="w-full px-2 py-2 bg-black/20 border border-white/10 rounded-xl font-bold text-xs text-center outline-none text-white"
-                          value={row.averageWeight}
-                          onChange={(e) => handleRowWeightChange(row.id, e.target.value)}
-                        />
+                        <div className="flex flex-col gap-1 items-center">
+                          <input
+                            type="number"
+                            step="0.1"
+                            className="w-full px-2 py-2 bg-black/20 border border-white/10 rounded-xl font-bold text-xs text-center outline-none text-white"
+                            value={row.averageWeight}
+                            onChange={(e) => handleRowWeightChange(row.id, e.target.value)}
+                          />
+                          {row.batchId && (
+                            <button
+                              type="button"
+                              onClick={() => handleToggleRowProjection(row.id)}
+                              className={`w-full text-[8px] font-black uppercase py-1 rounded-md transition-all tracking-wider select-none text-center ${
+                                row.useProjection
+                                  ? 'bg-blue-600/30 text-blue-300 border border-blue-500/40 hover:bg-blue-600/40'
+                                  : 'bg-white/5 text-[#e4e4d4]/60 border border-white/10 hover:bg-white/10 hover:text-white'
+                              }`}
+                            >
+                              {row.useProjection ? '📈 Projeção' : '⚖️ Biometria'}
+                            </button>
+                          )}
+                        </div>
                       </div>
                       <div>
                         <label className="block text-[9px] font-bold text-[#e4e4d4]/50 uppercase tracking-wider mb-1">Semana</label>
