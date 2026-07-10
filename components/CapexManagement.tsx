@@ -6,7 +6,8 @@ import {
   Calendar, User as UserIcon, DollarSign, Layers, 
   ArrowRight, TrendingDown, CheckCircle2, AlertCircle,
   Search, Filter, ChevronRight, Truck, ClipboardList, Building2, TrendingUp,
-  ChevronUp, ChevronDown, CheckSquare, Square, Save, ShoppingBag, PlusCircle
+  ChevronUp, ChevronDown, CheckSquare, Square, Save, ShoppingBag, PlusCircle,
+  Info
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { formatNumber } from '../utils/formatters';
@@ -50,6 +51,15 @@ const CapexManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
   const [invoicePortfolioFilter, setInvoicePortfolioFilter] = useState('');
   const [invoiceProjectFilter, setInvoiceProjectFilter] = useState('');
   const [invoiceTypeFilter, setInvoiceTypeFilter] = useState('');
+  const [invoiceCostCenterFilter, setInvoiceCostCenterFilter] = useState('');
+  const [expandedInvoices, setExpandedInvoices] = useState<Record<string, boolean>>({});
+
+  const toggleInvoiceExpanded = (id: string) => {
+    setExpandedInvoices(prev => ({
+      ...prev,
+      [id]: !prev[id]
+    }));
+  };
 
   // Filter & Search states for PO History
   const [poSearch, setPoSearch] = useState('');
@@ -217,6 +227,12 @@ const CapexManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     return Array.from(new Set(centers)).sort();
   }, [state.capexProjects, selectedPortfolioId]);
 
+  const invoiceUniqueCostCenters = useMemo(() => {
+    const projects = state.capexProjects || [];
+    const centers = projects.map(p => p.costCenter).filter(Boolean);
+    return Array.from(new Set(centers)).sort();
+  }, [state.capexProjects]);
+
   const filteredProjectsDropdown = useMemo(() => {
     let list = state.capexProjects || [];
     if (selectedPortfolioId) {
@@ -319,9 +335,16 @@ const CapexManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     if (invoiceTypeFilter) {
       list = list.filter(inv => inv.type === invoiceTypeFilter);
     }
+
+    if (invoiceCostCenterFilter) {
+      list = list.filter(inv => {
+        const proj = (state.capexProjects || []).find(p => p.id === inv.projectId);
+        return proj?.costCenter === invoiceCostCenterFilter;
+      });
+    }
     
     return list.sort((a, b) => b.timestamp.localeCompare(a.timestamp));
-  }, [state.capexInvoices, invoiceSearch, invoicePortfolioFilter, invoiceProjectFilter, invoiceTypeFilter]);
+  }, [state.capexInvoices, state.capexProjects, invoiceSearch, invoicePortfolioFilter, invoiceProjectFilter, invoiceTypeFilter, invoiceCostCenterFilter]);
 
   const filteredPurchaseOrders = useMemo(() => {
     let list = state.capexPurchaseOrders || [];
@@ -2286,13 +2309,13 @@ const CapexManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
 
                 {/* Filtros e Busca de Notas */}
                 <div className="bg-slate-50 p-4 rounded-3xl border border-slate-200/80 space-y-3">
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                  <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
                     {/* Campo de Busca */}
                     <div className="md:col-span-1 relative">
                       <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                       <input
                         type="text"
-                        placeholder="Buscar por NF, Fornecedor, CNPJ..."
+                        placeholder="Buscar por NF, Fornecedor..."
                         className="w-full pl-9 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl font-bold text-xs outline-none focus:ring-2 focus:ring-amber-500 placeholder:text-slate-400 text-slate-700"
                         value={invoiceSearch}
                         onChange={e => setInvoiceSearch(e.target.value)}
@@ -2316,17 +2339,34 @@ const CapexManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                       </select>
                     </div>
 
+                    {/* Filtro por Centro de Custo */}
+                    <div className="md:col-span-1">
+                      <select
+                        className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-xl font-bold text-xs outline-none focus:ring-2 focus:ring-amber-500 text-slate-700"
+                        value={invoiceCostCenterFilter}
+                        onChange={e => {
+                          setInvoiceCostCenterFilter(e.target.value);
+                          setInvoiceProjectFilter(''); // Reset project filter if cost center changes
+                        }}
+                      >
+                        <option value="">Todos os CCs</option>
+                        {invoiceUniqueCostCenters.map(cc => (
+                          <option key={cc} value={cc}>{formatCostCenter(cc)}</option>
+                        ))}
+                      </select>
+                    </div>
+
                     {/* Filtro por Projeto */}
                     <div className="md:col-span-1">
                       <select
                         className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-xl font-bold text-xs outline-none focus:ring-2 focus:ring-amber-500 text-slate-700 disabled:opacity-60"
                         value={invoiceProjectFilter}
                         onChange={e => setInvoiceProjectFilter(e.target.value)}
-                        disabled={!invoicePortfolioFilter}
+                        disabled={!invoicePortfolioFilter && !invoiceCostCenterFilter}
                       >
                         <option value="">Todos os Projetos</option>
                         {(state.capexProjects || [])
-                          .filter(p => !invoicePortfolioFilter || p.portfolioId === invoicePortfolioFilter)
+                          .filter(p => (!invoicePortfolioFilter || p.portfolioId === invoicePortfolioFilter) && (!invoiceCostCenterFilter || p.costCenter === invoiceCostCenterFilter))
                           .map(p => (
                             <option key={p.id} value={p.id}>{p.name}</option>
                           ))}
@@ -2340,7 +2380,7 @@ const CapexManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                         value={invoiceTypeFilter}
                         onChange={e => setInvoiceTypeFilter(e.target.value)}
                       >
-                        <option value="">Todos os Tipos de Lançamento</option>
+                        <option value="">Todos os Tipos</option>
                         <option value="Aquisição">Aquisição</option>
                         <option value="Prestação de Serviço">Prestação de Serviço</option>
                       </select>
@@ -2348,7 +2388,7 @@ const CapexManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                   </div>
 
                   {/* Botão de Limpar Filtros */}
-                  {(invoiceSearch || invoicePortfolioFilter || invoiceProjectFilter || invoiceTypeFilter) && (
+                  {(invoiceSearch || invoicePortfolioFilter || invoiceProjectFilter || invoiceTypeFilter || invoiceCostCenterFilter) && (
                     <div className="flex justify-end pt-1">
                       <button
                         onClick={() => {
@@ -2356,6 +2396,7 @@ const CapexManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                           setInvoicePortfolioFilter('');
                           setInvoiceProjectFilter('');
                           setInvoiceTypeFilter('');
+                          setInvoiceCostCenterFilter('');
                         }}
                         className="flex items-center gap-1.5 px-3 py-1 bg-slate-200/60 hover:bg-slate-200 text-slate-600 rounded-lg text-[10px] font-black uppercase tracking-tight transition-colors"
                       >
@@ -2369,6 +2410,7 @@ const CapexManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                   <table className="w-full text-left min-w-[1000px]">
                     <thead className="bg-slate-50 text-[10px] font-black text-slate-400 uppercase tracking-widest">
                       <tr>
+                        <th className="w-12 px-4 py-4 text-center"></th>
                         <th className="px-6 py-4">Data Inclusão</th>
                         <th className="px-6 py-4">Nota / Tipo</th>
                         <th className="px-6 py-4">Fornecedor</th>
@@ -2384,77 +2426,166 @@ const CapexManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                         const portfolio = state.portfolios?.find(p => p.id === inv.portfolioId);
                         const project = state.capexProjects?.find(p => p.id === inv.projectId);
                         const user = state.users.find(u => u.id === inv.userId);
+                        const isExpanded = !!expandedInvoices[inv.id];
                         return (
-                          <tr key={inv.id} className="hover:bg-slate-50 transition-colors">
-                            <td className="px-6 py-4 text-xs font-bold text-slate-500">
-                              {format(parseISO(inv.timestamp), 'dd/MM/yyyy HH:mm')}
-                            </td>
-                            <td className="px-6 py-4">
-                              <div className="font-black text-slate-800 uppercase tracking-tighter">NF {inv.invoiceNumber}</div>
-                              <div className="flex flex-wrap gap-1 mt-0.5">
-                                <span className={`text-[8px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest ${inv.type === 'Aquisição' ? 'bg-blue-100 text-blue-600' : 'bg-purple-100 text-purple-600'}`}>
-                                  {inv.type}
-                                </span>
-                                {inv.purchaseOrderId && (() => {
-                                  const po = (state.capexPurchaseOrders || []).find(p => p.id === inv.purchaseOrderId);
-                                  return po ? (
-                                    <div className="flex flex-wrap gap-1">
-                                      <span className="text-[8px] font-black px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 uppercase tracking-widest flex items-center gap-0.5">
-                                        <ShoppingBag className="w-2 h-2" /> OC #{po.orderNumber}
-                                      </span>
-                                      <span className="text-[8px] font-black px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 border border-blue-200 uppercase tracking-widest">
-                                        Baixada
-                                      </span>
+                          <React.Fragment key={inv.id}>
+                            <tr 
+                              className={`hover:bg-slate-50 transition-colors cursor-pointer select-none ${isExpanded ? 'bg-slate-50/70 font-medium' : ''}`}
+                              onClick={() => toggleInvoiceExpanded(inv.id)}
+                            >
+                              <td className="px-4 py-4 text-center">
+                                {isExpanded ? (
+                                  <ChevronUp className="w-4 h-4 text-slate-500 mx-auto" />
+                                ) : (
+                                  <ChevronDown className="w-4 h-4 text-slate-500 mx-auto" />
+                                )}
+                              </td>
+                              <td className="px-6 py-4 text-xs font-bold text-slate-500">
+                                {format(parseISO(inv.timestamp), 'dd/MM/yyyy HH:mm')}
+                              </td>
+                              <td className="px-6 py-4">
+                                <div className="font-black text-slate-800 uppercase tracking-tighter">NF {inv.invoiceNumber}</div>
+                                <div className="flex flex-wrap gap-1 mt-0.5">
+                                  <span className={`text-[8px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest ${inv.type === 'Aquisição' ? 'bg-blue-100 text-blue-600' : 'bg-purple-100 text-purple-600'}`}>
+                                    {inv.type}
+                                  </span>
+                                  {inv.purchaseOrderId && (() => {
+                                    const po = (state.capexPurchaseOrders || []).find(p => p.id === inv.purchaseOrderId);
+                                    return po ? (
+                                      <div className="flex flex-wrap gap-1">
+                                        <span className="text-[8px] font-black px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 uppercase tracking-widest flex items-center gap-0.5">
+                                          <ShoppingBag className="w-2 h-2" /> OC #{po.orderNumber}
+                                        </span>
+                                        <span className="text-[8px] font-black px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 border border-blue-200 uppercase tracking-widest">
+                                          Baixada
+                                        </span>
+                                      </div>
+                                    ) : null;
+                                  })()}
+                                </div>
+                              </td>
+                              <td className="px-6 py-4">
+                                <div className="font-black text-slate-700 uppercase tracking-tight text-[10px]">{inv.supplier}</div>
+                                <div className="text-[9px] font-bold text-slate-400 uppercase">{inv.cnpj}</div>
+                              </td>
+                              <td className="px-6 py-4">
+                                <div className="text-[10px] font-black text-blue-600 uppercase tracking-tight">{portfolio?.name}</div>
+                                <div className="text-[10px] font-black text-emerald-600 uppercase tracking-tight">{project?.name}</div>
+                              </td>
+                              <td className="px-6 py-4 font-black text-slate-800">
+                                R$ {formatNumber(inv.value)}
+                              </td>
+                              <td className="px-6 py-4 text-[10px] font-bold text-slate-500">
+                                {format(parseISO(inv.deliveryDate), 'dd/MM/yyyy')}
+                              </td>
+                              <td className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase">
+                                @{user?.username || '---'}
+                              </td>
+                              <td className="px-6 py-4 text-center" onClick={e => e.stopPropagation()}>
+                                <div className="flex justify-center gap-1">
+                                  <button onClick={(e) => { 
+                                    e.stopPropagation();
+                                    setEditingInvoiceId(inv.id); 
+                                    setInvoiceForm({
+                                      portfolioId: inv.portfolioId, 
+                                      projectId: inv.projectId, 
+                                      purchaseOrderId: inv.purchaseOrderId || '',
+                                      invoiceNumber: inv.invoiceNumber, 
+                                      supplier: inv.supplier,
+                                      cnpj: inv.cnpj,
+                                      items: inv.items,
+                                      type: inv.type,
+                                      value: inv.value.toString(), 
+                                      date: inv.date, 
+                                      deliveryDate: inv.deliveryDate,
+                                      description: inv.description
+                                    }); 
+                                  }} className="p-2 text-slate-300 hover:text-amber-500 transition-colors"><Edit className="w-4 h-4" /></button>
+                                  <button onClick={(e) => { e.stopPropagation(); removeInvoice(inv.id); }} className="p-2 text-slate-300 hover:text-red-500 transition-colors"><Trash2 className="w-4 h-4" /></button>
+                                </div>
+                              </td>
+                            </tr>
+                            {isExpanded && (
+                              <tr className="bg-slate-50/40">
+                                <td colSpan={9} className="px-6 py-4 border-l-2 border-amber-500 bg-amber-50/5">
+                                  <div className="bg-white rounded-2xl border border-slate-200/80 p-5 space-y-4 shadow-sm">
+                                    <div className="flex items-center gap-2 border-b border-slate-100 pb-2 mb-2">
+                                      <Info className="w-4 h-4 text-amber-500" />
+                                      <h5 className="text-[10px] font-black text-slate-700 uppercase tracking-widest">Detalhes Completos do Lançamento</h5>
                                     </div>
-                                  ) : null;
-                                })()}
-                              </div>
-                            </td>
-                            <td className="px-6 py-4">
-                              <div className="font-black text-slate-700 uppercase tracking-tight text-[10px]">{inv.supplier}</div>
-                              <div className="text-[9px] font-bold text-slate-400 uppercase">{inv.cnpj}</div>
-                            </td>
-                            <td className="px-6 py-4">
-                              <div className="text-[10px] font-black text-blue-600 uppercase tracking-tight">{portfolio?.name}</div>
-                              <div className="text-[10px] font-black text-emerald-600 uppercase tracking-tight">{project?.name}</div>
-                            </td>
-                            <td className="px-6 py-4 font-black text-slate-800">
-                              R$ {formatNumber(inv.value)}
-                            </td>
-                            <td className="px-6 py-4 text-[10px] font-bold text-slate-500">
-                              {format(parseISO(inv.deliveryDate), 'dd/MM/yyyy')}
-                            </td>
-                            <td className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase">
-                              @{user?.username || '---'}
-                            </td>
-                            <td className="px-6 py-4 text-center">
-                              <div className="flex justify-center gap-1">
-                                <button onClick={() => { 
-                                  setEditingInvoiceId(inv.id); 
-                                  setInvoiceForm({
-                                    portfolioId: inv.portfolioId, 
-                                    projectId: inv.projectId, 
-                                    purchaseOrderId: inv.purchaseOrderId || '',
-                                    invoiceNumber: inv.invoiceNumber, 
-                                    supplier: inv.supplier,
-                                    cnpj: inv.cnpj,
-                                    items: inv.items,
-                                    type: inv.type,
-                                    value: inv.value.toString(), 
-                                    date: inv.date, 
-                                    deliveryDate: inv.deliveryDate,
-                                    description: inv.description
-                                  }); 
-                                }} className="p-2 text-slate-300 hover:text-amber-500 transition-colors"><Edit className="w-4 h-4" /></button>
-                                <button onClick={() => removeInvoice(inv.id)} className="p-2 text-slate-300 hover:text-red-500 transition-colors"><Trash2 className="w-4 h-4" /></button>
-                              </div>
-                            </td>
-                          </tr>
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                      {/* Informações Gerais */}
+                                      <div className="space-y-1.5">
+                                        <h6 className="text-[9px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-50 pb-1">Informações Gerais</h6>
+                                        <div className="space-y-1 text-slate-600">
+                                          <p className="text-[11px] font-bold">Número da Nota: <span className="text-slate-800 font-black uppercase">NF {inv.invoiceNumber}</span></p>
+                                          <p className="text-[11px] font-bold">Tipo: <span className="text-slate-800 font-black">{inv.type}</span></p>
+                                          <p className="text-[11px] font-bold">Valor total: <span className="text-slate-800 font-black">R$ {formatNumber(inv.value)}</span></p>
+                                          <p className="text-[11px] font-bold">Data de Emissão: <span className="text-slate-800 font-bold">{format(parseISO(inv.date), 'dd/MM/yyyy')}</span></p>
+                                          <p className="text-[11px] font-bold">Data de Entrega: <span className="text-slate-800 font-bold">{format(parseISO(inv.deliveryDate), 'dd/MM/yyyy')}</span></p>
+                                        </div>
+                                      </div>
+
+                                      {/* Fornecedor & Projeto */}
+                                      <div className="space-y-1.5">
+                                        <h6 className="text-[9px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-50 pb-1">Fornecedor & Destinação</h6>
+                                        <div className="space-y-1 text-slate-600">
+                                          <p className="text-[11px] font-bold">Fornecedor: <span className="text-slate-800 font-black uppercase">{inv.supplier}</span></p>
+                                          <p className="text-[11px] font-bold">CNPJ: <span className="text-slate-800 font-bold">{inv.cnpj}</span></p>
+                                          <p className="text-[11px] font-bold">Carteira: <span className="text-blue-600 font-black uppercase">{portfolio?.name}</span></p>
+                                          <p className="text-[11px] font-bold">Projeto: <span className="text-emerald-600 font-black uppercase">{project?.name}</span></p>
+                                          <p className="text-[11px] font-bold">Centro de Custo: <span className="text-slate-800 font-black">{formatCostCenter(project?.costCenter || '')}</span></p>
+                                        </div>
+                                      </div>
+
+                                      {/* Ordem de Compra & Usuário */}
+                                      <div className="space-y-1.5">
+                                        <h6 className="text-[9px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-50 pb-1">Ordem de Compra & Auditoria</h6>
+                                        <div className="space-y-1 text-slate-600">
+                                          {inv.purchaseOrderId ? (() => {
+                                            const po = (state.capexPurchaseOrders || []).find(p => p.id === inv.purchaseOrderId);
+                                            return po ? (
+                                              <>
+                                                <p className="text-[11px] font-bold">Ordem de Compra (OC): <span className="text-amber-700 font-black">OC #{po.orderNumber}</span></p>
+                                                <p className="text-[11px] font-bold">Valor da OC: <span className="text-slate-800 font-bold">R$ {formatNumber(po.value)}</span></p>
+                                              </>
+                                            ) : (
+                                              <p className="text-[11px] text-slate-400 font-bold italic">Vínculo com OC não localizado</p>
+                                            );
+                                          })() : (
+                                            <p className="text-[11px] text-slate-400 font-bold italic">Sem OC vinculada (Lançamento Direto)</p>
+                                          )}
+                                          <p className="text-[11px] font-bold">Cadastrado por: <span className="text-slate-800 font-black">@{user?.username || '---'}</span></p>
+                                          <p className="text-[11px] font-bold">Data de Registro: <span className="text-slate-800 font-bold">{format(parseISO(inv.timestamp), 'dd/MM/yyyy HH:mm')}</span></p>
+                                        </div>
+                                      </div>
+                                    </div>
+
+                                    {/* Itens e Observações */}
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2 border-t border-slate-100">
+                                      <div className="space-y-1">
+                                        <h6 className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Itens / Produtos da Nota</h6>
+                                        <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-200/85 min-h-[40px] text-[11px] font-bold text-slate-700 whitespace-pre-line uppercase">
+                                          {inv.items || 'Nenhum item especificado.'}
+                                        </div>
+                                      </div>
+                                      <div className="space-y-1">
+                                        <h6 className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Observações / Descrição</h6>
+                                        <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-200/85 min-h-[40px] text-[11px] font-bold text-slate-700 whitespace-pre-line uppercase">
+                                          {inv.description || 'Nenhuma observação cadastrada.'}
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </div>
+                                </td>
+                              </tr>
+                            )}
+                          </React.Fragment>
                         );
                       })}
                       {filteredInvoices.length === 0 && (
                         <tr>
-                          <td colSpan={8} className="px-6 py-10 text-center text-slate-400 font-bold uppercase text-[10px] tracking-widest italic">
+                          <td colSpan={9} className="px-6 py-10 text-center text-slate-400 font-bold uppercase text-[10px] tracking-widest italic">
                             {(state.capexInvoices || []).length > 0 
                               ? "Nenhum lançamento corresponde aos filtros aplicados." 
                               : "Nenhum lançamento de nota fiscal encontrado."}
