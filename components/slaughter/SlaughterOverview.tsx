@@ -36,6 +36,7 @@ const SlaughterSummary = React.memo(({ stats, startDate, endDate, onStartDateCha
     renderingYield: number;
     avgSlaughterPerDay: number;
     avgFinishedProductPerDay: number;
+    totalOrcadoRecep: number;
   }, 
   startDate: string, 
   endDate: string, 
@@ -75,7 +76,14 @@ const SlaughterSummary = React.memo(({ stats, startDate, endDate, onStartDateCha
           </div>
 
           {/* Linha 1: Produção */}
-          <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-8 mb-8 pb-8 border-b border-white/5">
+          <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-7 gap-8 mb-8 pb-8 border-b border-white/5">
+             <div className="space-y-2 border-l-2 border-blue-400/30 pl-6">
+                <div className="text-[9px] font-black opacity-40 uppercase tracking-widest text-blue-300">TOTAL ORÇADO RECEPÇÃO</div>
+                <div className="text-2xl font-black text-blue-200 flex items-baseline gap-1">
+                   {formatNumber(stats.totalOrcadoRecep, 0)}
+                   <span className="text-[10px] opacity-40">kg</span>
+                </div>
+             </div>
              <div className="space-y-2 border-l-2 border-white/10 pl-6">
                 <div className="text-[9px] font-black opacity-40 uppercase tracking-widest">Total Recepção</div>
                 <div className="text-2xl font-black flex items-baseline gap-1">
@@ -598,6 +606,15 @@ const SlaughterOverview: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
     const avgSlaughterPerDay = totalRecep / daysToDivide;
     const avgFinishedProductPerDay = totalPacked / daysToDivide;
 
+    const filteredSchedules = (state.pcpSlaughterSchedules || []).filter(s => {
+      try {
+        return isWithinInterval(parseISO(s.expectedDate), { start, end });
+      } catch {
+        return false;
+      }
+    });
+    const totalOrcadoRecep = filteredSchedules.reduce((acc, s) => acc + (s.expectedWeight || 0), 0);
+
     return { 
       totalGta, 
       totalRecep, 
@@ -616,9 +633,10 @@ const SlaughterOverview: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
       totalTransportCondemnation,
       renderingYield,
       avgSlaughterPerDay,
-      avgFinishedProductPerDay
+      avgFinishedProductPerDay,
+      totalOrcadoRecep
     };
-  }, [state.slaughterLogs, state.slaughterExpenses, state.utilityLogs, summaryStartDate, summaryEndDate]);
+  }, [state.slaughterLogs, state.slaughterExpenses, state.utilityLogs, state.pcpSlaughterSchedules, summaryStartDate, summaryEndDate]);
 
   const dailyYieldData = useMemo(() => {
     const baseDate = new Date(chartYear, chartMonth, 1);
