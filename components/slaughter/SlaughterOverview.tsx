@@ -37,6 +37,7 @@ const SlaughterSummary = React.memo(({ stats, startDate, endDate, onStartDateCha
     avgSlaughterPerDay: number;
     avgFinishedProductPerDay: number;
     totalOrcadoRecep: number;
+    avgOrcadoPerDay: number;
   }, 
   startDate: string, 
   endDate: string, 
@@ -76,12 +77,19 @@ const SlaughterSummary = React.memo(({ stats, startDate, endDate, onStartDateCha
           </div>
 
           {/* Linha 1: Produção */}
-          <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-7 gap-8 mb-8 pb-8 border-b border-white/5">
+          <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-8 gap-8 mb-8 pb-8 border-b border-white/5">
              <div className="space-y-2 border-l-2 border-blue-400/30 pl-6">
                 <div className="text-[9px] font-black opacity-40 uppercase tracking-widest text-blue-300">TOTAL ORÇADO RECEPÇÃO</div>
                 <div className="text-2xl font-black text-blue-200 flex items-baseline gap-1">
                    {formatNumber(stats.totalOrcadoRecep, 0)}
                    <span className="text-[10px] opacity-40">kg</span>
+                </div>
+             </div>
+             <div className="space-y-2 border-l-2 border-blue-400/30 pl-6">
+                <div className="text-[9px] font-black opacity-40 uppercase tracking-widest text-blue-300">MÉDIA ORÇADO DIA</div>
+                <div className="text-2xl font-black text-blue-200 flex items-baseline gap-1">
+                   {formatNumber(stats.avgOrcadoPerDay, 0)}
+                   <span className="text-[10px] opacity-40">kg/dia</span>
                 </div>
              </div>
              <div className="space-y-2 border-l-2 border-white/10 pl-6">
@@ -615,6 +623,10 @@ const SlaughterOverview: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
     });
     const totalOrcadoRecep = filteredSchedules.reduce((acc, s) => acc + (s.expectedWeight || 0), 0);
 
+    const uniqueScheduledDays = new Set(filteredSchedules.map(s => s.expectedDate)).size;
+    const daysToDivideOrcado = Math.max(1, uniqueScheduledDays);
+    const avgOrcadoPerDay = totalOrcadoRecep / daysToDivideOrcado;
+
     return { 
       totalGta, 
       totalRecep, 
@@ -634,7 +646,8 @@ const SlaughterOverview: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
       renderingYield,
       avgSlaughterPerDay,
       avgFinishedProductPerDay,
-      totalOrcadoRecep
+      totalOrcadoRecep,
+      avgOrcadoPerDay
     };
   }, [state.slaughterLogs, state.slaughterExpenses, state.utilityLogs, state.pcpSlaughterSchedules, summaryStartDate, summaryEndDate]);
 
