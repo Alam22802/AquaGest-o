@@ -1,44 +1,44 @@
 {
   "data": {
-    "price": 10.09,
-    "source": "CEPEA (06 - 10/07/2026)",
-    "lastUpdate": "2026-07-15T11:00:00.000Z",
-    "variation": -0.44,
-    "weeklyVariation": -0.44,
+    "price": 10.04,
+    "source": "CEPEA (13 - 17/07/2026)",
+    "lastUpdate": "2026-07-20T11:00:00.000Z",
+    "variation": -0.50,
+    "weeklyVariation": -0.50,
     "regions": [
       {
         "name": "Triângulo Mineiro",
-        "price": 10.09,
-        "variation": -0.44,
-        "weeklyVariation": -0.44
+        "price": 10.04,
+        "variation": -0.50,
+        "weeklyVariation": -0.50
       },
       {
         "name": "Grandes Lagos",
-        "price": 9.85,
-        "variation": -0.32,
-        "weeklyVariation": -0.32
+        "price": 9.80,
+        "variation": -0.52,
+        "weeklyVariation": -0.52
       },
       {
         "name": "Norte do Paraná",
-        "price": 10.37,
-        "variation": -0.30,
-        "weeklyVariation": -0.30
+        "price": 10.31,
+        "variation": -0.61,
+        "weeklyVariation": -0.61
       },
       {
         "name": "Morada Nova",
-        "price": 9.50,
-        "variation": -0.04,
-        "weeklyVariation": -0.04
+        "price": 9.48,
+        "variation": -0.26,
+        "weeklyVariation": -0.26
       },
       {
         "name": "Oeste do Paraná",
-        "price": 8.71,
-        "variation": -0.28,
-        "weeklyVariation": -0.28
+        "price": 8.70,
+        "variation": -0.10,
+        "weeklyVariation": -0.10
       }
     ]
   },
-  "timestamp": 1784112100000,
+  "timestamp": 1784565088270,
   "isFallback": false,
-  "isExhausted": false
+  "isExhausted": true
 }

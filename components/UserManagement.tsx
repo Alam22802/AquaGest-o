@@ -205,7 +205,7 @@ const UserManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       password: user.password,
       canEdit: true, // Default to editor on approval
       receiveNotifications: user.receiveNotifications,
-      allowedTabs: user.allowedTabs || ['dashboard', 'feeding', 'biometry', 'mortality', 'pcm'] // Default tabs for new users
+      allowedTabs: user.allowedTabs || ['dashboard', 'feeding', 'biometry', 'mortality'] // Default tabs for new users
     });
     // Mark as approved in the form data so it saves as approved
     // We'll handle the actual isApproved: true in handleSaveUser
@@ -501,7 +501,7 @@ const UserManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                         const allTabs = [
                           'biometry', 'inventory', 'feed', 'slaughter', 'capex', 
                           'lines', 'batches', 'maintenance', 'protocols', 'mortality', 
-                          'pcm', 'cages', 'feeding', 'cloud'
+                          'cages', 'feeding', 'cloud'
                         ];
                         const isAllSelected = allTabs.every(id => (formData.allowedTabs || []).includes(id));
                         return (
@@ -533,7 +533,6 @@ const UserManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                         { id: 'maintenance', label: 'Manutenção' },
                         { id: 'protocols', label: 'Modelos de Produção' },
                         { id: 'mortality', label: 'Mortalidade' },
-                        { id: 'pcm', label: 'PCM' },
                         { id: 'cages', label: 'Povoamento' },
                         { id: 'feeding', label: 'Trato Diário' },
                         { id: 'cloud', label: 'Backup/Nuvem' }

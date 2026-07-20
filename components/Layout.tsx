@@ -33,7 +33,6 @@ const Layout: React.FC<Props> = ({ children, activeTab, setActiveTab, currentUse
     { id: 'maintenance', label: 'Manutenção', icon: <Settings className="w-5 h-5" /> },
     { id: 'protocols', label: 'Modelos de Produção', icon: <BookOpen className="w-5 h-5" /> },
     { id: 'mortality', label: 'Mortalidade', icon: <FishOff className="w-5 h-5" /> },
-    { id: 'pcm', label: 'PCM', icon: <ClipboardList className="w-5 h-5" /> },
     { id: 'cages', label: 'Povoamento', icon: <ClipboardList className="w-5 h-5" /> },
     { id: 'feeding', label: 'Trato Diário', icon: <Utensils className="w-5 h-5" /> },
     { 
