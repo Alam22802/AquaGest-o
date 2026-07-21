@@ -99,7 +99,33 @@ const WeatherWidget = () => {
     if (showLoading) setLoading(true);
     setError(null);
     try {
-      // 1. Try fetching via the server-side cache proxy
+      // 1. Try fetching directly from public Open-Meteo API in client first
+      // This ensures we get real-time local data using the browser's network, bypassing any cloud server-side rate-limits or blocks.
+      const url = "https://api.open-meteo.com/v1/forecast?latitude=-18.6475&longitude=-48.1872&current_weather=true&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,precipitation_sum&timezone=auto";
+      try {
+        const directResponse = await fetch(url);
+        if (directResponse.ok) {
+          const directData = await directResponse.json();
+          // Normalize response code properties
+          if (directData.current_weather) {
+            const code = directData.current_weather.weather_code !== undefined ? directData.current_weather.weather_code : directData.current_weather.weathercode;
+            directData.current_weather.weathercode = code;
+            directData.current_weather.weather_code = code;
+          }
+          if (directData.daily) {
+            const codes = directData.daily.weather_code !== undefined ? directData.daily.weather_code : directData.daily.weathercode;
+            directData.daily.weathercode = codes;
+            directData.daily.weather_code = codes;
+          }
+          setWeather(directData);
+          setLastUpdated(new Date());
+          return;
+        }
+      } catch (directErr) {
+        console.warn('Direct client-side weather fetch failed, trying backend proxy...', directErr);
+      }
+
+      // 2. Secondary fallback: Try fetching via the server-side cache proxy
       const response = await fetch('/api/weather');
       if (response.ok) {
         const data = await response.json();
@@ -108,29 +134,7 @@ const WeatherWidget = () => {
         return;
       }
       
-      // 2. Secondary fallback: Fetch directly from public Open-Meteo API in client
-      console.warn('Backend weather proxy failed. Retrying directly from Open-Meteo...');
-      const url = "https://api.open-meteo.com/v1/forecast?latitude=-18.6475&longitude=-48.1872&current_weather=true&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,precipitation_sum&timezone=auto";
-      const directResponse = await fetch(url);
-      if (directResponse.ok) {
-        const directData = await directResponse.json();
-        // Normalize response code properties
-        if (directData.current_weather) {
-          const code = directData.current_weather.weather_code !== undefined ? directData.current_weather.weather_code : directData.current_weather.weathercode;
-          directData.current_weather.weathercode = code;
-          directData.current_weather.weather_code = code;
-        }
-        if (directData.daily) {
-          const codes = directData.daily.weather_code !== undefined ? directData.daily.weather_code : directData.daily.weathercode;
-          directData.daily.weathercode = codes;
-          directData.daily.weather_code = codes;
-        }
-        setWeather(directData);
-        setLastUpdated(new Date());
-        return;
-      }
-      
-      throw new Error('Both proxy and direct fetch failed');
+      throw new Error('Both direct fetch and backend proxy failed');
     } catch (err: any) {
       console.warn('Error fetching weather data, applying high-quality client-side fallback:', err);
       // Fallback instead of an ugly error board
