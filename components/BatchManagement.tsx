@@ -669,7 +669,7 @@ const BatchManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       const feedCost = feedingCostByBatch.get(batch.id) || 0;
       const stockingCost = batch.invoiceValue || 0;
       const totalCost = stockingCost + feedCost;
-      const custoKgProduzido = totalBiomassKg > 0 ? (totalCost / totalBiomassKg) : (totalProducedBiomassKg > 0 ? (totalCost / totalProducedBiomassKg) : 0);
+      const custoKgProduzido = totalProducedBiomassKg > 0 ? (totalCost / totalProducedBiomassKg) : 0;
 
       return {
         ...batch,
