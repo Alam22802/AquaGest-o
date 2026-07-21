@@ -67,6 +67,7 @@ const WeatherWidget = () => {
   const [weather, setWeather] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
 
   const getClientFallbackWeather = () => {
     return {
@@ -94,8 +95,8 @@ const WeatherWidget = () => {
     };
   };
 
-  const fetchWeather = async () => {
-    setLoading(true);
+  const fetchWeather = async (showLoading = true) => {
+    if (showLoading) setLoading(true);
     setError(null);
     try {
       // 1. Try fetching via the server-side cache proxy
@@ -103,6 +104,7 @@ const WeatherWidget = () => {
       if (response.ok) {
         const data = await response.json();
         setWeather(data);
+        setLastUpdated(new Date());
         return;
       }
       
@@ -124,6 +126,7 @@ const WeatherWidget = () => {
           directData.daily.weather_code = codes;
         }
         setWeather(directData);
+        setLastUpdated(new Date());
         return;
       }
       
@@ -132,13 +135,21 @@ const WeatherWidget = () => {
       console.warn('Error fetching weather data, applying high-quality client-side fallback:', err);
       // Fallback instead of an ugly error board
       setWeather(getClientFallbackWeather());
+      setLastUpdated(new Date());
     } finally {
-      setLoading(false);
+      if (showLoading) setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchWeather();
+    fetchWeather(true);
+
+    // Automatically update weather every 10 minutes
+    const interval = setInterval(() => {
+      fetchWeather(false);
+    }, 10 * 60 * 1000);
+
+    return () => clearInterval(interval);
   }, []);
 
   const getWeatherInfo = (code: number) => {
@@ -216,9 +227,19 @@ const WeatherWidget = () => {
           </div>
         </div>
         
-        <div className="hidden sm:block text-right">
-          <div className="text-[9px] font-black text-[#e4e4d4]/40 uppercase tracking-widest mb-0.5">Atualizado</div>
-          <div className="text-[11px] font-bold text-[#e4e4d4]/70">{format(new Date(), 'HH:mm')}</div>
+        <div className="flex items-center gap-2.5 text-right shrink-0">
+          <div>
+            <div className="text-[9px] font-black text-[#e4e4d4]/40 uppercase tracking-widest mb-0.5">Atualizado</div>
+            <div className="text-[11px] font-bold text-[#e4e4d4]/70">{format(lastUpdated, 'HH:mm')}</div>
+          </div>
+          <button 
+            onClick={() => fetchWeather(true)} 
+            disabled={loading}
+            title="Atualizar clima"
+            className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-[#e4e4d4]/60 hover:text-[#e4e4d4] transition-all border border-white/5 disabled:opacity-50 flex items-center justify-center hover:scale-105 active:scale-95"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+          </button>
         </div>
       </div>
 
