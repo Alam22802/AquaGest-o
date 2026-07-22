@@ -933,6 +933,248 @@ const BatchManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     doc.save(`estoque-lotes-${format(new Date(), "yyyy-MM-dd-HHmm")}.pdf`);
   };
 
+  const exportSchedulesPDF = (schedulesToExport: any[]) => {
+    if (!schedulesToExport || schedulesToExport.length === 0) {
+      alert("Nenhuma programação selecionada para gerar o PDF.");
+      return;
+    }
+
+    const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+
+    schedulesToExport.forEach((schedule, index) => {
+      if (index > 0) {
+        doc.addPage();
+      }
+
+      const batch =
+        batchStats.find((b) => b.id === schedule.batchId) ||
+        state.batches.find((b) => b.id === schedule.batchId);
+      const batchName = batch?.name || "Lote Desconhecido";
+      const settlementDateStr = batch?.settlementDate
+        ? format(parseISO(batch.settlementDate), "dd/MM/yyyy")
+        : "---";
+      const protocolName = batch?.protocol?.name || "Nenhum";
+      const currentAvgWeight = batch?.currentAvgWeight || 0;
+
+      const scheduleCagesData = schedule.cageIds.map((cid: string) => {
+        const cage = state.cages.find((c) => c.id === cid);
+        const mortality = (state.mortalityLogs || [])
+          .filter((m) => {
+            if (m.cageId !== cid) return false;
+            if (m.batchId) return m.batchId === schedule.batchId;
+            return batch?.settlementDate ? m.date >= batch.settlementDate : true;
+          })
+          .reduce((acc, curr) => acc + curr.count, 0);
+
+        const initialCount = cage?.initialFishCount || 0;
+        const currentCount = Math.max(0, initialCount - mortality);
+        const biomassKg = (currentCount * currentAvgWeight) / 1000;
+
+        const model = cage?.model || "Gaiola";
+        const d = cage?.dimensions || { width: 0, length: 0, depth: 0 };
+        const dimStr =
+          model === "Circular"
+            ? `Circular (${d.depth || 0}m prof.)`
+            : `${model} (${d.width || 0}x${d.length || 0}x${d.depth || 0}m)`;
+
+        return {
+          cageName: cage?.name || "---",
+          dimStr,
+          currentCount,
+          mortality,
+          currentAvgWeight,
+          biomassKg,
+        };
+      });
+
+      const totalFish = scheduleCagesData.reduce(
+        (acc, c) => acc + c.currentCount,
+        0,
+      );
+      const totalMortality = scheduleCagesData.reduce(
+        (acc, c) => acc + c.mortality,
+        0,
+      );
+      const totalBiomass = scheduleCagesData.reduce(
+        (acc, c) => acc + c.biomassKg,
+        0,
+      );
+
+      let fastingStr = "Não informado";
+      if (schedule.date && schedule.lastFeedingDate) {
+        const harvestDate = parseISO(schedule.date);
+        harvestDate.setHours(3, 0, 0, 0);
+        const feedingDate = parseISO(schedule.lastFeedingDate);
+        const hours = Math.floor(
+          (harvestDate.getTime() - feedingDate.getTime()) / (1000 * 60 * 60),
+        );
+        fastingStr = `${hours}h de Jejum Estimado (Último trato: ${format(feedingDate, "dd/MM/yyyy 'às' HH:mm")})`;
+      } else if (schedule.lastFeedingDate) {
+        fastingStr = `Último trato: ${format(parseISO(schedule.lastFeedingDate), "dd/MM/yyyy 'às' HH:mm")}`;
+      }
+
+      const stratMap: Record<string, number> = {};
+      scheduleCagesData.forEach((c) => {
+        stratMap[c.dimStr] = (stratMap[c.dimStr] || 0) + 1;
+      });
+      const stratSummary = Object.entries(stratMap)
+        .map(([dim, count]) => `${dim} (${count} uni)`)
+        .join(" | ");
+
+      doc.setFillColor(52, 68, 52);
+      doc.rect(0, 0, 210, 22, "F");
+
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(13);
+      doc.setFont("helvetica", "bold");
+      doc.text("AQUAGESTÃO - PROGRAMAÇÃO DE DESPESCA", 14, 11);
+
+      doc.setFontSize(8);
+      doc.setFont("helvetica", "normal");
+      doc.text(
+        `Emissão: ${format(new Date(), "dd/MM/yyyy HH:mm")}`,
+        196,
+        11,
+        { align: "right" },
+      );
+      doc.text("RELATÓRIO DE INDICAÇÃO E PLANEJAMENTO POR GAIOLA", 14, 17);
+
+      doc.setFillColor(248, 250, 252);
+      doc.setDrawColor(226, 232, 240);
+      doc.roundedRect(14, 26, 182, 38, 3, 3, "FD");
+
+      doc.setTextColor(15, 23, 42);
+      doc.setFontSize(10);
+      doc.setFont("helvetica", "bold");
+      doc.text(`LOTE: ${batchName.toUpperCase()}`, 18, 33);
+
+      doc.setFontSize(8.5);
+      doc.setFont("helvetica", "normal");
+      doc.text(
+        `Data Programada da Despesca: ${schedule.date ? format(parseISO(schedule.date), "dd/MM/yyyy") : "---"}`,
+        18,
+        40,
+      );
+      doc.text(`Data de Povoamento: ${settlementDateStr}`, 18, 46);
+      doc.text(`Protocolo de Produção: ${protocolName}`, 18, 52);
+      doc.text(
+        `Peso Médio Esperado do Lote: ${formatNumber(currentAvgWeight, 1)}g`,
+        18,
+        58,
+      );
+
+      doc.text(`Jejum / Trato: ${fastingStr}`, 108, 40);
+      doc.text(
+        `Total de Gaiolas: ${schedule.cageIds.length} unidades`,
+        108,
+        46,
+      );
+      doc.text(
+        `Biomassa Total Esperada: ${formatNumber(totalBiomass, 1)} kg`,
+        108,
+        52,
+      );
+      doc.text(`Estratificação: ${stratSummary || "---"}`, 108, 58, {
+        maxWidth: 84,
+      });
+
+      const tableHead = [
+        [
+          "Gaiola",
+          "Modelo / Dimensões",
+          "População (un)",
+          "Mort. Acum. (un)",
+          "Peso Médio Esperado (g)",
+          "Biomassa Esperada (kg)",
+        ],
+      ];
+
+      const tableBody = scheduleCagesData.map((c) => [
+        c.cageName,
+        c.dimStr,
+        formatNumber(c.currentCount),
+        formatNumber(c.mortality),
+        `${formatNumber(c.currentAvgWeight, 1)} g`,
+        `${formatNumber(c.biomassKg, 1)} kg`,
+      ]);
+
+      const tableFoot = [
+        [
+          "TOTAL DA PROGRAMAÇÃO",
+          `${scheduleCagesData.length} gaiolas`,
+          `${formatNumber(totalFish)} un`,
+          `${formatNumber(totalMortality)} un`,
+          `Média: ${formatNumber(currentAvgWeight, 1)} g`,
+          `${formatNumber(totalBiomass, 1)} kg`,
+        ],
+      ];
+
+      autoTable(doc, {
+        startY: 68,
+        head: tableHead,
+        body: tableBody,
+        foot: tableFoot,
+        theme: "striped",
+        headStyles: {
+          fillColor: [52, 68, 52],
+          textColor: [255, 255, 255],
+          fontSize: 8,
+          fontStyle: "bold",
+          halign: "left",
+          valign: "middle",
+        },
+        styles: {
+          fontSize: 8,
+          cellPadding: 3,
+          valign: "middle",
+          halign: "left",
+        },
+        columnStyles: {
+          0: { fontStyle: "bold", cellWidth: 30 },
+          1: { cellWidth: 45 },
+          2: { cellWidth: 28, halign: "right" },
+          3: { cellWidth: 28, halign: "right" },
+          4: { cellWidth: 28, halign: "right" },
+          5: { cellWidth: 23, halign: "right", fontStyle: "bold" },
+        },
+        footStyles: {
+          fillColor: [241, 245, 249],
+          textColor: [15, 23, 42],
+          fontSize: 8,
+          fontStyle: "bold",
+          valign: "middle",
+        },
+        margin: { left: 14, right: 14 },
+      });
+
+      const finalY = (doc as any).lastAutoTable?.finalY || 180;
+      const signY = Math.min(Math.max(finalY + 25, 220), 265);
+
+      doc.setDrawColor(148, 163, 184);
+      doc.setLineWidth(0.4);
+
+      doc.line(20, signY, 90, signY);
+      doc.setFontSize(8);
+      doc.setTextColor(71, 85, 105);
+      doc.setFont("helvetica", "bold");
+      doc.text("Responsável pela Despesca / Equipe", 55, signY + 5, {
+        align: "center",
+      });
+
+      doc.line(120, signY, 190, signY);
+      doc.text("Visto da Gerência / Piscicultura", 155, signY + 5, {
+        align: "center",
+      });
+    });
+
+    const fileName =
+      schedulesToExport.length === 1
+        ? `programacao-despesca-${schedulesToExport[0].date || "relatorio"}.pdf`
+        : `programacoes-despesca-${format(new Date(), "yyyy-MM-dd-HHmm")}.pdf`;
+
+    doc.save(fileName);
+  };
+
   const planningCages = useMemo(() => {
     if (!selectedPlanningBatchId) return [];
 
@@ -1646,15 +1888,39 @@ const BatchManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                         </div>
                       </div>
 
-                      <button
-                        onClick={handleSaveSchedule}
-                        className="w-full py-4 bg-blue-600 text-white rounded-2xl font-black uppercase tracking-widest text-xs shadow-lg shadow-blue-200 hover:bg-blue-700 transition-all flex items-center justify-center gap-2"
-                      >
-                        <CheckCircle2 className="w-4 h-4" />
-                        {editingScheduleId
-                          ? "Atualizar Programação"
-                          : "Salvar Programação"}
-                      </button>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={handleSaveSchedule}
+                          className="flex-1 py-4 bg-blue-600 text-white rounded-2xl font-black uppercase tracking-widest text-xs shadow-lg shadow-blue-200 hover:bg-blue-700 transition-all flex items-center justify-center gap-2"
+                        >
+                          <CheckCircle2 className="w-4 h-4" />
+                          {editingScheduleId
+                            ? "Atualizar Programação"
+                            : "Salvar Programação"}
+                        </button>
+                        <button
+                          onClick={() => {
+                            if (!plannedHarvestDate) {
+                              alert("Informe a data da despesca para gerar o PDF da programação.");
+                              return;
+                            }
+                            exportSchedulesPDF([
+                              {
+                                id: editingScheduleId || "draft",
+                                batchId: selectedPlanningBatchId,
+                                cageIds: selectedPlanningCageIds,
+                                date: plannedHarvestDate,
+                                lastFeedingDate: lastFeeding,
+                              },
+                            ]);
+                          }}
+                          className="px-4 py-4 bg-slate-800 text-white rounded-2xl font-black uppercase tracking-widest text-xs shadow-lg shadow-slate-200 hover:bg-slate-900 transition-all flex items-center justify-center gap-2"
+                          title="Gerar PDF desta programação"
+                        >
+                          <FileText className="w-4 h-4 text-emerald-400" />
+                          PDF
+                        </button>
+                      </div>
 
                       <div className="p-4 bg-amber-50 border border-amber-100 rounded-2xl flex items-start gap-3">
                         <Info className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
@@ -1666,160 +1932,224 @@ const BatchManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                       </div>
                     </div>
                   ) : (
-                    <div className="space-y-4">
-                      <h4 className="text-xs font-black text-slate-800 uppercase tracking-widest italic ml-1">
-                        Programações Salvas
-                      </h4>
-                      <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2 scrollbar-hide">
-                        {(state.harvestSchedules || [])
-                          .filter(
-                            (s) =>
-                              !selectedScheduleDate ||
-                              s.date === selectedScheduleDate,
-                          )
-                          .sort((a, b) => b.date.localeCompare(a.date))
-                          .map((schedule) => {
-                            const batch = state.batches.find(
-                              (b) => b.id === schedule.batchId,
-                            );
-                            return (
-                              <div
-                                key={schedule.id}
-                                className="bg-white p-4 rounded-2xl border border-slate-100 hover:border-blue-200 transition-all group"
-                              >
-                                <div className="flex items-center justify-between mb-3">
-                                  <div className="flex items-center gap-2">
-                                    <Calendar className="w-4 h-4 text-blue-500" />
-                                    <span className="text-xs font-black text-slate-800">
-                                      {format(
-                                        parseISO(schedule.date),
-                                        "dd/MM/yyyy",
-                                      )}
-                                    </span>
-                                  </div>
-                                  <div className="flex gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
-                                    <button
-                                      onClick={() =>
-                                        startEditSchedule(schedule)
-                                      }
-                                      className="p-1.5 text-slate-300 hover:text-blue-500 transition-colors"
-                                    >
-                                      <Edit className="w-3.5 h-3.5" />
-                                    </button>
-                                    <button
-                                      onClick={() =>
-                                        removeSchedule(schedule.id)
-                                      }
-                                      className="p-1.5 text-slate-300 hover:text-red-500 transition-colors"
-                                    >
-                                      <Trash2 className="w-3.5 h-3.5" />
-                                    </button>
-                                  </div>
-                                </div>
-                                <div className="flex items-center justify-between">
-                                  <div className="flex flex-col">
-                                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                                      Lote
-                                    </span>
-                                    <span className="text-xs font-bold text-slate-700">
-                                      {batch?.name || "Lote removido"}
-                                    </span>
-                                  </div>
-                                  <div className="flex flex-col items-end">
-                                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                                      Gaiolas
-                                    </span>
-                                    <span className="text-xs font-bold text-blue-600">
-                                      {schedule.cageIds.length} unidades
-                                    </span>
-                                  </div>
-                                </div>
+                    (() => {
+                      const visibleSchedules = (state.harvestSchedules || [])
+                        .filter(
+                          (s) =>
+                            !selectedScheduleDate ||
+                            s.date === selectedScheduleDate,
+                        )
+                        .sort((a, b) => b.date.localeCompare(a.date));
 
-                                {schedule.lastFeedingDate && (
-                                  <div className="mb-2 px-2 py-1 bg-amber-50 rounded-lg border border-amber-100 flex items-center gap-2">
-                                    <Utensils className="w-3 h-3 text-amber-600" />
-                                    <div className="flex flex-col">
-                                      <span className="text-[8px] font-black text-amber-400 uppercase tracking-widest">
-                                        Último Trato
-                                      </span>
-                                      <span className="text-[9px] font-bold text-amber-700 uppercase">
+                      return (
+                        <div className="space-y-4">
+                          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                            <h4 className="text-xs font-black text-slate-800 uppercase tracking-widest italic ml-1">
+                              Programações Salvas
+                            </h4>
+                            {visibleSchedules.length > 0 && (
+                              <button
+                                onClick={() => exportSchedulesPDF(visibleSchedules)}
+                                className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-black uppercase tracking-widest transition-all flex items-center gap-2 shadow-sm shrink-0"
+                              >
+                                <FileText className="w-4 h-4" />
+                                Exportar Todos os Lotes (PDF)
+                              </button>
+                            )}
+                          </div>
+
+                          <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2 scrollbar-hide">
+                            {visibleSchedules.map((schedule) => {
+                              const batch =
+                                batchStats.find((b) => b.id === schedule.batchId) ||
+                                state.batches.find((b) => b.id === schedule.batchId);
+                              const avgWeight = batch?.currentAvgWeight || 0;
+
+                              const totalScheduleBiomass = schedule.cageIds.reduce(
+                                (acc, cid) => {
+                                  const cage = state.cages.find((c) => c.id === cid);
+                                  const mortality = (state.mortalityLogs || [])
+                                    .filter((m) => {
+                                      if (m.cageId !== cid) return false;
+                                      if (m.batchId) return m.batchId === schedule.batchId;
+                                      return batch?.settlementDate
+                                        ? m.date >= batch.settlementDate
+                                        : true;
+                                    })
+                                    .reduce((sum, curr) => sum + curr.count, 0);
+                                  const count = Math.max(
+                                    0,
+                                    (cage?.initialFishCount || 0) - mortality,
+                                  );
+                                  return acc + (count * avgWeight) / 1000;
+                                },
+                                0,
+                              );
+
+                              return (
+                                <div
+                                  key={schedule.id}
+                                  className="bg-white p-4 rounded-2xl border border-slate-100 hover:border-blue-200 transition-all group"
+                                >
+                                  <div className="flex items-center justify-between mb-3">
+                                    <div className="flex items-center gap-2">
+                                      <Calendar className="w-4 h-4 text-blue-500" />
+                                      <span className="text-xs font-black text-slate-800">
                                         {format(
-                                          parseISO(schedule.lastFeedingDate),
-                                          "dd/MM/yyyy 'às' HH:mm",
+                                          parseISO(schedule.date),
+                                          "dd/MM/yyyy",
                                         )}
                                       </span>
                                     </div>
+                                    <div className="flex items-center gap-1">
+                                      <button
+                                        onClick={() => exportSchedulesPDF([schedule])}
+                                        title="Gerar PDF desta programação"
+                                        className="px-2.5 py-1 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-lg text-[10px] font-black uppercase transition-all flex items-center gap-1 border border-blue-200"
+                                      >
+                                        <FileText className="w-3.5 h-3.5" />
+                                        PDF
+                                      </button>
+                                      <button
+                                        onClick={() =>
+                                          startEditSchedule(schedule)
+                                        }
+                                        title="Editar programação"
+                                        className="p-1.5 text-slate-300 hover:text-blue-500 transition-colors"
+                                      >
+                                        <Edit className="w-3.5 h-3.5" />
+                                      </button>
+                                      <button
+                                        onClick={() =>
+                                          removeSchedule(schedule.id)
+                                        }
+                                        title="Excluir programação"
+                                        className="p-1.5 text-slate-300 hover:text-red-500 transition-colors"
+                                      >
+                                        <Trash2 className="w-3.5 h-3.5" />
+                                      </button>
+                                    </div>
                                   </div>
-                                )}
-
-                                {(() => {
-                                  const scheduleCages = schedule.cageIds
-                                    .map((cid) =>
-                                      state.cages.find((c) => c.id === cid),
-                                    )
-                                    .filter(Boolean);
-                                  const counts: Record<string, number> = {};
-                                  scheduleCages.forEach((cage) => {
-                                    if (!cage) return;
-                                    const model = cage.model || "Gaiola";
-                                    const d = cage.dimensions || {
-                                      width: 0,
-                                      length: 0,
-                                      depth: 0,
-                                    };
-                                    const dim =
-                                      model === "Circular"
-                                        ? `Circular (${d.depth || 0}m prof.)`
-                                        : `${model} (${d.width || 0}x${d.length || 0}x${d.depth || 0})`;
-                                    counts[dim] = (counts[dim] || 0) + 1;
-                                  });
-                                  const strat = Object.entries(counts)
-                                    .map(
-                                      ([dim, count]) =>
-                                        `${dim} ${formatNumber(count)}uni`,
-                                    )
-                                    .join(", ");
-                                  return strat ? (
-                                    <div className="mt-2 px-2 py-1 bg-slate-50 rounded-lg border border-slate-100">
-                                      <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest block">
-                                        Estratificação
+                                  <div className="flex items-center justify-between">
+                                    <div className="flex flex-col">
+                                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                                        Lote
                                       </span>
-                                      <span className="text-[9px] font-bold text-slate-600 uppercase">
-                                        {strat}
+                                      <span className="text-xs font-bold text-slate-700">
+                                        {batch?.name || "Lote removido"}
                                       </span>
                                     </div>
-                                  ) : null;
-                                })()}
-
-                                <div className="mt-3 flex flex-wrap gap-1">
-                                  {schedule.cageIds.map((cid) => {
-                                    const c = state.cages.find(
-                                      (cage) => cage.id === cid,
-                                    );
-                                    return (
-                                      <span
-                                        key={cid}
-                                        className="px-1.5 py-0.5 bg-slate-50 text-[8px] font-black text-slate-500 rounded uppercase border border-slate-100"
-                                      >
-                                        {c?.name || "---"}
+                                    <div className="flex flex-col items-end">
+                                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                                        Gaiolas
                                       </span>
-                                    );
-                                  })}
+                                      <span className="text-xs font-bold text-blue-600">
+                                        {schedule.cageIds.length} unidades
+                                      </span>
+                                    </div>
+                                  </div>
+
+                                  <div className="mt-2 pt-2 border-t border-slate-100 flex items-center justify-between text-[10px] font-bold">
+                                    <span className="text-slate-400">
+                                      Peso Esperado:{" "}
+                                      <strong className="text-slate-700">
+                                        {formatNumber(avgWeight, 1)}g
+                                      </strong>
+                                    </span>
+                                    <span className="text-slate-400">
+                                      Biomassa Esperada:{" "}
+                                      <strong className="text-blue-600">
+                                        {formatNumber(totalScheduleBiomass, 1)}kg
+                                      </strong>
+                                    </span>
+                                  </div>
+
+                                  {schedule.lastFeedingDate && (
+                                    <div className="mt-2 px-2 py-1 bg-amber-50 rounded-lg border border-amber-100 flex items-center gap-2">
+                                      <Utensils className="w-3 h-3 text-amber-600" />
+                                      <div className="flex flex-col">
+                                        <span className="text-[8px] font-black text-amber-400 uppercase tracking-widest">
+                                          Último Trato
+                                        </span>
+                                        <span className="text-[9px] font-bold text-amber-700 uppercase">
+                                          {format(
+                                            parseISO(schedule.lastFeedingDate),
+                                            "dd/MM/yyyy 'às' HH:mm",
+                                          )}
+                                        </span>
+                                      </div>
+                                    </div>
+                                  )}
+
+                                  {(() => {
+                                    const scheduleCages = schedule.cageIds
+                                      .map((cid) =>
+                                        state.cages.find((c) => c.id === cid),
+                                      )
+                                      .filter(Boolean);
+                                    const counts: Record<string, number> = {};
+                                    scheduleCages.forEach((cage) => {
+                                      if (!cage) return;
+                                      const model = cage.model || "Gaiola";
+                                      const d = cage.dimensions || {
+                                        width: 0,
+                                        length: 0,
+                                        depth: 0,
+                                      };
+                                      const dim =
+                                        model === "Circular"
+                                          ? `Circular (${d.depth || 0}m prof.)`
+                                          : `${model} (${d.width || 0}x${d.length || 0}x${d.depth || 0})`;
+                                      counts[dim] = (counts[dim] || 0) + 1;
+                                    });
+                                    const strat = Object.entries(counts)
+                                      .map(
+                                        ([dim, count]) =>
+                                          `${dim} ${formatNumber(count)}uni`,
+                                      )
+                                      .join(", ");
+                                    return strat ? (
+                                      <div className="mt-2 px-2 py-1 bg-slate-50 rounded-lg border border-slate-100">
+                                        <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest block">
+                                          Estratificação
+                                        </span>
+                                        <span className="text-[9px] font-bold text-slate-600 uppercase">
+                                          {strat}
+                                        </span>
+                                      </div>
+                                    ) : null;
+                                  })()}
+
+                                  <div className="mt-3 flex flex-wrap gap-1">
+                                    {schedule.cageIds.map((cid) => {
+                                      const c = state.cages.find(
+                                        (cage) => cage.id === cid,
+                                      );
+                                      return (
+                                        <span
+                                          key={cid}
+                                          className="px-1.5 py-0.5 bg-slate-50 text-[8px] font-black text-slate-500 rounded uppercase border border-slate-100"
+                                        >
+                                          {c?.name || "---"}
+                                        </span>
+                                      );
+                                    })}
+                                  </div>
                                 </div>
+                              );
+                            })}
+                            {visibleSchedules.length === 0 && (
+                              <div className="py-12 text-center bg-slate-50 rounded-[2rem] border border-dashed border-slate-200">
+                                <Calendar className="w-8 h-8 text-slate-200 mx-auto mb-2" />
+                                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
+                                  Nenhuma programação salva.
+                                </p>
                               </div>
-                            );
-                          })}
-                        {(!state.harvestSchedules ||
-                          state.harvestSchedules.length === 0) && (
-                          <div className="py-12 text-center bg-slate-50 rounded-[2rem] border border-dashed border-slate-200">
-                            <Calendar className="w-8 h-8 text-slate-200 mx-auto mb-2" />
-                            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
-                              Nenhuma programação salva.
-                            </p>
+                            )}
                           </div>
-                        )}
-                      </div>
-                    </div>
+                        </div>
+                      );
+                    })()
                   )}
                 </div>
               </div>
