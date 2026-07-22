@@ -614,20 +614,53 @@ const BatchManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       const batchBiometries = biometryByBatch.get(batch.id) || [];
 
       let currentAvgWeight = batch.initialUnitWeight;
-      if (batchBiometries.length > 0) {
-        const lastDate = batchBiometries.reduce(
-          (max, log) => (log.date > max ? log.date : max),
-          "",
+      let biometriesToConsider = batchBiometries;
+
+      if (batchHarvests.length > 0) {
+        const firstHarvestDate = batchHarvests.reduce(
+          (min, h) => (h.date < min ? h.date : min),
+          batchHarvests[0].date,
         );
-        const lastDayLogs = batchBiometries.filter(
-          (log) => log.date === lastDate,
+        const biometriesBeforeHarvest = batchBiometries.filter(
+          (b) => b.date <= firstHarvestDate,
         );
-        if (lastDayLogs.length > 0) {
-          const sumWeights = lastDayLogs.reduce(
+        if (biometriesBeforeHarvest.length > 0) {
+          biometriesToConsider = biometriesBeforeHarvest;
+        }
+      }
+
+      if (biometriesToConsider.length > 0) {
+        let targetLogs: typeof state.biometryLogs = [];
+
+        if (batchHarvests.length > 0) {
+          const firstHarvestDate = batchHarvests.reduce(
+            (min, h) => (h.date < min ? h.date : min),
+            batchHarvests[0].date,
+          );
+          const harvestDayLogs = biometriesToConsider.filter(
+            (log) => log.date === firstHarvestDate,
+          );
+          if (harvestDayLogs.length > 0) {
+            targetLogs = harvestDayLogs;
+          }
+        }
+
+        if (targetLogs.length === 0) {
+          const lastDate = biometriesToConsider.reduce(
+            (max, log) => (log.date > max ? log.date : max),
+            "",
+          );
+          targetLogs = biometriesToConsider.filter(
+            (log) => log.date === lastDate,
+          );
+        }
+
+        if (targetLogs.length > 0) {
+          const sumWeights = targetLogs.reduce(
             (acc, log) => acc + log.averageWeight,
             0,
           );
-          currentAvgWeight = sumWeights / lastDayLogs.length;
+          currentAvgWeight = sumWeights / targetLogs.length;
         }
       }
 

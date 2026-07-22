@@ -554,13 +554,45 @@ const Dashboard: React.FC<Props> = ({ state }) => {
       let currentAvgWeight = batch.initialUnitWeight || 0;
       let samplingInfo = "Peso Inicial";
 
-      if (batchBiometries.length > 0) {
-        const sorted = [...batchBiometries].sort((a, b) => b.date.localeCompare(a.date));
-        const lastDate = sorted[0].date;
-        const lastDayLogs = batchBiometries.filter(log => log.date === lastDate);
-        const sumWeights = lastDayLogs.reduce((acc, log) => acc + log.averageWeight, 0);
-        currentAvgWeight = sumWeights / lastDayLogs.length;
-        samplingInfo = `Média de ${lastDayLogs.length} gaiolas (${lastDate})`;
+      const batchHarvests = (state.harvestLogs || []).filter(h => h.batchId === batch.id);
+      let biometriesToConsider = batchBiometries;
+
+      if (batchHarvests.length > 0) {
+        const firstHarvestDate = batchHarvests.reduce(
+          (min, h) => (h.date < min ? h.date : min),
+          batchHarvests[0].date
+        );
+        const biometriesBeforeHarvest = batchBiometries.filter(b => b.date <= firstHarvestDate);
+        if (biometriesBeforeHarvest.length > 0) {
+          biometriesToConsider = biometriesBeforeHarvest;
+        }
+      }
+
+      if (biometriesToConsider.length > 0) {
+        let targetLogs: typeof state.biometryLogs = [];
+
+        if (batchHarvests.length > 0) {
+          const firstHarvestDate = batchHarvests.reduce(
+            (min, h) => (h.date < min ? h.date : min),
+            batchHarvests[0].date
+          );
+          const harvestDayLogs = biometriesToConsider.filter(log => log.date === firstHarvestDate);
+          if (harvestDayLogs.length > 0) {
+            targetLogs = harvestDayLogs;
+          }
+        }
+
+        if (targetLogs.length === 0) {
+          const sorted = [...biometriesToConsider].sort((a, b) => b.date.localeCompare(a.date));
+          const lastDate = sorted[0].date;
+          targetLogs = biometriesToConsider.filter(log => log.date === lastDate);
+        }
+
+        if (targetLogs.length > 0) {
+          const sumWeights = targetLogs.reduce((acc, log) => acc + log.averageWeight, 0);
+          currentAvgWeight = sumWeights / targetLogs.length;
+          samplingInfo = `Média de ${targetLogs.length} gaiolas (${targetLogs[0].date})`;
+        }
       }
 
       const totalBiomassKg = (currentTotalStock * currentAvgWeight) / 1000;
