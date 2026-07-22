@@ -76,147 +76,182 @@ const SlaughterSummary = React.memo(({ stats, startDate, endDate, onStartDateCha
              </div>
           </div>
 
-          {/* Linha 1: Produção */}
-          <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-8 gap-8 mb-8 pb-8 border-b border-white/5">
-             <div className="space-y-2 border-l-2 border-blue-400/30 pl-6">
-                <div className="text-[9px] font-black opacity-40 uppercase tracking-widest text-blue-300">TOTAL ORÇADO RECEPÇÃO</div>
-                <div className="text-2xl font-black text-blue-200 flex items-baseline gap-1">
-                   {formatNumber(stats.totalOrcadoRecep, 0)}
-                   <span className="text-[10px] opacity-40">kg</span>
-                </div>
+          {/* Linha 1: Indicadores Orçamento e Recepção */}
+          <div className="mb-8 pb-8 border-b border-white/5">
+             <div className="text-[10px] font-black uppercase tracking-[0.2em] text-blue-300/70 mb-4 flex items-center gap-2">
+                <span className="w-1.5 h-1.5 rounded-full bg-blue-400"></span>
+                Orçamento & Recepção
              </div>
-             <div className="space-y-2 border-l-2 border-blue-400/30 pl-6">
-                <div className="text-[9px] font-black opacity-40 uppercase tracking-widest text-blue-300">MÉDIA ORÇADO DIA</div>
-                <div className="text-2xl font-black text-blue-200 flex items-baseline gap-1">
-                   {formatNumber(stats.avgOrcadoPerDay, 0)}
-                   <span className="text-[10px] opacity-40">kg/dia</span>
+             <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+                <div className="space-y-2 border-l-2 border-blue-400/40 pl-5">
+                   <div className="text-[9px] font-black opacity-50 uppercase tracking-widest text-blue-300">TOTAL ORÇADO RECEPÇÃO</div>
+                   <div className="text-2xl font-black text-blue-200 flex items-baseline gap-1">
+                      {formatNumber(stats.totalOrcadoRecep, 0)}
+                      <span className="text-[10px] opacity-40">kg</span>
+                   </div>
                 </div>
-             </div>
-             <div className="space-y-2 border-l-2 border-white/10 pl-6">
-                <div className="text-[9px] font-black opacity-40 uppercase tracking-widest">Total Recepção</div>
-                <div className="text-2xl font-black flex items-baseline gap-1">
-                   {formatNumber(stats.totalRecep, 0)}
-                   <span className="text-[10px] opacity-40">kg</span>
+                <div className="space-y-2 border-l-2 border-blue-400/40 pl-5">
+                   <div className="text-[9px] font-black opacity-50 uppercase tracking-widest text-blue-300">MÉDIA ORÇADO DIA</div>
+                   <div className="text-2xl font-black text-blue-200 flex items-baseline gap-1">
+                      {formatNumber(stats.avgOrcadoPerDay, 0)}
+                      <span className="text-[10px] opacity-40">kg/dia</span>
+                   </div>
                 </div>
-             </div>
-             <div className="space-y-2 border-l-2 border-emerald-500/30 pl-6">
-                <div className="text-[9px] font-black opacity-40 uppercase tracking-widest">Total Embalado</div>
-                <div className="text-2xl font-black text-emerald-400 flex items-baseline gap-1">
-                   {formatNumber(stats.totalPacked, 0)}
-                   <span className="text-[10px] opacity-40">kg</span>
+                <div className="space-y-2 border-l-2 border-white/20 pl-5">
+                   <div className="text-[9px] font-black opacity-50 uppercase tracking-widest">Total Recepção</div>
+                   <div className="text-2xl font-black flex items-baseline gap-1">
+                      {formatNumber(stats.totalRecep, 0)}
+                      <span className="text-[10px] opacity-40">kg</span>
+                   </div>
                 </div>
-             </div>
-             <div className="space-y-2 border-l-2 border-blue-500/30 pl-6">
-                <div className="text-[9px] font-black opacity-40 uppercase tracking-widest">Rendimento</div>
-                <div className="text-2xl font-black text-blue-300 flex items-baseline gap-1">
-                   {formatNumber(stats.yieldPercentage, 1)}
-                   <span className="text-[10px] opacity-40">%</span>
-                </div>
-             </div>
-             <div className="space-y-2 border-l-2 border-white/10 pl-6">
-                <div className="text-[9px] font-black opacity-40 uppercase tracking-widest">Filé Congelado</div>
-                <div className="text-2xl font-black flex items-baseline gap-1">
-                   {formatNumber(stats.totalGta, 0)}
-                   <span className="text-[10px] opacity-40">kg</span>
-                </div>
-             </div>
-             <div className="space-y-2 border-l-2 border-white/10 pl-6">
-                <div className="text-[9px] font-black opacity-40 uppercase tracking-widest">Média Abate Dia</div>
-                <div className="text-2xl font-black flex items-baseline gap-1">
-                   {formatNumber(stats.avgSlaughterPerDay, 0)}
-                   <span className="text-[10px] opacity-40">kg/dia</span>
-                </div>
-             </div>
-             <div className="space-y-2 border-l-2 border-emerald-500/30 pl-6">
-                <div className="text-[9px] font-black opacity-40 uppercase tracking-widest">Média Prod. Acabado Dia</div>
-                <div className="text-2xl font-black text-emerald-400 flex items-baseline gap-1">
-                   {formatNumber(stats.avgFinishedProductPerDay, 0)}
-                   <span className="text-[10px] opacity-40">kg/dia</span>
+                <div className="space-y-2 border-l-2 border-white/20 pl-5">
+                   <div className="text-[9px] font-black opacity-50 uppercase tracking-widest">Média Abate Dia</div>
+                   <div className="text-2xl font-black flex items-baseline gap-1">
+                      {formatNumber(stats.avgSlaughterPerDay, 0)}
+                      <span className="text-[10px] opacity-40">kg/dia</span>
+                   </div>
                 </div>
              </div>
           </div>
 
-          {/* Linha 2: Condenações */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-8 mb-8 pb-8 border-b border-white/5">
-             <div className="space-y-2 border-l-2 border-red-500/30 pl-6">
-                <div className="text-[9px] font-black opacity-40 uppercase tracking-widest">Condenações Frig.</div>
-                <div className="text-xl font-black text-red-400 flex items-baseline gap-1">
-                   {formatNumber(stats.totalSlaughterCondemnation)}
-                   <span className="text-[10px] opacity-40">kg</span>
-                </div>
+          {/* Linha 2: Dados de Abate */}
+          <div className="mb-8 pb-8 border-b border-white/5">
+             <div className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-300/70 mb-4 flex items-center gap-2">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                Dados de Abate
              </div>
-             <div className="space-y-2 border-l-2 border-orange-500/30 pl-6">
-                <div className="text-[9px] font-black opacity-40 uppercase tracking-widest">Condenações Transp.</div>
-                <div className="text-xl font-black text-orange-400 flex items-baseline gap-1">
-                   {formatNumber(stats.totalTransportCondemnation)}
-                   <span className="text-[10px] opacity-40">kg</span>
+             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-6">
+                <div className="space-y-2 border-l-2 border-emerald-500/40 pl-5">
+                   <div className="text-[9px] font-black opacity-50 uppercase tracking-widest">Total Embalado</div>
+                   <div className="text-xl font-black text-emerald-400 flex items-baseline gap-1">
+                      {formatNumber(stats.totalPacked, 0)}
+                      <span className="text-[10px] opacity-40">kg</span>
+                   </div>
                 </div>
-             </div>
-             <div className="space-y-2 border-l-2 border-amber-500/30 pl-6">
-                <div className="text-[9px] font-black opacity-40 uppercase tracking-widest">Graxaria</div>
-                <div className="text-xl font-black text-amber-400 flex items-baseline gap-1">
-                   {formatNumber(stats.totalRendering, 0)}
-                   <span className="text-[10px] opacity-40">kg</span>
+                <div className="space-y-2 border-l-2 border-white/20 pl-5">
+                   <div className="text-[9px] font-black opacity-50 uppercase tracking-widest">Filé Congelado</div>
+                   <div className="text-xl font-black flex items-baseline gap-1">
+                      {formatNumber(stats.totalGta, 0)}
+                      <span className="text-[10px] opacity-40">kg</span>
+                   </div>
                 </div>
-             </div>
-             <div className="space-y-2 border-l-2 border-amber-500/30 pl-6">
-                <div className="text-[9px] font-black opacity-40 uppercase tracking-widest">Rendimento Graxaria</div>
-                <div className="text-xl font-black text-amber-200 flex items-baseline gap-1">
-                   {formatNumber(stats.renderingYield, 1)}
-                   <span className="text-[10px] opacity-40">%</span>
+                <div className="space-y-2 border-l-2 border-emerald-500/40 pl-5">
+                   <div className="text-[9px] font-black opacity-50 uppercase tracking-widest">Média Prod. Acabado Dia</div>
+                   <div className="text-xl font-black text-emerald-300 flex items-baseline gap-1">
+                      {formatNumber(stats.avgFinishedProductPerDay, 0)}
+                      <span className="text-[10px] opacity-40">kg/dia</span>
+                   </div>
+                </div>
+                <div className="space-y-2 border-l-2 border-red-500/40 pl-5">
+                   <div className="text-[9px] font-black opacity-50 uppercase tracking-widest">Condenações Frig.</div>
+                   <div className="text-xl font-black text-red-400 flex items-baseline gap-1">
+                      {formatNumber(stats.totalSlaughterCondemnation)}
+                      <span className="text-[10px] opacity-40">kg</span>
+                   </div>
+                </div>
+                <div className="space-y-2 border-l-2 border-orange-500/40 pl-5">
+                   <div className="text-[9px] font-black opacity-50 uppercase tracking-widest">Condenações Transp.</div>
+                   <div className="text-xl font-black text-orange-400 flex items-baseline gap-1">
+                      {formatNumber(stats.totalTransportCondemnation)}
+                      <span className="text-[10px] opacity-40">kg</span>
+                   </div>
+                </div>
+                <div className="space-y-2 border-l-2 border-amber-500/40 pl-5">
+                   <div className="text-[9px] font-black opacity-50 uppercase tracking-widest">Graxaria</div>
+                   <div className="text-xl font-black text-amber-400 flex items-baseline gap-1">
+                      {formatNumber(stats.totalRendering, 0)}
+                      <span className="text-[10px] opacity-40">kg</span>
+                   </div>
                 </div>
              </div>
           </div>
 
-          {/* Linha 3: Financeiro */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-8">
-             <div className="space-y-2 border-l-2 border-amber-500/30 pl-6">
-                <div className="text-[9px] font-black opacity-40 uppercase tracking-widest">VALOR TOTAL MP PEIXE VIVO</div>
-                <div className="text-xl font-black text-amber-100 flex items-baseline gap-1">
-                   <span className="text-[10px] opacity-40">R$</span>
-                   {formatNumber(stats.totalInvoiceValue, 2)}
+          {/* Linha 3: Rendimentos */}
+          <div className="mb-8 pb-8 border-b border-white/5">
+             <div className="text-[10px] font-black uppercase tracking-[0.2em] text-amber-300/70 mb-4 flex items-center gap-2">
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
+                Rendimentos
+             </div>
+             <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+                <div className="space-y-2 border-l-2 border-blue-500/50 pl-5 bg-blue-500/5 rounded-r-xl py-3">
+                   <div className="text-[9px] font-black text-blue-300 uppercase tracking-widest">Rendimento PA</div>
+                   <div className="text-2xl font-black text-blue-200 flex items-baseline gap-1">
+                      {formatNumber(stats.yieldPercentage, 1)}
+                      <span className="text-[10px] opacity-40">%</span>
+                   </div>
+                </div>
+                <div className="space-y-2 border-l-2 border-emerald-500/50 pl-5 bg-emerald-500/5 rounded-r-xl py-3">
+                   <div className="text-[9px] font-black text-emerald-300 uppercase tracking-widest">RENDIMENTO DE FILÉ</div>
+                   <div className="text-2xl font-black text-emerald-200 flex items-baseline gap-1">
+                      {formatNumber(stats.totalRecep > 0 ? (stats.totalGta / stats.totalRecep) * 100 : 0, 1)}
+                      <span className="text-[10px] opacity-40">%</span>
+                   </div>
+                </div>
+                <div className="space-y-2 border-l-2 border-amber-500/50 pl-5 bg-amber-500/5 rounded-r-xl py-3">
+                   <div className="text-[9px] font-black text-amber-300 uppercase tracking-widest">Rendimento Graxaria</div>
+                   <div className="text-2xl font-black text-amber-200 flex items-baseline gap-1">
+                      {formatNumber(stats.renderingYield, 1)}
+                      <span className="text-[10px] opacity-40">%</span>
+                   </div>
                 </div>
              </div>
-             <div className="space-y-2 border-l-2 border-amber-500/30 pl-6">
-                <div className="text-[9px] font-black opacity-40 uppercase tracking-widest">kilo MP PEIXE VIVO</div>
-                <div className="text-xl font-black text-amber-100 flex items-baseline gap-1">
-                   <span className="text-[10px] opacity-40">R$</span>
-                   {formatNumber(stats.totalRecep > 0 ? stats.totalInvoiceValue / stats.totalRecep : 0, 2)}
-                </div>
+          </div>
+
+          {/* Linha 4: Dados Financeiros */}
+          <div>
+             <div className="text-[10px] font-black uppercase tracking-[0.2em] text-indigo-300/70 mb-4 flex items-center gap-2">
+                <span className="w-1.5 h-1.5 rounded-full bg-indigo-400"></span>
+                Dados Financeiros
              </div>
-             <div className="space-y-2 border-l-2 border-white/20 pl-6">
-                <div className="text-[9px] font-black opacity-40 uppercase tracking-widest">FRETE KG VIVO</div>
-                <div className="text-xl font-black text-white/90 flex items-baseline gap-1">
-                   <span className="text-[10px] opacity-40">R$</span>
-                   {formatNumber(stats.freightPerKgLive, 2)}
+             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-6">
+                <div className="space-y-2 border-l-2 border-amber-500/40 pl-5">
+                   <div className="text-[9px] font-black opacity-50 uppercase tracking-widest">VALOR TOTAL MP PEIXE VIVO</div>
+                   <div className="text-lg font-black text-amber-100 flex items-baseline gap-1">
+                      <span className="text-[10px] opacity-40">R$</span>
+                      {formatNumber(stats.totalInvoiceValue, 2)}
+                   </div>
                 </div>
-             </div>
-             <div className="space-y-2 border-l-2 border-white/20 pl-6">
-                <div className="text-[9px] font-black opacity-40 uppercase tracking-widest">MÃO DE OBRA/KG</div>
-                <div className="text-xl font-black text-white/90 flex items-baseline gap-1">
-                   <span className="text-[10px] opacity-40">R$</span>
-                   {formatNumber(stats.laborPerKg, 2)}
+                <div className="space-y-2 border-l-2 border-amber-500/40 pl-5">
+                   <div className="text-[9px] font-black opacity-50 uppercase tracking-widest">kilo MP PEIXE VIVO</div>
+                   <div className="text-lg font-black text-amber-100 flex items-baseline gap-1">
+                      <span className="text-[10px] opacity-40">R$</span>
+                      {formatNumber(stats.totalRecep > 0 ? stats.totalInvoiceValue / stats.totalRecep : 0, 2)}
+                   </div>
                 </div>
-             </div>
-             <div className="space-y-2 border-l-2 border-indigo-500/50 pl-6 bg-indigo-500/5 rounded-r-xl py-2 -ml-2">
-                <div className="text-[9px] font-black text-indigo-300 uppercase tracking-widest">CUSTO KG PRODUZIDO</div>
-                <div className="text-xl font-black text-indigo-200 flex items-baseline gap-1">
-                   <span className="text-[10px] opacity-40">R$</span>
-                   {formatNumber(stats.costPerKgProduced, 2)}
+                <div className="space-y-2 border-l-2 border-white/20 pl-5">
+                   <div className="text-[9px] font-black opacity-50 uppercase tracking-widest">FRETE KG VIVO</div>
+                   <div className="text-lg font-black text-white/90 flex items-baseline gap-1">
+                      <span className="text-[10px] opacity-40">R$</span>
+                      {formatNumber(stats.freightPerKgLive, 2)}
+                   </div>
                 </div>
-             </div>
-             <div className="space-y-2 border-l-2 border-white/20 pl-6">
-                <div className="text-[9px] font-black opacity-40 uppercase tracking-widest">CONSUMO AGUA/KG</div>
-                <div className="text-xl font-black text-white/90 flex items-baseline gap-1">
-                   {formatNumber(stats.waterConsumptionPerKg, 2)}
-                   <span className="text-[10px] opacity-40">L/kg</span>
+                <div className="space-y-2 border-l-2 border-white/20 pl-5">
+                   <div className="text-[9px] font-black opacity-50 uppercase tracking-widest">MÃO DE OBRA/KG</div>
+                   <div className="text-lg font-black text-white/90 flex items-baseline gap-1">
+                      <span className="text-[10px] opacity-40">R$</span>
+                      {formatNumber(stats.laborPerKg, 2)}
+                   </div>
                 </div>
-             </div>
-             <div className="space-y-2 border-l-2 border-white/20 pl-6">
-                <div className="text-[9px] font-black opacity-40 uppercase tracking-widest">CUSTO ENERGIA/KG</div>
-                <div className="text-xl font-black text-white/90 flex items-baseline gap-1">
-                   <span className="text-[10px] opacity-40">R$</span>
-                   {formatNumber(stats.energyCostPerKg, 2)}
+                <div className="space-y-2 border-l-2 border-indigo-500/50 pl-5 bg-indigo-500/10 rounded-r-xl py-2 -ml-2">
+                   <div className="text-[9px] font-black text-indigo-300 uppercase tracking-widest">CUSTO KG PRODUZIDO</div>
+                   <div className="text-lg font-black text-indigo-200 flex items-baseline gap-1">
+                      <span className="text-[10px] opacity-40">R$</span>
+                      {formatNumber(stats.costPerKgProduced, 2)}
+                   </div>
+                </div>
+                <div className="space-y-2 border-l-2 border-white/20 pl-5">
+                   <div className="text-[9px] font-black opacity-50 uppercase tracking-widest">CONSUMO AGUA/KG</div>
+                   <div className="text-lg font-black text-white/90 flex items-baseline gap-1">
+                      {formatNumber(stats.waterConsumptionPerKg, 2)}
+                      <span className="text-[10px] opacity-40">L/kg</span>
+                   </div>
+                </div>
+                <div className="space-y-2 border-l-2 border-white/20 pl-5">
+                   <div className="text-[9px] font-black opacity-50 uppercase tracking-widest">CUSTO ENERGIA/KG</div>
+                   <div className="text-lg font-black text-white/90 flex items-baseline gap-1">
+                      <span className="text-[10px] opacity-40">R$</span>
+                      {formatNumber(stats.energyCostPerKg, 2)}
+                   </div>
                 </div>
              </div>
           </div>
