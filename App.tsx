@@ -252,8 +252,11 @@ const App: React.FC = () => {
       saveTimeoutRef.current = setTimeout(() => {
         const configToUse = state.supabaseConfig || currentUser?.supabaseConfig;
         
-        saveState(state, configToUse).then(() => {
-          lastSavedStateRef.current = state;
+        saveState(state, configToUse).then((finalState) => {
+          if (finalState) {
+            lastSavedStateRef.current = finalState;
+            setState(prev => prev ? ensureStateIntegrity(prev, finalState, 'local') : finalState);
+          }
         }).finally(() => {
           isSavingRef.current = false;
         });

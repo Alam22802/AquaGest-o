@@ -750,7 +750,8 @@ const SlaughterOverview: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
           transportCondemnation: Number(formData.transportCondemnation) || 0,
           slaughterCondemnation: Number(formData.slaughterCondemnation) || 0,
           invoiceValue: Number(formData.invoiceValue) || 0,
-          revenuePerKg: (Number(formData.packedQuantity) || 0) > 0 ? (Number(formData.invoiceValue) || 0) / (Number(formData.packedQuantity) || 0) : 0
+          revenuePerKg: (Number(formData.packedQuantity) || 0) > 0 ? (Number(formData.invoiceValue) || 0) / (Number(formData.packedQuantity) || 0) : 0,
+          updatedAt: Date.now()
         } : log
       );
       

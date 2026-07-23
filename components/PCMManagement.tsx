@@ -54,7 +54,7 @@ const PCMManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
   // Handlers for Registration
   const addCC = () => {
     if (!ccName || !ccCode) return;
-    const newCCs = [...(state.costCenters || []), { id: generateId(), name: ccName, code: ccCode, userId: currentUser.id }];
+    const newCCs = [...(state.costCenters || []), { id: generateId(), name: ccName, code: ccCode, userId: currentUser.id, updatedAt: Date.now() }];
     onUpdate({ ...state, costCenters: newCCs });
     setCcName('');
     setCcCode('');
@@ -72,7 +72,8 @@ const PCMManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       name: eqName, 
       code: autoCode, 
       costCenterId: eqCC, 
-      userId: currentUser.id 
+      userId: currentUser.id,
+      updatedAt: Date.now()
     }];
     onUpdate({ ...state, pcmEquipments: newEqs });
     setEqName('');
@@ -81,21 +82,33 @@ const PCMManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
 
   const addReason = () => {
     if (!reasonName) return;
-    const newReasons = [...(state.pcmStoppageReasons || []), { id: generateId(), name: reasonName, userId: currentUser.id }];
+    const newReasons = [...(state.pcmStoppageReasons || []), { id: generateId(), name: reasonName, userId: currentUser.id, updatedAt: Date.now() }];
     onUpdate({ ...state, pcmStoppageReasons: newReasons });
     setReasonName('');
   };
 
   const removeCC = (id: string) => {
-    onUpdate({ ...state, costCenters: (state.costCenters || []).filter(c => c.id !== id) });
+    onUpdate({ 
+      ...state, 
+      costCenters: (state.costCenters || []).filter(c => c.id !== id),
+      deletedIds: Array.from(new Set([...(state.deletedIds || []), id]))
+    });
   };
 
   const removeEq = (id: string) => {
-    onUpdate({ ...state, pcmEquipments: (state.pcmEquipments || []).filter(e => e.id !== id) });
+    onUpdate({ 
+      ...state, 
+      pcmEquipments: (state.pcmEquipments || []).filter(e => e.id !== id),
+      deletedIds: Array.from(new Set([...(state.deletedIds || []), id]))
+    });
   };
 
   const removeReason = (id: string) => {
-    onUpdate({ ...state, pcmStoppageReasons: (state.pcmStoppageReasons || []).filter(r => r.id !== id) });
+    onUpdate({ 
+      ...state, 
+      pcmStoppageReasons: (state.pcmStoppageReasons || []).filter(r => r.id !== id),
+      deletedIds: Array.from(new Set([...(state.deletedIds || []), id]))
+    });
   };
 
   // Handlers for Stoppages
@@ -109,7 +122,8 @@ const PCMManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       startDateTime: stoppageStart,
       endDateTime: stoppageEnd,
       description: stoppageDesc,
-      userId: currentUser.id
+      userId: currentUser.id,
+      updatedAt: Date.now()
     }];
     onUpdate({ ...state, pcmProductionStoppages: newStoppages });
     setStoppageCC('');
@@ -121,7 +135,11 @@ const PCMManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
   };
 
   const removeStoppage = (id: string) => {
-    onUpdate({ ...state, pcmProductionStoppages: (state.pcmProductionStoppages || []).filter(s => s.id !== id) });
+    onUpdate({ 
+      ...state, 
+      pcmProductionStoppages: (state.pcmProductionStoppages || []).filter(s => s.id !== id),
+      deletedIds: Array.from(new Set([...(state.deletedIds || []), id]))
+    });
   };
 
   // Handlers for Improvements
@@ -137,7 +155,8 @@ const PCMManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       plannedEndDate: impEnd,
       description: impDesc,
       status: 'Pendente',
-      userId: currentUser.id
+      userId: currentUser.id,
+      updatedAt: Date.now()
     }] as PCMPlannedImprovement[];
     onUpdate({ ...state, pcmPlannedImprovements: newImps });
     setImpCC('');

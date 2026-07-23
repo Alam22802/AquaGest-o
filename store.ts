@@ -79,7 +79,7 @@ const initialState: AppState = {
   deletedIds: []
 };
 
-function mergeArraysById<T extends { id: string, updatedAt?: number }>(
+function mergeArraysById<T extends { id: string, updatedAt?: number | string }>(
   local: T[], 
   remote: T[], 
   deletedIds: string[] = [],
@@ -89,28 +89,50 @@ function mergeArraysById<T extends { id: string, updatedAt?: number }>(
   const safeRemote = remote || [];
   
   if (safeRemote.length === 0 && deletedIds.length === 0) return safeLocal;
+  if (safeLocal.length === 0 && deletedIds.length === 0) return safeRemote;
   
   const map = new Map<string, T>();
   const deletedSet = deletedIds.length > 0 ? new Set(deletedIds) : null;
 
-  const processItem = (item: T) => {
-    if (!item || !item.id || (deletedSet && deletedSet.has(item.id))) return;
+  const getTime = (item: T): number => {
+    if (!item || item.updatedAt === undefined || item.updatedAt === null) return 0;
+    if (typeof item.updatedAt === 'number') return item.updatedAt;
+    const parsed = new Date(item.updatedAt).getTime();
+    return isNaN(parsed) ? 0 : parsed;
+  };
+
+  // 1. Process local items first
+  for (let i = 0; i < safeLocal.length; i++) {
+    const item = safeLocal[i];
+    if (!item || !item.id || (deletedSet && deletedSet.has(item.id))) continue;
+    map.set(item.id, item);
+  }
+
+  // 2. Process remote items
+  for (let i = 0; i < safeRemote.length; i++) {
+    const item = safeRemote[i];
+    if (!item || !item.id || (deletedSet && deletedSet.has(item.id))) continue;
     const existing = map.get(item.id);
     if (!existing) {
       map.set(item.id, item);
     } else {
-      const itemTime = Number(item.updatedAt) || 0;
-      const existingTime = Number(existing.updatedAt) || 0;
+      const itemTime = getTime(item);
+      const existingTime = getTime(existing);
+      
+      // If remote item is STRICTLY newer, update map
       if (itemTime > existingTime) {
         map.set(item.id, item);
-      } else if (itemTime === existingTime && priority === 'remote') {
-        map.set(item.id, item);
+      } else if (itemTime === existingTime) {
+        // Equal timestamp!
+        // When timestamps are equal (or both 0), PRESERVE local item
+        // so that recent/pending local user edits or additions are NEVER wiped by remote state.
+        if (priority === 'remote' && (!existingTime || existingTime === 0)) {
+          // If neither has a timestamp, prefer local to keep current user's changes
+          // map already has existing (local), so leave it.
+        }
       }
     }
-  };
-
-  for (let i = 0; i < safeLocal.length; i++) processItem(safeLocal[i]);
-  for (let i = 0; i < safeRemote.length; i++) processItem(safeRemote[i]);
+  }
 
   return Array.from(map.values());
 }
@@ -351,15 +373,15 @@ export const ensureStateIntegrity = (state: any, mergeWith?: AppState, priority:
     slaughterSupplyRequests: mergeArraysById(result.slaughterSupplyRequests || [], mergeWith.slaughterSupplyRequests || [], combinedDeletedIdsArray, priority),
     slaughterPurchaseOrders: mergeArraysById(result.slaughterPurchaseOrders || [], mergeWith.slaughterPurchaseOrders || [], combinedDeletedIdsArray, priority),
     slaughterSupplyInvoices: mergeArraysById(result.slaughterSupplyInvoices || [], mergeWith.slaughterSupplyInvoices || [], combinedDeletedIdsArray, priority),
-    slaughterSupplyCategories: (mergeWith.slaughterSupplyCategoriesUpdated || 0) > (result.slaughterSupplyCategoriesUpdated || 0) ? mergeWith.slaughterSupplyCategories : result.slaughterSupplyCategories,
+    slaughterSupplyCategories: Array.from(new Set([...(result.slaughterSupplyCategories || []), ...(mergeWith.slaughterSupplyCategories || [])])),
     slaughterSupplyCategoriesUpdated: Math.max(result.slaughterSupplyCategoriesUpdated || 0, mergeWith.slaughterSupplyCategoriesUpdated || 0),
-    slaughterExpenseCategories: (mergeWith.slaughterExpenseCategoriesUpdated || 0) > (result.slaughterExpenseCategoriesUpdated || 0) ? mergeWith.slaughterExpenseCategories : result.slaughterExpenseCategories,
+    slaughterExpenseCategories: Array.from(new Set([...(result.slaughterExpenseCategories || []), ...(mergeWith.slaughterExpenseCategories || [])])),
     slaughterExpenseCategoriesUpdated: Math.max(result.slaughterExpenseCategoriesUpdated || 0, mergeWith.slaughterExpenseCategoriesUpdated || 0),
-    slaughterHREntryTypes: (mergeWith.slaughterHREntryTypesUpdated || 0) > (result.slaughterHREntryTypesUpdated || 0) ? mergeWith.slaughterHREntryTypes : result.slaughterHREntryTypes,
+    slaughterHREntryTypes: Array.from(new Set([...(result.slaughterHREntryTypes || []), ...(mergeWith.slaughterHREntryTypes || [])])),
     slaughterHREntryTypesUpdated: Math.max(result.slaughterHREntryTypesUpdated || 0, mergeWith.slaughterHREntryTypesUpdated || 0),
-    slaughterHRDepartments: (mergeWith.slaughterHRDepartmentsUpdated || 0) > (result.slaughterHRDepartmentsUpdated || 0) ? mergeWith.slaughterHRDepartments : result.slaughterHRDepartments,
+    slaughterHRDepartments: Array.from(new Set([...(result.slaughterHRDepartments || []), ...(mergeWith.slaughterHRDepartments || [])])),
     slaughterHRDepartmentsUpdated: Math.max(result.slaughterHRDepartmentsUpdated || 0, mergeWith.slaughterHRDepartmentsUpdated || 0),
-    slaughterHRRoles: (mergeWith.slaughterHRRolesUpdated || 0) > (result.slaughterHRRolesUpdated || 0) ? mergeWith.slaughterHRRoles : result.slaughterHRRoles,
+    slaughterHRRoles: Array.from(new Set([...(result.slaughterHRRoles || []), ...(mergeWith.slaughterHRRoles || [])])),
     slaughterHRRolesUpdated: Math.max(result.slaughterHRRolesUpdated || 0, mergeWith.slaughterHRRolesUpdated || 0),
     protocols: mergeArraysById(result.protocols, mergeWith.protocols, combinedDeletedIdsArray, priority),
     standardCurves: mergeArraysById(result.standardCurves || [], mergeWith.standardCurves || [], combinedDeletedIdsArray, priority),
@@ -515,34 +537,9 @@ export const loadState = async (): Promise<AppState> => {
   return state;
 };
 
-export const saveState = async (state: AppState, userConfig?: {url: string, key: string}): Promise<void> => {
+export const saveState = async (state: AppState, userConfig?: {url: string, key: string}): Promise<AppState> => {
   const integrityState = ensureStateIntegrity(state);
-  
-  try {
-    const jsonStr = JSON.stringify(integrityState);
-    const compressed = LZString.compressToUTF16(jsonStr);
-    localStorage.setItem(STORAGE_KEY, compressed);
-  } catch (err) {
-    console.error('Erro de Quota no localStorage:', err);
-    // Se falhar mesmo com compressão, tentamos remover dados antigos/logs pesados como última medida
-    try {
-      const minimizedState = {
-        ...integrityState,
-        feedingLogs: integrityState.feedingLogs.slice(-500), // Mantém apenas os últimos 500
-        mortalityLogs: integrityState.mortalityLogs.slice(-500),
-        biometryLogs: integrityState.biometryLogs.slice(-500),
-        feedStockLogs: (integrityState.feedStockLogs || []).slice(-500),
-        slaughterLogs: integrityState.slaughterLogs.slice(-500),
-        slaughterExpenses: (integrityState.slaughterExpenses || []).slice(-500),
-      };
-      const compressed = LZString.compressToUTF16(JSON.stringify(minimizedState));
-      localStorage.setItem(STORAGE_KEY, compressed);
-      console.log('Estado salvo no cache local após minificação (excesso de quota).');
-    } catch (e) {
-      // Se ainda falhar, apenas notificamos que o cache local não funcionou
-      console.warn('Não foi possível salvar nem o estado reduzido no cache local.');
-    }
-  }
+  let finalState = integrityState;
   
   const configToUse = userConfig || integrityState.supabaseConfig;
   
@@ -558,12 +555,38 @@ export const saveState = async (state: AppState, userConfig?: {url: string, key:
   if (supabase) {
     try {
       const remote = await fetchRemoteState(configToUse);
-      const finalState = remote ? ensureStateIntegrity(integrityState, remote, 'local') : integrityState;
+      finalState = remote ? ensureStateIntegrity(integrityState, remote, 'local') : integrityState;
       await supabase.from('farm_data').upsert({ id: 'singleton', state: finalState, last_sync: new Date().toISOString() });
     } catch (err) {
       console.error('Erro de sincronização:', err);
     }
   }
+
+  try {
+    const jsonStr = JSON.stringify(finalState);
+    const compressed = LZString.compressToUTF16(jsonStr);
+    localStorage.setItem(STORAGE_KEY, compressed);
+  } catch (err) {
+    console.error('Erro de Quota no localStorage:', err);
+    try {
+      const minimizedState = {
+        ...finalState,
+        feedingLogs: finalState.feedingLogs.slice(-500),
+        mortalityLogs: finalState.mortalityLogs.slice(-500),
+        biometryLogs: finalState.biometryLogs.slice(-500),
+        feedStockLogs: (finalState.feedStockLogs || []).slice(-500),
+        slaughterLogs: finalState.slaughterLogs.slice(-500),
+        slaughterExpenses: (finalState.slaughterExpenses || []).slice(-500),
+      };
+      const compressed = LZString.compressToUTF16(JSON.stringify(minimizedState));
+      localStorage.setItem(STORAGE_KEY, compressed);
+      console.log('Estado salvo no cache local após minificação (excesso de quota).');
+    } catch (e) {
+      console.warn('Não foi possível salvar nem o estado reduzido no cache local.');
+    }
+  }
+
+  return finalState;
 };
 
 export const subscribeToRemoteChanges = (config: {url: string, key: string}, callback: (newState: AppState) => void) => {
