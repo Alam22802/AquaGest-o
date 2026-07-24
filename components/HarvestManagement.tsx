@@ -72,6 +72,20 @@ const HarvestManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
       return;
     }
 
+    const updatedCages = state.cages.map(c => 
+      (c.id === selectedCageId || (selectedCage && c.name === selectedCage.name)) ? { 
+        ...c, 
+        batchId: undefined, 
+        initialFishCount: undefined, 
+        settlementDate: undefined,
+        harvestDate: undefined,
+        status: 'Limpeza' as const,
+        maintenanceStartDate: undefined,
+        maintenanceEndDate: undefined,
+        updatedAt: Date.now()
+      } : c
+    );
+
     if (editingId) {
       const updatedLogs = (state.harvestLogs || []).map(l => 
         l.id === editingId ? {
@@ -89,6 +103,7 @@ const HarvestManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
 
       onUpdate({
         ...state,
+        cages: updatedCages,
         harvestLogs: updatedLogs
       });
       setEditingId(null);
@@ -107,21 +122,6 @@ const HarvestManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
         timestamp: new Date().toISOString(),
         updatedAt: Date.now()
       };
-
-      // Update state: add harvest log and clear cage
-      const updatedCages = state.cages.map(c => 
-        c.id === selectedCageId ? { 
-          ...c, 
-          batchId: undefined, 
-          initialFishCount: undefined, 
-          settlementDate: undefined,
-          harvestDate: undefined,
-          status: 'Limpeza' as const,
-          maintenanceStartDate: undefined,
-          maintenanceEndDate: undefined,
-          updatedAt: Date.now()
-        } : c
-      );
 
       const updatedHarvestLogs = [newLog, ...(state.harvestLogs || [])];
 

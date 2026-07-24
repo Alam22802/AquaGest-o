@@ -409,14 +409,34 @@ export const ensureStateIntegrity = (state: any, mergeWith?: AppState, priority:
       : (result.farmTargetCapacity !== undefined ? result.farmTargetCapacity : mergeWith.farmTargetCapacity),
   } : result;
 
-  const healedCages = (finalResult.cages || []).map(cage => {
-    const hasHarvestLog = (finalResult.harvestLogs || []).some(h => h.cageId === cage.id);
+  const getCanonicalBatchId = (batchRef?: string) => {
+    if (!batchRef) return '';
+    const match = (finalResult.batches || []).find(b => b.id === batchRef || b.name === batchRef);
+    return match ? match.id : batchRef;
+  };
 
-    if (cage.batchId) {
-      const harvestedFromCurrentBatch = (finalResult.harvestLogs || []).some(
-        h => h.cageId === cage.id && h.batchId === cage.batchId
-      );
-      if (harvestedFromCurrentBatch) {
+  const logBelongsToCage = (logCageId: string, cage: any) => {
+    if (!logCageId || !cage) return false;
+    if (logCageId === cage.id || logCageId === cage.name) return true;
+    const cleanLog = logCageId.toLowerCase().replace(/gaiola\s*/i, '').trim();
+    const cleanCageName = (cage.name || '').toLowerCase().replace(/gaiola\s*/i, '').trim();
+    const cleanCageId = (cage.id || '').toLowerCase().replace(/gaiola\s*/i, '').trim();
+    return Boolean(cleanLog && (cleanLog === cleanCageName || cleanLog === cleanCageId));
+  };
+
+  const healedCages = (finalResult.cages || []).map(cage => {
+    const cageHarvestLogs = (finalResult.harvestLogs || []).filter(h => logBelongsToCage(h.cageId, cage));
+    const hasHarvestLog = cageHarvestLogs.length > 0;
+
+    const currentBatchId = getCanonicalBatchId(cage.batchId);
+
+    if (currentBatchId) {
+      const harvestedFromCurrentBatch = cageHarvestLogs.some(h => {
+        const hBatchId = getCanonicalBatchId(h.batchId);
+        return hBatchId === currentBatchId;
+      });
+
+      if (harvestedFromCurrentBatch || hasHarvestLog) {
         return {
           ...cage,
           batchId: undefined,
@@ -441,13 +461,15 @@ export const ensureStateIntegrity = (state: any, mergeWith?: AppState, priority:
       return cage;
     }
 
-    const mLog = (finalResult.mortalityLogs || []).find(m => m.cageId === cage.id && m.batchId);
-    const bLog = (finalResult.biometryLogs || []).find(b => b.cageId === cage.id && b.batchId);
-    const candidateBatchId = mLog?.batchId || bLog?.batchId;
+    const mLog = (finalResult.mortalityLogs || []).find(m => logBelongsToCage(m.cageId, cage) && m.batchId);
+    const bLog = (finalResult.biometryLogs || []).find(b => logBelongsToCage(b.cageId, cage) && b.batchId);
+    const candidateBatchId = getCanonicalBatchId(mLog?.batchId || bLog?.batchId);
+
     if (candidateBatchId) {
       const openBatch = (finalResult.batches || []).find(b => b.id === candidateBatchId && !b.isClosed);
-      const harvestedFromCandidate = (finalResult.harvestLogs || []).some(h => h.cageId === cage.id && h.batchId === candidateBatchId);
-      if (openBatch && !harvestedFromCandidate) {
+      const harvestedFromCandidate = cageHarvestLogs.some(h => getCanonicalBatchId(h.batchId) === candidateBatchId);
+
+      if (openBatch && !harvestedFromCandidate && !hasHarvestLog) {
         return {
           ...cage,
           batchId: candidateBatchId,
