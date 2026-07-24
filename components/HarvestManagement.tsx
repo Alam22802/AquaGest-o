@@ -283,10 +283,29 @@ const HarvestManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
 
   const removeLog = (id: string) => {
     if (!hasPermission) return;
-    if (!confirm('Deseja excluir este registro de despesca? Atenção: isso não reverterá o status da gaiola automaticamente.')) return;
+    if (!confirm('Deseja excluir este registro de despesca? A gaiola será restaurada para o lote correspondente.')) return;
     
+    const logToRemove = (state.harvestLogs || []).find(l => l.id === id);
+    let updatedCages = state.cages;
+
+    if (logToRemove && logToRemove.cageId && logToRemove.batchId) {
+      updatedCages = state.cages.map(c => {
+        if (c.id === logToRemove.cageId && (!c.batchId || c.batchId === logToRemove.batchId)) {
+          return {
+            ...c,
+            batchId: logToRemove.batchId,
+            status: 'Em Uso' as const,
+            initialFishCount: c.initialFishCount || logToRemove.initialFishCount || 0,
+            updatedAt: Date.now()
+          };
+        }
+        return c;
+      });
+    }
+
     onUpdate({
       ...state,
+      cages: updatedCages,
       harvestLogs: (state.harvestLogs || []).filter(l => l.id !== id),
       deletedIds: [...(state.deletedIds || []), id]
     });
@@ -318,14 +337,67 @@ const HarvestManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
 
   const removeSelectedLogs = () => {
     if (!hasPermission || selectedLogIds.size === 0) return;
-    if (!confirm(`Deseja excluir os ${selectedLogIds.size} registros de despesca selecionados?`)) return;
+    if (!confirm(`Deseja excluir os ${selectedLogIds.size} registros de despesca selecionados? As gaiolas serão restauradas para os seus lotes.`)) return;
+
+    const logsToRemove = (state.harvestLogs || []).filter(l => selectedLogIds.has(l.id));
+    const cageBatchMap = new Map<string, { batchId: string; initialFishCount?: number }>();
+    logsToRemove.forEach(l => {
+      if (l.cageId && l.batchId) {
+        cageBatchMap.set(l.cageId, { batchId: l.batchId, initialFishCount: l.initialFishCount });
+      }
+    });
+
+    const updatedCages = state.cages.map(c => {
+      const restoreInfo = cageBatchMap.get(c.id);
+      if (restoreInfo && (!c.batchId || c.batchId === restoreInfo.batchId)) {
+        return {
+          ...c,
+          batchId: restoreInfo.batchId,
+          status: 'Em Uso' as const,
+          initialFishCount: c.initialFishCount || restoreInfo.initialFishCount || 0,
+          updatedAt: Date.now()
+        };
+      }
+      return c;
+    });
 
     onUpdate({
       ...state,
+      cages: updatedCages,
       harvestLogs: (state.harvestLogs || []).filter(l => !selectedLogIds.has(l.id)),
       deletedIds: [...(state.deletedIds || []), ...Array.from(selectedLogIds)]
     });
     setSelectedLogIds(new Set());
+  };
+
+  const handleRestoreOrphanedCages = () => {
+    let restoredCount = 0;
+    const updatedCages = state.cages.map(cage => {
+      if (cage.batchId) return cage;
+      const mLog = (state.mortalityLogs || []).find(m => m.cageId === cage.id && m.batchId);
+      const bLog = (state.biometryLogs || []).find(b => b.cageId === cage.id && b.batchId);
+      const candidateBatchId = mLog?.batchId || bLog?.batchId;
+      if (candidateBatchId) {
+        const openBatch = (state.batches || []).find(b => b.id === candidateBatchId && !b.isClosed);
+        if (openBatch) {
+          restoredCount++;
+          return {
+            ...cage,
+            batchId: candidateBatchId,
+            status: 'Em Uso' as const,
+            updatedAt: Date.now()
+          };
+        }
+      }
+      return cage;
+    });
+
+    if (restoredCount > 0) {
+      onUpdate({ ...state, cages: updatedCages });
+      alert(`Sucesso! ${restoredCount} gaiolas e todos os dados do lote foram reassociados e restaurados.`);
+    } else {
+      alert('Todas as gaiolas já estão vinculadas corretamente aos seus lotes.');
+    }
   };
 
   const harvestLogs = useMemo(() => {
@@ -553,6 +625,14 @@ const HarvestManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
                   Excluir Selecionados ({selectedLogIds.size})
                 </button>
               )}
+              <button
+                onClick={handleRestoreOrphanedCages}
+                className="flex items-center gap-2 px-3 py-1.5 bg-indigo-50 border border-indigo-200 text-indigo-700 hover:bg-indigo-100 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all"
+                title="Reassocia gaiolas e recupera dados do lote caso tenham se desvinculado"
+              >
+                <CheckCircle2 className="w-3.5 h-3.5 text-indigo-600" />
+                Restaurar Vínculos do Lote
+              </button>
             </div>
             <div className="flex items-center gap-2 text-[10px] font-black text-slate-400 uppercase tracking-widest">
               <Info className="w-4 h-4" />

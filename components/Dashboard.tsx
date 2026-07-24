@@ -605,7 +605,7 @@ const Dashboard: React.FC<Props> = ({ state }) => {
       const fcaValue = totalProducedWeightKg > 0 ? formatNumber(totalFeedKg / totalProducedWeightKg, 2) : '0,00';
 
       return { 
-        id: batch.id, name: batch.name, stock: currentTotalStock, harvested: totalHarvested,
+        id: batch.id, name: batch.name, isClosed: batch.isClosed, stock: currentTotalStock, harvested: totalHarvested,
         harvestedWeight: totalHarvestedWeight, mortality: totalMortality, biomass: totalBiomassKg, 
         feed: totalFeedKg, feedBreakdown, fca: fcaValue, avgWeight: currentAvgWeight,
         samplingInfo, settlementBalance
@@ -614,8 +614,10 @@ const Dashboard: React.FC<Props> = ({ state }) => {
   }, [state.batches, state.cages, state.mortalityLogs, state.biometryLogs, state.feedingLogs, state.feedTypes, state.harvestLogs]);
 
   const filteredBatchStats = useMemo(() => {
-    // Show only batches that are fully settled (balance 0)
-    return batchStats.filter(b => b.settlementBalance === 0);
+    const settledActive = batchStats.filter(b => !b.isClosed && b.settlementBalance === 0);
+    if (settledActive.length > 0) return settledActive;
+    const allSettled = batchStats.filter(b => b.settlementBalance === 0);
+    return allSettled.length > 0 ? allSettled : batchStats;
   }, [batchStats]);
 
   const selectedBatchData = useMemo(() => {
@@ -677,10 +679,9 @@ const Dashboard: React.FC<Props> = ({ state }) => {
     let expectedHarvestDate = '';
 
     const filteredBatches = (state.batches || []).filter(b => {
-      const stats = batchStats.find(s => s.id === b.id);
-      const isSettled = stats?.settlementBalance === 0;
       const isSelected = selectedBatchIds.length === 0 || selectedBatchIds.includes(b.id);
-      return isSettled && isSelected;
+      if (selectedBatchIds.length > 0) return isSelected;
+      return !b.isClosed;
     });
     
     // Optimization: Index filtered batches, cages and harvest logs
@@ -1008,10 +1009,9 @@ const Dashboard: React.FC<Props> = ({ state }) => {
     let logs: any[] = [];
 
     const filteredBatches = (state.batches || []).filter(b => {
-      const stats = batchStats.find(s => s.id === b.id);
-      const isSettled = stats?.settlementBalance === 0;
       const isSelected = selectedBatchIds.length === 0 || selectedBatchIds.includes(b.id);
-      return isSettled && isSelected;
+      if (selectedBatchIds.length > 0) return isSelected;
+      return !b.isClosed;
     });
 
     const filteredBatchMap = new Map((filteredBatches || []).map(b => [b.id, b]));
@@ -1062,10 +1062,9 @@ const Dashboard: React.FC<Props> = ({ state }) => {
     let expectedHarvestDate = '';
 
     const relevantBatches = (state.batches || []).filter(b => {
-      const stats = batchStats.find(s => s.id === b.id);
-      const isSettled = stats?.settlementBalance === 0;
       const isSelected = selectedBatchIds.length === 0 || selectedBatchIds.includes(b.id);
-      return isSettled && isSelected;
+      if (selectedBatchIds.length > 0) return isSelected;
+      return !b.isClosed;
     });
 
     if (relevantBatches.length > 0) {

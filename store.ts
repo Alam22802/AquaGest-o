@@ -409,10 +409,34 @@ export const ensureStateIntegrity = (state: any, mergeWith?: AppState, priority:
       : (result.farmTargetCapacity !== undefined ? result.farmTargetCapacity : mergeWith.farmTargetCapacity),
   } : result;
 
-  if (state && areStatesEqual(state, finalResult)) {
+  const healedCages = (finalResult.cages || []).map(cage => {
+    if (cage.batchId) return cage;
+    const mLog = (finalResult.mortalityLogs || []).find(m => m.cageId === cage.id && m.batchId);
+    const bLog = (finalResult.biometryLogs || []).find(b => b.cageId === cage.id && b.batchId);
+    const candidateBatchId = mLog?.batchId || bLog?.batchId;
+    if (candidateBatchId) {
+      const openBatch = (finalResult.batches || []).find(b => b.id === candidateBatchId && !b.isClosed);
+      if (openBatch) {
+        return {
+          ...cage,
+          batchId: candidateBatchId,
+          status: 'Em Uso' as const,
+          updatedAt: Date.now()
+        };
+      }
+    }
+    return cage;
+  });
+
+  const stateWithHealedCages = {
+    ...finalResult,
+    cages: healedCages
+  };
+
+  if (state && areStatesEqual(state, stateWithHealedCages)) {
     return state;
   }
-  return finalResult;
+  return stateWithHealedCages;
 };
 
 export const getSupabaseConfig = () => {
