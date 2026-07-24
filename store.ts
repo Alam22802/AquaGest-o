@@ -410,17 +410,48 @@ export const ensureStateIntegrity = (state: any, mergeWith?: AppState, priority:
   } : result;
 
   const healedCages = (finalResult.cages || []).map(cage => {
-    if (cage.batchId) return cage;
+    const hasHarvestLog = (finalResult.harvestLogs || []).some(h => h.cageId === cage.id);
+
+    if (cage.batchId) {
+      const harvestedFromCurrentBatch = (finalResult.harvestLogs || []).some(
+        h => h.cageId === cage.id && h.batchId === cage.batchId
+      );
+      if (harvestedFromCurrentBatch) {
+        return {
+          ...cage,
+          batchId: undefined,
+          initialFishCount: undefined,
+          settlementDate: undefined,
+          harvestDate: undefined,
+          status: (cage.status === 'Ocupada' || cage.status === 'Em Uso' || !cage.status) ? ('Limpeza' as const) : cage.status,
+          updatedAt: Date.now()
+        };
+      }
+      return cage;
+    }
+
+    if (hasHarvestLog) {
+      if (cage.status === 'Ocupada' || cage.status === 'Em Uso' || !cage.status) {
+        return {
+          ...cage,
+          status: 'Limpeza' as const,
+          updatedAt: Date.now()
+        };
+      }
+      return cage;
+    }
+
     const mLog = (finalResult.mortalityLogs || []).find(m => m.cageId === cage.id && m.batchId);
     const bLog = (finalResult.biometryLogs || []).find(b => b.cageId === cage.id && b.batchId);
     const candidateBatchId = mLog?.batchId || bLog?.batchId;
     if (candidateBatchId) {
       const openBatch = (finalResult.batches || []).find(b => b.id === candidateBatchId && !b.isClosed);
-      if (openBatch) {
+      const harvestedFromCandidate = (finalResult.harvestLogs || []).some(h => h.cageId === cage.id && h.batchId === candidateBatchId);
+      if (openBatch && !harvestedFromCandidate) {
         return {
           ...cage,
           batchId: candidateBatchId,
-          status: 'Em Uso' as const,
+          status: 'Ocupada' as const,
           updatedAt: Date.now()
         };
       }

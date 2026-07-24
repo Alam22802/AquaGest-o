@@ -378,15 +378,18 @@ const HarvestManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
       const bLog = (state.biometryLogs || []).find(b => b.cageId === cage.id && b.batchId);
       const candidateBatchId = mLog?.batchId || bLog?.batchId;
       if (candidateBatchId) {
-        const openBatch = (state.batches || []).find(b => b.id === candidateBatchId && !b.isClosed);
-        if (openBatch) {
-          restoredCount++;
-          return {
-            ...cage,
-            batchId: candidateBatchId,
-            status: 'Em Uso' as const,
-            updatedAt: Date.now()
-          };
+        const harvested = (state.harvestLogs || []).some(h => h.cageId === cage.id && h.batchId === candidateBatchId);
+        if (!harvested) {
+          const openBatch = (state.batches || []).find(b => b.id === candidateBatchId && !b.isClosed);
+          if (openBatch) {
+            restoredCount++;
+            return {
+              ...cage,
+              batchId: candidateBatchId,
+              status: 'Ocupada' as const,
+              updatedAt: Date.now()
+            };
+          }
         }
       }
       return cage;

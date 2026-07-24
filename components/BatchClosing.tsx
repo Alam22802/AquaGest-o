@@ -535,9 +535,22 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       b.id === selectedBatchId ? { ...b, isClosed: true, closedAt: new Date().toISOString() } : b
     );
 
+    const updatedCages = (state.cages || []).map(c => 
+      c.batchId === selectedBatchId ? {
+        ...c,
+        batchId: undefined,
+        initialFishCount: undefined,
+        settlementDate: undefined,
+        harvestDate: undefined,
+        status: 'Limpeza' as const,
+        updatedAt: Date.now()
+      } : c
+    );
+
     onUpdate({
       ...state,
-      batches: updatedBatches
+      batches: updatedBatches,
+      cages: updatedCages
     });
   };
 
