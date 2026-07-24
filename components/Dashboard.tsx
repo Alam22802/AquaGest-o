@@ -501,16 +501,23 @@ const Dashboard: React.FC<Props> = ({ state }) => {
 
     const harvestsByBatch = new Map<string, { fishCount: number, weight: number, initialFishCount: number }>();
     (state.harvestLogs || []).forEach(h => {
-      const current = harvestsByBatch.get(h.batchId) || { fishCount: 0, weight: 0, initialFishCount: 0 };
-      let initial = h.initialFishCount || 0;
-      if (!initial) {
-        initial = h.fishCount; // Fallback aproximado se não houver dado histórico
+      let bId = h.batchId;
+      if (!bId && h.cageId) {
+        const cage = cageMap.get(h.cageId);
+        if (cage?.batchId) bId = cage.batchId;
       }
-      harvestsByBatch.set(h.batchId, {
-        fishCount: current.fishCount + h.fishCount,
-        weight: current.weight + (h.totalWeight || 0),
-        initialFishCount: current.initialFishCount + initial
-      });
+      if (bId) {
+        const current = harvestsByBatch.get(bId) || { fishCount: 0, weight: 0, initialFishCount: 0 };
+        let initial = h.initialFishCount || 0;
+        if (!initial) {
+          initial = h.fishCount; // Fallback aproximado se não houver dado histórico
+        }
+        harvestsByBatch.set(bId, {
+          fishCount: current.fishCount + h.fishCount,
+          weight: current.weight + (h.totalWeight || 0),
+          initialFishCount: current.initialFishCount + initial
+        });
+      }
     });
 
     // Biometry Indexing
@@ -614,16 +621,17 @@ const Dashboard: React.FC<Props> = ({ state }) => {
   }, [state.batches, state.cages, state.mortalityLogs, state.biometryLogs, state.feedingLogs, state.feedTypes, state.harvestLogs]);
 
   const filteredBatchStats = useMemo(() => {
-    const settledActive = batchStats.filter(b => !b.isClosed && b.settlementBalance === 0);
-    if (settledActive.length > 0) return settledActive;
-    const allSettled = batchStats.filter(b => b.settlementBalance === 0);
-    return allSettled.length > 0 ? allSettled : batchStats;
+    const active = batchStats.filter(b => !b.isClosed);
+    return active.length > 0 ? active : batchStats;
   }, [batchStats]);
 
   const selectedBatchData = useMemo(() => {
+    const activeBatches = batchStats.filter(b => !b.isClosed);
+    const defaultBatches = activeBatches.length > 0 ? activeBatches : batchStats;
+
     const batchesToProcess = selectedBatchIds.length > 0 
-      ? filteredBatchStats.filter(b => selectedBatchIds.includes(b.id))
-      : filteredBatchStats;
+      ? batchStats.filter(b => selectedBatchIds.includes(b.id))
+      : defaultBatches;
 
     const stats = batchesToProcess.reduce((acc, curr) => {
       acc.stock += curr.stock;
@@ -665,7 +673,7 @@ const Dashboard: React.FC<Props> = ({ state }) => {
         ? batchStats.find(b => b.id === selectedBatchIds[0])?.samplingInfo || 'Sem dados'
         : `Total de ${batchesToProcess.length} lotes`
     };
-  }, [batchStats, filteredBatchStats, selectedBatchIds]);
+  }, [batchStats, selectedBatchIds]);
 
   const batch = selectedBatchIds.length === 1 
     ? (state.batches || []).find(b => b.id === selectedBatchIds[0])
@@ -1684,14 +1692,21 @@ const Dashboard: React.FC<Props> = ({ state }) => {
                   </div>
                   <div className="space-y-2">
                     {filteredBatchStats.map(batch => (
-                      <label key={batch.id} className="flex items-center gap-3 p-2 hover:bg-slate-50 rounded-xl cursor-pointer transition-colors">
-                        <input 
-                          type="checkbox" 
-                          checked={selectedBatchIds.includes(batch.id)}
-                          onChange={() => toggleBatch(batch.id)}
-                          className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-                        />
-                        <span className="text-xs font-bold text-slate-700 uppercase">{batch.name}</span>
+                      <label key={batch.id} className="flex items-center justify-between p-2 hover:bg-slate-50 rounded-xl cursor-pointer transition-colors">
+                        <div className="flex items-center gap-3">
+                          <input 
+                            type="checkbox" 
+                            checked={selectedBatchIds.includes(batch.id)}
+                            onChange={() => toggleBatch(batch.id)}
+                            className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                          />
+                          <span className="text-xs font-bold text-slate-700 uppercase">{batch.name}</span>
+                        </div>
+                        {batch.settlementBalance === 0 && (
+                          <span className="text-[9px] font-black uppercase tracking-wider text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100">
+                            Saldo 0
+                          </span>
+                        )}
                       </label>
                     ))}
                     {filteredBatchStats.length === 0 && (
