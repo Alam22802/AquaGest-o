@@ -621,17 +621,15 @@ const Dashboard: React.FC<Props> = ({ state }) => {
   }, [state.batches, state.cages, state.mortalityLogs, state.biometryLogs, state.feedingLogs, state.feedTypes, state.harvestLogs]);
 
   const filteredBatchStats = useMemo(() => {
-    const active = batchStats.filter(b => !b.isClosed);
-    return active.length > 0 ? active : batchStats;
+    const settled = batchStats.filter(b => b.settlementBalance === 0);
+    const activeSettled = settled.filter(b => !b.isClosed);
+    return activeSettled.length > 0 ? activeSettled : settled;
   }, [batchStats]);
 
   const selectedBatchData = useMemo(() => {
-    const activeBatches = batchStats.filter(b => !b.isClosed);
-    const defaultBatches = activeBatches.length > 0 ? activeBatches : batchStats;
-
     const batchesToProcess = selectedBatchIds.length > 0 
       ? batchStats.filter(b => selectedBatchIds.includes(b.id))
-      : defaultBatches;
+      : filteredBatchStats;
 
     const stats = batchesToProcess.reduce((acc, curr) => {
       acc.stock += curr.stock;
@@ -1692,21 +1690,14 @@ const Dashboard: React.FC<Props> = ({ state }) => {
                   </div>
                   <div className="space-y-2">
                     {filteredBatchStats.map(batch => (
-                      <label key={batch.id} className="flex items-center justify-between p-2 hover:bg-slate-50 rounded-xl cursor-pointer transition-colors">
-                        <div className="flex items-center gap-3">
-                          <input 
-                            type="checkbox" 
-                            checked={selectedBatchIds.includes(batch.id)}
-                            onChange={() => toggleBatch(batch.id)}
-                            className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-                          />
-                          <span className="text-xs font-bold text-slate-700 uppercase">{batch.name}</span>
-                        </div>
-                        {batch.settlementBalance === 0 && (
-                          <span className="text-[9px] font-black uppercase tracking-wider text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100">
-                            Saldo 0
-                          </span>
-                        )}
+                      <label key={batch.id} className="flex items-center gap-3 p-2 hover:bg-slate-50 rounded-xl cursor-pointer transition-colors">
+                        <input 
+                          type="checkbox" 
+                          checked={selectedBatchIds.includes(batch.id)}
+                          onChange={() => toggleBatch(batch.id)}
+                          className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                        />
+                        <span className="text-xs font-bold text-slate-700 uppercase">{batch.name}</span>
                       </label>
                     ))}
                     {filteredBatchStats.length === 0 && (
