@@ -1,0 +1,2624 @@
+import React, { useState, useMemo } from "react";
+import { Batch, AppState, User } from "../types";
+import {
+  Plus,
+  Trash2,
+  Tag,
+  Calendar,
+  Scale,
+  Hash,
+  Edit,
+  X,
+  BookOpen,
+  Eye,
+  TrendingUp,
+  Fish,
+  AlertCircle,
+  ShoppingCart,
+  CheckCircle2,
+  Package,
+  Utensils,
+  Info,
+  CheckSquare,
+  Box,
+  FileText,
+} from "lucide-react";
+import { format, differenceInDays, parseISO, startOfDay } from "date-fns";
+import { ptBR } from "date-fns/locale";
+import { formatNumber } from "../utils/formatters";
+import HarvestManagement from "./HarvestManagement";
+import BatchClosing from "./BatchClosing";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
+
+interface Props {
+  state: AppState;
+  onUpdate: (newState: AppState) => void;
+  currentUser: User;
+}
+
+const generateId = () => {
+  try {
+    return crypto.randomUUID();
+  } catch (e) {
+    return Date.now().toString(36) + Math.random().toString(36).substring(2);
+  }
+};
+
+const BatchManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
+  const [activeSubTab, setActiveSubTab] = useState<
+    "inventory" | "harvest" | "closing"
+  >("inventory");
+  const [selectedPlanningBatchId, setSelectedPlanningBatchId] = useState("");
+  const [selectedPlanningCageIds, setSelectedPlanningCageIds] = useState<
+    string[]
+  >([]);
+  const [lastFeeding, setLastFeeding] = useState("");
+  const [lastFeedingHour, setLastFeedingHour] = useState("16:00");
+  const [plannedHarvestDate, setPlannedHarvestDate] = useState("");
+  const [selectedScheduleDate, setSelectedScheduleDate] = useState("");
+  const [editingScheduleId, setEditingScheduleId] = useState<string | null>(
+    null,
+  );
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [formInvoices, setFormInvoices] = useState<any[]>([]);
+  const [selectedBatchIds, setSelectedBatchIds] = useState<string[]>([]);
+  const [filterMonth, setFilterMonth] = useState("");
+  const [filterType, setFilterType] = useState<"settlement" | "harvest">(
+    "settlement",
+  );
+  const [formData, setFormData] = useState({
+    name: "",
+    settlementDate: new Date().toISOString().split("T")[0],
+    initialQuantity: "",
+    initialUnitWeight: "",
+    protocolId: "",
+    expectedHarvestDate: "",
+    invoiceNumber: "",
+    supplierCnpj: "",
+    supplierName: "",
+    invoiceValue: "",
+  });
+
+  const hasPermission = currentUser.isMaster || currentUser.canEdit;
+
+  const handleAddFormInvoice = () => {
+    if (!formData.invoiceValue || Number(formData.invoiceValue) <= 0) {
+      alert("Por favor, preencha o valor da nota fiscal.");
+      return;
+    }
+    const newInvoice = {
+      id: generateId(),
+      invoiceNumber: formData.invoiceNumber || undefined,
+      supplierCnpj: formData.supplierCnpj || undefined,
+      supplierName: formData.supplierName || undefined,
+      invoiceValue: Number(formData.invoiceValue)
+    };
+    setFormInvoices([...formInvoices, newInvoice]);
+    setFormData({
+      ...formData,
+      invoiceNumber: "",
+      supplierCnpj: "",
+      supplierName: "",
+      invoiceValue: ""
+    });
+  };
+
+  const handleSave = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!hasPermission) return;
+    if (!formData.name || !formData.initialQuantity) return;
+
+    let finalInvoices = [...formInvoices];
+    if (formData.invoiceValue && Number(formData.invoiceValue) > 0) {
+      finalInvoices.push({
+        id: generateId(),
+        invoiceNumber: formData.invoiceNumber || undefined,
+        supplierCnpj: formData.supplierCnpj || undefined,
+        supplierName: formData.supplierName || undefined,
+        invoiceValue: Number(formData.invoiceValue),
+      });
+    }
+
+    const totalInvoiceVal = finalInvoices.reduce((sum, inv) => sum + inv.invoiceValue, 0);
+    const primaryInvoice = finalInvoices[0] || {};
+
+    if (editingId) {
+      const updatedBatches = (state.batches || []).map((b) =>
+        b.id === editingId
+          ? {
+              ...b,
+              name: formData.name,
+              settlementDate: formData.settlementDate,
+              initialQuantity: Number(formData.initialQuantity),
+              initialUnitWeight: Number(formData.initialUnitWeight),
+              protocolId: formData.protocolId,
+              expectedHarvestDate: formData.expectedHarvestDate || undefined,
+              supplierCnpj: primaryInvoice.supplierCnpj || undefined,
+              supplierName: primaryInvoice.supplierName || undefined,
+              invoiceValue: totalInvoiceVal > 0 ? totalInvoiceVal : undefined,
+              invoices: finalInvoices.length > 0 ? finalInvoices : undefined,
+              updatedAt: Date.now(),
+            }
+          : b,
+      );
+      onUpdate({ ...state, batches: updatedBatches });
+      setEditingId(null);
+    } else {
+      const newBatch: Batch = {
+        id: generateId(),
+        name: formData.name,
+        settlementDate: formData.settlementDate,
+        initialQuantity: Number(formData.initialQuantity),
+        initialUnitWeight: Number(formData.initialUnitWeight),
+        protocolId: formData.protocolId,
+        expectedHarvestDate: formData.expectedHarvestDate || undefined,
+        supplierCnpj: primaryInvoice.supplierCnpj || undefined,
+        supplierName: primaryInvoice.supplierName || undefined,
+        invoiceValue: totalInvoiceVal > 0 ? totalInvoiceVal : undefined,
+        invoices: finalInvoices.length > 0 ? finalInvoices : undefined,
+        updatedAt: Date.now(),
+      };
+      onUpdate({ ...state, batches: [...(state.batches || []), newBatch] });
+    }
+
+    setFormInvoices([]);
+    setFormData({
+      name: "",
+      settlementDate: new Date().toISOString().split("T")[0],
+      initialQuantity: "",
+      initialUnitWeight: "",
+      protocolId: "",
+      expectedHarvestDate: "",
+      invoiceNumber: "",
+      supplierCnpj: "",
+      supplierName: "",
+      invoiceValue: "",
+    });
+  };
+
+  const startEdit = (batch: Batch) => {
+    if (!hasPermission) return;
+    setEditingId(batch.id);
+    
+    const invoicesToSet = batch.invoices && batch.invoices.length > 0
+      ? batch.invoices
+      : (batch.invoiceValue ? [{
+          id: generateId(),
+          invoiceNumber: "",
+          supplierCnpj: batch.supplierCnpj || "",
+          supplierName: batch.supplierName || "",
+          invoiceValue: batch.invoiceValue
+        }] : []);
+    
+    setFormInvoices(invoicesToSet);
+
+    setFormData({
+      name: batch.name,
+      settlementDate: batch.settlementDate,
+      initialQuantity: batch.initialQuantity.toString(),
+      initialUnitWeight: batch.initialUnitWeight.toString(),
+      protocolId: batch.protocolId || "",
+      expectedHarvestDate: batch.expectedHarvestDate || "",
+      invoiceNumber: "",
+      supplierCnpj: "",
+      supplierName: "",
+      invoiceValue: "",
+    });
+  };
+
+  const removeBatch = (id: string) => {
+    if (!hasPermission) return;
+    if (
+      !confirm(
+        "Deseja excluir este lote PERMANENTEMENTE? Todos os dados (lançamentos, tratos, mortalidade, biometria e despescas) associados a ele serão apagados para liberar espaço. Esta ação não pode ser desfeita.",
+      )
+    )
+      return;
+
+    const feedingLogsToRemove = (state.feedingLogs || []).filter((f) => f.batchId === id).map(f => f.id);
+    const mortalityLogsToRemove = (state.mortalityLogs || []).filter((m) => m.batchId === id).map(m => m.id);
+    const biometryLogsToRemove = (state.biometryLogs || []).filter((b) => b.batchId === id).map(b => b.id);
+    const harvestLogsToRemove = (state.harvestLogs || []).filter((h) => h.batchId === id).map(h => h.id);
+    const batchExpensesToRemove = (state.batchExpenses || []).filter((e) => e.batchId === id).map(e => e.id);
+    const batchRevenuesToRemove = (state.batchRevenues || []).filter((r) => r.batchId === id).map(r => r.id);
+    const slaughterLogsToRemove = (state.slaughterLogs || []).filter((s: any) => s.batchId === id).map((s: any) => s.id);
+    const harvestSchedulesToRemove = (state.harvestSchedules || []).filter((hs) => hs.batchId === id).map(hs => hs.id);
+
+    const allRemovedIds = [
+      id,
+      ...feedingLogsToRemove,
+      ...mortalityLogsToRemove,
+      ...biometryLogsToRemove,
+      ...harvestLogsToRemove,
+      ...batchExpensesToRemove,
+      ...batchRevenuesToRemove,
+      ...slaughterLogsToRemove,
+      ...harvestSchedulesToRemove,
+    ];
+
+    onUpdate({
+      ...state,
+      batches: (state.batches || []).filter((b) => b.id !== id),
+      feedingLogs: (state.feedingLogs || []).filter((f) => f.batchId !== id),
+      mortalityLogs: (state.mortalityLogs || []).filter((m) => m.batchId !== id),
+      biometryLogs: (state.biometryLogs || []).filter((b) => b.batchId !== id),
+      harvestLogs: (state.harvestLogs || []).filter((h) => h.batchId !== id),
+      batchExpenses: (state.batchExpenses || []).filter((e) => e.batchId !== id),
+      batchRevenues: (state.batchRevenues || []).filter((r) => r.batchId !== id),
+      slaughterLogs: (state.slaughterLogs || []).filter((s: any) => s.batchId !== id),
+      harvestSchedules: (state.harvestSchedules || []).filter((hs) => hs.batchId !== id),
+      cages: (state.cages || []).map((c) =>
+        c.batchId === id
+          ? {
+              ...c,
+              batchId: undefined,
+              initialFishCount: undefined,
+              settlementDate: undefined,
+              harvestDate: undefined,
+              status: 'Disponível' as const,
+              updatedAt: Date.now(),
+            }
+          : c,
+      ),
+      deletedIds: Array.from(new Set([...(state.deletedIds || []), ...allRemovedIds])),
+    });
+  };
+
+  const toggleSettlementComplete = (batchId: string) => {
+    if (!hasPermission) return;
+    const updatedBatches = (state.batches || []).map((b) =>
+      b.id === batchId
+        ? {
+            ...b,
+            isSettlementComplete: !b.isSettlementComplete,
+            updatedAt: Date.now(),
+          }
+        : b,
+    );
+    onUpdate({ ...state, batches: updatedBatches });
+  };
+
+  const handleSaveSchedule = () => {
+    if (!hasPermission) return;
+    if (
+      !selectedPlanningBatchId ||
+      selectedPlanningCageIds.length === 0 ||
+      !plannedHarvestDate
+    ) {
+      alert("Por favor, selecione o lote, as gaiolas e a data da despesca.");
+      return;
+    }
+
+    const newSchedule = {
+      id: editingScheduleId || generateId(),
+      batchId: selectedPlanningBatchId,
+      cageIds: selectedPlanningCageIds,
+      date: plannedHarvestDate,
+      lastFeedingDate: lastFeeding,
+      userId: currentUser.id,
+      updatedAt: Date.now(),
+    };
+
+    const existingSchedules = state.harvestSchedules || [];
+    let updatedSchedules;
+    if (editingScheduleId) {
+      updatedSchedules = existingSchedules.map((s) =>
+        s.id === editingScheduleId ? newSchedule : s,
+      );
+    } else {
+      updatedSchedules = [newSchedule, ...existingSchedules];
+    }
+
+    onUpdate({
+      ...state,
+      harvestSchedules: updatedSchedules,
+    });
+
+    setSelectedPlanningCageIds([]);
+    setPlannedHarvestDate("");
+    setLastFeeding("");
+    setEditingScheduleId(null);
+    setSelectedPlanningBatchId("");
+  };
+
+  const removeSchedule = (id: string) => {
+    if (!hasPermission) return;
+    if (!confirm("Excluir esta programação?")) return;
+    onUpdate({
+      ...state,
+      harvestSchedules: (state.harvestSchedules || []).filter(
+        (s) => s.id !== id,
+      ),
+      deletedIds: [...(state.deletedIds || []), id],
+    });
+  };
+
+  const startEditSchedule = (schedule: any) => {
+    if (!hasPermission) return;
+    setEditingScheduleId(schedule.id);
+    setSelectedPlanningBatchId(schedule.batchId);
+    setSelectedPlanningCageIds(schedule.cageIds);
+    setPlannedHarvestDate(schedule.date);
+    setLastFeeding(schedule.lastFeedingDate || "");
+    if (schedule.lastFeedingDate) {
+      const time = schedule.lastFeedingDate.split("T")[1];
+      setLastFeedingHour(time);
+    }
+  };
+
+  const batchStats = useMemo(() => {
+    const cagesByBatch = new Map<string, typeof state.cages>();
+    (state.cages || []).forEach((c) => {
+      if (c.batchId) {
+        const list = cagesByBatch.get(c.batchId) || [];
+        list.push(c);
+        cagesByBatch.set(c.batchId, list);
+      }
+    });
+
+    const sortedHarvestLogs = [...(state.harvestLogs || [])].sort((a, b) =>
+      (a.date || "").localeCompare(b.date || ""),
+    );
+    const cageMap = new Map((state.cages || []).map((c) => [c.id, c]));
+    const batchMap = new Map((state.batches || []).map((b) => [b.id, b]));
+
+    const resolveLogBatchId = (
+      logCageId?: string,
+      logDate?: string,
+      explicitBatchId?: string,
+    ) => {
+      if (!logDate) return explicitBatchId;
+      const cleanDate = logDate.split('T')[0];
+
+      if (explicitBatchId) {
+        const batch = batchMap.get(explicitBatchId);
+        if (batch) {
+          if (!batch.settlementDate || cleanDate >= batch.settlementDate) {
+            return explicitBatchId;
+          }
+        } else {
+          return explicitBatchId;
+        }
+      }
+
+      if (!logCageId) return undefined;
+
+      const harvest = sortedHarvestLogs.find(
+        (h) => h.cageId === logCageId && h.date >= cleanDate,
+      );
+      if (harvest) {
+        const harvestBatch = batchMap.get(harvest.batchId);
+        if (!harvestBatch?.settlementDate || cleanDate >= harvestBatch.settlementDate) {
+          return harvest.batchId;
+        }
+      }
+
+      const cage = cageMap.get(logCageId);
+      if (cage?.batchId) {
+        const batch = batchMap.get(cage.batchId);
+        const cageSettlement = cage.settlementDate || batch?.settlementDate;
+        if (cageSettlement && cleanDate >= cageSettlement) {
+          return cage.batchId;
+        }
+      }
+
+      return undefined;
+    };
+
+    const mortalityByBatch = new Map<string, number>();
+    const activeCageMortalityByBatch = new Map<string, number>();
+    const nurseryMortalityByBatch = new Map<string, number>();
+    (state.mortalityLogs || []).forEach((m) => {
+      const bId = resolveLogBatchId(m.cageId, m.date, m.batchId);
+      const cage = m.cageId ? cageMap.get(m.cageId) : null;
+
+      if (bId) {
+        mortalityByBatch.set(bId, (mortalityByBatch.get(bId) || 0) + m.count);
+        // Mortalidade em gaiola ATIVA (que ainda pertence ao lote)
+        if (cage && cage.batchId === bId) {
+          activeCageMortalityByBatch.set(
+            bId,
+            (activeCageMortalityByBatch.get(bId) || 0) + m.count,
+          );
+        }
+        // Mortalidade no berçário (sem gaiola)
+        if (!m.cageId) {
+          nurseryMortalityByBatch.set(
+            bId,
+            (nurseryMortalityByBatch.get(bId) || 0) + m.count,
+          );
+        }
+      }
+    });
+
+    const biometryByBatch = new Map<string, typeof state.biometryLogs>();
+    (state.biometryLogs || []).forEach((b) => {
+      const bId = resolveLogBatchId(b.cageId, b.date, b.batchId);
+
+      if (bId) {
+        const list = biometryByBatch.get(bId) || [];
+        list.push(b);
+        biometryByBatch.set(bId, list);
+      }
+    });
+
+    // Pre-calculate the average price for each feed model (by feedTypeId) from feed stock entries (type === 'Entrada')
+    const feedTypePrices = new Map<string, number>();
+    (state.feedTypes || []).forEach(feedType => {
+      const entries = (state.feedStockLogs || []).filter(
+        log => log.feedTypeId === feedType.id && 
+               log.type === 'Entrada' && 
+               log.unitPrice !== undefined && 
+               log.unitPrice > 0
+      );
+      if (entries.length === 0) {
+        feedTypePrices.set(feedType.id, 0);
+        return;
+      }
+      let totalCost = 0;
+      let totalKg = 0;
+      entries.forEach(log => {
+        const amountKg = log.amount / 1000;
+        totalCost += (log.unitPrice || 0) * amountKg;
+        totalKg += amountKg;
+      });
+      const avgPrice = totalKg > 0 ? (totalCost / totalKg) : (entries.reduce((acc, log) => acc + (log.unitPrice || 0), 0) / entries.length);
+      feedTypePrices.set(feedType.id, avgPrice);
+    });
+
+    const feedingByBatch = new Map<string, number>();
+    const feedingCostByBatch = new Map<string, number>();
+    (state.feedingLogs || []).forEach((f) => {
+      const fDate = (f.timestamp || "").split("T")[0];
+      const bId = resolveLogBatchId(f.cageId, fDate, f.batchId);
+
+      if (bId) {
+        feedingByBatch.set(bId, (feedingByBatch.get(bId) || 0) + f.amount);
+
+        // Calculate and add feed cost for this feeding log based on average model price
+        const pricePerKg = feedTypePrices.get(f.feedTypeId) || 0;
+        const amountKg = f.amount / 1000;
+        const logCost = amountKg * pricePerKg;
+        feedingCostByBatch.set(bId, (feedingCostByBatch.get(bId) || 0) + logCost);
+      }
+    });
+
+    const harvestsByBatch = new Map<
+      string,
+      { fishCount: number; initialFishCount: number; weight: number }
+    >();
+    (state.harvestLogs || []).forEach((h) => {
+      const current = harvestsByBatch.get(h.batchId) || {
+        fishCount: 0,
+        initialFishCount: 0,
+        weight: 0,
+      };
+
+      // Se não temos o initialFishCount no log (logs antigos), tentamos reconstruir com a mortalidade daquela gaiola
+      let initial = h.initialFishCount;
+      if (!initial) {
+        const batch = (state.batches || []).find((b) => b.id === h.batchId);
+        const cageMortality = (state.mortalityLogs || [])
+          .filter((m) => {
+            if (m.cageId !== h.cageId) return false;
+            if (m.batchId) return m.batchId === h.batchId;
+            return batch && m.date >= batch.settlementDate && m.date <= h.date;
+          })
+          .reduce((acc, curr) => acc + curr.count, 0);
+        initial = h.fishCount + cageMortality;
+      }
+
+      harvestsByBatch.set(h.batchId, {
+        fishCount: current.fishCount + h.fishCount,
+        initialFishCount: current.initialFishCount + initial,
+        weight: current.weight + h.totalWeight,
+      });
+    });
+
+    return (state.batches || []).map((batch) => {
+      const batchCages = cagesByBatch.get(batch.id) || [];
+      const cageIds = batchCages.map((c) => c.id);
+
+      const usedFish = batchCages.reduce(
+        (acc, curr) => acc + (curr.initialFishCount || 0),
+        0,
+      );
+      const harvestData = harvestsByBatch.get(batch.id) || {
+        fishCount: 0,
+        initialFishCount: 0,
+        weight: 0,
+      };
+      const rawHarvestedFish = harvestData.fishCount;
+      const rawHarvestedWeight = harvestData.weight;
+      const settledAndHarvested = harvestData.initialFishCount;
+
+      const totalMortality = mortalityByBatch.get(batch.id) || 0;
+      const nurseryMortality = nurseryMortalityByBatch.get(batch.id) || 0;
+
+      // Saldo Povoamento: O que ainda não saiu do berçário
+      const balance = batch.isSettlementComplete
+        ? 0
+        : Math.max(
+            0,
+            batch.initialQuantity -
+              usedFish -
+              settledAndHarvested -
+              nurseryMortality,
+          );
+
+      const mortality = totalMortality;
+
+      // 1. Calculate slaughters and reception weights for batch
+      const batchRevenues = (state.batchRevenues || []).filter(r => r.batchId === batch.id);
+      const manualReceptionWeight = batchRevenues.reduce((acc, curr) => acc + (curr.receptionWeight || 0), 0);
+
+      const slaughters = (state.slaughterLogs || []).filter((s) => {
+        if (s.batchId === batch.id) return true;
+        if (s.batchId && (state.batches || []).some(b => b.id === s.batchId && b.id !== batch.id)) {
+          return false;
+        }
+
+        const bn = (batch.name || '').trim().toLowerCase();
+        const bnNorm = bn.replace(/[^a-z0-9]/g, '');
+        const bnNoLote = bn.replace(/^lote\s*/i, '').trim();
+        const bnNum = bnNoLote.replace(/^0+/, '');
+
+        const candidates = [s.batchId, s.slaughterBatch].filter(Boolean) as string[];
+
+        for (const cand of candidates) {
+          const c = cand.trim().toLowerCase();
+          if (c === bn) return true;
+          const cNorm = c.replace(/[^a-z0-9]/g, '');
+          if (cNorm.length > 0 && cNorm === bnNorm) return true;
+          const cNoLote = c.replace(/^lote\s*/i, '').trim();
+          if (cNoLote.length > 0 && cNoLote === bnNoLote) return true;
+          const cNum = cNoLote.replace(/^0+/, '');
+          if (cNum.length > 0 && cNum === bnNum) return true;
+        }
+
+        return false;
+      });
+
+      const slaughterReceptionWeight = slaughters.reduce((acc, curr) => acc + (curr.receptionWeight || 0), 0);
+      const effectiveHarvestedWeight = slaughterReceptionWeight > 0 
+        ? slaughterReceptionWeight 
+        : (manualReceptionWeight > 0 ? manualReceptionWeight : rawHarvestedWeight);
+
+      // 2. Determine biometria do primeiro dia de despesca
+      const batchHarvests = (state.harvestLogs || []).filter(
+        (h) => h.batchId === batch.id,
+      );
+
+      const harvestDates: string[] = [];
+      batchHarvests.forEach(h => { if (h.date) harvestDates.push(h.date); });
+      slaughters.forEach(s => { if (s.date) harvestDates.push(s.date); });
+
+      let firstHarvestDate: string | null = null;
+      if (harvestDates.length > 0) {
+        firstHarvestDate = harvestDates.reduce((min, d) => (d < min ? d : min), harvestDates[0]);
+      }
+
+      const batchBiometries = biometryByBatch.get(batch.id) || [];
+      let harvestBiometryAvgWeight = 0;
+
+      if (firstHarvestDate && batchBiometries.length > 0) {
+        const harvestDayLogs = batchBiometries.filter(b => b.date === firstHarvestDate);
+        if (harvestDayLogs.length > 0) {
+          harvestBiometryAvgWeight = harvestDayLogs.reduce((acc, b) => acc + b.averageWeight, 0) / harvestDayLogs.length;
+        } else {
+          const biometriesBeforeHarvest = batchBiometries.filter(b => b.date <= firstHarvestDate);
+          if (biometriesBeforeHarvest.length > 0) {
+            const lastDate = biometriesBeforeHarvest.reduce((max, b) => (b.date > max ? b.date : max), "");
+            const lastLogs = biometriesBeforeHarvest.filter(b => b.date === lastDate);
+            if (lastLogs.length > 0) {
+              harvestBiometryAvgWeight = lastLogs.reduce((acc, b) => acc + b.averageWeight, 0) / lastLogs.length;
+            }
+          }
+        }
+      }
+
+      if (harvestBiometryAvgWeight === 0 && batchBiometries.length > 0) {
+        const lastDate = batchBiometries.reduce((max, b) => (b.date > max ? b.date : max), "");
+        const lastLogs = batchBiometries.filter(b => b.date === lastDate);
+        if (lastLogs.length > 0) {
+          harvestBiometryAvgWeight = lastLogs.reduce((acc, b) => acc + b.averageWeight, 0) / lastLogs.length;
+        }
+      }
+
+      if (harvestBiometryAvgWeight === 0) {
+        harvestBiometryAvgWeight = batch.initialUnitWeight;
+      }
+
+      // 3. Calculate despescado units (effectiveHarvestedFish)
+      let harvestedFish = rawHarvestedFish;
+      if (effectiveHarvestedWeight > 0 && harvestBiometryAvgWeight > 0) {
+        harvestedFish = Math.round((effectiveHarvestedWeight * 1000) / harvestBiometryAvgWeight);
+      }
+
+      // 4. Calculate live fish stock
+      const liveFish = Math.max(
+        0,
+        batch.initialQuantity - mortality - harvestedFish,
+      );
+
+      // Rendimento baseado na sobrevivência (Povoado - Morto) / Povoado
+      const yieldPercentage =
+        batch.initialQuantity > 0
+          ? ((batch.initialQuantity - mortality) / batch.initialQuantity) * 100
+          : 0;
+
+      const expectedAtHarvest = batch.initialQuantity - mortality;
+
+      // Calculate Expected Weight for finalized batches to match BatchClosing logic
+      let expectedWeight = 0;
+      if (firstHarvestDate) {
+        const fDate = firstHarvestDate;
+        const mortalityBeforeHarvest = (state.mortalityLogs || [])
+          .filter((m) => {
+            let bId = m.batchId;
+            if (!bId && m.cageId) {
+              const cage = (state.cages || []).find((c) => c.id === m.cageId);
+              if (cage?.batchId === batch.id) bId = batch.id;
+            }
+            return bId === batch.id && m.date < fDate;
+          })
+          .reduce((acc, curr) => acc + curr.count, 0);
+
+        const expectedFishAtHarvest =
+          batch.initialQuantity - mortalityBeforeHarvest;
+
+        expectedWeight = (expectedFishAtHarvest * harvestBiometryAvgWeight) / 1000;
+      }
+
+      const accuracy =
+        expectedWeight > 0 ? (effectiveHarvestedWeight / expectedWeight) * 100 : 0;
+      const isFinalized = harvestedFish > 0 && batchCages.length === 0;
+
+      let currentAvgWeight = harvestBiometryAvgWeight;
+
+      const totalBiomassKg = (liveFish * currentAvgWeight) / 1000;
+      const totalProducedCount = Math.max(0, batch.initialQuantity - mortality);
+      const totalProducedBiomassKg = totalBiomassKg + effectiveHarvestedWeight;
+
+      const totalFeed = feedingByBatch.get(batch.id) || 0;
+
+      // FCA: Total Feed / Total Produced Weight (Harvested + Current)
+      const fca =
+        totalProducedBiomassKg > 0
+          ? totalFeed / 1000 / totalProducedBiomassKg
+          : 0;
+
+      const protocol = (state.protocols || []).find(
+        (p) => p.id === batch.protocolId,
+      );
+
+      let settlementAlert = null;
+      if (batch.settlementDate) {
+        const today = startOfDay(new Date());
+        const settlement = startOfDay(parseISO(batch.settlementDate));
+        const daysDiff = differenceInDays(settlement, today);
+
+        if (daysDiff >= 0 && daysDiff <= 5) {
+          settlementAlert = (
+            <div className="bg-amber-50 border border-amber-200 p-3 rounded-2xl flex items-center gap-3 animate-pulse">
+              <AlertCircle className="w-4 h-4 text-amber-600" />
+              <span className="text-[10px] font-black text-amber-700 uppercase tracking-widest">
+                Povoamento em {daysDiff === 0 ? "HOJE" : `${daysDiff} dias`}
+              </span>
+            </div>
+          );
+        }
+      }
+
+      // Calculate the batch financial costs
+      const feedCost = feedingCostByBatch.get(batch.id) || 0;
+      const stockingCost = batch.invoiceValue || 0;
+      const totalCost = stockingCost + feedCost;
+      const custoKgProduzido = totalProducedBiomassKg > 0 ? (totalCost / totalProducedBiomassKg) : 0;
+
+      return {
+        ...batch,
+        batchCages,
+        usedFish,
+        harvestedFish,
+        balance,
+        mortality,
+        liveFish,
+        yieldPercentage,
+        currentAvgWeight,
+        totalBiomassKg,
+        totalProducedBiomassKg,
+        totalProducedCount,
+        totalFeed,
+        fca,
+        protocol,
+        settlementAlert,
+        accuracy,
+        isFinalized,
+        feedCost,
+        stockingCost,
+        totalCost,
+        custoKgProduzido,
+      };
+    }).sort((a, b) => a.name.localeCompare(b.name));
+  }, [
+    state.batches,
+    state.cages,
+    state.mortalityLogs,
+    state.biometryLogs,
+    state.protocols,
+    state.harvestLogs,
+    state.feedingLogs,
+    state.feedStockLogs,
+    state.feedTypes,
+    state.slaughterLogs,
+    state.batchRevenues,
+  ]);
+
+  const availableMonths = useMemo(() => {
+    const months = new Set<string>();
+    (state.batches || []).forEach((b) => {
+      if (b.settlementDate) {
+        try {
+          months.add(format(parseISO(b.settlementDate), "yyyy-MM"));
+        } catch (e) {}
+      }
+      if (b.expectedHarvestDate) {
+        try {
+          months.add(format(parseISO(b.expectedHarvestDate), "yyyy-MM"));
+        } catch (e) {}
+      }
+    });
+    return Array.from(months).sort().reverse();
+  }, [state.batches]);
+
+  const filteredBatchStats = useMemo(() => {
+    const activeBatches = batchStats.filter(b => !b.isClosed);
+    if (!filterMonth) return activeBatches;
+
+    return activeBatches.filter((batch) => {
+      const dateStr =
+        filterType === "settlement"
+          ? batch.settlementDate
+          : batch.expectedHarvestDate;
+      if (!dateStr) return false;
+
+      try {
+        const date = parseISO(dateStr);
+        const monthStr = format(date, "yyyy-MM");
+        return monthStr === filterMonth;
+      } catch (e) {
+        return false;
+      }
+    });
+  }, [batchStats, filterMonth, filterType]);
+
+  const handleGeneratePDF = () => {
+    const selectedBatches = filteredBatchStats.filter((b) =>
+      selectedBatchIds.includes(b.id)
+    );
+    if (selectedBatches.length === 0) return;
+
+    const doc = new jsPDF({ orientation: "landscape", format: "a4" });
+
+    // Title & Context
+    doc.setFontSize(16);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(51, 65, 85);
+    doc.text("AQUAGESTÃO - DETALHAMENTO DE ESTOQUE DOS LOTES", 14, 15);
+
+    doc.setFontSize(9);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(100, 116, 139);
+    doc.text(
+      `Relatório gerado em: ${format(new Date(), "dd/MM/yyyy HH:mm")}`,
+      14,
+      21
+    );
+
+    const filterInfo = filterMonth
+      ? `Filtro aplicado: ${format(parseISO(filterMonth + "-01"), "MMMM yyyy", { locale: ptBR })} (${filterType === "settlement" ? "Povoamento" : "Despesca"})`
+      : "Filtro aplicado: Todos os lotes ativos";
+    doc.text(filterInfo, 14, 25);
+
+    // Compute Totals over selected batches
+    const totalInitialQuantity = selectedBatches.reduce(
+      (sum, b) => sum + b.initialQuantity,
+      0
+    );
+    const totalLiveFish = selectedBatches.reduce((sum, b) => sum + b.liveFish, 0);
+    const averageSurvival =
+      selectedBatches.length > 0
+        ? selectedBatches.reduce((sum, b) => sum + b.yieldPercentage, 0) /
+          selectedBatches.length
+        : 0;
+    const totalFeedConsumed =
+      selectedBatches.reduce((sum, b) => sum + b.totalFeed, 0) / 1000;
+    const totalProducedBiomass = selectedBatches.reduce(
+      (sum, b) => sum + b.totalProducedBiomassKg,
+      0
+    );
+    const overallFca =
+      totalProducedBiomass > 0 ? totalFeedConsumed / totalProducedBiomass : 0;
+
+    // Table Data
+    const tableHead = [
+      [
+        "Lote",
+        "Fornecedor & Notas Fiscais",
+        "Povoamento",
+        "Peixes Atuais / Vivos",
+        "Pesos Médios (g)",
+        "FCA",
+        "Ração Total",
+        "Biomassa Total",
+      ],
+    ];
+
+    const tableRows = selectedBatches.map((batch) => {
+      // Invoices list format
+      let invDetails = "";
+      if (batch.invoices && batch.invoices.length > 0) {
+        invDetails = batch.invoices
+          .map(
+            (inv, idx) =>
+              `${idx + 1}. ${inv.supplierName || "FORNECEDOR"} (NF: ${inv.invoiceNumber || "S/N"})\n   Valor: R$ ${formatNumber(inv.invoiceValue)}`
+          )
+          .join("\n");
+      } else if (batch.invoiceValue) {
+        invDetails = `${batch.supplierName || "Fornecedor"} (CNPJ: ${batch.supplierCnpj || "M.I."})\n   Valor: R$ ${formatNumber(batch.invoiceValue)}`;
+      } else {
+        invDetails = "Sem Notas Registradas";
+      }
+
+      const settlementDateStr = batch.settlementDate
+        ? format(new Date(batch.settlementDate + "T12:00:00"), "dd/MM/yyyy")
+        : "---";
+      const expHarvestDateStr = batch.expectedHarvestDate
+        ? `\n(Prev: ${format(new Date(batch.expectedHarvestDate + "T12:00:00"), "dd/MM/yyyy")})`
+        : "";
+
+      return [
+        batch.name + (batch.protocol ? `\nProtocolo: ${batch.protocol.name}` : ""),
+        invDetails,
+        `${settlementDateStr}\nQtde: ${formatNumber(batch.initialQuantity)} un${expHarvestDateStr}`,
+        `${formatNumber(batch.liveFish)} un\nSobrev.: ${formatNumber(batch.yieldPercentage, 1)}%`,
+        `Inicial: ${formatNumber(batch.initialUnitWeight, 1)}g\nAtual: ${formatNumber(batch.currentAvgWeight, 1)}g`,
+        formatNumber(batch.fca, 2),
+        `${formatNumber(batch.totalFeed / 1000, 1)} kg`,
+        `${formatNumber(batch.totalProducedBiomassKg, 1)} kg`,
+      ];
+    });
+
+    const tableFoot = [
+      [
+        "TOTAIS",
+        "-",
+        `Qtde Inicial Total:\n${formatNumber(totalInitialQuantity)} un`,
+        `Total Vivos:\n${formatNumber(totalLiveFish)} un (Sobrev. Média: ${formatNumber(averageSurvival, 1)}%)`,
+        "-",
+        `FCA Médio:\n${formatNumber(overallFca, 2)}`,
+        `Consumo total:\n${formatNumber(totalFeedConsumed, 1)} kg`,
+        `Biomassa total:\n${formatNumber(totalProducedBiomass, 1)} kg`,
+      ],
+    ];
+
+    autoTable(doc, {
+      startY: 32,
+      head: tableHead,
+      body: tableRows,
+      foot: tableFoot,
+      theme: "striped",
+      headStyles: {
+        fillColor: [52, 68, 52], // bg-[#344434] matching company theme
+        textColor: [255, 255, 255],
+        fontSize: 8,
+        fontStyle: "bold",
+        halign: "left",
+        valign: "middle",
+      },
+      styles: {
+        fontSize: 8,
+        cellPadding: 3,
+        valign: "middle",
+        halign: "left",
+      },
+      footStyles: {
+        fillColor: [241, 245, 249],
+        textColor: [15, 23, 42],
+        fontSize: 8,
+        fontStyle: "bold",
+        valign: "middle",
+        halign: "left",
+      },
+      columnStyles: {
+        0: { fontStyle: "bold", cellWidth: 35 },
+        1: { cellWidth: 60 },
+        2: { cellWidth: 40 },
+        3: { cellWidth: 38 },
+        4: { cellWidth: 32 },
+        5: { cellWidth: 15, halign: "center" },
+        6: { cellWidth: 25, halign: "right" },
+        7: { cellWidth: 25, halign: "right" },
+      },
+      margin: { left: 14, right: 14 },
+    });
+
+    doc.save(`estoque-lotes-${format(new Date(), "yyyy-MM-dd-HHmm")}.pdf`);
+  };
+
+  const exportSchedulesPDF = (schedulesToExport: any[]) => {
+    if (!schedulesToExport || schedulesToExport.length === 0) {
+      alert("Nenhuma programação selecionada para gerar o PDF.");
+      return;
+    }
+
+    const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+
+    schedulesToExport.forEach((schedule, index) => {
+      if (index > 0) {
+        doc.addPage();
+      }
+
+      const batch =
+        batchStats.find((b) => b.id === schedule.batchId) ||
+        state.batches.find((b) => b.id === schedule.batchId);
+      const batchName = batch?.name || "Lote Desconhecido";
+      const settlementDateStr = batch?.settlementDate
+        ? format(parseISO(batch.settlementDate), "dd/MM/yyyy")
+        : "---";
+      const protocolName = batch?.protocol?.name || "Nenhum";
+      const currentAvgWeight = batch?.currentAvgWeight || 0;
+
+      const scheduleCagesData = schedule.cageIds.map((cid: string) => {
+        const cage = state.cages.find((c) => c.id === cid);
+        const mortality = (state.mortalityLogs || [])
+          .filter((m) => {
+            if (m.cageId !== cid) return false;
+            if (m.batchId) return m.batchId === schedule.batchId;
+            return batch?.settlementDate ? m.date >= batch.settlementDate : true;
+          })
+          .reduce((acc, curr) => acc + curr.count, 0);
+
+        const initialCount = cage?.initialFishCount || 0;
+        const currentCount = Math.max(0, initialCount - mortality);
+        const biomassKg = (currentCount * currentAvgWeight) / 1000;
+
+        const model = cage?.model || "Gaiola";
+        const d = cage?.dimensions || { width: 0, length: 0, depth: 0 };
+        const dimStr =
+          model === "Circular"
+            ? `Circular (${d.depth || 0}m prof.)`
+            : `${model} (${d.width || 0}x${d.length || 0}x${d.depth || 0}m)`;
+
+        return {
+          cageName: cage?.name || "---",
+          dimStr,
+          currentCount,
+          mortality,
+          currentAvgWeight,
+          biomassKg,
+        };
+      });
+
+      const totalFish = scheduleCagesData.reduce(
+        (acc, c) => acc + c.currentCount,
+        0,
+      );
+      const totalMortality = scheduleCagesData.reduce(
+        (acc, c) => acc + c.mortality,
+        0,
+      );
+      const totalBiomass = scheduleCagesData.reduce(
+        (acc, c) => acc + c.biomassKg,
+        0,
+      );
+
+      let fastingStr = "Não informado";
+      if (schedule.date && schedule.lastFeedingDate) {
+        const harvestDate = parseISO(schedule.date);
+        harvestDate.setHours(3, 0, 0, 0);
+        const feedingDate = parseISO(schedule.lastFeedingDate);
+        const hours = Math.floor(
+          (harvestDate.getTime() - feedingDate.getTime()) / (1000 * 60 * 60),
+        );
+        fastingStr = `${hours}h de Jejum Estimado (Último trato: ${format(feedingDate, "dd/MM/yyyy 'às' HH:mm")})`;
+      } else if (schedule.lastFeedingDate) {
+        fastingStr = `Último trato: ${format(parseISO(schedule.lastFeedingDate), "dd/MM/yyyy 'às' HH:mm")}`;
+      }
+
+      const stratMap: Record<string, number> = {};
+      scheduleCagesData.forEach((c) => {
+        stratMap[c.dimStr] = (stratMap[c.dimStr] || 0) + 1;
+      });
+      const stratSummary = Object.entries(stratMap)
+        .map(([dim, count]) => `${dim} (${count} uni)`)
+        .join(" | ");
+
+      doc.setFillColor(52, 68, 52);
+      doc.rect(0, 0, 210, 22, "F");
+
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(13);
+      doc.setFont("helvetica", "bold");
+      doc.text("AQUAGESTÃO - PROGRAMAÇÃO DE DESPESCA", 14, 11);
+
+      doc.setFontSize(8);
+      doc.setFont("helvetica", "normal");
+      doc.text(
+        `Emissão: ${format(new Date(), "dd/MM/yyyy HH:mm")}`,
+        196,
+        11,
+        { align: "right" },
+      );
+      doc.text("RELATÓRIO DE INDICAÇÃO E PLANEJAMENTO POR GAIOLA", 14, 17);
+
+      doc.setFillColor(248, 250, 252);
+      doc.setDrawColor(226, 232, 240);
+      doc.roundedRect(14, 26, 182, 38, 3, 3, "FD");
+
+      doc.setTextColor(15, 23, 42);
+      doc.setFontSize(10);
+      doc.setFont("helvetica", "bold");
+      doc.text(`LOTE: ${batchName.toUpperCase()}`, 18, 33);
+
+      doc.setFontSize(8.5);
+      doc.setFont("helvetica", "normal");
+      doc.text(
+        `Data Programada da Despesca: ${schedule.date ? format(parseISO(schedule.date), "dd/MM/yyyy") : "---"}`,
+        18,
+        40,
+      );
+      doc.text(`Data de Povoamento: ${settlementDateStr}`, 18, 46);
+      doc.text(`Protocolo de Produção: ${protocolName}`, 18, 52);
+      doc.text(
+        `Peso Médio Esperado do Lote: ${formatNumber(currentAvgWeight, 1)}g`,
+        18,
+        58,
+      );
+
+      doc.text(`Jejum / Trato: ${fastingStr}`, 108, 40);
+      doc.text(
+        `Total de Gaiolas: ${schedule.cageIds.length} unidades`,
+        108,
+        46,
+      );
+      doc.text(
+        `Biomassa Total Esperada: ${formatNumber(totalBiomass, 1)} kg`,
+        108,
+        52,
+      );
+      doc.text(`Estratificação: ${stratSummary || "---"}`, 108, 58, {
+        maxWidth: 84,
+      });
+
+      const tableHead = [
+        [
+          "Gaiola",
+          "Modelo / Dimensões",
+          "População (un)",
+          "Mort. Acum. (un)",
+          "Peso Médio Esperado (g)",
+          "Biomassa Esperada (kg)",
+        ],
+      ];
+
+      const tableBody = scheduleCagesData.map((c) => [
+        c.cageName,
+        c.dimStr,
+        formatNumber(c.currentCount),
+        formatNumber(c.mortality),
+        `${formatNumber(c.currentAvgWeight, 1)} g`,
+        `${formatNumber(c.biomassKg, 1)} kg`,
+      ]);
+
+      const tableFoot = [
+        [
+          "TOTAL DA PROGRAMAÇÃO",
+          `${scheduleCagesData.length} gaiolas`,
+          `${formatNumber(totalFish)} un`,
+          `${formatNumber(totalMortality)} un`,
+          `Média: ${formatNumber(currentAvgWeight, 1)} g`,
+          `${formatNumber(totalBiomass, 1)} kg`,
+        ],
+      ];
+
+      autoTable(doc, {
+        startY: 68,
+        head: tableHead,
+        body: tableBody,
+        foot: tableFoot,
+        theme: "striped",
+        headStyles: {
+          fillColor: [52, 68, 52],
+          textColor: [255, 255, 255],
+          fontSize: 8,
+          fontStyle: "bold",
+          halign: "left",
+          valign: "middle",
+        },
+        styles: {
+          fontSize: 8,
+          cellPadding: 3,
+          valign: "middle",
+          halign: "left",
+        },
+        columnStyles: {
+          0: { fontStyle: "bold", cellWidth: 30 },
+          1: { cellWidth: 45 },
+          2: { cellWidth: 28, halign: "right" },
+          3: { cellWidth: 28, halign: "right" },
+          4: { cellWidth: 28, halign: "right" },
+          5: { cellWidth: 23, halign: "right", fontStyle: "bold" },
+        },
+        footStyles: {
+          fillColor: [241, 245, 249],
+          textColor: [15, 23, 42],
+          fontSize: 8,
+          fontStyle: "bold",
+          valign: "middle",
+        },
+        margin: { left: 14, right: 14 },
+      });
+
+      const finalY = (doc as any).lastAutoTable?.finalY || 180;
+      const signY = Math.min(Math.max(finalY + 25, 220), 265);
+
+      doc.setDrawColor(148, 163, 184);
+      doc.setLineWidth(0.4);
+
+      doc.line(20, signY, 90, signY);
+      doc.setFontSize(8);
+      doc.setTextColor(71, 85, 105);
+      doc.setFont("helvetica", "bold");
+      doc.text("Responsável pela Despesca / Equipe", 55, signY + 5, {
+        align: "center",
+      });
+
+      doc.line(120, signY, 190, signY);
+      doc.text("Visto da Gerência / Piscicultura", 155, signY + 5, {
+        align: "center",
+      });
+    });
+
+    const fileName =
+      schedulesToExport.length === 1
+        ? `programacao-despesca-${schedulesToExport[0].date || "relatorio"}.pdf`
+        : `programacoes-despesca-${format(new Date(), "yyyy-MM-dd-HHmm")}.pdf`;
+
+    doc.save(fileName);
+  };
+
+  const planningCages = useMemo(() => {
+    if (!selectedPlanningBatchId) return [];
+
+    const batch = batchStats.find((b) => b.id === selectedPlanningBatchId);
+    if (!batch) return [];
+
+    // Get all cage IDs already scheduled, excluding the one being edited
+    const scheduledCageIds = (state.harvestSchedules || [])
+      .filter((s) => s.id !== editingScheduleId)
+      .flatMap((s) => s.cageIds);
+
+    // Get all cage IDs that have already been harvested (despescadas) for this batch
+    const harvestedCageIds = new Set(
+      (state.harvestLogs || [])
+        .filter((h) => h.batchId === batch.id)
+        .map((h) => h.cageId)
+    );
+
+    return batch.batchCages
+      .filter((cage) => 
+        !scheduledCageIds.includes(cage.id) &&
+        !harvestedCageIds.has(cage.id) &&
+        cage.batchId === batch.id &&
+        cage.status === 'Ocupada'
+      )
+      .map((cage) => {
+        const mortality = (state.mortalityLogs || [])
+          .filter((m) => {
+            if (m.cageId !== cage.id) return false;
+            if (m.batchId) return m.batchId === batch.id;
+            // Fallback for old logs
+            return m.date >= batch.settlementDate;
+          })
+          .reduce((acc, curr) => acc + curr.count, 0);
+
+        const currentCount = (cage.initialFishCount || 0) - mortality;
+        const biomass = (currentCount * batch.currentAvgWeight) / 1000;
+
+        return {
+          ...cage,
+          mortality,
+          currentCount,
+          biomass,
+        };
+      })
+      .sort((a, b) => b.mortality - a.mortality);
+  }, [
+    selectedPlanningBatchId,
+    batchStats,
+    state.mortalityLogs,
+    state.harvestSchedules,
+    state.harvestLogs,
+    editingScheduleId,
+  ]);
+
+  const selectedPlanningCagesData = useMemo(() => {
+    return planningCages.filter((c) => selectedPlanningCageIds.includes(c.id));
+  }, [planningCages, selectedPlanningCageIds]);
+
+  const stratification = useMemo(() => {
+    const counts: Record<string, number> = {};
+    selectedPlanningCagesData.forEach((cage) => {
+      const model = cage.model || "Gaiola";
+      const d = cage.dimensions || { width: 0, length: 0, depth: 0 };
+      const dim =
+        model === "Circular"
+          ? `Circular (${d.depth || 0}m prof.)`
+          : `${model} (${d.width || 0}x${d.length || 0}x${d.depth || 0})`;
+      counts[dim] = (counts[dim] || 0) + 1;
+    });
+    return Object.entries(counts)
+      .map(([dim, count]) => `${dim} ${formatNumber(count)}uni`)
+      .join(", ");
+  }, [selectedPlanningCagesData]);
+
+  const fastingHours = useMemo(() => {
+    if (!plannedHarvestDate || !lastFeeding) return 0;
+    const harvestDate = parseISO(plannedHarvestDate);
+    harvestDate.setHours(3, 0, 0, 0); // Despesca às 03:00 AM
+    const feedingDate = parseISO(lastFeeding);
+    return Math.floor(
+      (harvestDate.getTime() - feedingDate.getTime()) / (1000 * 60 * 60),
+    );
+  }, [plannedHarvestDate, lastFeeding]);
+
+  const totalPlanningBiomass = useMemo(() => {
+    return selectedPlanningCagesData.reduce(
+      (acc, curr) => acc + curr.biomass,
+      0,
+    );
+  }, [selectedPlanningCagesData]);
+
+  return (
+    <div className="space-y-8 pb-20 print:p-0 print:pb-0 print:space-y-0">
+      {/* Sub-tabs */}
+      <div className="flex items-center gap-2 bg-slate-100 p-1.5 rounded-2xl w-fit mx-auto md:mx-0 print:hidden">
+        <button
+          onClick={() => setActiveSubTab("inventory")}
+          className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${activeSubTab === "inventory" ? "bg-white text-blue-600 shadow-sm" : "text-slate-400 hover:text-slate-600"}`}
+        >
+          <Tag className="w-4 h-4" />
+          Estoque de Lotes
+        </button>
+        <button
+          onClick={() => setActiveSubTab("harvest")}
+          className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${activeSubTab === "harvest" ? "bg-white text-blue-600 shadow-sm" : "text-slate-400 hover:text-slate-600"}`}
+        >
+          <ShoppingCart className="w-4 h-4" />
+          Despesca
+        </button>
+        <button
+          onClick={() => setActiveSubTab("closing")}
+          className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${activeSubTab === "closing" ? "bg-white text-blue-600 shadow-sm" : "text-slate-400 hover:text-slate-600"}`}
+        >
+          <FileText className="w-4 h-4" />
+          Fechamento
+        </button>
+      </div>
+
+      {activeSubTab === "harvest" ? (
+        <HarvestManagement
+          state={state}
+          onUpdate={onUpdate}
+          currentUser={currentUser}
+        />
+      ) : activeSubTab === "closing" ? (
+        <BatchClosing
+          state={state}
+          onUpdate={onUpdate}
+          currentUser={currentUser}
+        />
+      ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
+          <div className="lg:col-span-1 lg:sticky lg:top-8">
+            {hasPermission ? (
+              <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200">
+                <h3 className="text-lg font-black text-slate-800 mb-6 flex items-center justify-between uppercase tracking-tighter italic">
+                  <div className="flex items-center gap-2">
+                    {editingId ? (
+                      <Edit className="w-5 h-5 text-amber-500" />
+                    ) : (
+                      <Plus className="w-5 h-5 text-blue-500" />
+                    )}
+                    {editingId ? "Editar Lote" : "Cadastrar Lote"}
+                  </div>
+                  {editingId && (
+                    <button
+                      onClick={() => {
+                        setEditingId(null);
+                        setFormData({
+                          name: "",
+                          settlementDate: new Date()
+                            .toISOString()
+                            .split("T")[0],
+                          initialQuantity: "",
+                          initialUnitWeight: "",
+                          protocolId: "",
+                          expectedHarvestDate: "",
+                          supplierCnpj: "",
+                          supplierName: "",
+                          invoiceValue: "",
+                        });
+                      }}
+                      className="text-slate-400 hover:text-slate-600"
+                    >
+                      <X className="w-5 h-5" />
+                    </button>
+                  )}
+                </h3>
+                <form onSubmit={handleSave} className="space-y-4">
+                  <div>
+                    <label className="block text-[10px] font-black text-slate-400 uppercase mb-1 tracking-widest">
+                      Identificação do Lote
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="Ex: Lote 2024-A"
+                      className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 font-bold text-sm"
+                      value={formData.name}
+                      onChange={(e) =>
+                        setFormData({ ...formData, name: e.target.value })
+                      }
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-black text-slate-400 uppercase mb-1 tracking-widest">
+                      Modelo de Produção
+                    </label>
+                    <select
+                      className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 font-bold text-sm"
+                      value={formData.protocolId}
+                      onChange={(e) =>
+                        setFormData({ ...formData, protocolId: e.target.value })
+                      }
+                    >
+                      <option value="">Nenhum modelo</option>
+                      {(state.protocols || []).map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-[10px] font-black text-slate-400 uppercase mb-1 tracking-widest">
+                        Povoamento
+                      </label>
+                      <input
+                        type="date"
+                        required
+                        className="w-full px-3 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 font-bold text-xs"
+                        value={formData.settlementDate}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            settlementDate: e.target.value,
+                          })
+                        }
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-black text-slate-400 uppercase mb-1 tracking-widest">
+                        Quantidade
+                      </label>
+                      <input
+                        type="number"
+                        required
+                        placeholder="0"
+                        className="w-full px-3 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 font-bold text-xs"
+                        value={formData.initialQuantity}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            initialQuantity: e.target.value,
+                          })
+                        }
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-[10px] font-black text-slate-400 uppercase mb-1 tracking-widest">
+                        Peso Médio (g)
+                      </label>
+                      <input
+                        type="number"
+                        required
+                        placeholder="0"
+                        className="w-full px-3 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 font-bold text-xs"
+                        value={formData.initialUnitWeight}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            initialUnitWeight: e.target.value,
+                          })
+                        }
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-black text-slate-400 uppercase mb-1 tracking-widest">
+                        Prev. Despesca
+                      </label>
+                      <input
+                        type="date"
+                        className="w-full px-3 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 font-bold text-xs"
+                        value={formData.expectedHarvestDate}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            expectedHarvestDate: e.target.value,
+                          })
+                        }
+                      />
+                    </div>
+                  </div>
+
+                  {/* Detalhes do Povoamento e Fornecedor */}
+                  <div className="bg-slate-50/50 p-4 rounded-2xl border border-slate-200/60 space-y-3">
+                    <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-1.5 italic">
+                      <FileText className="w-3.5 h-3.5 text-blue-500" />
+                      Fornecedor e Nota Fiscal (Opcional)
+                    </span>
+                    
+                    <div className="space-y-3">
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-[10px] font-black text-slate-400 uppercase mb-1 tracking-wider">
+                            Nº da Nota
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="Ex: 50422"
+                            className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 font-bold text-xs"
+                            value={formData.invoiceNumber}
+                            onChange={(e) =>
+                              setFormData({
+                                ...formData,
+                                invoiceNumber: e.target.value,
+                              })
+                            }
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-black text-slate-400 uppercase mb-1 tracking-wider">
+                            Valor da Nota (R$)
+                          </label>
+                          <input
+                            type="number"
+                            placeholder="0,00"
+                            className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 font-bold text-xs"
+                            value={formData.invoiceValue}
+                            onChange={(e) =>
+                              setFormData({
+                                ...formData,
+                                invoiceValue: e.target.value,
+                              })
+                            }
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-[10px] font-black text-slate-400 uppercase mb-1 tracking-wider">
+                            CNPJ Fornecedor
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="00.000.000/0000-00"
+                            className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 font-bold text-xs"
+                            value={formData.supplierCnpj}
+                            onChange={(e) =>
+                              setFormData({
+                                ...formData,
+                                supplierCnpj: e.target.value,
+                              })
+                            }
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-black text-slate-400 uppercase mb-1 tracking-wider">
+                            Razão Social
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="Ex: Piscicultura Vale Azul"
+                            className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 font-bold text-xs"
+                            value={formData.supplierName}
+                            onChange={(e) =>
+                              setFormData({
+                                ...formData,
+                                supplierName: e.target.value,
+                              })
+                            }
+                          />
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={handleAddFormInvoice}
+                        className="w-full py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl font-bold text-[10px] uppercase tracking-widest flex items-center justify-center gap-1.5 transition-colors active:scale-95"
+                      >
+                        <Plus className="w-3.5 h-3.5" /> Adicionar Nota à Lista
+                      </button>
+                    </div>
+
+                    {/* Exibição das Notas já adicionadas */}
+                    {formInvoices.length > 0 && (
+                      <div className="bg-white border border-slate-100 rounded-xl p-3 space-y-2 max-h-48 overflow-y-auto mt-2">
+                        <span className="text-[9px] font-black text-slate-400 uppercase tracking-wider block">
+                          Lista de Notas ({formInvoices.length})
+                        </span>
+                        <div className="space-y-1.5">
+                          {formInvoices.map((inv, index) => (
+                            <div key={inv.id} className="flex justify-between items-center bg-slate-50/50 p-2 rounded-lg border border-slate-100">
+                              <div className="text-[9px] font-bold text-slate-600 space-y-0.5 leading-tight">
+                                <span className="font-black text-slate-800 uppercase block truncate max-w-[150px]">
+                                  {index + 1}. {inv.supplierName || "Fornecedor"}
+                                </span>
+                                <div className="flex gap-2 text-slate-400 font-medium">
+                                  {inv.invoiceNumber && <span>Nº: {inv.invoiceNumber}</span>}
+                                  {inv.supplierCnpj && <span>CNPJ: {inv.supplierCnpj}</span>}
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs font-black text-blue-600">
+                                  R$ {formatNumber(inv.invoiceValue)}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => setFormInvoices(formInvoices.filter(item => item.id !== inv.id))}
+                                  className="text-red-400 hover:text-red-600 p-1"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                        <div className="text-right pt-1.5 border-t border-dashed border-slate-150 text-[10px] font-black text-slate-700">
+                          Total Acumulado: R$ {formatNumber(formInvoices.reduce((sum, item) => sum + item.invoiceValue, 0))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  <button
+                    type="submit"
+                    className={`w-full py-4 rounded-2xl font-black uppercase tracking-widest text-xs text-white shadow-xl transition-all active:scale-95 mt-2 ${editingId ? "bg-amber-600 shadow-amber-600/20" : "bg-blue-600 shadow-blue-600/20"}`}
+                  >
+                    {editingId ? "Salvar Lote" : "Povoar Lote"}
+                  </button>
+                </form>
+              </div>
+            ) : (
+              <div className="bg-slate-100 p-8 rounded-3xl border border-dashed border-slate-300 flex flex-col items-center gap-4 text-center">
+                <Eye className="w-10 h-10 text-slate-300" />
+                <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">
+                  Modo Leitura
+                </h4>
+                <p className="text-[9px] font-bold text-slate-400 uppercase leading-relaxed">
+                  Sem permissão para editar.
+                </p>
+              </div>
+            )}
+          </div>
+
+          <div className="lg:col-span-2 space-y-8">
+            {/* Indicação de Gaiola Box */}
+            <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-200">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+                <div className="flex items-center gap-3">
+                  <div className="p-3 bg-blue-50 rounded-2xl">
+                    <ShoppingCart className="w-6 h-6 text-blue-600" />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-black text-slate-800 uppercase tracking-tighter italic">
+                      Indicação de Gaiolas para Despesca
+                    </h3>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                      Planejamento e Programação por Gaiola
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                    Filtrar por Data:
+                  </label>
+                  <input
+                    type="date"
+                    className="px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl font-bold outline-none focus:ring-2 focus:ring-blue-500/10 text-xs"
+                    value={selectedScheduleDate}
+                    onChange={(e) => setSelectedScheduleDate(e.target.value)}
+                  />
+                  {selectedScheduleDate && (
+                    <button
+                      onClick={() => setSelectedScheduleDate("")}
+                      className="p-2 text-slate-400 hover:text-red-500"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <div className="space-y-6">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-widest">
+                      Selecionar Lote
+                    </label>
+                    <select
+                      className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none focus:ring-2 focus:ring-blue-500/10 text-sm"
+                      value={selectedPlanningBatchId}
+                      onChange={(e) => {
+                        setSelectedPlanningBatchId(e.target.value);
+                        setSelectedPlanningCageIds([]);
+                      }}
+                    >
+                      <option value="">Escolher Lote para Planejar</option>
+                      {batchStats
+                        .filter((b) => !b.isFinalized)
+                        .map((b) => (
+                          <option key={b.id} value={b.id}>
+                            {b.name} ({formatNumber(b.batchCages.length)}{" "}
+                            gaiolas)
+                          </option>
+                        ))}
+                    </select>
+                  </div>
+
+                  {selectedPlanningBatchId && (
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between px-1">
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                          Gaiolas Disponíveis
+                        </label>
+                        <span className="text-[10px] font-black text-blue-600 uppercase bg-blue-50 px-2 py-1 rounded-lg">
+                          {formatNumber(planningCages.length)} Total
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[400px] overflow-y-auto pr-2 scrollbar-hide">
+                        {planningCages.map((cage) => (
+                          <button
+                            key={cage.id}
+                            onClick={() => {
+                              if (selectedPlanningCageIds.includes(cage.id)) {
+                                setSelectedPlanningCageIds(
+                                  selectedPlanningCageIds.filter(
+                                    (id) => id !== cage.id,
+                                  ),
+                                );
+                              } else {
+                                setSelectedPlanningCageIds([
+                                  ...selectedPlanningCageIds,
+                                  cage.id,
+                                ]);
+                              }
+                            }}
+                            className={`flex items-center justify-between p-4 rounded-2xl border transition-all ${
+                              selectedPlanningCageIds.includes(cage.id)
+                                ? "bg-blue-50 border-blue-200 ring-2 ring-blue-500/10"
+                                : "bg-white border-slate-100 hover:border-slate-200"
+                            }`}
+                          >
+                            <div className="flex items-center gap-3">
+                              <div
+                                className={`p-2 rounded-xl ${selectedPlanningCageIds.includes(cage.id) ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-400"}`}
+                              >
+                                {selectedPlanningCageIds.includes(cage.id) ? (
+                                  <CheckCircle2 className="w-4 h-4" />
+                                ) : (
+                                  <Box className="w-4 h-4" />
+                                )}
+                              </div>
+                              <div className="text-left">
+                                <span className="text-sm font-black text-slate-800 uppercase italic">
+                                  {cage.name}
+                                </span>
+                                <div className="flex flex-col mt-0.5">
+                                  <span className="text-[9px] font-bold text-slate-400 uppercase">
+                                    {formatNumber(cage.currentCount)} peixes
+                                  </span>
+                                  <span className="text-[9px] font-black text-red-500 uppercase">
+                                    Mortalidade: {formatNumber(cage.mortality)}
+                                  </span>
+                                  <span className="text-[9px] font-black text-blue-600 uppercase">
+                                    {formatNumber(cage.biomass, 1)}kg
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div className="space-y-6">
+                  {selectedPlanningCageIds.length > 0 ? (
+                    <div className="bg-slate-50 p-6 rounded-[2rem] border border-slate-100 space-y-6 animate-in fade-in slide-in-from-right-4">
+                      <div className="flex items-center justify-between pb-4 border-b border-slate-200">
+                        <h4 className="text-xs font-black text-slate-800 uppercase tracking-widest italic">
+                          Nova Programação
+                        </h4>
+                        <div className="flex gap-2">
+                          {editingScheduleId && (
+                            <button
+                              onClick={() => {
+                                setEditingScheduleId(null);
+                                setSelectedPlanningCageIds([]);
+                                setPlannedHarvestDate("");
+                                setLastFeeding("");
+                              }}
+                              className="p-2 text-slate-400 hover:text-red-500"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                          )}
+                          <span className="px-3 py-1 bg-blue-600 text-white text-[10px] font-black rounded-full uppercase">
+                            {formatNumber(selectedPlanningCageIds.length)}{" "}
+                            Gaiolas
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="bg-white p-4 rounded-2xl border border-slate-100">
+                          <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">
+                            Biomassa Total
+                          </span>
+                          <span className="text-xl font-black text-blue-600 italic">
+                            {formatNumber(totalPlanningBiomass, 1)}kg
+                          </span>
+                        </div>
+                        <div className="bg-white p-4 rounded-2xl border border-slate-100">
+                          <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">
+                            Estratificação
+                          </span>
+                          <span className="text-[10px] font-black text-slate-700 uppercase leading-tight block">
+                            {stratification || "---"}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="bg-white p-4 rounded-2xl border border-slate-100">
+                          <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">
+                            Data da Despesca
+                          </span>
+                          <input
+                            type="date"
+                            className="w-full mt-1 bg-transparent border-none p-0 font-black text-emerald-600 outline-none text-xs"
+                            value={plannedHarvestDate}
+                            onChange={(e) => {
+                              const date = e.target.value;
+                              setPlannedHarvestDate(date);
+                              if (date) {
+                                const [h, m] = lastFeedingHour
+                                  .split(":")
+                                  .map(Number);
+                                const harvestDateObj = parseISO(date);
+                                const lastFeedingDate = new Date(
+                                  harvestDateObj.getTime() -
+                                    2 * 24 * 60 * 60 * 1000,
+                                );
+                                lastFeedingDate.setHours(h, m, 0, 0);
+                                setLastFeeding(
+                                  format(lastFeedingDate, "yyyy-MM-dd'T'HH:mm"),
+                                );
+                              } else {
+                                setLastFeeding("");
+                              }
+                            }}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="bg-white p-4 rounded-2xl border border-slate-100">
+                        <div className="flex items-center justify-between mb-2">
+                          <div>
+                            <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block">
+                              Último Trato (Jejum Est. {fastingHours}h)
+                            </span>
+                            {plannedHarvestDate && (
+                              <span className="text-[10px] font-black text-blue-600 uppercase">
+                                Sugestão:{" "}
+                                {format(
+                                  new Date(
+                                    parseISO(plannedHarvestDate).getTime() -
+                                      2 * 24 * 60 * 60 * 1000,
+                                  ),
+                                  "dd/MM/yyyy",
+                                )}
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex gap-1">
+                            {["07:00", "11:00", "13:00", "16:00"].map((h) => (
+                              <button
+                                key={h}
+                                onClick={() => {
+                                  setLastFeedingHour(h);
+                                  if (plannedHarvestDate) {
+                                    const [hour, min] = h
+                                      .split(":")
+                                      .map(Number);
+                                    const harvestDateObj =
+                                      parseISO(plannedHarvestDate);
+                                    const lastFeedingDate = new Date(
+                                      harvestDateObj.getTime() -
+                                        2 * 24 * 60 * 60 * 1000,
+                                    );
+                                    lastFeedingDate.setHours(hour, min, 0, 0);
+                                    setLastFeeding(
+                                      format(
+                                        lastFeedingDate,
+                                        "yyyy-MM-dd'T'HH:mm",
+                                      ),
+                                    );
+                                  }
+                                }}
+                                className={`px-1.5 py-0.5 rounded text-[8px] font-black transition-all ${lastFeedingHour === h ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-400 hover:bg-slate-200"}`}
+                              >
+                                {h}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Utensils className="w-4 h-4 text-amber-500" />
+                          <span className="text-sm font-black text-slate-700">
+                            {lastFeeding
+                              ? format(
+                                  parseISO(lastFeeding),
+                                  "dd/MM/yyyy 'às' HH:mm",
+                                )
+                              : "---"}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="bg-white p-4 rounded-2xl border border-slate-100">
+                        <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-2">
+                          Gaiolas Selecionadas
+                        </span>
+                        <div className="flex flex-wrap gap-1.5">
+                          {selectedPlanningCagesData.map((c) => (
+                            <span
+                              key={c.id}
+                              className="px-2 py-1 bg-slate-100 text-[10px] font-black text-slate-600 rounded-lg uppercase border border-slate-200"
+                            >
+                              {c.name}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="flex gap-2">
+                        <button
+                          onClick={handleSaveSchedule}
+                          className="flex-1 py-4 bg-blue-600 text-white rounded-2xl font-black uppercase tracking-widest text-xs shadow-lg shadow-blue-200 hover:bg-blue-700 transition-all flex items-center justify-center gap-2"
+                        >
+                          <CheckCircle2 className="w-4 h-4" />
+                          {editingScheduleId
+                            ? "Atualizar Programação"
+                            : "Salvar Programação"}
+                        </button>
+                        <button
+                          onClick={() => {
+                            if (!plannedHarvestDate) {
+                              alert("Informe a data da despesca para gerar o PDF da programação.");
+                              return;
+                            }
+                            exportSchedulesPDF([
+                              {
+                                id: editingScheduleId || "draft",
+                                batchId: selectedPlanningBatchId,
+                                cageIds: selectedPlanningCageIds,
+                                date: plannedHarvestDate,
+                                lastFeedingDate: lastFeeding,
+                              },
+                            ]);
+                          }}
+                          className="px-4 py-4 bg-slate-800 text-white rounded-2xl font-black uppercase tracking-widest text-xs shadow-lg shadow-slate-200 hover:bg-slate-900 transition-all flex items-center justify-center gap-2"
+                          title="Gerar PDF desta programação"
+                        >
+                          <FileText className="w-4 h-4 text-emerald-400" />
+                          PDF
+                        </button>
+                      </div>
+
+                      <div className="p-4 bg-amber-50 border border-amber-100 rounded-2xl flex items-start gap-3">
+                        <Info className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                        <p className="text-[9px] font-bold text-amber-700 uppercase leading-relaxed">
+                          Esta ferramenta é apenas para planejamento. Nenhuma
+                          alteração será feita nos registros de despesca ou
+                          status das gaiolas.
+                        </p>
+                      </div>
+                    </div>
+                  ) : (
+                    (() => {
+                      const visibleSchedules = (state.harvestSchedules || [])
+                        .filter(
+                          (s) =>
+                            !selectedScheduleDate ||
+                            s.date === selectedScheduleDate,
+                        )
+                        .sort((a, b) => b.date.localeCompare(a.date));
+
+                      return (
+                        <div className="space-y-4">
+                          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                            <h4 className="text-xs font-black text-slate-800 uppercase tracking-widest italic ml-1">
+                              Programações Salvas
+                            </h4>
+                            {visibleSchedules.length > 0 && (
+                              <button
+                                onClick={() => exportSchedulesPDF(visibleSchedules)}
+                                className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-black uppercase tracking-widest transition-all flex items-center gap-2 shadow-sm shrink-0"
+                              >
+                                <FileText className="w-4 h-4" />
+                                Exportar Todos os Lotes (PDF)
+                              </button>
+                            )}
+                          </div>
+
+                          <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2 scrollbar-hide">
+                            {visibleSchedules.map((schedule) => {
+                              const batch =
+                                batchStats.find((b) => b.id === schedule.batchId) ||
+                                state.batches.find((b) => b.id === schedule.batchId);
+                              const avgWeight = batch?.currentAvgWeight || 0;
+
+                              const totalScheduleBiomass = schedule.cageIds.reduce(
+                                (acc, cid) => {
+                                  const cage = state.cages.find((c) => c.id === cid);
+                                  const mortality = (state.mortalityLogs || [])
+                                    .filter((m) => {
+                                      if (m.cageId !== cid) return false;
+                                      if (m.batchId) return m.batchId === schedule.batchId;
+                                      return batch?.settlementDate
+                                        ? m.date >= batch.settlementDate
+                                        : true;
+                                    })
+                                    .reduce((sum, curr) => sum + curr.count, 0);
+                                  const count = Math.max(
+                                    0,
+                                    (cage?.initialFishCount || 0) - mortality,
+                                  );
+                                  return acc + (count * avgWeight) / 1000;
+                                },
+                                0,
+                              );
+
+                              return (
+                                <div
+                                  key={schedule.id}
+                                  className="bg-white p-4 rounded-2xl border border-slate-100 hover:border-blue-200 transition-all group"
+                                >
+                                  <div className="flex items-center justify-between mb-3">
+                                    <div className="flex items-center gap-2">
+                                      <Calendar className="w-4 h-4 text-blue-500" />
+                                      <span className="text-xs font-black text-slate-800">
+                                        {format(
+                                          parseISO(schedule.date),
+                                          "dd/MM/yyyy",
+                                        )}
+                                      </span>
+                                    </div>
+                                    <div className="flex items-center gap-1">
+                                      <button
+                                        onClick={() => exportSchedulesPDF([schedule])}
+                                        title="Gerar PDF desta programação"
+                                        className="px-2.5 py-1 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-lg text-[10px] font-black uppercase transition-all flex items-center gap-1 border border-blue-200"
+                                      >
+                                        <FileText className="w-3.5 h-3.5" />
+                                        PDF
+                                      </button>
+                                      <button
+                                        onClick={() =>
+                                          startEditSchedule(schedule)
+                                        }
+                                        title="Editar programação"
+                                        className="p-1.5 text-slate-300 hover:text-blue-500 transition-colors"
+                                      >
+                                        <Edit className="w-3.5 h-3.5" />
+                                      </button>
+                                      <button
+                                        onClick={() =>
+                                          removeSchedule(schedule.id)
+                                        }
+                                        title="Excluir programação"
+                                        className="p-1.5 text-slate-300 hover:text-red-500 transition-colors"
+                                      >
+                                        <Trash2 className="w-3.5 h-3.5" />
+                                      </button>
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center justify-between">
+                                    <div className="flex flex-col">
+                                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                                        Lote
+                                      </span>
+                                      <span className="text-xs font-bold text-slate-700">
+                                        {batch?.name || "Lote removido"}
+                                      </span>
+                                    </div>
+                                    <div className="flex flex-col items-end">
+                                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                                        Gaiolas
+                                      </span>
+                                      <span className="text-xs font-bold text-blue-600">
+                                        {schedule.cageIds.length} unidades
+                                      </span>
+                                    </div>
+                                  </div>
+
+                                  <div className="mt-2 pt-2 border-t border-slate-100 flex items-center justify-between text-[10px] font-bold">
+                                    <span className="text-slate-400">
+                                      Peso Esperado:{" "}
+                                      <strong className="text-slate-700">
+                                        {formatNumber(avgWeight, 1)}g
+                                      </strong>
+                                    </span>
+                                    <span className="text-slate-400">
+                                      Biomassa Esperada:{" "}
+                                      <strong className="text-blue-600">
+                                        {formatNumber(totalScheduleBiomass, 1)}kg
+                                      </strong>
+                                    </span>
+                                  </div>
+
+                                  {schedule.lastFeedingDate && (
+                                    <div className="mt-2 px-2 py-1 bg-amber-50 rounded-lg border border-amber-100 flex items-center gap-2">
+                                      <Utensils className="w-3 h-3 text-amber-600" />
+                                      <div className="flex flex-col">
+                                        <span className="text-[8px] font-black text-amber-400 uppercase tracking-widest">
+                                          Último Trato
+                                        </span>
+                                        <span className="text-[9px] font-bold text-amber-700 uppercase">
+                                          {format(
+                                            parseISO(schedule.lastFeedingDate),
+                                            "dd/MM/yyyy 'às' HH:mm",
+                                          )}
+                                        </span>
+                                      </div>
+                                    </div>
+                                  )}
+
+                                  {(() => {
+                                    const scheduleCages = schedule.cageIds
+                                      .map((cid) =>
+                                        state.cages.find((c) => c.id === cid),
+                                      )
+                                      .filter(Boolean);
+                                    const counts: Record<string, number> = {};
+                                    scheduleCages.forEach((cage) => {
+                                      if (!cage) return;
+                                      const model = cage.model || "Gaiola";
+                                      const d = cage.dimensions || {
+                                        width: 0,
+                                        length: 0,
+                                        depth: 0,
+                                      };
+                                      const dim =
+                                        model === "Circular"
+                                          ? `Circular (${d.depth || 0}m prof.)`
+                                          : `${model} (${d.width || 0}x${d.length || 0}x${d.depth || 0})`;
+                                      counts[dim] = (counts[dim] || 0) + 1;
+                                    });
+                                    const strat = Object.entries(counts)
+                                      .map(
+                                        ([dim, count]) =>
+                                          `${dim} ${formatNumber(count)}uni`,
+                                      )
+                                      .join(", ");
+                                    return strat ? (
+                                      <div className="mt-2 px-2 py-1 bg-slate-50 rounded-lg border border-slate-100">
+                                        <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest block">
+                                          Estratificação
+                                        </span>
+                                        <span className="text-[9px] font-bold text-slate-600 uppercase">
+                                          {strat}
+                                        </span>
+                                      </div>
+                                    ) : null;
+                                  })()}
+
+                                  <div className="mt-3 flex flex-wrap gap-1">
+                                    {schedule.cageIds.map((cid) => {
+                                      const c = state.cages.find(
+                                        (cage) => cage.id === cid,
+                                      );
+                                      return (
+                                        <span
+                                          key={cid}
+                                          className="px-1.5 py-0.5 bg-slate-50 text-[8px] font-black text-slate-500 rounded uppercase border border-slate-100"
+                                        >
+                                          {c?.name || "---"}
+                                        </span>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                            {visibleSchedules.length === 0 && (
+                              <div className="py-12 text-center bg-slate-50 rounded-[2rem] border border-dashed border-slate-200">
+                                <Calendar className="w-8 h-8 text-slate-200 mx-auto mb-2" />
+                                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
+                                  Nenhuma programação salva.
+                                </p>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })()
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="lg:col-span-2 space-y-6">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-[2rem] border border-slate-200 shadow-sm">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-blue-50 rounded-xl">
+                    <Calendar className="w-5 h-5 text-blue-600" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest italic">
+                      Filtros de Lotes
+                    </h3>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                      Organize por período e tipo de data
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-3">
+                  <select
+                    value={filterMonth}
+                    onChange={(e) => setFilterMonth(e.target.value)}
+                    className="px-4 py-2 bg-white border border-slate-200 rounded-xl text-[10px] font-black uppercase tracking-widest outline-none focus:ring-2 focus:ring-blue-500/10 shadow-sm min-w-[140px]"
+                  >
+                    <option value="">Todos os Meses</option>
+                    {availableMonths.map((m) => {
+                      const [year, month] = m.split("-");
+                      const date = new Date(
+                        parseInt(year),
+                        parseInt(month) - 1,
+                      );
+                      return (
+                        <option key={m} value={m}>
+                          {format(date, "MMMM yyyy", { locale: ptBR })}
+                        </option>
+                      );
+                    })}
+                  </select>
+
+                  {filterMonth && (
+                    <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200">
+                      <button
+                        onClick={() => setFilterType("settlement")}
+                        className={`px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${filterType === "settlement" ? "bg-white text-blue-600 shadow-sm" : "text-slate-400 hover:text-slate-600"}`}
+                      >
+                        Povoamento
+                      </button>
+                      <button
+                        onClick={() => setFilterType("harvest")}
+                        className={`px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${filterType === "harvest" ? "bg-white text-blue-600 shadow-sm" : "text-slate-400 hover:text-slate-600"}`}
+                      >
+                        Despesca
+                      </button>
+                    </div>
+                  )}
+
+                  {filterMonth && (
+                    <button
+                      onClick={() => {
+                        setFilterMonth("");
+                        setFilterType("settlement");
+                      }}
+                      className="p-2 text-slate-400 hover:text-red-500 transition-colors"
+                      title="Limpar Filtros"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Barra de Seleção para PDF */}
+              <div className="bg-slate-50 border border-slate-200 p-4 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <input
+                    type="checkbox"
+                    id="select-all-batches"
+                    checked={
+                      filteredBatchStats.length > 0 &&
+                      filteredBatchStats.every((b) => selectedBatchIds.includes(b.id))
+                    }
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        setSelectedBatchIds(filteredBatchStats.map((b) => b.id));
+                      } else {
+                        setSelectedBatchIds([]);
+                      }
+                    }}
+                    className="w-4.5 h-4.5 text-blue-600 border-slate-300 rounded focus:ring-blue-500 cursor-pointer"
+                  />
+                  <label
+                    htmlFor="select-all-batches"
+                    className="text-[10px] font-black text-slate-500 uppercase tracking-widest cursor-pointer select-none"
+                  >
+                    Selecionar Todos ({filteredBatchStats.length} Lote{filteredBatchStats.length !== 1 ? "s" : ""})
+                  </label>
+                </div>
+
+                <div className="flex items-center gap-3 self-end sm:self-auto">
+                  {selectedBatchIds.length > 0 && (
+                    <span className="text-[10px] font-black text-blue-600 uppercase tracking-widest bg-blue-50 border border-blue-200/55 px-2.5 py-1 rounded-lg">
+                      {selectedBatchIds.length} selecionado{selectedBatchIds.length > 1 ? "s" : ""}
+                    </span>
+                  )}
+                  <button
+                    onClick={handleGeneratePDF}
+                    disabled={selectedBatchIds.length === 0}
+                    className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-200 disabled:text-slate-400 text-white rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 transition-all shadow-md hover:shadow-lg disabled:shadow-none active:scale-95 duration-150"
+                  >
+                    <FileText className="w-4 h-4" /> Gerar PDF do Cenário Atual
+                  </button>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {filteredBatchStats.map((batch) => {
+                  return (
+                    <div
+                      key={batch.id}
+                      className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden hover:border-blue-200 transition-all"
+                    >
+                      <div className="p-4 bg-slate-50 border-b border-slate-100 flex justify-between items-center">
+                        <div className="flex items-center gap-3">
+                          <input
+                            type="checkbox"
+                            checked={selectedBatchIds.includes(batch.id)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setSelectedBatchIds([...selectedBatchIds, batch.id]);
+                              } else {
+                                setSelectedBatchIds(
+                                  selectedBatchIds.filter((id) => id !== batch.id)
+                                );
+                              }
+                            }}
+                            className="w-4 h-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500 cursor-pointer"
+                          />
+                          <div className="flex items-center gap-2">
+                            <Tag className="w-4 h-4 text-blue-500" />
+                            <span className="font-black text-slate-800 uppercase tracking-tighter">
+                              {batch.name}
+                            </span>
+                          </div>
+                        </div>
+                        {hasPermission && (
+                          <div className="flex gap-1">
+                            <button
+                              onClick={() => startEdit(batch)}
+                              className="text-slate-300 hover:text-blue-500 p-2 transition-colors"
+                            >
+                              <Edit className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => removeBatch(batch.id)}
+                              className="text-slate-300 hover:text-red-500 p-2 transition-colors"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                      <div className="p-6 space-y-4">
+                        {batch.settlementAlert}
+                        <div className="flex items-center justify-between">
+                          {batch.protocol ? (
+                            <div className="flex items-center gap-2 px-3 py-1.5 bg-indigo-50 rounded-xl border border-indigo-100">
+                              <BookOpen className="w-3 h-3 text-indigo-600" />
+                              <span className="text-[10px] font-black text-indigo-700 uppercase tracking-widest">
+                                {batch.protocol.name}
+                              </span>
+                            </div>
+                          ) : (
+                            <div></div>
+                          )}
+
+                          {batch.isFinalized ? (
+                            <div className="flex items-center gap-2 px-3 py-1.5 bg-indigo-900 rounded-xl border border-indigo-800 text-white">
+                              <CheckCircle2 className="w-3 h-3 text-indigo-400" />
+                              <span className="text-[10px] font-black uppercase tracking-widest">
+                                Taxa de Sobrevivência do Lote:{" "}
+                                {formatNumber(batch.accuracy, 1)}%
+                              </span>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-2 px-3 py-1.5 bg-emerald-50 rounded-xl border border-emerald-100">
+                              <TrendingUp className="w-3 h-3 text-emerald-600" />
+                              <span className="text-[10px] font-black text-emerald-700 uppercase tracking-widest">
+                                Taxa de Sobrevivência do Lote:{" "}
+                                {formatNumber(batch.yieldPercentage, 1)}%
+                              </span>
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="space-y-2">
+                          <div className="flex justify-between items-center">
+                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1">
+                              <Calendar className="w-3 h-3 opacity-30" />{" "}
+                              Povoamento
+                            </span>
+                            <span className="text-xs font-black text-slate-700">
+                              {batch.settlementDate
+                                ? format(
+                                    new Date(
+                                      batch.settlementDate + "T12:00:00",
+                                    ),
+                                    "dd/MM/yyyy",
+                                  )
+                                : "---"}
+                            </span>
+                          </div>
+
+                          {batch.expectedHarvestDate && (
+                            <div className="flex justify-between items-center">
+                              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1">
+                                <Calendar className="w-3 h-3 opacity-30 text-blue-400" />{" "}
+                                Prev. Despesca
+                              </span>
+                              <span className="text-xs font-black text-blue-600">
+                                {format(
+                                  new Date(
+                                    batch.expectedHarvestDate + "T12:00:00",
+                                  ),
+                                  "dd/MM/yyyy",
+                                )}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Detalhes do Fornecedor e de Nota Fiscal */}
+                        {((batch.invoices && batch.invoices.length > 0) || batch.supplierName || batch.supplierCnpj || (batch.invoiceValue !== undefined && batch.invoiceValue > 0)) && (
+                          <div className="bg-slate-50 p-3 rounded-2xl border border-slate-100 space-y-1 text-[10px] font-bold">
+                            <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1">
+                              <FileText className="w-3 h-3 text-blue-500" /> Detalhes do Povoamento
+                            </span>
+                            {batch.invoices && batch.invoices.length > 0 ? (
+                              <div className="space-y-1.5 pt-1.5">
+                                {batch.invoices.map((inv, idx) => (
+                                  <div key={inv.id || idx} className="border-b border-dashed border-slate-200/50 pb-1.5 last:border-0 last:pb-0">
+                                    <div className="flex justify-between font-black text-slate-700 uppercase mb-0.5">
+                                      <span className="truncate max-w-[150px]">{idx + 1}. {inv.supplierName || 'FORNECEDOR'}</span>
+                                      <span className="text-blue-600">R$ {formatNumber(inv.invoiceValue)}</span>
+                                    </div>
+                                    <div className="flex gap-2 text-[8px] font-bold text-slate-400">
+                                      {inv.invoiceNumber && <span>Nota nº: {inv.invoiceNumber}</span>}
+                                      {inv.supplierCnpj && <span>CNPJ: {inv.supplierCnpj}</span>}
+                                    </div>
+                                  </div>
+                                ))}
+                                <div className="flex justify-between items-center pt-1.5 border-t border-dashed border-slate-200 mt-1 font-black text-slate-800">
+                                  <span className="uppercase text-[9px] text-slate-400">Total das Notas:</span>
+                                  <span className="text-xs text-blue-600 font-extrabold">
+                                    R$ {formatNumber(batch.invoices.reduce((sum, inv) => sum + inv.invoiceValue, 0))}
+                                  </span>
+                                </div>
+                              </div>
+                            ) : (
+                              <>
+                                {batch.supplierName && (
+                                  <div className="flex justify-between">
+                                    <span className="text-slate-400 uppercase">Fornecedor:</span>
+                                    <span className="text-slate-700 uppercase font-black">{batch.supplierName}</span>
+                                  </div>
+                                )}
+                                {batch.supplierCnpj && (
+                                  <div className="flex justify-between">
+                                    <span className="text-slate-400 uppercase">CNPJ:</span>
+                                    <span className="text-slate-700 font-black">{batch.supplierCnpj}</span>
+                                  </div>
+                                )}
+                                {batch.invoiceValue !== undefined && batch.invoiceValue > 0 && (
+                                  <div className="flex justify-between items-center pt-1 border-t border-dashed border-slate-200 mt-1">
+                                    <span className="text-slate-400 uppercase">Valor da Nota:</span>
+                                    <span className="text-xs font-black text-blue-600">
+                                      R$ {formatNumber(batch.invoiceValue)}
+                                    </span>
+                                  </div>
+                                )}
+                              </>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Barra de Progresso da Assertividade */}
+                        <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden mt-2">
+                          <div
+                            className={`h-full transition-all duration-500 ${(batch.isFinalized ? batch.accuracy : batch.yieldPercentage) > 90 ? "bg-emerald-500" : (batch.isFinalized ? batch.accuracy : batch.yieldPercentage) > 70 ? "bg-blue-500" : "bg-amber-500"}`}
+                            style={{
+                              width: `${batch.isFinalized ? batch.accuracy : batch.yieldPercentage}%`,
+                            }}
+                          />
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4 pt-3 border-t border-slate-50">
+                          <div className="flex flex-col">
+                            <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1">
+                              <Scale className="w-2.5 h-2.5" /> Peso Médio Inicial
+                            </span>
+                            <span className="text-lg font-black text-slate-700 leading-none mt-1">
+                              {formatNumber(batch.initialUnitWeight, 1)}g
+                            </span>
+                          </div>
+                          <div className="flex flex-col items-end">
+                            <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1">
+                              <Scale className="w-2.5 h-2.5" /> Peso Médio Atual
+                            </span>
+                            <span className="text-lg font-black text-blue-600 leading-none mt-1">
+                              {formatNumber(batch.currentAvgWeight, 1)}g
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4 pt-3 border-t border-slate-50">
+                          <div className="flex flex-col">
+                            <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1">
+                              <TrendingUp className="w-2.5 h-2.5" /> Biomassa
+                              Total
+                            </span>
+                            <span className="text-lg font-black text-emerald-600 leading-none mt-1">
+                              {formatNumber(batch.totalProducedBiomassKg, 1)}kg
+                            </span>
+                          </div>
+                          <div className="flex flex-col items-end">
+                            <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1">
+                              <Package className="w-2.5 h-2.5" /> Ração Total
+                            </span>
+                            <span className="text-lg font-black text-amber-600 leading-none mt-1">
+                              {formatNumber(batch.totalFeed / 1000, 1)}kg
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4 pt-3 border-t border-slate-50">
+                          <div className="flex flex-col">
+                            <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1">
+                              <TrendingUp className="w-2.5 h-2.5" /> FCA
+                            </span>
+                            <span className="text-lg font-black text-indigo-600 leading-none mt-1">
+                              {formatNumber(batch.fca, 2)}
+                            </span>
+                          </div>
+                          <div className="flex flex-col items-end">
+                            <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1">
+                              <Fish className="w-2.5 h-2.5" /> Peixes Produzidos
+                            </span>
+                            <span className="text-lg font-black text-slate-700 leading-none mt-1">
+                              {formatNumber(batch.totalProducedCount)} un
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4 pt-3 border-t border-slate-50">
+                          <div className="flex flex-col">
+                            <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1">
+                              <ShoppingCart className="w-2.5 h-2.5 text-emerald-500" /> CUSTO VAR/KG ESTIMADO
+                            </span>
+                            <span className="text-lg font-black text-emerald-700 leading-none mt-1">
+                              R$ {formatNumber(batch.custoKgProduzido || 0, 2)}
+                            </span>
+                          </div>
+                          <div className="flex flex-col items-end">
+                            <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1">
+                              <ShoppingCart className="w-2.5 h-2.5 text-slate-400" /> CUSTO VAR/ESTIMADO DO LOTE
+                            </span>
+                            <span className="text-lg font-black text-slate-700 leading-none mt-1">
+                              R$ {formatNumber(batch.totalCost || 0, 2)}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4 pt-3 border-t border-slate-50">
+                          <div className="flex flex-col">
+                            <div className="flex items-center gap-2">
+                              <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
+                                Saldo Povoam.
+                              </span>
+                              {hasPermission && (
+                                <button
+                                  onClick={() =>
+                                    toggleSettlementComplete(batch.id)
+                                  }
+                                  title={
+                                    batch.isSettlementComplete
+                                      ? "Reativar Saldo"
+                                      : "Zerar Saldo Manualmente"
+                                  }
+                                  className={`p-1 rounded-md transition-all ${batch.isSettlementComplete ? "bg-blue-100 text-blue-600" : "bg-slate-100 text-slate-400 hover:bg-blue-50 hover:text-blue-500"}`}
+                                >
+                                  <CheckSquare className="w-3 h-3" />
+                                </button>
+                              )}
+                            </div>
+                            <span
+                              className={`text-lg font-black mt-1 leading-none ${batch.balance > 0 ? "text-blue-600" : "text-slate-400"}`}
+                            >
+                              {formatNumber(batch.balance)} un
+                            </span>
+                          </div>
+                          <div className="flex flex-col items-end">
+                            <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
+                              Total Despescado
+                            </span>
+                            <span className="text-lg font-black text-blue-600 leading-none mt-1">
+                              {formatNumber(batch.harvestedFish)} un
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4 pt-3 border-t border-slate-50">
+                          <div className="flex flex-col">
+                            <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
+                              Mortalidade
+                            </span>
+                            <span className="text-lg font-black text-red-500 leading-none mt-1">
+                              {formatNumber(batch.mortality)} un
+                            </span>
+                          </div>
+                          <div className="flex flex-col items-end">
+                            <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
+                              Total Povoado
+                            </span>
+                            <span className="text-lg font-black text-slate-700 leading-none mt-1">
+                              {formatNumber(batch.initialQuantity)} un
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default BatchManagement;

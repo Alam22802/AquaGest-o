@@ -1,0 +1,2137 @@
+
+import React, { useMemo, useState, useEffect } from 'react';
+import { AppState } from '../types';
+import { 
+  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  BarChart, Bar, Cell, AreaChart, Area
+} from 'recharts';
+import { formatNumber } from '../utils/formatters';
+import { Fish, Utensils, Scale, TrendingUp, FishOff, Calendar, Layers, Download, Info, AlertTriangle, PackageSearch, CloudSun, Droplets, Wind, CloudRain, Thermometer, Umbrella, Cloud, RefreshCw, ChevronDown, ClipboardCheck } from 'lucide-react';
+import * as XLSX from 'xlsx';
+import { format, isWithinInterval, parseISO, startOfDay, endOfDay, subDays, differenceInDays, addDays } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
+import { getTilapiaPriceMG, MarketPrice } from '../src/services/marketPriceService';
+
+const getInterpolatedStandardCurvePoints = (standardCurves: any[], avgInitial: number) => {
+  const curves = (standardCurves || []).filter(sc => sc.curve && sc.curve.some((p: any) => p.weight > 0));
+  if (curves.length === 0) {
+    const pts = [];
+    for (let i = 0; i <= 210; i += 15) pts.push({ day: i, weight: avgInitial + (i * 5.4) });
+    return pts;
+  }
+  
+  const allWeeks = Array.from(new Set(curves.flatMap(sc => sc.curve.map((p: any) => p.day)))).sort((a, b) => a - b);
+  return allWeeks.map(week => {
+    let sumWeight = 0;
+    let count = 0;
+    curves.forEach(sc => {
+      const c = sc.curve.filter((p: any) => p.weight > 0).sort((a: any, b: any) => a.day - b.day);
+      const nextIdx = c.findIndex((p: any) => p.day >= week);
+      if (nextIdx === 0) {
+        sumWeight += c[0].weight;
+        count++;
+      } else if (nextIdx !== -1) {
+        const p1 = c[nextIdx - 1];
+        const p2 = c[nextIdx];
+        const w = p1.weight + (p2.weight - p1.weight) * (week - p1.day) / (p2.day - p1.day);
+        sumWeight += w;
+        count++;
+      } else {
+        const last = c[c.length - 1];
+        if (week <= last.day + 2) {
+          sumWeight += last.weight;
+          count++;
+        }
+      }
+    });
+    return { day: week * 7, weight: count > 0 ? sumWeight / count : 0 };
+  }).filter(p => p.weight > 0);
+};
+
+interface Props {
+  state: AppState;
+}
+
+const MiniStat = ({ label, value, icon, color, subtext }: any) => (
+  <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-4 transition-all hover:shadow-md h-full">
+    <div className={`p-3 rounded-xl bg-slate-50 shadow-sm ${color} shrink-0`}>{icon}</div>
+    <div className="flex-1 min-w-0">
+      <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">{label}</div>
+      <div className="text-slate-800">{value}</div>
+      {subtext && <div className="text-[9px] font-bold text-slate-400 mt-1 uppercase tracking-tight">{subtext}</div>}
+    </div>
+  </div>
+);
+
+const WeatherWidget = () => {
+  const [weather, setWeather] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
+
+  const getClientFallbackWeather = () => {
+    return {
+      current_weather: {
+        temperature: 24.5,
+        weathercode: 3,
+        weather_code: 3,
+        windspeed: 12.5,
+        winddirection: 180,
+        time: new Date().toISOString()
+      },
+      daily: {
+        time: Array.from({ length: 7 }, (_, i) => {
+          const d = new Date();
+          d.setDate(d.getDate() + i);
+          return d.toISOString().split("T")[0];
+        }),
+        weathercode: [3, 0, 1, 2, 80, 51, 3],
+        weather_code: [3, 0, 1, 2, 80, 51, 3],
+        temperature_2m_max: [28.5, 29.0, 27.5, 26.0, 25.5, 26.5, 28.0],
+        temperature_2m_min: [17.0, 16.5, 18.0, 17.5, 16.0, 15.5, 16.5],
+        precipitation_probability_max: [10, 0, 15, 40, 75, 45, 20],
+        precipitation_sum: [0.0, 0.0, 0.0, 2.5, 12.0, 4.0, 0.5]
+      }
+    };
+  };
+
+  const fetchWeather = async (showLoading = true) => {
+    if (showLoading) setLoading(true);
+    setError(null);
+    try {
+      // 1. Try fetching directly from public Open-Meteo API in client first
+      // This ensures we get real-time local data using the browser's network, bypassing any cloud server-side rate-limits or blocks.
+      const url = "https://api.open-meteo.com/v1/forecast?latitude=-18.6475&longitude=-48.1872&current_weather=true&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,precipitation_sum&timezone=auto";
+      try {
+        const directResponse = await fetch(url);
+        if (directResponse.ok) {
+          const directData = await directResponse.json();
+          // Normalize response code properties
+          if (directData.current_weather) {
+            const code = directData.current_weather.weather_code !== undefined ? directData.current_weather.weather_code : directData.current_weather.weathercode;
+            directData.current_weather.weathercode = code;
+            directData.current_weather.weather_code = code;
+          }
+          if (directData.daily) {
+            const codes = directData.daily.weather_code !== undefined ? directData.daily.weather_code : directData.daily.weathercode;
+            directData.daily.weathercode = codes;
+            directData.daily.weather_code = codes;
+          }
+          setWeather(directData);
+          setLastUpdated(new Date());
+          return;
+        }
+      } catch (directErr) {
+        console.warn('Direct client-side weather fetch failed, trying backend proxy...', directErr);
+      }
+
+      // 2. Secondary fallback: Try fetching via the server-side cache proxy
+      const response = await fetch('/api/weather');
+      if (response.ok) {
+        const data = await response.json();
+        setWeather(data);
+        setLastUpdated(new Date());
+        return;
+      }
+      
+      throw new Error('Both direct fetch and backend proxy failed');
+    } catch (err: any) {
+      console.warn('Error fetching weather data, applying high-quality client-side fallback:', err);
+      // Fallback instead of an ugly error board
+      setWeather(getClientFallbackWeather());
+      setLastUpdated(new Date());
+    } finally {
+      if (showLoading) setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchWeather(true);
+
+    // Automatically update weather every 10 minutes
+    const interval = setInterval(() => {
+      fetchWeather(false);
+    }, 10 * 60 * 1000);
+
+    return () => clearInterval(interval);
+  }, []);
+
+  const getWeatherInfo = (code: number) => {
+    // WMO Weather interpretation codes
+    if (code === 0) return { icon: <CloudSun className="w-6 h-6" />, desc: 'Céu Limpo' };
+    if (code <= 3) return { icon: <Cloud className="w-6 h-6" />, desc: 'Parcialmente Nublado' };
+    if (code <= 48) return { icon: <Cloud className="w-6 h-6" />, desc: 'Nevoeiro' };
+    if (code <= 55) return { icon: <CloudRain className="w-6 h-6" />, desc: 'Garoa' };
+    if (code <= 65) return { icon: <CloudRain className="w-6 h-6" />, desc: 'Chuva' };
+    if (code <= 82) return { icon: <CloudRain className="w-6 h-6" />, desc: 'Pancadas de Chuva' };
+    if (code <= 99) return { icon: <CloudRain className="w-6 h-6" />, desc: 'Tempestade' };
+    return { icon: <CloudSun className="w-6 h-6" />, desc: 'N/A' };
+  };
+
+  if (loading) {
+    return (
+      <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm animate-pulse flex flex-col gap-6">
+        <div className="flex items-center gap-4">
+          <div className="w-12 h-12 bg-slate-100 rounded-2xl" />
+          <div className="space-y-2 flex-1">
+            <div className="h-3 bg-slate-100 rounded w-1/4" />
+            <div className="h-6 bg-slate-100 rounded w-1/2" />
+          </div>
+        </div>
+        <div className="grid grid-cols-5 gap-2">
+          {[1, 2, 3, 4, 5].map(i => <div key={i} className="h-20 bg-slate-50 rounded-xl" />)}
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="bg-red-50 p-4 rounded-2xl border border-red-100 flex items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <AlertTriangle className="w-5 h-5 text-red-500" />
+          <div>
+            <div className="text-[10px] font-black text-red-400 uppercase tracking-widest mb-0.5">Erro de Conexão</div>
+            <div className="text-xs font-bold text-red-700 uppercase tracking-tight">Não foi possível carregar o clima</div>
+          </div>
+        </div>
+        <button 
+          onClick={fetchWeather}
+          className="px-4 py-2 bg-white border border-red-200 text-red-600 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-red-50 transition-all shadow-sm active:scale-95"
+        >
+          Tentar Novamente
+        </button>
+      </div>
+    );
+  }
+
+  if (!weather || !weather.current_weather || !weather.daily) return null;
+
+  const current = weather.current_weather;
+  const daily = weather.daily;
+  const currentCode = current.weather_code !== undefined ? current.weather_code : current.weathercode;
+  const currentInfo = getWeatherInfo(currentCode);
+
+  return (
+    <div className="bg-[#344434] rounded-2xl p-4 sm:p-6 text-[#e4e4d4] shadow-lg shadow-black/10 flex flex-col justify-between gap-4 overflow-hidden relative group border border-white/5 h-full">
+      <div className="relative z-10 flex flex-col sm:flex-row items-center justify-between gap-4">
+        <div className="flex items-center gap-4 text-left">
+          <div className="p-3 bg-white/5 backdrop-blur-md rounded-xl border border-white/10 shadow-inner">
+            {currentInfo.icon}
+          </div>
+          <div>
+            <div className="flex items-center gap-2 mb-0.5">
+              <span className="text-[9px] font-black uppercase tracking-[0.2em] text-[#e4e4d4]/60">Clima em Tempo Real</span>
+              <span className="px-1.5 py-0.5 bg-white/10 rounded text-[8px] font-black uppercase tracking-widest text-[#e4e4d4] border border-white/5">Araguari-MG</span>
+            </div>
+            <div className="flex items-baseline gap-2">
+              <h2 className="text-3xl font-black tracking-tighter italic drop-shadow-sm">{Math.round(current.temperature)}°C</h2>
+              <span className="text-xs font-bold text-[#e4e4d4]/80 capitalize">{currentInfo.desc}</span>
+            </div>
+          </div>
+        </div>
+        
+        <div className="flex items-center gap-2.5 text-right shrink-0">
+          <div>
+            <div className="text-[9px] font-black text-[#e4e4d4]/40 uppercase tracking-widest mb-0.5">Atualizado</div>
+            <div className="text-[11px] font-bold text-[#e4e4d4]/70">{format(lastUpdated, 'HH:mm')}</div>
+          </div>
+          <button 
+            onClick={() => fetchWeather(true)} 
+            disabled={loading}
+            title="Atualizar clima"
+            className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-[#e4e4d4]/60 hover:text-[#e4e4d4] transition-all border border-white/5 disabled:opacity-50 flex items-center justify-center hover:scale-105 active:scale-95"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+          </button>
+        </div>
+      </div>
+
+      {/* Previsão 5 Dias */}
+      <div className="relative z-10 grid grid-cols-5 gap-2">
+        {(daily.time || []).slice(1, 6).map((date: string, index: number) => {
+          const idx = index + 1;
+          const weathercodeList = daily.weather_code || daily.weathercode || [];
+          const info = getWeatherInfo(weathercodeList[idx]);
+          const rainProb = daily.precipitation_probability_max ? daily.precipitation_probability_max[idx] : 0;
+          const rainSum = daily.precipitation_sum ? daily.precipitation_sum[idx] : 0;
+          const tempMax = daily.temperature_2m_max ? daily.temperature_2m_max[idx] : 0;
+          const tempMin = daily.temperature_2m_min ? daily.temperature_2m_min[idx] : 0;
+          
+          return (
+            <div key={date} className="bg-white/5 backdrop-blur-sm p-2 rounded-xl border border-white/5 flex flex-col items-center text-center transition-all hover:bg-white/10">
+              <span className="text-[8px] font-black uppercase tracking-widest text-[#e4e4d4]/50 mb-1">
+                {format(parseISO(date), 'eee', { locale: ptBR })}
+              </span>
+              <div className="mb-1 text-[#e4e4d4]/80 scale-75">
+                {info.icon}
+              </div>
+              <div className="flex items-center gap-1">
+                <span className="text-xs font-black">{Math.round(tempMax)}°</span>
+                <span className="text-[9px] font-bold text-[#e4e4d4]/40">{Math.round(tempMin)}°</span>
+              </div>
+              
+              {(rainProb > 20 || rainSum > 0) && (
+                <div className="mt-1.5 pt-1.5 border-t border-white/5 w-full flex flex-col items-center gap-0.5">
+                  <div className="flex items-center gap-0.5 text-[8px] font-black text-blue-300 uppercase">
+                    <Umbrella className="w-2 h-2" />
+                    {rainProb}%
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Decorative background elements */}
+      <div className="absolute right-[-15px] top-[-15px] opacity-5 group-hover:scale-110 transition-transform duration-1000">
+        <CloudSun className="w-32 h-32" />
+      </div>
+    </div>
+  );
+};
+
+const TilapiaPriceWidget = () => {
+  const [marketData, setMarketData] = useState<MarketPrice | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchPrice = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await getTilapiaPriceMG();
+      setMarketData(data);
+    } catch (err: any) {
+      console.error('Error fetching price:', err);
+      setError('Falha ao obter preço');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchPrice();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="bg-[#344434] p-6 rounded-2xl border border-white/5 shadow-sm animate-pulse flex items-center gap-4">
+        <div className="w-12 h-12 bg-white/5 rounded-xl" />
+        <div className="space-y-2 flex-1">
+          <div className="h-3 bg-white/5 rounded w-1/4" />
+          <div className="h-6 bg-white/5 rounded w-1/2" />
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-[#344434] rounded-2xl p-4 sm:p-6 text-[#e4e4d4] shadow-lg shadow-black/10 flex flex-col justify-between gap-4 overflow-hidden relative group border border-white/5 h-full min-h-[160px]">
+      <div className="relative z-10 flex flex-col sm:flex-row items-center justify-between gap-4 text-left">
+        <div className="flex items-center gap-4 w-full sm:w-auto">
+          <div className="p-3 bg-white/5 backdrop-blur-md rounded-xl border border-white/10 shadow-inner">
+            <TrendingUp className="w-6 h-6" />
+          </div>
+          <div className="flex-1">
+            <div className="flex items-center gap-2 mb-0.5">
+              <span className="text-[9px] font-black uppercase tracking-[0.2em] text-[#e4e4d4]/60">Triângulo Mineiro/Alto Paranaíba</span>
+              <span className="px-1.5 py-0.5 bg-white/10 rounded text-[8px] font-black uppercase tracking-widest text-[#e4e4d4] border border-white/5">CEPEA/Peixe BR</span>
+            </div>
+            <div className="flex items-baseline gap-3">
+              <h2 className="text-3xl font-black tracking-tighter italic drop-shadow-sm">R$ {(marketData?.price ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</h2>
+              
+              <div className="flex items-center gap-3">
+                <div className="flex flex-col items-center">
+                  <span className="text-[7px] font-black uppercase tracking-tighter text-[#e4e4d4]/40">Semana</span>
+                  <span className={`text-[10px] font-black px-1.5 py-0.5 rounded ${(marketData?.weeklyVariation || 0) >= 0 ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'}`}>
+                    {(marketData?.weeklyVariation || 0) >= 0 ? '+' : ''}{(marketData?.weeklyVariation || 0)}%
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <div className="hidden sm:flex items-center gap-3 text-right">
+          <div>
+            <div className="text-[9px] font-black text-[#e4e4d4]/40 uppercase tracking-widest mb-0.5">Atualizado</div>
+            <div className="text-[10px] font-bold text-[#e4e4d4]/70">{marketData ? format(new Date(marketData.lastUpdate), 'dd/MM HH:mm') : '---'}</div>
+          </div>
+          <button 
+            onClick={fetchPrice}
+            className="p-1.5 bg-white/5 hover:bg-white/10 rounded-lg text-[#e4e4d4]/60 hover:text-[#e4e4d4] transition-all border border-white/5 active:scale-95"
+            title="Atualizar"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+          </button>
+        </div>
+      </div>
+
+      {/* Regions variations list */}
+      {marketData?.regions && marketData.regions.length > 0 && (
+        <div className="relative z-10 grid grid-cols-5 gap-2">
+          {marketData.regions.slice(0, 5).map((region, idx) => (
+            <div key={idx} className="bg-white/5 backdrop-blur-sm p-2 rounded-xl border border-white/5 flex flex-col items-center text-center transition-all hover:bg-white/10 group/item">
+              <span 
+                className="text-[8px] font-black uppercase tracking-widest text-[#e4e4d4]/60 mb-1 truncate w-full"
+                title={region.name}
+              >
+                {region.name.includes('Grandes') ? 'G. Lagos' :
+                 region.name.includes('Morada') ? 'Morada N.' :
+                 region.name.includes('Norte') ? 'Norte PR' :
+                 region.name.includes('Oeste') ? 'Oeste PR' :
+                 region.name.includes('Triângulo') ? 'Triângulo' : region.name}
+              </span>
+              <div className="flex items-center gap-1 mb-1">
+                <span className="text-xs font-black">R$ {Math.floor(region.price)}</span>
+                <span className="text-[9px] font-bold text-[#e4e4d4]/40">,{(region.price % 1).toFixed(2).split('.')[1]}</span>
+              </div>
+              <div className="flex flex-col items-center pt-1.5 border-t border-white/5 w-full gap-0.5">
+                <span className={`text-[8px] font-black ${(region.weeklyVariation || 0) >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                  Sem: {(region.weeklyVariation || 0) >= 0 ? '+' : ''}{(region.weeklyVariation || 0)}%
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="text-[8px] font-bold text-[#e4e4d4]/30 uppercase tracking-tighter">
+        Fonte: {marketData?.source}
+      </div>
+
+      {/* Decorative background element */}
+      <div className="absolute right-[-15px] top-[-15px] opacity-10 group-hover:scale-110 transition-transform duration-1000">
+        <TrendingUp className="w-32 h-32" />
+      </div>
+    </div>
+  );
+};
+
+const Dashboard: React.FC<Props> = ({ state }) => {
+  const [selectedBatchIds, setSelectedBatchIds] = useState<string[]>([]);
+  const [showBatchSelector, setShowBatchSelector] = useState(false);
+  const [reportStartDate, setReportStartDate] = useState<string>(format(subDays(new Date(), 30), 'yyyy-MM-dd'));
+  const [reportEndDate, setReportEndDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'));
+  const [showSupplierCurve, setShowSupplierCurve] = useState<boolean>(false);
+  const [showStandardCurve, setShowStandardCurve] = useState<boolean>(false);
+  const [showContinueCurve, setShowContinueCurve] = useState<boolean>(false);
+
+  const lowStockFeeds = useMemo(() => {
+    return (state.feedTypes || []).filter(feed => {
+      const stockKg = feed.totalStock / 1000;
+      const limitKg = (feed.maxCapacity * feed.minStockPercentage) / 100;
+      return stockKg <= limitKg;
+    });
+  }, [state.feedTypes]);
+
+  const toggleBatch = (batchId: string) => {
+    setSelectedBatchIds(prev => 
+      prev.includes(batchId) 
+        ? prev.filter(id => id !== batchId) 
+        : [...prev, batchId]
+    );
+  };
+
+  const batchStats = useMemo(() => {
+    const cagesByBatch = new Map<string, typeof state.cages>();
+    const cageMap = new Map((state.cages || []).map(c => [c.id, c]));
+    const batchMap = new Map((state.batches || []).map(b => [b.id, b]));
+    const feedTypeMap = new Map((state.feedTypes || []).map(ft => [ft.id, ft]));
+
+    (state.cages || []).forEach(c => {
+      if (c.batchId) {
+        const list = cagesByBatch.get(c.batchId) || [];
+        list.push(c);
+        cagesByBatch.set(c.batchId, list);
+      }
+    });
+
+    const sortedHarvestLogs = [...(state.harvestLogs || [])].sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+    const harvestLogsByCage = new Map<string, typeof state.harvestLogs>();
+    const harvestsByBatchListMap = new Map<string, typeof state.harvestLogs>();
+    sortedHarvestLogs.forEach(h => {
+      const list = harvestLogsByCage.get(h.cageId) || [];
+      list.push(h);
+      harvestLogsByCage.set(h.cageId, list);
+
+      if (h.batchId) {
+        const bList = harvestsByBatchListMap.get(h.batchId) || [];
+        bList.push(h);
+        harvestsByBatchListMap.set(h.batchId, bList);
+      }
+    });
+
+    const mortalityByCageMap = new Map<string, typeof state.mortalityLogs>();
+    (state.mortalityLogs || []).forEach(m => {
+      if (m.cageId) {
+        const list = mortalityByCageMap.get(m.cageId) || [];
+        list.push(m);
+        mortalityByCageMap.set(m.cageId, list);
+      }
+    });
+
+    const resolveLogBatchId = (logCageId?: string, logDate?: string, explicitBatchId?: string) => {
+      if (!logDate) return explicitBatchId;
+      const cleanDate = logDate.split('T')[0];
+
+      if (explicitBatchId) {
+        const batch = batchMap.get(explicitBatchId);
+        if (batch) {
+          if (!batch.settlementDate || cleanDate >= batch.settlementDate) {
+            return explicitBatchId;
+          }
+        } else {
+          return explicitBatchId;
+        }
+      }
+
+      if (!logCageId) return undefined;
+
+      const cageHarvests = harvestLogsByCage.get(logCageId);
+      if (cageHarvests && cageHarvests.length > 0) {
+        const harvest = cageHarvests.find(h => h.date >= cleanDate);
+        if (harvest) {
+          const harvestBatch = batchMap.get(harvest.batchId);
+          if (!harvestBatch?.settlementDate || cleanDate >= harvestBatch.settlementDate) {
+            return harvest.batchId;
+          }
+        }
+      }
+
+      const cage = cageMap.get(logCageId);
+      if (cage?.batchId) {
+        const batch = batchMap.get(cage.batchId);
+        const cageSettlement = cage.settlementDate || batch?.settlementDate;
+        if (cageSettlement && cleanDate >= cageSettlement) {
+          return cage.batchId;
+        }
+      }
+
+      return undefined;
+    };
+
+    // Performance Optimization: Index logs by batchId
+    const mortalityByBatch = new Map<string, number>();
+    const nurseryMortalityByBatch = new Map<string, number>();
+    const feedingByBatch = new Map<string, number>();
+    const feedBreakdownByBatch = new Map<string, { [name: string]: number }>();
+
+    (state.mortalityLogs || []).forEach(m => {
+      const bId = resolveLogBatchId(m.cageId, m.date, m.batchId);
+      if (bId) {
+        mortalityByBatch.set(bId, (mortalityByBatch.get(bId) || 0) + m.count);
+        if (!m.cageId) nurseryMortalityByBatch.set(bId, (nurseryMortalityByBatch.get(bId) || 0) + m.count);
+      }
+    });
+
+    (state.feedingLogs || []).forEach(f => {
+      const fDate = (f.timestamp || '').split('T')[0];
+      const bId = resolveLogBatchId(f.cageId, fDate, f.batchId);
+      if (bId) {
+        feedingByBatch.set(bId, (feedingByBatch.get(bId) || 0) + f.amount);
+        const breakdown = feedBreakdownByBatch.get(bId) || {};
+        const feedType = feedTypeMap.get(f.feedTypeId);
+        const name = feedType ? feedType.name : 'Ração S/ Ident.';
+        breakdown[name] = (breakdown[name] || 0) + f.amount;
+        feedBreakdownByBatch.set(bId, breakdown);
+      }
+    });
+
+    const harvestsByBatch = new Map<string, { fishCount: number, weight: number, initialFishCount: number }>();
+    (state.harvestLogs || []).forEach(h => {
+      let bId = h.batchId;
+      if (!bId && h.cageId) {
+        const cage = cageMap.get(h.cageId);
+        if (cage?.batchId) bId = cage.batchId;
+      }
+      if (bId) {
+        const current = harvestsByBatch.get(bId) || { fishCount: 0, weight: 0, initialFishCount: 0 };
+        let initial = h.initialFishCount || 0;
+        if (!initial) {
+          const batch = batchMap.get(bId);
+          const cageMortalityList = mortalityByCageMap.get(h.cageId) || [];
+          const cageMortality = cageMortalityList
+            .filter((m) => {
+              if (m.batchId) return m.batchId === bId;
+              return batch && m.date >= batch.settlementDate && m.date <= h.date;
+            })
+            .reduce((acc, curr) => acc + curr.count, 0);
+          initial = h.fishCount + cageMortality;
+        }
+        harvestsByBatch.set(bId, {
+          fishCount: current.fishCount + h.fishCount,
+          weight: current.weight + (h.totalWeight || 0),
+          initialFishCount: current.initialFishCount + initial
+        });
+      }
+    });
+
+    // Biometry Indexing
+    const biometriesByBatch = new Map<string, typeof state.biometryLogs>();
+    (state.biometryLogs || []).forEach(b => {
+      const bId = resolveLogBatchId(b.cageId, b.date, b.batchId);
+      if (bId) {
+        const list = biometriesByBatch.get(bId) || [];
+        list.push(b);
+        biometriesByBatch.set(bId, list);
+      }
+    });
+
+    return (state.batches || []).map(batch => {
+      const batchCages = cagesByBatch.get(batch.id) || [];
+      const totalInitial = batch.initialQuantity || 0;
+      const harvestData = harvestsByBatch.get(batch.id) || { fishCount: 0, weight: 0, initialFishCount: 0 };
+      const rawHarvested = harvestData.fishCount;
+      const rawHarvestedWeight = harvestData.weight;
+      const totalInitialInHarvested = harvestData.initialFishCount;
+      const totalMortality = mortalityByBatch.get(batch.id) || 0;
+      const nurseryMortality = nurseryMortalityByBatch.get(batch.id) || 0;
+
+      const usedFish = batchCages.reduce((acc, curr) => acc + (curr.initialFishCount || 0), 0);
+      const settlementBalance = batch.isSettlementComplete ? 0 : Math.max(0, totalInitial - usedFish - totalInitialInHarvested - nurseryMortality);
+
+      // Slaughters for this batch
+      const slaughters = (state.slaughterLogs || []).filter(s => {
+        if (s.batchId === batch.id) return true;
+        if (s.batchId && (state.batches || []).some(b => b.id === s.batchId && b.id !== batch.id)) {
+          return false;
+        }
+
+        const bn = (batch.name || '').trim().toLowerCase();
+        const bnNorm = bn.replace(/[^a-z0-9]/g, '');
+        const bnNoLote = bn.replace(/^lote\s*/i, '').trim();
+        const bnNum = bnNoLote.replace(/^0+/, '');
+
+        const candidates = [s.batchId, s.slaughterBatch].filter(Boolean) as string[];
+
+        for (const cand of candidates) {
+          const c = cand.trim().toLowerCase();
+          if (c === bn) return true;
+          const cNorm = c.replace(/[^a-z0-9]/g, '');
+          if (cNorm.length > 0 && cNorm === bnNorm) return true;
+          const cNoLote = c.replace(/^lote\s*/i, '').trim();
+          if (cNoLote.length > 0 && cNoLote === bnNoLote) return true;
+          const cNum = cNoLote.replace(/^0+/, '');
+          if (cNum.length > 0 && cNum === bnNum) return true;
+        }
+
+        return false;
+      });
+
+      const batchRevenues = (state.batchRevenues || []).filter(r => r.batchId === batch.id);
+      const manualReceptionWeight = batchRevenues.reduce((acc, curr) => acc + (curr.receptionWeight || 0), 0);
+      const slaughterReceptionWeight = slaughters.reduce((acc, curr) => acc + (curr.receptionWeight || 0), 0);
+
+      const effectiveHarvestedWeight = slaughterReceptionWeight > 0
+        ? slaughterReceptionWeight
+        : (manualReceptionWeight > 0 ? manualReceptionWeight : rawHarvestedWeight);
+
+      const batchHarvests = harvestsByBatchListMap.get(batch.id) || [];
+      const harvestDates: string[] = [];
+      batchHarvests.forEach(h => { if (h.date) harvestDates.push(h.date); });
+      slaughters.forEach(s => { if (s.date) harvestDates.push(s.date); });
+
+      let firstHarvestDate: string | null = null;
+      if (harvestDates.length > 0) {
+        firstHarvestDate = harvestDates.reduce((min, d) => (d < min ? d : min), harvestDates[0]);
+      }
+
+      const batchBiometries = biometriesByBatch.get(batch.id) || [];
+      let harvestBiometryAvgWeight = 0;
+
+      if (firstHarvestDate && batchBiometries.length > 0) {
+        const harvestDayLogs = batchBiometries.filter(b => b.date === firstHarvestDate);
+        if (harvestDayLogs.length > 0) {
+          harvestBiometryAvgWeight = harvestDayLogs.reduce((acc, b) => acc + b.averageWeight, 0) / harvestDayLogs.length;
+        } else {
+          const biometriesBeforeHarvest = batchBiometries.filter(b => b.date <= firstHarvestDate);
+          if (biometriesBeforeHarvest.length > 0) {
+            const lastDate = biometriesBeforeHarvest.reduce((max, b) => (b.date > max ? b.date : max), "");
+            const lastLogs = biometriesBeforeHarvest.filter(b => b.date === lastDate);
+            if (lastLogs.length > 0) {
+              harvestBiometryAvgWeight = lastLogs.reduce((acc, b) => acc + b.averageWeight, 0) / lastLogs.length;
+            }
+          }
+        }
+      }
+
+      if (harvestBiometryAvgWeight === 0 && batchBiometries.length > 0) {
+        const lastDate = batchBiometries.reduce((max, b) => (b.date > max ? b.date : max), "");
+        const lastLogs = batchBiometries.filter(b => b.date === lastDate);
+        if (lastLogs.length > 0) {
+          harvestBiometryAvgWeight = lastLogs.reduce((acc, b) => acc + b.averageWeight, 0) / lastLogs.length;
+        }
+      }
+
+      if (harvestBiometryAvgWeight === 0) {
+        harvestBiometryAvgWeight = batch.initialUnitWeight || 0;
+      }
+
+      let totalHarvested = rawHarvested;
+      if (effectiveHarvestedWeight > 0 && harvestBiometryAvgWeight > 0) {
+        totalHarvested = Math.round((effectiveHarvestedWeight * 1000) / harvestBiometryAvgWeight);
+      }
+      const finalHarvestedWeight = effectiveHarvestedWeight;
+
+      const currentTotalStock = Math.max(0, totalInitial - totalMortality - totalHarvested);
+
+      let currentAvgWeight = harvestBiometryAvgWeight > 0 ? harvestBiometryAvgWeight : (batch.initialUnitWeight || 0);
+      let samplingInfo = "Peso Inicial";
+
+      let biometriesToConsider = batchBiometries;
+
+      if (batchHarvests.length > 0) {
+        const firstHarvestDate = batchHarvests.reduce(
+          (min, h) => (h.date < min ? h.date : min),
+          batchHarvests[0].date
+        );
+        const biometriesBeforeHarvest = batchBiometries.filter(b => b.date <= firstHarvestDate);
+        if (biometriesBeforeHarvest.length > 0) {
+          biometriesToConsider = biometriesBeforeHarvest;
+        }
+      }
+
+      if (biometriesToConsider.length > 0) {
+        let targetLogs: typeof state.biometryLogs = [];
+
+        if (batchHarvests.length > 0) {
+          const firstHarvestDate = batchHarvests.reduce(
+            (min, h) => (h.date < min ? h.date : min),
+            batchHarvests[0].date
+          );
+          const harvestDayLogs = biometriesToConsider.filter(log => log.date === firstHarvestDate);
+          if (harvestDayLogs.length > 0) {
+            targetLogs = harvestDayLogs;
+          }
+        }
+
+        if (targetLogs.length === 0) {
+          const sorted = [...biometriesToConsider].sort((a, b) => b.date.localeCompare(a.date));
+          const lastDate = sorted[0].date;
+          targetLogs = biometriesToConsider.filter(log => log.date === lastDate);
+        }
+
+        if (targetLogs.length > 0) {
+          const sumWeights = targetLogs.reduce((acc, log) => acc + log.averageWeight, 0);
+          currentAvgWeight = sumWeights / targetLogs.length;
+          samplingInfo = `Média de ${targetLogs.length} gaiolas (${targetLogs[0].date})`;
+        }
+      }
+
+      const totalBiomassKg = (currentTotalStock * currentAvgWeight) / 1000;
+      const totalFeedKg = (feedingByBatch.get(batch.id) || 0) / 1000;
+      const feedBreakdown = Object.entries(feedBreakdownByBatch.get(batch.id) || {}).map(([name, amount]) => ({
+        name, amountKg: amount / 1000
+      })).sort((a, b) => a.name.localeCompare(b.name));
+
+      const totalProducedWeightKg = totalBiomassKg + finalHarvestedWeight;
+      const fcaValue = totalProducedWeightKg > 0 ? formatNumber(totalFeedKg / totalProducedWeightKg, 2) : '0,00';
+
+      return { 
+        id: batch.id, name: batch.name, isClosed: batch.isClosed, stock: currentTotalStock, harvested: totalHarvested,
+        harvestedWeight: finalHarvestedWeight, mortality: totalMortality, biomass: totalBiomassKg, 
+        feed: totalFeedKg, feedBreakdown, fca: fcaValue, avgWeight: currentAvgWeight,
+        samplingInfo, settlementBalance
+      };
+    }).sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+  }, [state.batches, state.cages, state.mortalityLogs, state.biometryLogs, state.feedingLogs, state.feedTypes, state.harvestLogs, state.slaughterLogs, state.batchRevenues]);
+
+  const filteredBatchStats = useMemo(() => {
+    const settled = batchStats.filter(b => b.settlementBalance === 0);
+    const activeSettled = settled.filter(b => !b.isClosed);
+    return activeSettled.length > 0 ? activeSettled : settled;
+  }, [batchStats]);
+
+  const selectedBatchData = useMemo(() => {
+    const batchesToProcess = selectedBatchIds.length > 0 
+      ? batchStats.filter(b => selectedBatchIds.includes(b.id))
+      : filteredBatchStats;
+
+    const stats = batchesToProcess.reduce((acc, curr) => {
+      acc.stock += curr.stock;
+      acc.harvested += curr.harvested;
+      acc.harvestedWeight += curr.harvestedWeight;
+      acc.mortality += curr.mortality;
+      acc.biomass += curr.biomass;
+      acc.feed += curr.feed;
+      
+      curr.feedBreakdown.forEach(fb => {
+        const existing = acc.feedBreakdown.find(f => f.name === fb.name);
+        if (existing) {
+          existing.amountKg += fb.amountKg;
+        } else {
+          acc.feedBreakdown.push({ ...fb });
+        }
+      });
+      
+      return acc;
+    }, { 
+      stock: 0, 
+      harvested: 0, 
+      harvestedWeight: 0,
+      mortality: 0, 
+      biomass: 0, 
+      feed: 0, 
+      feedBreakdown: [] as { name: string, amountKg: number }[] 
+    });
+
+    const totalProducedWeightKg = stats.biomass + stats.harvestedWeight;
+    const fcaValue = totalProducedWeightKg > 0 ? formatNumber(stats.feed / totalProducedWeightKg, 2) : '0,00';
+    const avgWeight = stats.stock > 0 ? (stats.biomass * 1000) / stats.stock : 0;
+
+    return {
+      ...stats,
+      fca: fcaValue,
+      avgWeight,
+      samplingInfo: selectedBatchIds.length === 1 
+        ? batchStats.find(b => b.id === selectedBatchIds[0])?.samplingInfo || 'Sem dados'
+        : `Total de ${batchesToProcess.length} lotes`
+    };
+  }, [batchStats, selectedBatchIds]);
+
+  const batch = selectedBatchIds.length === 1 
+    ? (state.batches || []).find(b => b.id === selectedBatchIds[0])
+    : (state.batches || []).find(b => b.id === (state.biometryLogs || []).find(l => l.batchId)?.batchId);
+  const protocol = state.protocols.find(p => p.id === batch?.protocolId);
+
+  const biometryEvolutionData = useMemo(() => {
+    let logs: any[] = [];
+    let initialWeights: number[] = [];
+    let settlementDate = '';
+    let expectedHarvestDate = '';
+
+    const filteredBatches = (state.batches || []).filter(b => {
+      const isSelected = selectedBatchIds.length === 0 || selectedBatchIds.includes(b.id);
+      if (selectedBatchIds.length > 0) return isSelected;
+      return !b.isClosed;
+    });
+    
+    // Optimization: Index filtered batches, cages and harvest logs
+    const filteredBatchMap = new Map((filteredBatches || []).map(b => [b.id, b]));
+    const cageMap = new Map((state.cages || []).map(c => [c.id, c]));
+    const harvestLogsByCage = new Map<string, typeof state.harvestLogs>();
+    (state.harvestLogs || []).forEach(h => {
+      const list = harvestLogsByCage.get(h.cageId) || [];
+      list.push(h);
+      harvestLogsByCage.set(h.cageId, list);
+    });
+
+    initialWeights = filteredBatches.map(b => b.initialUnitWeight);
+    if (filteredBatches.length > 0) {
+      settlementDate = filteredBatches[0].settlementDate;
+      expectedHarvestDate = filteredBatches[0].expectedHarvestDate || '';
+    }
+    
+    logs = (state.biometryLogs || []).filter(l => {
+      const batch = filteredBatchMap.get(l.batchId || '');
+      if (batch) return true;
+      
+      if (!l.batchId && l.cageId) {
+        const cage = cageMap.get(l.cageId);
+        const cageBatch = cage?.batchId ? filteredBatchMap.get(cage.batchId) : null;
+        if (cageBatch && l.date >= cageBatch.settlementDate) return true;
+        
+        const cageHarvests = harvestLogsByCage.get(l.cageId) || [];
+        const harvest = cageHarvests.find(h => h.date >= l.date);
+        return harvest && filteredBatchMap.has(harvest.batchId);
+      }
+      return false;
+    });
+    
+    const uniqueDates = Array.from(new Set(logs.map(l => l.date))).sort();
+    
+    const actualData = uniqueDates.map(currentDate => {
+      const dayLogs = logs.filter(l => l.date === currentDate);
+      const avgWeight = dayLogs.reduce((a, b) => a + b.averageWeight, 0) / dayLogs.length;
+
+      let dateLabel = currentDate;
+      try {
+        dateLabel = format(new Date(currentDate + 'T12:00:00'), 'dd/MM');
+      } catch {}
+
+      return {
+        date: dateLabel,
+        fullDate: currentDate,
+        weight: Math.round(avgWeight)
+      };
+    });
+    
+    const avgInitial = initialWeights.length > 0 ? initialWeights.reduce((a, b) => a + b, 0) / initialWeights.length : 0;
+    const baseData = [{ date: 'Início', weight: Math.round(avgInitial), fullDate: settlementDate }, ...actualData];
+
+    // Prediction Curves
+    if ((showSupplierCurve || showStandardCurve || showContinueCurve) && settlementDate) {
+      const start = parseISO(settlementDate);
+      const targetW = protocol?.targetWeight || 950;
+      
+      const getPoints = (curve: {day: number, weight: number}[], fallbackRate: number) => {
+        if (curve && curve.some(p => p.weight > 0)) {
+          return [...curve].filter(p => p.weight > 0).sort((a, b) => a.day - b.day).map(p => ({ day: p.day * 7, weight: p.weight }));
+        }
+        const pts = [];
+        for (let i = 0; i <= 210; i += 15) pts.push({ day: i, weight: avgInitial + (i * fallbackRate) });
+        return pts;
+      };
+
+      const standardCurvePoints = getInterpolatedStandardCurvePoints(state.standardCurves || [], avgInitial);
+      const supplierCurvePoints = getPoints(protocol?.supplierCurve || [], 5.7);
+
+      const getWeightAtDay = (points: {day: number, weight: number}[], targetDay: number) => {
+        if (points.length === 0) return null;
+        const nextIdx = points.findIndex(p => p.day >= targetDay);
+        if (nextIdx === 0) return points[0].weight;
+        if (nextIdx === -1) {
+          const p1 = points[points.length - 2];
+          const p2 = points[points.length - 1];
+          const rate = (p2.weight - p1.weight) / Math.max(1, p2.day - p1.day);
+          return p2.weight + rate * (targetDay - p2.day);
+        }
+        const p1 = points[nextIdx - 1];
+        const p2 = points[nextIdx];
+        return p1.weight + (p2.weight - p1.weight) * (targetDay - p1.day) / Math.max(1, p2.day - p1.day);
+      };
+
+      // 2. Calculate Batch Rate based on LAST interval if possible
+      let currentBatchRate = 0;
+      let lastActualDay = 0;
+      let lastWeight = avgInitial;
+      const dataForProjection = [...baseData].filter(d => d.weight !== undefined);
+      
+      if (dataForProjection.length > 0) {
+        const lastActual = dataForProjection[dataForProjection.length - 1];
+        lastWeight = lastActual.weight;
+        lastActualDay = Math.floor((parseISO(lastActual.fullDate).getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+        
+        const lastTwo = dataForProjection.slice(-2);
+        if (lastTwo.length === 2) {
+          const p1 = lastTwo[0];
+          const p2 = lastTwo[1];
+          const d1 = Math.floor((parseISO(p1.fullDate).getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+          const d2 = Math.floor((parseISO(p2.fullDate).getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+          currentBatchRate = (p2.weight - p1.weight) / Math.max(1, d2 - d1);
+        } else {
+          const firstActual = dataForProjection[0];
+          const firstActualDay = Math.floor((parseISO(firstActual.fullDate).getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+          currentBatchRate = (lastActual.weight - firstActual.weight) / Math.max(1, lastActualDay - firstActualDay);
+        }
+      }
+
+      // 3. Determine Total Days
+      const end = expectedHarvestDate ? parseISO(expectedHarvestDate) : addDays(start, 168);
+      const baseTotalDays = Math.floor((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+      const totalDays = Math.max(180, baseTotalDays);
+      
+      const allDates: string[] = [];
+      for (let i = 0; i <= totalDays; i += 7) {
+        allDates.push(format(addDays(start, i), 'yyyy-MM-dd'));
+      }
+      if (expectedHarvestDate && !allDates.includes(expectedHarvestDate)) allDates.push(expectedHarvestDate);
+      if (settlementDate && !allDates.includes(settlementDate)) allDates.push(settlementDate);
+      uniqueDates.forEach(d => { if (!allDates.includes(d)) allDates.push(d); });
+      allDates.sort();
+
+      const stdWeightAtStart = getWeightAtDay(standardCurvePoints, lastActualDay) || 0;
+      const supWeightAtStart = getWeightAtDay(supplierCurvePoints, lastActualDay) || 0;
+
+      return allDates.map(d => {
+        const day = differenceInDays(parseISO(d), start);
+        const actual = actualData.find(ad => ad.fullDate === d);
+        
+        let supplierWeight = showSupplierCurve ? getWeightAtDay(supplierCurvePoints, day) : undefined;
+        let standardWeight = showStandardCurve ? getWeightAtDay(standardCurvePoints, day) : undefined;
+        
+        if (day > 210) {
+          supplierWeight = undefined;
+          standardWeight = undefined;
+        } else {
+          if (supplierWeight !== null && supplierWeight !== undefined && supplierWeight > targetW + 50) supplierWeight = undefined;
+          if (standardWeight !== null && standardWeight !== undefined && standardWeight > targetW + 50) standardWeight = undefined;
+        }
+        
+        let continueWeight = undefined;
+        if (showContinueCurve && day >= lastActualDay) {
+          const gainBatch = currentBatchRate * (day - lastActualDay);
+          const gainStd = (getWeightAtDay(standardCurvePoints, day) || 0) - stdWeightAtStart;
+          const gainSup = (getWeightAtDay(supplierCurvePoints, day) || 0) - supWeightAtStart;
+          
+          continueWeight = lastWeight + (gainBatch + gainStd + gainSup) / 3;
+          if (continueWeight > targetW + 50) continueWeight = undefined;
+        }
+
+        let dateLabel = d;
+        try {
+          dateLabel = format(new Date(d + 'T12:00:00'), 'dd/MM');
+        } catch {}
+
+        let weight = actual?.weight;
+        if (d === settlementDate && weight === undefined) weight = Math.round(avgInitial);
+
+        return {
+          date: d === settlementDate ? 'Início' : dateLabel,
+          fullDate: d,
+          isHarvestDate: expectedHarvestDate && d === expectedHarvestDate,
+          weight: weight,
+          supplierWeight: supplierWeight ? Math.round(supplierWeight) : undefined,
+          standardWeight: standardWeight ? Math.round(standardWeight) : undefined,
+          continueWeight: continueWeight ? Math.round(continueWeight) : undefined
+        };
+      });
+    }
+
+    return baseData;
+  }, [state.biometryLogs, state.batches, state.cages, state.harvestLogs, state.protocols, state.standardCurves, selectedBatchIds, batchStats, showSupplierCurve, showStandardCurve, showContinueCurve]);
+
+  const biometryStdDevData = useMemo(() => {
+    const batchesToProcess = selectedBatchIds.length > 0 
+      ? filteredBatchStats.filter(b => selectedBatchIds.includes(b.id))
+      : filteredBatchStats;
+
+    const biometriesByBatch = new Map<string, typeof state.biometryLogs>();
+    const cageMap = new Map((state.cages || []).map(c => [c.id, c]));
+    const batchMap = new Map((state.batches || []).map(b => [b.id, b]));
+    const sortedHarvestLogs = [...(state.harvestLogs || [])].sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+    const harvestLogsByCage = new Map<string, typeof state.harvestLogs>();
+    sortedHarvestLogs.forEach(h => {
+      const list = harvestLogsByCage.get(h.cageId) || [];
+      list.push(h);
+      harvestLogsByCage.set(h.cageId, list);
+    });
+
+    (state.biometryLogs || []).forEach(b => {
+      let bId = b.batchId;
+      if (!bId && b.cageId) {
+        const hList = harvestLogsByCage.get(b.cageId);
+        const harvest = hList?.find(h => h.date >= b.date);
+        if (harvest) bId = harvest.batchId;
+        else {
+          const cage = cageMap.get(b.cageId);
+          if (cage?.batchId) {
+            const batch = batchMap.get(cage.batchId);
+            if (batch && b.date >= batch.settlementDate) bId = cage.batchId;
+          }
+        }
+      }
+      if (bId) {
+        const list = biometriesByBatch.get(bId) || [];
+        list.push(b);
+        biometriesByBatch.set(bId, list);
+      }
+    });
+
+    let allSamples: number[] = [];
+    const samplesByBatchDate: { [batchId: string]: { date: string, weights: number[] } } = {};
+
+    batchesToProcess.forEach(batch => {
+      const batchBiometries = biometriesByBatch.get(batch.id) || [];
+      if (batchBiometries.length > 0) {
+        const sorted = [...batchBiometries].sort((a, b) => b.date.localeCompare(a.date));
+        const lastDate = sorted[0].date;
+        const lastDayLogs = batchBiometries.filter(log => log.date === lastDate);
+        const weights = lastDayLogs.map(l => l.averageWeight);
+        if (weights.length > 0) {
+          samplesByBatchDate[batch.id] = { date: lastDate, weights };
+          allSamples = [...allSamples, ...weights];
+        }
+      }
+    });
+
+    if (allSamples.length === 0) {
+      return {
+        hasData: false,
+        mean: 0,
+        stdDev: 0,
+        cv: 0,
+        sampleCount: 0,
+        samples: [],
+        curveData: [],
+        rating: 'Sem dados',
+        ratingColor: 'text-slate-500',
+        ratingBg: 'bg-slate-50',
+        lastDate: ''
+      };
+    }
+
+    const n = allSamples.length;
+    const mean = allSamples.reduce((a, b) => a + b, 0) / n;
+    let variance = 0;
+    if (n > 1) {
+      variance = allSamples.reduce((acc, val) => acc + Math.pow(val - mean, 2), 0) / (n - 1);
+    } else {
+      variance = 0;
+    }
+    const stdDev = Math.sqrt(variance);
+    const cv = mean > 0 ? (stdDev / mean) * 100 : 0;
+
+    const activeStdDev = stdDev > 0 ? stdDev : (mean * 0.1 || 10);
+    const curvePointsCount = 30;
+    const minX = Math.max(0, mean - 3 * activeStdDev);
+    const maxX = mean + 3 * activeStdDev;
+    const step = (maxX - minX) / curvePointsCount;
+
+    const normalPdf = (x: number, m: number, sd: number) => {
+      return (1 / (sd * Math.sqrt(2 * Math.PI))) * Math.exp(-0.5 * Math.pow((x - m) / sd, 2));
+    };
+
+    const curveData = [];
+    for (let i = 0; i <= curvePointsCount; i++) {
+      const x = minX + i * step;
+      const y = normalPdf(x, mean, activeStdDev);
+      curveData.push({
+        weight: Math.round(x),
+        probability: y,
+        representativeProbability: Math.round(y * 100000000) / 100000
+      });
+    }
+
+    let latestDateStr = '';
+    const dates = Object.values(samplesByBatchDate).map(s => s.date);
+    if (dates.length > 0) {
+      latestDateStr = [...dates].sort().reverse()[0];
+    }
+
+    let rating = 'Sem dados';
+    let ratingColor = 'text-slate-500';
+    let ratingBg = 'bg-slate-50';
+    if (cv >= 0) {
+      if (cv < 5) {
+        rating = 'Excelente (Muito Uniforme)';
+        ratingColor = 'text-blue-600';
+        ratingBg = 'bg-blue-50';
+      } else if (cv <= 10) {
+        rating = 'Bom (Baixo Desvio)';
+        ratingColor = 'text-emerald-600';
+        ratingBg = 'bg-emerald-50';
+      } else if (cv <= 15) {
+        rating = 'Atenção (Desvio Médio)';
+        ratingColor = 'text-amber-600';
+        ratingBg = 'bg-amber-50';
+      } else {
+        rating = 'Alerta (Desvio Elevado)';
+        ratingColor = 'text-red-600';
+        ratingBg = 'bg-red-50';
+      }
+    }
+
+    return {
+      hasData: true,
+      mean,
+      stdDev,
+      cv,
+      sampleCount: n,
+      samples: allSamples,
+      curveData,
+      rating,
+      ratingColor,
+      ratingBg,
+      lastDate: latestDateStr
+    };
+  }, [state.batches, state.cages, state.biometryLogs, state.harvestLogs, selectedBatchIds, filteredBatchStats]);
+
+  const mortalityEvolutionData = useMemo(() => {
+    let logs: any[] = [];
+
+    const filteredBatches = (state.batches || []).filter(b => {
+      const isSelected = selectedBatchIds.length === 0 || selectedBatchIds.includes(b.id);
+      if (selectedBatchIds.length > 0) return isSelected;
+      return !b.isClosed;
+    });
+
+    const filteredBatchMap = new Map((filteredBatches || []).map(b => [b.id, b]));
+    const cageMap = new Map((state.cages || []).map(c => [c.id, c]));
+    const harvestLogsByCage = new Map<string, typeof state.harvestLogs>();
+    (state.harvestLogs || []).forEach(h => {
+      const list = harvestLogsByCage.get(h.cageId) || [];
+      list.push(h);
+      harvestLogsByCage.set(h.cageId, list);
+    });
+
+    logs = (state.mortalityLogs || []).filter(m => {
+      const batch = filteredBatchMap.get(m.batchId || '');
+      if (batch) return true;
+
+      if (!m.batchId && m.cageId) {
+        const cage = cageMap.get(m.cageId);
+        const cageBatch = cage?.batchId ? filteredBatchMap.get(cage.batchId) : null;
+        if (cageBatch && m.date >= cageBatch.settlementDate) return true;
+        
+        const cageHarvests = harvestLogsByCage.get(m.cageId) || [];
+        const harvest = cageHarvests.find(h => h.date >= m.date);
+        return harvest && filteredBatchMap.has(harvest.batchId);
+      }
+      return false;
+    });
+
+    const grouped = logs.reduce((acc: any, log) => {
+      if (!acc[log.date]) acc[log.date] = 0;
+      acc[log.date] += log.count;
+      return acc;
+    }, {});
+    return Object.keys(grouped).map(date => {
+      let dateLabel = date;
+      try {
+        dateLabel = format(new Date(date + 'T12:00:00'), 'dd/MM');
+      } catch {}
+      return { 
+        date: dateLabel, 
+        fullDate: date, 
+        count: grouped[date] 
+      };
+    }).sort((a, b) => a.fullDate.localeCompare(b.fullDate));
+  }, [state.mortalityLogs, state.cages, state.batches, state.harvestLogs, selectedBatchIds, batchStats]);
+
+  const biomassEvolutionData = useMemo(() => {
+    let settlementDate = '';
+    let expectedHarvestDate = '';
+
+    const relevantBatches = (state.batches || []).filter(b => {
+      const isSelected = selectedBatchIds.length === 0 || selectedBatchIds.includes(b.id);
+      if (selectedBatchIds.length > 0) return isSelected;
+      return !b.isClosed;
+    });
+
+    if (relevantBatches.length > 0) {
+      settlementDate = relevantBatches[0].settlementDate;
+      expectedHarvestDate = relevantBatches[0].expectedHarvestDate || '';
+    }
+
+    if (relevantBatches.length === 0) return [];
+
+    const batchIds = (relevantBatches || []).map(b => b.id);
+    const relevantBatchMap = new Map((relevantBatches || []).map(b => [b.id, b]));
+    const batchIdSet = new Set(batchIds);
+    const cageMap = new Map((state.cages || []).map(c => [c.id, c]));
+    const harvestLogsByCage = new Map<string, typeof state.harvestLogs>();
+    (state.harvestLogs || []).forEach(h => {
+      const list = harvestLogsByCage.get(h.cageId) || [];
+      list.push(h);
+      harvestLogsByCage.set(h.cageId, list);
+    });
+
+    const initialPop = relevantBatches.reduce((acc, b) => acc + b.initialQuantity, 0);
+    const initialWeight = relevantBatches.length > 0 ? relevantBatches.reduce((acc, b) => acc + b.initialUnitWeight, 0) / relevantBatches.length : 0;
+
+    // Helper to check if a log belongs to the relevant batches
+    const isLogRelevant = (log: any) => {
+      if (log.batchId && batchIdSet.has(log.batchId)) return true;
+      if (!log.batchId && log.cageId) {
+        const cage = cageMap.get(log.cageId);
+        if (cage?.batchId && batchIdSet.has(cage.batchId)) {
+          const batch = relevantBatchMap.get(cage.batchId);
+          if (batch && log.date >= batch.settlementDate) return true;
+        }
+        const cageHarvests = harvestLogsByCage.get(log.cageId) || [];
+        const harvest = cageHarvests.find(h => h.date >= log.date);
+        if (harvest && batchIdSet.has(harvest.batchId)) return true;
+      }
+      return false;
+    };
+
+    const biometries = (state.biometryLogs || []).filter(isLogRelevant);
+    const mortalities = (state.mortalityLogs || []).filter(isLogRelevant);
+    const harvests = (state.harvestLogs || []).filter(l => batchIds.includes(l.batchId));
+
+    // Use ONLY biometry dates as requested
+    const biometryDates = Array.from(new Set(biometries.map(l => l.date))).sort();
+    
+    const actualData = biometryDates.map(date => {
+      // "Estoque Vivo" at this specific date
+      const cumMortality = mortalities.filter(m => m.date <= date).reduce((acc, m) => acc + m.count, 0);
+      const cumHarvest = harvests.filter(h => h.date <= date).reduce((acc, h) => acc + h.fishCount, 0);
+      const currentPop = Math.max(0, initialPop - cumMortality - cumHarvest);
+      
+      const dayBiometries = biometries.filter(b => b.date === date);
+      const avgWeight = dayBiometries.reduce((acc, b) => acc + b.averageWeight, 0) / dayBiometries.length;
+      
+      // Biomassa = Estoque Vivo * Média de Peso da Biometria
+      const biomassKg = (currentPop * avgWeight) / 1000;
+
+      let dateLabel = date;
+      try {
+        dateLabel = format(new Date(date + 'T12:00:00'), 'dd/MM');
+      } catch {}
+
+      return {
+        date: dateLabel,
+        fullDate: date,
+        biomass: Number(biomassKg.toFixed(1)),
+        weight: Math.round(avgWeight),
+        pop: currentPop
+      };
+    });
+
+    const baseData = [
+      { 
+        date: 'Início', 
+        fullDate: settlementDate,
+        biomass: Number(((initialPop * initialWeight) / 1000).toFixed(1)), 
+        weight: Math.round(initialWeight), 
+        pop: initialPop 
+      }, 
+      ...actualData
+    ];
+
+    // Prediction Curves
+    if ((showSupplierCurve || showStandardCurve || showContinueCurve) && settlementDate) {
+      const start = parseISO(settlementDate);
+      const targetW = protocol?.targetWeight || 950;
+      
+      // Calculate projected days to reach target weight to ensure chart extends far enough
+      let projectedTotalDays = 168;
+      if (actualData.length > 0) {
+        const lastActual = actualData[actualData.length - 1];
+        const firstActual = actualData[0];
+        const lastActualDay = Math.floor((parseISO(lastActual.fullDate).getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+        const firstActualDay = Math.floor((parseISO(firstActual.fullDate).getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+        const batchRate = (lastActual.weight - firstActual.weight) / Math.max(1, lastActualDay - firstActualDay);
+        const daysToTarget = batchRate > 0 ? (targetW - lastActual.weight) / batchRate : 0;
+        projectedTotalDays = Math.ceil(lastActualDay + daysToTarget);
+      }
+
+      const end = expectedHarvestDate ? parseISO(expectedHarvestDate) : addDays(start, 168);
+      const baseTotalDays = Math.floor((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+      const totalDays = Math.max(168, baseTotalDays, projectedTotalDays);
+      
+      // Standard Curve (Interpolated from all registered curves)
+      const standardCurvePoints = getInterpolatedStandardCurvePoints(state.standardCurves || [], initialWeight);
+
+      // Supplier Curve (from Protocol)
+      let supplierCurvePoints: { day: number, weight: number }[] = [];
+      if (protocol?.supplierCurve && protocol.supplierCurve.some(p => p.weight > 0)) {
+        const sortedPoints = [...protocol.supplierCurve]
+          .filter(p => p.weight > 0)
+          .sort((a, b) => a.day - b.day);
+        
+        supplierCurvePoints = sortedPoints.map(p => ({
+          day: p.day * 7, // Convert weeks to days
+          weight: p.weight
+        }));
+      }
+
+      const getWeightAtDay = (points: {day: number, weight: number}[], targetDay: number) => {
+        if (points.length === 0) return null;
+        const nextIdx = points.findIndex(p => p.day >= targetDay);
+        if (nextIdx === 0) return points[0].weight;
+        if (nextIdx === -1) {
+          const p1 = points[points.length - 2];
+          const p2 = points[points.length - 1];
+          const rate = (p2.weight - p1.weight) / Math.max(1, p2.day - p1.day);
+          return p2.weight + rate * (targetDay - p2.day);
+        }
+        const p1 = points[nextIdx - 1];
+        const p2 = points[nextIdx];
+        return p1.weight + (p2.weight - p1.weight) * (targetDay - p1.day) / Math.max(1, p2.day - p1.day);
+      };
+
+      const allDates: string[] = [];
+      for (let i = 0; i <= totalDays; i += 7) {
+        const d = addDays(start, i);
+        allDates.push(format(d, 'yyyy-MM-dd'));
+      }
+      if (expectedHarvestDate && !allDates.includes(expectedHarvestDate)) allDates.push(expectedHarvestDate);
+      if (settlementDate && !allDates.includes(settlementDate)) allDates.push(settlementDate);
+      biometryDates.forEach(d => { if (!allDates.includes(d)) allDates.push(d); });
+      allDates.sort();
+
+      // Calculate Batch Rate based on LAST interval
+      let currentBatchRate = 0;
+      let lastActualDay = 0;
+      let lastWeight = initialWeight;
+      if (actualData.length > 0) {
+        const lastActual = actualData[actualData.length - 1];
+        lastWeight = lastActual.weight;
+        lastActualDay = Math.floor((parseISO(lastActual.fullDate).getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+        
+        const lastTwo = actualData.slice(-2);
+        if (lastTwo.length === 2) {
+          const p1 = lastTwo[0];
+          const p2 = lastTwo[1];
+          const d1 = Math.floor((parseISO(p1.fullDate).getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+          const d2 = Math.floor((parseISO(p2.fullDate).getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+          currentBatchRate = (p2.weight - p1.weight) / Math.max(1, d2 - d1);
+        } else {
+          const firstActual = actualData[0];
+          const firstActualDay = Math.floor((parseISO(firstActual.fullDate).getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+          currentBatchRate = (lastActual.weight - firstActual.weight) / Math.max(1, lastActualDay - firstActualDay);
+        }
+      }
+
+      const todayStr = format(new Date(), 'yyyy-MM-dd');
+      const totalMortalitySoFar = mortalities.filter(m => m.date <= todayStr).reduce((acc, m) => acc + m.count, 0);
+      const totalHarvestSoFar = harvests.filter(h => h.date <= todayStr).reduce((acc, h) => acc + h.fishCount, 0);
+      const currentLiveStock = Math.max(0, initialPop - totalMortalitySoFar - totalHarvestSoFar);
+
+      const stdWeightAtStart = getWeightAtDay(standardCurvePoints, lastActualDay) || 0;
+      const supWeightAtStart = getWeightAtDay(supplierCurvePoints, lastActualDay) || 0;
+
+      return allDates.map(d => {
+        const day = differenceInDays(parseISO(d), start);
+        const actual = actualData.find(ad => ad.fullDate === d);
+        
+        // Use current live stock for the entire prediction curve as requested
+        const estimatedPop = currentLiveStock;
+
+        let supplierBiomass = undefined;
+        if (showSupplierCurve) {
+          let supplierWeight = getWeightAtDay(supplierCurvePoints, day);
+          if (day > 210 || (supplierWeight !== null && supplierWeight !== undefined && supplierWeight > targetW + 50)) {
+            supplierWeight = undefined;
+          }
+          if (supplierWeight !== undefined && supplierWeight !== null) {
+            supplierBiomass = (estimatedPop * supplierWeight) / 1000;
+          }
+        }
+
+        let standardBiomass = undefined;
+        if (showStandardCurve) {
+          let standardWeight = getWeightAtDay(standardCurvePoints, day);
+          if (day > 210 || (standardWeight !== null && standardWeight !== undefined && standardWeight > targetW + 50)) {
+            standardWeight = undefined;
+          }
+          if (standardWeight !== undefined && standardWeight !== null) {
+            standardBiomass = (estimatedPop * standardWeight) / 1000;
+          }
+        }
+
+        let dateLabel = d;
+        try {
+          dateLabel = format(new Date(d + 'T12:00:00'), 'dd/MM');
+        } catch {}
+
+        let biomass = actual?.biomass;
+        let weight = actual?.weight;
+        let pop = actual?.pop;
+
+        if (d === settlementDate && biomass === undefined) {
+          biomass = Number(((initialPop * initialWeight) / 1000).toFixed(1));
+          weight = Math.round(initialWeight);
+          pop = initialPop;
+        }
+
+        let continueBiomass = undefined;
+        if (showContinueCurve && day >= lastActualDay) {
+          const gainBatch = currentBatchRate * (day - lastActualDay);
+          const gainStd = (getWeightAtDay(standardCurvePoints, day) || 0) - stdWeightAtStart;
+          const gainSup = (getWeightAtDay(supplierCurvePoints, day) || 0) - supWeightAtStart;
+          
+          const projectedWeight = lastWeight + (gainBatch + gainStd + gainSup) / 3;
+          if (projectedWeight <= targetW + 50) {
+            continueBiomass = Number(((estimatedPop * projectedWeight) / 1000).toFixed(1));
+          }
+        }
+
+        return {
+          date: d === settlementDate ? 'Início' : dateLabel,
+          fullDate: d,
+          biomass: biomass,
+          weight: weight,
+          pop: pop,
+          supplierBiomass: supplierBiomass ? Number(supplierBiomass.toFixed(1)) : undefined,
+          standardBiomass: standardBiomass ? Number(standardBiomass.toFixed(1)) : undefined,
+          continueBiomass: continueBiomass
+        };
+      });
+    }
+
+    return baseData;
+  }, [state.biometryLogs, state.mortalityLogs, state.cages, state.batches, state.harvestLogs, selectedBatchIds, batchStats, showSupplierCurve, showStandardCurve, showContinueCurve]);
+
+  const totalMortalityInChart = useMemo(() => {
+    return mortalityEvolutionData.reduce((acc, curr) => acc + curr.count, 0);
+  }, [mortalityEvolutionData]);
+
+  // FUNÇÃO DE EXPORTAÇÃO COMPLETA COM FILTRO DE DATA
+  const handleDownloadReport = () => {
+    // Definir intervalo de filtro
+    const start = startOfDay(parseISO(reportStartDate));
+    const end = endOfDay(parseISO(reportEndDate));
+
+    // Função auxiliar para filtrar logs por data
+    const filterByDate = (dateString: string | undefined) => {
+      if (!dateString) return false;
+      try {
+        const itemDate = parseISO(dateString);
+        if (isNaN(itemDate.getTime())) return false;
+        return isWithinInterval(itemDate, { start, end });
+      } catch {
+        return false;
+      }
+    };
+
+    // 1. Helpers de Mapeamento
+    const cageMap = new Map(state.cages.map(c => [c.id, c.name]));
+    const feedMap = new Map(state.feedTypes.map(f => [f.id, f.name]));
+    const userMap = new Map(state.users.map(u => [u.id, u.name]));
+    const lineMap = new Map(state.lines.map(l => [l.id, l.name]));
+    const batchMap = new Map(state.batches.map(b => [b.id, b.name]));
+    const protocolMap = new Map(state.protocols.map(p => [p.id, p.name]));
+    const sortedHarvestLogs = [...(state.harvestLogs || [])].sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+
+    const wb = XLSX.utils.book_new();
+
+    // 2. ABA: RESUMO GERAL
+    const summaryHeader = [
+      ["RELATÓRIO GERAL DE PRODUÇÃO - AQUAGESTÃO"],
+      ["Período Selecionado:", `${format(start, 'dd/MM/yyyy')} até ${format(end, 'dd/MM/yyyy')}`],
+      ["Data de Exportação:", format(new Date(), 'dd/MM/yyyy HH:mm')],
+      [""],
+      ["ESTATÍSTICAS CONSOLIDADAS POR LOTE (DADOS ATUAIS)"]
+    ];
+    const summaryData = batchStats.map(bs => [
+      bs.name,
+      `Estoque: ${formatNumber(bs.stock)} un`,
+      `Biomassa: ${formatNumber(bs.biomass, 2)} kg`,
+      `Consumo Total: ${formatNumber(bs.feed, 2)} kg`,
+      `FCA: ${bs.fca}`,
+      `Peso Médio: ${formatNumber(bs.avgWeight, 1)} g`
+    ]);
+    const wsSummary = XLSX.utils.aoa_to_sheet([...summaryHeader, ...summaryData]);
+    XLSX.utils.book_append_sheet(wb, wsSummary, "Resumo Geral");
+
+    // 3. ABA: LOTES
+    const wsBatches = XLSX.utils.json_to_sheet(state.batches.map(b => ({
+      "Nome do Lote": b.name,
+      "Data Povoamento": b.settlementDate,
+      "Qtd Inicial": b.initialQuantity,
+      "Peso Inicial (g)": b.initialUnitWeight,
+      "Modelo Produção": protocolMap.get(b.protocolId || '') || "Nenhum"
+    })));
+    XLSX.utils.book_append_sheet(wb, wsBatches, "Lotes");
+
+    // 4. ABA: GAIOLAS (INVENTÁRIO)
+    const wsCages = XLSX.utils.json_to_sheet(state.cages.map(c => ({
+      "Gaiola": c.name,
+      "Linha/Setor": lineMap.get(c.lineId || '') || "N/A",
+      "Capacidade": c.stockingCapacity,
+      "Status": c.status,
+      "Lote Atual": batchMap.get(c.batchId || '') || "Vazia",
+      "Peixes Alojados": c.initialFishCount || 0,
+      "Povoamento": c.settlementDate || "",
+      "Prev. Despesca": c.harvestDate || ""
+    })));
+    XLSX.utils.book_append_sheet(wb, wsCages, "Inventário Gaiolas");
+
+    // 5. ABA: TRATOS (ALIMENTAÇÃO) - FILTRADO
+    const filteredFeedingLogs = (state.feedingLogs || []).filter(f => filterByDate(f.timestamp));
+    const wsFeeding = XLSX.utils.json_to_sheet(filteredFeedingLogs.map(f => {
+      let bId = f.batchId;
+      if (!bId && f.cageId) {
+        const fDate = (f.timestamp || '').split('T')[0];
+        const harvest = sortedHarvestLogs.find(h => h.cageId === f.cageId && h.date >= fDate);
+        if (harvest) {
+          bId = harvest.batchId;
+        } else {
+          const cage = (state.cages || []).find(c => c.id === f.cageId);
+          if (cage?.batchId) {
+            const batch = (state.batches || []).find(b => b.id === cage.batchId);
+            if (batch && fDate >= batch.settlementDate) {
+              bId = cage.batchId;
+            }
+          }
+        }
+      }
+
+      return {
+        "Data/Hora": f.timestamp,
+        "Lote": batchMap.get(bId || '') || "N/A",
+        "Gaiola": cageMap.get(f.cageId) || f.cageId,
+        "Ração": feedMap.get(f.feedTypeId) || f.feedTypeId,
+        "Quantidade (g)": f.amount,
+        "Lançado por": userMap.get(f.userId) || f.userId
+      };
+    }));
+    XLSX.utils.book_append_sheet(wb, wsFeeding, "Tratos Alimentares");
+
+    // 6. ABA: MORTALIDADE - FILTRADO
+    const filteredMortalityLogs = (state.mortalityLogs || []).filter(m => filterByDate(m.date));
+    const wsMortality = XLSX.utils.json_to_sheet(filteredMortalityLogs.map(m => {
+      let bId = m.batchId;
+      if (!bId && m.cageId) {
+        const mDate = m.date;
+        const harvest = sortedHarvestLogs.find(h => h.cageId === m.cageId && h.date >= mDate);
+        if (harvest) {
+          bId = harvest.batchId;
+        } else {
+          const cage = (state.cages || []).find(c => c.id === m.cageId);
+          if (cage?.batchId) {
+            const batch = (state.batches || []).find(b => b.id === cage.batchId);
+            if (batch && mDate >= batch.settlementDate) {
+              bId = cage.batchId;
+            }
+          }
+        }
+      }
+
+      return {
+        "Data": m.date,
+        "Lote": batchMap.get(bId || '') || "N/A",
+        "Gaiola": cageMap.get(m.cageId) || m.cageId,
+        "Quantidade": m.count,
+        "Lançado por": userMap.get(m.userId) || m.userId
+      };
+    }));
+    XLSX.utils.book_append_sheet(wb, wsMortality, "Mortalidade");
+
+    // 7. ABA: BIOMETRIA - FILTRADO
+    const filteredBiometryLogs = (state.biometryLogs || []).filter(b => filterByDate(b.date));
+    const wsBiometry = XLSX.utils.json_to_sheet(filteredBiometryLogs.map(b => {
+      let bId = b.batchId;
+      if (!bId && b.cageId) {
+        const bDate = b.date;
+        const harvest = sortedHarvestLogs.find(h => h.cageId === b.cageId && h.date >= bDate);
+        if (harvest) {
+          bId = harvest.batchId;
+        } else {
+          const cage = (state.cages || []).find(c => c.id === b.cageId);
+          if (cage?.batchId) {
+            const batch = (state.batches || []).find(b => b.id === cage.batchId);
+            if (batch && bDate >= batch.settlementDate) {
+              bId = cage.batchId;
+            }
+          }
+        }
+      }
+
+      return {
+        "Data": b.date,
+        "Lote": batchMap.get(bId || '') || "N/A",
+        "Gaiola": cageMap.get(b.cageId) || b.cageId,
+        "Peso Médio (g)": b.averageWeight,
+        "Lançado por": userMap.get(b.userId) || b.userId
+      };
+    }));
+    XLSX.utils.book_append_sheet(wb, wsBiometry, "Biometria");
+
+    // 8. ABA: ESTOQUE RAÇÃO
+    const wsFeedStock = XLSX.utils.json_to_sheet((state.feedTypes || []).map(f => ({
+      "Ração": f.name,
+      "Estoque Atual (kg)": f.totalStock / 1000,
+      "Capacidade Silo (kg)": f.maxCapacity,
+      "Alerta Mínimo (%)": f.minStockPercentage
+    })));
+    XLSX.utils.book_append_sheet(wb, wsFeedStock, "Estoque Ração");
+
+    // 10. ABA: FRIGORÍFICO - FILTRADO
+    const filteredSlaughterLogs = (state.slaughterLogs || []).filter(s => filterByDate(s.date));
+    const wsSlaughter = XLSX.utils.json_to_sheet(filteredSlaughterLogs.map(s => ({
+      "Data": s.date,
+      "Lote Abate": s.slaughterBatch,
+      "Produtor": s.producer,
+      "Peso Filé Congelado (kg)": s.gtaWeight,
+      "Recepção (kg)": s.receptionWeight,
+      "Embalado (kg)": s.packedQuantity,
+      "Rendimento (%)": s.receptionWeight > 0 ? formatNumber((s.packedQuantity / s.receptionWeight) * 100, 1) : 0,
+      "Lote Embalagem": s.packagingBatch,
+      "Lançado por": userMap.get(s.userId) || s.userId
+    })));
+    XLSX.utils.book_append_sheet(wb, wsSlaughter, "Frigorífico");
+
+    // 11. ABA: DESPESCAS - FILTRADO
+    const filteredHarvestLogs = (state.harvestLogs || []).filter(h => filterByDate(h.date));
+    const wsHarvest = XLSX.utils.json_to_sheet(filteredHarvestLogs.map(h => ({
+      "Data": h.date,
+      "Lote": batchMap.get(h.batchId) || h.batchId,
+      "Gaiola": cageMap.get(h.cageId) || h.cageId,
+      "Peixes Retirados": h.fishCount,
+      "Peso Total (kg)": h.totalWeight,
+      "Peso Médio (g)": h.averageWeight || (h.fishCount > 0 ? formatNumber(h.totalWeight * 1000 / h.fishCount, 1) : 0),
+      "Lançado por": userMap.get(h.userId) || h.userId
+    })));
+    XLSX.utils.book_append_sheet(wb, wsHarvest, "Despescas");
+
+    // 12. ABA: FINANCEIRO FRIGORÍFICO - FILTRADO
+    const filteredSlaughterExpenses = (state.slaughterExpenses || []).filter(e => filterByDate(e.date));
+    const wsSlaughterFinance = XLSX.utils.json_to_sheet(filteredSlaughterExpenses.map(e => ({
+      "Data": e.date,
+      "Descrição": e.description,
+      "Categoria": e.category,
+      "Valor (R$)": e.value,
+      "Quantidade": e.quantity || 1,
+      "Valor Unitário": e.unitValue || e.value,
+      "Lançado por": userMap.get(e.userId) || e.userId
+    })));
+    XLSX.utils.book_append_sheet(wb, wsSlaughterFinance, "Finanças Frigorífico");
+
+    // 13. ABA: RH FRIGORÍFICO
+    const employeeMap = new Map((state.slaughterEmployees || []).map(e => [e.id, e.name]));
+    const filteredHREntries = (state.slaughterHREntries || []).filter(e => filterByDate(e.date));
+    const wsSlaughterHR = XLSX.utils.json_to_sheet(filteredHREntries.map(e => ({
+      "Data": e.date,
+      "Funcionários": e.employeeIds.map(id => employeeMap.get(id) || id).join(', '),
+      "Tipo": e.type,
+      "Dias": e.days || 1,
+      "Descrição": e.description || "",
+      "Lançado por": userMap.get(e.userId) || e.userId
+    })));
+    XLSX.utils.book_append_sheet(wb, wsSlaughterHR, "RH Frigorífico");
+
+    // 15. ABA: CAPEX - FILTRADO
+    const portfolioMap_capex = new Map(state.portfolios.map(p => [p.id, p.name]));
+    const projectMap = new Map(state.capexProjects.map(p => [p.id, p.name]));
+    const filteredCapexInvoices = (state.capexInvoices || []).filter(i => filterByDate(i.date));
+    const wsCapex = XLSX.utils.json_to_sheet(filteredCapexInvoices.map(i => ({
+      "Data": i.date,
+      "Portfólio": portfolioMap_capex.get(i.portfolioId) || i.portfolioId,
+      "Projeto": projectMap.get(i.projectId) || i.projectId,
+      "NF": i.invoiceNumber,
+      "Fornecedor": i.supplier,
+      "Tipo": i.type,
+      "Valor (R$)": i.value,
+      "Descrição": i.description,
+      "Lançado por": userMap.get(i.userId) || i.userId
+    })));
+    XLSX.utils.book_append_sheet(wb, wsCapex, "CAPEX (Investimentos)");
+
+    // 16. ABA: UTILIDADES E FRIO - FILTRADO
+    const filteredColdStorage = (state.coldStorageLogs || []).filter(l => filterByDate(l.date));
+    const filteredUtilities = (state.utilityLogs || []).filter(l => filterByDate(l.date));
+    
+    const utilityData = [
+      ...filteredColdStorage.map(l => {
+        const chamber = (state.coldChambers || []).find(c => c.id === l.chamberId);
+        return {
+          "Data": l.date,
+          "Hora": l.time,
+          "Tipo": "Câmara Fria",
+          "Local/Medição": chamber?.name || (l.chamberId?.startsWith('chamber-') ? l.chamberId.replace('chamber-', '').toUpperCase() : '---'),
+          "Valor/Temp": !isNaN(Number(l.temperature)) ? `${l.temperature}°C` : l.temperature,
+          "Lançado por": userMap.get(l.userId) || l.userId
+        };
+      }),
+      ...filteredUtilities.map(l => ({
+        "Data": l.date,
+        "Hora": "---",
+        "Tipo": l.type === 'water' ? 'Água' : 'Energia',
+        "Local/Medição": "Leitura Geral",
+        "Valor/Temp": l.reading,
+        "Lançado por": userMap.get(l.userId) || l.userId
+      }))
+    ].sort((a, b) => b.Data.localeCompare(a.Data) || b.Hora.localeCompare(a.Hora));
+
+    const wsUtilities = XLSX.utils.json_to_sheet(utilityData);
+    XLSX.utils.book_append_sheet(wb, wsUtilities, "Utilidades e Frio");
+
+    // 18. ABA: AGENDAMENTO DESPESCA
+    const filteredSchedules = (state.harvestSchedules || []).filter(s => filterByDate(s.date));
+    const wsSchedules = XLSX.utils.json_to_sheet(filteredSchedules.map(s => ({
+      "Data": s.date,
+      "Lote": batchMap.get(s.batchId) || s.batchId,
+      "Gaiolas": s.cageIds.map(id => cageMap.get(id) || id).join(', '),
+      "Último Trato": s.lastFeedingDate || "N/A",
+      "Observações": s.notes || ""
+    })));
+    XLSX.utils.book_append_sheet(wb, wsSchedules, "Agendamento Despesca");
+
+    // FINALIZAR DOWNLOAD
+    XLSX.writeFile(wb, `Relatorio_AquaGestao_${reportStartDate}_a_${reportEndDate}.xlsx`);
+  };
+
+  return (
+    <div className="space-y-6 pb-20">
+      {/* Clima e Mercado side-by-side */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <WeatherWidget />
+        <TilapiaPriceWidget />
+      </div>
+
+      {/* Alerta de Estoque Baixo */}
+      {lowStockFeeds.length > 0 && (
+        <div className="bg-red-50 border border-red-200 rounded-3xl p-5 flex flex-col md:flex-row items-center gap-6 animate-in fade-in slide-in-from-top duration-500 shadow-lg shadow-red-500/5">
+          <div className="p-4 bg-red-100 rounded-2xl text-red-600 animate-pulse">
+            <AlertTriangle className="w-8 h-8" />
+          </div>
+          <div className="flex-1 text-center md:text-left">
+            <h3 className="text-sm font-black text-red-800 uppercase tracking-widest italic">Estoque Crítico de Ração!</h3>
+            <div className="mt-2 flex flex-wrap gap-2 justify-center md:justify-start">
+              {lowStockFeeds.map(feed => (
+                <span key={feed.id} className="px-3 py-1 bg-white border border-red-100 rounded-xl text-[11px] font-black text-red-600 uppercase flex items-center gap-2">
+                  <PackageSearch className="w-3 h-3" /> {feed.name}: {formatNumber(feed.totalStock/1000, 0)}kg restantes
+                </span>
+              ))}
+            </div>
+          </div>
+          <div className="hidden lg:block text-[10px] font-black text-red-400 uppercase tracking-widest max-w-[150px] text-right">
+            Providencie a compra imediata para evitar falhas no trato.
+          </div>
+        </div>
+      )}
+
+      {/* Alerta de Otimização de Espaço (Lotes Antigos) */}
+      {state.batches.filter(b => b.isClosed).length >= 5 && (
+        <div className="bg-amber-50 border border-amber-200 rounded-3xl p-5 flex flex-col md:flex-row items-center gap-6 shadow-lg shadow-amber-500/5">
+          <div className="p-4 bg-amber-100 rounded-2xl text-amber-600">
+            <PackageSearch className="w-8 h-8" />
+          </div>
+          <div className="flex-1 text-center md:text-left">
+            <h3 className="text-sm font-black text-amber-800 uppercase tracking-widest italic">Otimização de Sistema</h3>
+            <p className="text-xs font-bold text-amber-700 mt-1 uppercase tracking-tight">
+              Existem {state.batches.filter(b => b.isClosed).length} lotes fechados no sistema. Para manter a performance ideal no celular e computador, considere excluir permanentemente lotes antigos na aba "Lote Estoque".
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Seleção de Lote e Relatórios */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <div className="p-3 bg-blue-50 text-blue-600 rounded-xl shadow-sm"><Layers className="w-6 h-6" /></div>
+            <div className="relative">
+              <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Lotes Selecionados</h3>
+              <button 
+                onClick={() => setShowBatchSelector(!showBatchSelector)}
+                className="flex items-center gap-2 text-lg font-black text-slate-800 hover:text-slate-600 transition-colors"
+              >
+                {selectedBatchIds.length === 0 ? 'Todos os Lotes' : `${selectedBatchIds.length} Selecionados`}
+                <ChevronDown className={`w-5 h-5 transition-transform ${showBatchSelector ? 'rotate-180' : ''}`} />
+              </button>
+
+              {showBatchSelector && (
+                <div className="absolute top-full mt-2 left-0 w-64 bg-white rounded-2xl shadow-2xl border border-slate-200 z-50 p-4 max-h-80 overflow-y-auto">
+                  <div className="flex justify-between items-center mb-4 pb-2 border-b border-slate-100">
+                    <span className="text-[10px] font-black uppercase text-slate-400">Selecionar Lotes</span>
+                    <div className="flex items-center gap-3">
+                      <button 
+                        onClick={() => setSelectedBatchIds(filteredBatchStats.map(b => b.id))} 
+                        className="text-[9px] font-black uppercase text-blue-600 hover:text-blue-700"
+                      >
+                        Selecionar Todos
+                      </button>
+                      <button 
+                        onClick={() => setSelectedBatchIds([])} 
+                        className="text-[9px] font-black uppercase text-red-500 hover:text-red-600"
+                      >
+                        Limpar
+                      </button>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    {filteredBatchStats.map(batch => (
+                      <label key={batch.id} className="flex items-center gap-3 p-2 hover:bg-slate-50 rounded-xl cursor-pointer transition-colors">
+                        <input 
+                          type="checkbox" 
+                          checked={selectedBatchIds.includes(batch.id)}
+                          onChange={() => toggleBatch(batch.id)}
+                          className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                        />
+                        <span className="text-xs font-bold text-slate-700 uppercase">{batch.name}</span>
+                      </label>
+                    ))}
+                    {filteredBatchStats.length === 0 && (
+                      <div className="text-center py-4 text-[10px] font-bold text-slate-400 uppercase">Nenhum lote encontrado</div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col xl:flex-row-reverse items-center gap-4">
+          <button onClick={handleDownloadReport} className="w-full xl:w-auto px-6 py-3 bg-emerald-600 text-white rounded-xl font-black text-xs uppercase tracking-widest flex items-center justify-center gap-2 shadow-lg hover:bg-emerald-700 transition-all active:scale-95 whitespace-nowrap">
+            <Download className="w-4 h-4" /> RELATÓRIO (EXCEL)
+          </button>
+          <div className="flex flex-col sm:flex-row items-center gap-3 flex-1 w-full">
+            <div className="p-3 bg-emerald-50 text-emerald-600 rounded-xl shadow-sm hidden sm:block"><Calendar className="w-6 h-6" /></div>
+            <div className="flex-1 grid grid-cols-2 gap-3 w-full">
+              <div>
+                <label className="text-[10px] font-black text-slate-400 uppercase block mb-1">Início Relatório</label>
+                <input type="date" value={reportStartDate} onChange={e => setReportStartDate(e.target.value)} className="w-full text-xs font-bold text-slate-700 bg-slate-50 border border-slate-100 rounded-lg p-2 outline-none" />
+              </div>
+              <div>
+                <label className="text-[10px] font-black text-slate-400 uppercase block mb-1">Fim Relatório</label>
+                <input type="date" value={reportEndDate} onChange={e => setReportEndDate(e.target.value)} className="w-full text-xs font-bold text-slate-700 bg-slate-50 border border-slate-100 rounded-lg p-2 outline-none" />
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Estatísticas Gerais do Lote */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+        <MiniStat label="Estoque Vivo Atual" value={<span className="text-xl font-black">{selectedBatchData.stock} un</span>} icon={<Fish className="w-5 h-5" />} color="text-blue-600" subtext="Peixes atualmente na água" />
+        <MiniStat 
+          label="Total Despescado" 
+          value={
+            <div className="flex flex-col">
+              <span className="text-xl font-black text-indigo-600 leading-none">{selectedBatchData.harvested} un</span>
+              <span className="text-[10px] font-black text-slate-400 uppercase mt-1">Biomassa: {formatNumber(selectedBatchData.harvestedWeight, 1)}kg</span>
+            </div>
+          } 
+          icon={<Download className="w-5 h-5" />} 
+          color="text-indigo-600" 
+          subtext="Peixes retirados para abate" 
+        />
+        <MiniStat label="Mortalidade Total" value={<span className="text-xl font-black">{(totalMortalityInChart || selectedBatchData.mortality).toLocaleString('pt-BR')} un</span>} icon={<FishOff className="w-5 h-5" />} color="text-red-600" subtext="Perdas registradas no lote" />
+        <MiniStat label="Biomassa Est. Atual" value={<span className="text-xl font-black">{formatNumber(selectedBatchData.biomass, 1)}kg</span>} icon={<Scale className="w-5 h-5" />} color="text-emerald-600" subtext={selectedBatchData.samplingInfo} />
+        <MiniStat 
+          label="Ração Consumida" 
+          value={
+            <div className="flex flex-col">
+              <div className="text-xl font-black text-slate-800 leading-none mb-2">{formatNumber(selectedBatchData.feed, 1)}kg</div>
+              <div className="space-y-1 pt-2 border-t border-slate-100">
+                {selectedBatchData.feedBreakdown.length > 0 ? selectedBatchData.feedBreakdown.map((item: any) => (
+                  <div key={item.name} className="flex justify-between items-center text-[9px]">
+                    <span className="font-bold text-slate-400 uppercase truncate">{item.name}</span>
+                    <span className="font-black text-slate-600 ml-1">{formatNumber(item.amountKg, 1)}k</span>
+                  </div>
+                )) : <span className="text-[9px] font-bold text-slate-300 italic">Sem consumo</span>}
+              </div>
+            </div>
+          } icon={<Utensils className="w-5 h-5" />} color="text-amber-600" />
+        <MiniStat label="FCA (Conversão)" value={<span className="text-xl font-black">{selectedBatchData.fca}</span>} icon={<TrendingUp className="w-5 h-5" />} color="text-indigo-600" subtext="Baseado na biomassa atual" />
+        <MiniStat 
+          label="Desvio de Peso (DP)" 
+          value={
+            biometryStdDevData.hasData ? (
+              <div className="flex flex-col">
+                <span className="text-xl font-black text-slate-800 leading-none">
+                  ± {formatNumber(biometryStdDevData.stdDev, 1)}g
+                </span>
+                <span className="text-[10px] font-black text-slate-400 uppercase mt-1">
+                  CV: {formatNumber(biometryStdDevData.cv, 1)}%
+                </span>
+              </div>
+            ) : (
+              <span className="text-xl font-black text-slate-300">Sem dados</span>
+            )
+          } 
+          icon={<ClipboardCheck className={`w-5 h-5 ${biometryStdDevData.hasData ? biometryStdDevData.ratingColor : 'text-slate-400'}`} />} 
+          color={biometryStdDevData.hasData ? biometryStdDevData.ratingColor : 'text-slate-400'} 
+          subtext={biometryStdDevData.hasData ? biometryStdDevData.rating : 'Última biometria do lote'} 
+        />
+      </div>
+
+      {/* Gráficos Evolutivos */}
+      <div className="flex flex-col gap-6">
+        <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
+          <div className="flex justify-between items-center mb-6">
+            <h3 className="text-sm font-black text-slate-400 uppercase tracking-widest flex items-center gap-2 italic"><TrendingUp className="w-4 h-4" /> Evolução de Peso (Lote)</h3>
+            <div className="flex items-center gap-3">
+              <label className="flex items-center gap-1.5 cursor-pointer group">
+                <input type="checkbox" checked={showSupplierCurve} onChange={e => setShowSupplierCurve(e.target.checked)} className="w-3 h-3 rounded border-slate-300 text-amber-600 focus:ring-amber-500" />
+                <span className="text-[9px] font-black text-slate-400 uppercase group-hover:text-amber-600 transition-colors">Curva Fornecedor</span>
+              </label>
+              <label className="flex items-center gap-1.5 cursor-pointer group">
+                <input type="checkbox" checked={showStandardCurve} onChange={e => setShowStandardCurve(e.target.checked)} className="w-3 h-3 rounded border-slate-300 text-violet-600 focus:ring-violet-500" />
+                <span className="text-[9px] font-black text-slate-400 uppercase group-hover:text-violet-600 transition-colors">Curva Padrão</span>
+              </label>
+              <label className="flex items-center gap-1.5 cursor-pointer group">
+                <input type="checkbox" checked={showContinueCurve} onChange={e => setShowContinueCurve(e.target.checked)} className="w-3 h-3 rounded border-slate-300 text-blue-600 focus:ring-blue-500" />
+                <span className="text-[9px] font-black text-slate-400 uppercase group-hover:text-blue-600 transition-colors">Projeção Lote</span>
+              </label>
+            </div>
+          </div>
+          <div className="h-[350px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={biometryEvolutionData}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{fontSize: 9, fontWeight: 700, fill: '#94a3b8'}} />
+                <YAxis axisLine={false} tickLine={false} tick={{fontSize: 9, fontWeight: 700, fill: '#94a3b8'}} />
+                <Tooltip 
+                  contentStyle={{ borderRadius: '1rem', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
+                  formatter={(value: number, name: string) => {
+                    if (name === 'weight') return [`${value} g`, 'PESO REAL'];
+                    if (name === 'continueWeight') return [`${value} g`, 'PROJEÇÃO LOTE'];
+                    if (name === 'supplierWeight') return [`${value} g`, 'CURVA FORNECEDOR'];
+                    if (name === 'standardWeight') return [`${value} g`, 'CURVA PADRÃO'];
+                    return [value, name];
+                  }}
+                />
+                <Line type="monotone" dataKey="weight" stroke="#3b82f6" strokeWidth={4} dot={{r: 4, fill: '#3b82f6', strokeWidth: 0}} activeDot={{r: 6, strokeWidth: 0}} connectNulls />
+                {showContinueCurve && (
+                  <Line 
+                    type="monotone" 
+                    dataKey="continueWeight" 
+                    stroke="#3b82f6" 
+                    strokeWidth={2} 
+                    strokeDasharray="5 5" 
+                    dot={(props: any) => {
+                      const { cx, cy, payload } = props;
+                      if (payload.isHarvestDate) {
+                        return (
+                          <g key={`harvest-dot-${payload.fullDate}`}>
+                            <circle cx={cx} cy={cy} r={6} fill="#3b82f6" stroke="white" strokeWidth={2} />
+                            <text x={cx} y={cy - 15} textAnchor="middle" fontSize={8} fontWeight={900} fill="#3b82f6" style={{ textTransform: 'uppercase' }}>
+                              Despesca Programada
+                            </text>
+                          </g>
+                        );
+                      }
+                      return null;
+                    }} 
+                    connectNulls 
+                  />
+                )}
+                {showSupplierCurve && <Line type="monotone" dataKey="supplierWeight" stroke="#f59e0b" strokeWidth={2} strokeDasharray="5 5" dot={false} connectNulls />}
+                {showStandardCurve && <Line type="monotone" dataKey="standardWeight" stroke="#8b5cf6" strokeWidth={2} strokeDasharray="5 5" dot={false} connectNulls />}
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+        <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
+          <div className="mb-6">
+            <div className="flex justify-between items-center">
+              <h3 className="text-sm font-black text-slate-400 uppercase tracking-widest flex items-center gap-2 italic"><FishOff className="w-4 h-4" /> Mortalidade Registrada</h3>
+            </div>
+            <div className="mt-1"><span className="text-[11px] font-black text-red-600 bg-red-50 px-2 py-0.5 rounded-lg">Perdas Totais: {totalMortalityInChart} un</span></div>
+          </div>
+          <div className="h-[350px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={mortalityEvolutionData}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{fontSize: 9, fontWeight: 700, fill: '#94a3b8'}} />
+                <YAxis axisLine={false} tickLine={false} tick={{fontSize: 9, fontWeight: 700, fill: '#94a3b8'}} />
+                <Tooltip cursor={{fill: 'transparent'}} />
+                <Bar dataKey="count" fill="#ef4444" radius={[4, 4, 0, 0]}>{mortalityEvolutionData.map((entry, index) => (<Cell key={`cell-${index}`} fill={entry.count > 50 ? '#b91c1c' : '#ef4444'} />))}</Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
+          <div className="flex justify-between items-center mb-6">
+            <div className="flex flex-col gap-1">
+              <h3 className="text-sm font-black text-slate-400 uppercase tracking-widest flex items-center gap-2 italic"><Scale className="w-4 h-4" /> Evolução da Biomassa Estimada (kg)</h3>
+              <div className="text-[10px] font-bold text-slate-400 uppercase">Considera despescas e mortalidade</div>
+            </div>
+            <div className="flex items-center gap-4">
+              <label className="flex items-center gap-1.5 cursor-pointer group">
+                <input type="checkbox" checked={showSupplierCurve} onChange={e => setShowSupplierCurve(e.target.checked)} className="w-3 h-3 rounded border-slate-300 text-amber-600 focus:ring-amber-500" />
+                <span className="text-[9px] font-black text-slate-400 uppercase group-hover:text-amber-600 transition-colors">Fornecedor</span>
+              </label>
+              <label className="flex items-center gap-1.5 cursor-pointer group">
+                <input type="checkbox" checked={showStandardCurve} onChange={e => setShowStandardCurve(e.target.checked)} className="w-3 h-3 rounded border-slate-300 text-violet-600 focus:ring-violet-500" />
+                <span className="text-[9px] font-black text-slate-400 uppercase group-hover:text-violet-600 transition-colors">Padrão</span>
+              </label>
+              <label className="flex items-center gap-1.5 cursor-pointer group">
+                <input type="checkbox" checked={showContinueCurve} onChange={e => setShowContinueCurve(e.target.checked)} className="w-3 h-3 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500" />
+                <span className="text-[9px] font-black text-slate-400 uppercase group-hover:text-emerald-600 transition-colors">Continue</span>
+              </label>
+            </div>
+          </div>
+          <div className="h-[350px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={biomassEvolutionData}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{fontSize: 9, fontWeight: 700, fill: '#94a3b8'}} />
+                <YAxis axisLine={false} tickLine={false} tick={{fontSize: 9, fontWeight: 700, fill: '#94a3b8'}} />
+                <Tooltip 
+                  contentStyle={{ borderRadius: '1rem', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
+                  formatter={(value: number, name: string) => {
+                    if (name === 'biomass') return [`${formatNumber(value)} kg`, 'Biomassa Real'];
+                    if (name === 'continueBiomass') return [`${formatNumber(value)} kg`, 'Projeção Lote'];
+                    if (name === 'supplierBiomass') return [`${formatNumber(value)} kg`, 'Prev. Fornecedor'];
+                    if (name === 'standardBiomass') return [`${formatNumber(value)} kg`, 'Prev. Padrão'];
+                    return [value, name];
+                  }}
+                />
+                <Line 
+                  type="monotone" 
+                  dataKey="biomass" 
+                  stroke="#10b981" 
+                  strokeWidth={4} 
+                  dot={{r: 4, fill: '#10b981', strokeWidth: 0}}
+                  activeDot={{r: 6, strokeWidth: 0}}
+                  connectNulls
+                />
+                {showContinueCurve && <Line type="monotone" dataKey="continueBiomass" stroke="#10b981" strokeWidth={2} strokeDasharray="5 5" dot={false} connectNulls />}
+                {showSupplierCurve && <Line type="monotone" dataKey="supplierBiomass" stroke="#f59e0b" strokeWidth={2} strokeDasharray="5 5" dot={false} connectNulls />}
+                {showStandardCurve && <Line type="monotone" dataKey="standardBiomass" stroke="#8b5cf6" strokeWidth={2} strokeDasharray="5 5" dot={false} connectNulls />}
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        {biometryStdDevData.hasData && (
+          <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm transition-all hover:border-emerald-100">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-6">
+              <div className="flex flex-col">
+                <h3 className="text-sm font-black text-slate-400 uppercase tracking-widest flex items-center gap-2 italic">
+                  <Scale className="w-4 h-4 text-emerald-500" /> Curva de Distribuição e Variação de Peso (Bell Curve)
+                </h3>
+                <span className="text-[10px] font-bold text-slate-400 uppercase mt-0.5">
+                  Análise da última biometria ({biometryStdDevData.lastDate ? format(parseISO(biometryStdDevData.lastDate), 'dd/MM/yyyy') : ''}) • Amostragem de {biometryStdDevData.sampleCount} gaiola(s)
+                </span>
+              </div>
+              <div className={`px-3 py-1.5 rounded-2xl ${biometryStdDevData.ratingBg} ${biometryStdDevData.ratingColor} text-[10px] font-black uppercase tracking-widest border border-current/10`}>
+                {biometryStdDevData.rating}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-stretch">
+              {/* Painel lateral informativo / Estatísticas */}
+              <div className="bg-slate-50 rounded-2xl p-5 border border-slate-100 flex flex-col justify-center gap-4">
+                <div>
+                  <div className="text-[9px] font-black text-slate-400 uppercase tracking-wider mb-0.5">Peso Médio</div>
+                  <div className="text-2xl font-black text-slate-800 italic">{formatNumber(biometryStdDevData.mean, 1)}g</div>
+                </div>
+                <div className="grid grid-cols-2 gap-4 border-t border-slate-200/60 pt-4">
+                  <div>
+                    <div className="text-[9px] font-black text-slate-400 uppercase tracking-wider mb-0.5">Desvio Padrão</div>
+                    <div className="text-lg font-black text-slate-700 italic">± {formatNumber(biometryStdDevData.stdDev, 1)}g</div>
+                  </div>
+                  <div>
+                    <div className="text-[9px] font-black text-slate-400 uppercase tracking-wider mb-0.5">Coef. Variação (CV)</div>
+                    <div className="text-lg font-black text-slate-700 italic">{formatNumber(biometryStdDevData.cv, 1)}%</div>
+                  </div>
+                </div>
+                <div className="pt-4 border-t border-slate-200/60">
+                  <p className="text-[10px] font-bold text-slate-500 leading-relaxed uppercase tracking-tight">
+                    O <strong>C.V. (Coeficiente de Variação)</strong> ideal para tilápias na fase final deve estar abaixo de <strong>10%</strong>. Valores acima de 12% indicam necessidade de ajuste no manejo alimentar, distribuição de ração ou classificação do lote para garantir um crescimento homogêneo.
+                  </p>
+                </div>
+              </div>
+
+              {/* O gráfico em si (Bell Curve / Normal Distribution) */}
+              <div className="lg:col-span-2 h-[280px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={biometryStdDevData.curveData} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id="colorProb" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#10b981" stopOpacity={0.2}/>
+                        <stop offset="95%" stopColor="#10b981" stopOpacity={0.0}/>
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                    <XAxis 
+                      dataKey="weight" 
+                      type="number"
+                      domain={['dataMin - 10', 'dataMax + 10']}
+                      axisLine={false} 
+                      tickLine={false} 
+                      tick={{fontSize: 9, fontWeight: 700, fill: '#94a3b8'}} 
+                      unit="g"
+                    />
+                    <YAxis 
+                      axisLine={false} 
+                      tickLine={false} 
+                      tick={false}
+                    />
+                    <Tooltip 
+                      contentStyle={{ borderRadius: '1rem', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
+                      labelFormatter={(value) => `Peso de Amostra: ${value}g`}
+                      formatter={(value: any) => ['Concentração de Peixes Estimada', 'Probabilidade']}
+                    />
+                    <Area 
+                      type="monotone" 
+                      dataKey="representativeProbability" 
+                      stroke="#10b981" 
+                      strokeWidth={3} 
+                      fillOpacity={1} 
+                      fill="url(#colorProb)" 
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default Dashboard;

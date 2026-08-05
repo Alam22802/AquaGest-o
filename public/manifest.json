@@ -1,0 +1,31 @@
+
+{
+  "short_name": "AquaGestão",
+  "name": "AquaGestão - Piscicultura Inteligente",
+  "icons": [
+    {
+      "src": "/icon-final-v10.svg",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-final-v10.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-final-v10.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ],
+  "start_url": "/?v=10",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "theme_color": "#344434",
+  "background_color": "#f5f5f0"
+}
