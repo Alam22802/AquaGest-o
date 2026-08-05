@@ -683,11 +683,10 @@ const BatchManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
 
       const totalFeed = feedingByBatch.get(batch.id) || 0;
 
-      // FCA: Total Feed / Total Produced Weight (Harvested + Current)
-      const fca =
-        totalProducedBiomassKg > 0
-          ? totalFeed / 1000 / totalProducedBiomassKg
-          : 0;
+      // FCA: Total Feed / Ganho de Biomassa (Biomassa Produzida Total - Peso Inicial no Povoamento)
+      const initialBatchWeightKg = ((batch.initialQuantity || 0) * (batch.initialUnitWeight || 0)) / 1000;
+      const biomassGainKg = Math.max(0, totalProducedBiomassKg - initialBatchWeightKg);
+      const fca = biomassGainKg > 0 ? (totalFeed / 1000) / biomassGainKg : 0;
 
       const protocol = (state.protocols || []).find(
         (p) => p.id === batch.protocolId,
@@ -839,8 +838,13 @@ const BatchManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       (sum, b) => sum + b.totalProducedBiomassKg,
       0
     );
+    const totalInitialBiomass = selectedBatches.reduce(
+      (sum, b) => sum + (((b.initialQuantity || 0) * (b.initialUnitWeight || 0)) / 1000),
+      0
+    );
+    const totalBiomassGain = Math.max(0, totalProducedBiomass - totalInitialBiomass);
     const overallFca =
-      totalProducedBiomass > 0 ? totalFeedConsumed / totalProducedBiomass : 0;
+      totalBiomassGain > 0 ? totalFeedConsumed / totalBiomassGain : 0;
 
     // Table Data
     const tableHead = [

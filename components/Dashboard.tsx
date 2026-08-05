@@ -727,8 +727,10 @@ const Dashboard: React.FC<Props> = ({ state }) => {
         name, amountKg: amount / 1000
       })).sort((a, b) => a.name.localeCompare(b.name));
 
+      const initialBatchWeightKg = ((batch.initialQuantity || 0) * (batch.initialUnitWeight || 0)) / 1000;
       const totalProducedWeightKg = totalBiomassKg + finalHarvestedWeight;
-      const fcaValue = totalProducedWeightKg > 0 ? formatNumber(totalFeedKg / totalProducedWeightKg, 2) : '0,00';
+      const biomassGainKg = Math.max(0, totalProducedWeightKg - initialBatchWeightKg);
+      const fcaValue = biomassGainKg > 0 ? formatNumber(totalFeedKg / biomassGainKg, 2) : '0,00';
 
       return { 
         id: batch.id, name: batch.name, isClosed: batch.isClosed, stock: currentTotalStock, harvested: totalHarvested,
@@ -779,7 +781,12 @@ const Dashboard: React.FC<Props> = ({ state }) => {
     });
 
     const totalProducedWeightKg = stats.biomass + stats.harvestedWeight;
-    const fcaValue = totalProducedWeightKg > 0 ? formatNumber(stats.feed / totalProducedWeightKg, 2) : '0,00';
+    const initialBiomassTotal = batchesToProcess.reduce((acc, bStat) => {
+      const originalBatch = (state.batches || []).find(b => b.id === bStat.id);
+      return acc + (originalBatch ? ((originalBatch.initialQuantity || 0) * (originalBatch.initialUnitWeight || 0)) / 1000 : 0);
+    }, 0);
+    const totalBiomassGainKg = Math.max(0, totalProducedWeightKg - initialBiomassTotal);
+    const fcaValue = totalBiomassGainKg > 0 ? formatNumber(stats.feed / totalBiomassGainKg, 2) : '0,00';
     const avgWeight = stats.stock > 0 ? (stats.biomass * 1000) / stats.stock : 0;
 
     return {
@@ -1881,7 +1888,7 @@ const Dashboard: React.FC<Props> = ({ state }) => {
               </div>
             </div>
           } icon={<Utensils className="w-5 h-5" />} color="text-amber-600" />
-        <MiniStat label="FCA (Conversão)" value={<span className="text-xl font-black">{selectedBatchData.fca}</span>} icon={<TrendingUp className="w-5 h-5" />} color="text-indigo-600" subtext="Baseado na biomassa atual" />
+        <MiniStat label="FCA (Conversão)" value={<span className="text-xl font-black">{selectedBatchData.fca}</span>} icon={<TrendingUp className="w-5 h-5" />} color="text-indigo-600" subtext="Ração / Ganho de Biomassa" />
         <MiniStat 
           label="Desvio de Peso (DP)" 
           value={

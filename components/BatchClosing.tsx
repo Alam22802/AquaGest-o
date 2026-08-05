@@ -439,17 +439,21 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       ? (expectedFish / batch.initialQuantity) * 100 
       : 0;
 
+    // Initial Biomass at Settlement (peso do lote de entrada no povoamento em kg)
+    const initialBatchWeightKg = ((batch.initialQuantity || 0) * (batch.initialUnitWeight || 0)) / 1000;
+
     // Biomass Before Harvest: (Avg Weight * Expected Fish) / 1000
     const expectedWeight = expectedFish * (avgWeightBeforeHarvest / 1000);
     biomassBeforeHarvest = expectedWeight;
 
-    // FCA Previsto: Total Feed / Predicted Biomass
-    const fcaTheoretical = expectedWeight > 0 ? (feeding / 1000) / expectedWeight : 0;
+    // FCA Previsto: Total Feed / (Biomassa Prevista - Peso Inicial do Povoamento)
+    const weightGainTheoretical = Math.max(0, expectedWeight - initialBatchWeightKg);
+    const fcaTheoretical = weightGainTheoretical > 0 ? (feeding / 1000) / weightGainTheoretical : 0;
 
-    // FCA Real: Total Feed / Frigorific Reception Weight (fallback to Harvested Weight)
-    const fcaReal = totalReceptionWeight > 0 
-      ? (feeding / 1000) / totalReceptionWeight 
-      : (harvestedWeight > 0 ? (feeding / 1000) / harvestedWeight : 0);
+    // FCA Real: Total Feed / (Peso Final Recebido/Despescado - Peso Inicial do Povoamento)
+    const finalWeight = totalReceptionWeight > 0 ? totalReceptionWeight : harvestedWeight;
+    const weightGainReal = Math.max(0, finalWeight - initialBatchWeightKg);
+    const fcaReal = weightGainReal > 0 ? (feeding / 1000) / weightGainReal : 0;
 
     // GPD: (Final Avg Weight - Initial Weight) / Total Days
     const finalAvgWeight = harvestedFish > 0 ? (harvestedWeight / harvestedFish) * 1000 : currentAvgWeight;
