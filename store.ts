@@ -286,13 +286,14 @@ export const ensureStateIntegrity = (state: any, mergeWith?: AppState, priority:
   const combinedDeletedIdsArray = Array.from(new Set(
     repairedDeletedIdsArr.filter(id => typeof id === 'string' && id.trim() !== '')
   ));
+  const trimmedDeletedIds = combinedDeletedIdsArray.length > 2000 ? combinedDeletedIdsArray.slice(-2000) : combinedDeletedIdsArray;
 
-  const deletedSet = new Set(combinedDeletedIdsArray);
+  const deletedSet = new Set(trimmedDeletedIds);
 
   const base: AppState = {
     ...initialState,
     ...state,
-    deletedIds: combinedDeletedIdsArray,
+    deletedIds: trimmedDeletedIds,
     slaughterExpenseCategories: repairArray(state?.slaughterExpenseCategories || initialState.slaughterExpenseCategories),
     slaughterHREntryTypes: repairArray(state?.slaughterHREntryTypes || initialState.slaughterHREntryTypes),
     slaughterHRDepartments: repairArray(state?.slaughterHRDepartments || initialState.slaughterHRDepartments),

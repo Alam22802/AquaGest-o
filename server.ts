@@ -1,10 +1,12 @@
 import express from "express";
 import path from "path";
 import fs from "fs";
+import compression from "compression";
 import { GoogleGenAI, Type } from "@google/genai";
 
 export const app = express();
 
+app.use(compression());
 app.use(express.json({ limit: "50mb" }));
 
 // Central Farm State Persistence & Synchronization
@@ -95,7 +97,9 @@ let serverFarmState: any = null;
       ...(s2.deletedIds || [])
     ])).filter(id => typeof id === 'string' && id.trim() !== '');
 
-    const deletedSet = new Set(rawDeletedIds);
+    // Keep only the last 2000 deleted IDs to prevent infinite array growth
+    const trimmedDeletedIds = rawDeletedIds.length > 2000 ? rawDeletedIds.slice(-2000) : rawDeletedIds;
+    const deletedSet = new Set(trimmedDeletedIds);
 
     const arrayKeys = [
       'lines', 'batches', 'cages', 'feedTypes', 'feedingLogs',
@@ -114,7 +118,7 @@ let serverFarmState: any = null;
     const merged: any = {
       ...s1,
       ...s2,
-      deletedIds: rawDeletedIds,
+      deletedIds: trimmedDeletedIds,
       users: mergeServerUsers(s1.users, s2.users, deletedSet),
       lastSync: new Date().toISOString()
     };
@@ -143,7 +147,11 @@ let serverFarmState: any = null;
         serverFarmState = mergeFarmStates(serverFarmState, clientState);
       }
 
-      fs.writeFileSync(FARM_STATE_FILE, JSON.stringify(serverFarmState, null, 2), "utf-8");
+      // Non-blocking async save using compact JSON format
+      fs.promises.writeFile(FARM_STATE_FILE, JSON.stringify(serverFarmState), "utf-8").catch(e => {
+        console.warn("Async save to farm_state.json failed:", e);
+      });
+
       return res.json({ state: serverFarmState });
     } catch (err) {
       console.error("Error saving farm state:", err);
