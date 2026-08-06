@@ -47,19 +47,26 @@
         });
 
         window.addEventListener('load', () => {
+          // Skip SW registration in embedded preview iframes to avoid cross-origin partition errors
+          if (window.self !== window.top) return;
+
           navigator.serviceWorker.register('/sw.js').then((reg) => {
-            reg.update();
+            if (reg && reg.update) {
+              reg.update().catch(() => {});
+            }
             setInterval(() => {
-              reg.update();
-            }, 60 * 60 * 1000); // Check every hour
-          }).catch(err => console.log('SW registration failed:', err));
+              if (reg && reg.update) {
+                reg.update().catch(() => {});
+              }
+            }, 60 * 60 * 1000);
+          }).catch(err => console.log('SW registration notice:', err));
         });
 
         document.addEventListener('visibilitychange', () => {
-          if (document.visibilityState === 'visible') {
+          if (document.visibilityState === 'visible' && window.self === window.top) {
             navigator.serviceWorker.getRegistration().then((reg) => {
-              if (reg) reg.update();
-            });
+              if (reg && reg.update) reg.update().catch(() => {});
+            }).catch(() => {});
           }
         });
       }

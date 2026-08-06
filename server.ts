@@ -9,6 +9,17 @@ export const app = express();
 app.use(compression());
 app.use(express.json({ limit: "50mb" }));
 
+// Serve service worker with no-cache headers
+app.get("/sw.js", (req, res) => {
+  const swPath = path.join(process.cwd(), "public", "sw.js");
+  if (fs.existsSync(swPath)) {
+    res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+    res.setHeader("Content-Type", "application/javascript");
+    return res.sendFile(swPath);
+  }
+  return res.status(404).send("// Service worker not found");
+});
+
 // Central Farm State Persistence & Synchronization
 const FARM_STATE_FILE = path.join(process.cwd(), "farm_state.json");
 let serverFarmState: any = null;
