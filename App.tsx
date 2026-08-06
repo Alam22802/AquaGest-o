@@ -354,7 +354,7 @@ const App: React.FC = () => {
 
     const interval = setInterval(() => {
       handleSyncTrigger();
-    }, 3000); 
+    }, 60000); 
 
     return () => {
       window.removeEventListener('focus', handleSyncTrigger);
