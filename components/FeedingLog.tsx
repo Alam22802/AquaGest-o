@@ -26,6 +26,7 @@ const FeedingLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
   const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedBatchId, setSelectedBatchId] = useState('');
+  const [selectedFilterCageId, setSelectedFilterCageId] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [selectedLogIds, setSelectedLogIds] = useState<Set<string>>(new Set());
@@ -94,14 +95,33 @@ const FeedingLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     return { cageMap: cages, feedMap: feeds, userMap: users };
   }, [state.cages, state.feedTypes, state.users]);
 
+  const availableFilterCages = useMemo(() => {
+    const allCages = state.cages || [];
+    if (!selectedBatchId) {
+      return [...allCages].sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+    }
+    
+    const batchCageIds = new Set(allCages.filter(c => c.batchId === selectedBatchId).map(c => c.id));
+    (state.feedingLogs || []).forEach(log => {
+      if (log.batchId === selectedBatchId && log.cageId) {
+        batchCageIds.add(log.cageId);
+      }
+    });
+
+    return allCages
+      .filter(c => batchCageIds.has(c.id))
+      .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+  }, [state.cages, state.feedingLogs, selectedBatchId]);
+
   const sortedLogs = useMemo(() => {
     const logs = Array.isArray(state.feedingLogs) ? state.feedingLogs : [];
     let filtered = logs;
     
-    if (selectedBatchId || startDate || endDate) {
+    if (selectedBatchId || selectedFilterCageId || startDate || endDate) {
       const sortedHarvestLogs = [...(state.harvestLogs || [])].sort((a, b) => a.date.localeCompare(b.date));
       
       filtered = logs.filter(log => {
+        if (selectedFilterCageId && log.cageId !== selectedFilterCageId) return false;
         if (selectedBatchId) {
           let bId = log.batchId;
           const fDate = (log.timestamp || '').split('T')[0];
@@ -145,7 +165,7 @@ const FeedingLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
         ? b.timestamp.localeCompare(a.timestamp) 
         : a.timestamp.localeCompare(b.timestamp);
     });
-  }, [state.feedingLogs, sortOrder, selectedBatchId, startDate, endDate, cageMap, state.harvestLogs, state.batches]);
+  }, [state.feedingLogs, sortOrder, selectedBatchId, selectedFilterCageId, startDate, endDate, cageMap, state.harvestLogs, state.batches]);
 
   const paginatedLogs = useMemo(() => {
     const startIndex = (currentPage - 1) * itemsPerPage;
@@ -519,6 +539,7 @@ const FeedingLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
               value={selectedBatchId}
               onChange={e => {
                 setSelectedBatchId(e.target.value);
+                setSelectedFilterCageId('');
                 setCurrentPage(1);
                 setSelectedLogIds(new Set());
               }}
@@ -526,6 +547,22 @@ const FeedingLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
               <option value="">Todos os Lotes</option>
               {(state.batches || []).sort((a, b) => a.name.localeCompare(b.name)).map(b => (
                 <option key={b.id} value={b.id}>{b.name}</option>
+              ))}
+            </select>
+            <select 
+              className="text-[10px] font-black uppercase text-slate-500 bg-slate-100 px-3 py-1.5 rounded-lg outline-none border-none"
+              value={selectedFilterCageId}
+              onChange={e => {
+                setSelectedFilterCageId(e.target.value);
+                setCurrentPage(1);
+                setSelectedLogIds(new Set());
+              }}
+            >
+              <option value="">Todas as Gaiolas</option>
+              {availableFilterCages.map(c => (
+                <option key={c.id} value={c.id}>
+                  {c.name} {c.model ? `(${c.model})` : ''}
+                </option>
               ))}
             </select>
             <div className="flex items-center gap-1 bg-slate-100 px-2 py-1 rounded-lg">
