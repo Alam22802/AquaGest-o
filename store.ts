@@ -129,10 +129,6 @@ function mergeArraysById<T extends { id: string, updatedAt?: number | string }>(
         const primary = priority === 'local' ? existing : item;
         const secondary = priority === 'local' ? item : existing;
         const merged: any = { ...secondary, ...primary };
-        if ((existing as any).isClosed || (item as any).isClosed) {
-          merged.isClosed = true;
-          merged.closedAt = (existing as any).closedAt || (item as any).closedAt;
-        }
         map.set(item.id, merged);
       }
     }

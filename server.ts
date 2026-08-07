@@ -57,10 +57,6 @@ let serverFarmState: any = null;
             map.set(item.id, { ...item, ...existing, updatedAt: t1 });
           } else {
             const mergedItem = { ...existing, ...item };
-            if (existing.isClosed || item.isClosed) {
-              mergedItem.isClosed = true;
-              mergedItem.closedAt = existing.closedAt || item.closedAt;
-            }
             map.set(item.id, mergedItem);
           }
         }
