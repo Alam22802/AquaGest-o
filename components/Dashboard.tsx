@@ -742,9 +742,8 @@ const Dashboard: React.FC<Props> = ({ state }) => {
   }, [state.batches, state.cages, state.mortalityLogs, state.biometryLogs, state.feedingLogs, state.feedTypes, state.harvestLogs, state.slaughterLogs, state.batchRevenues]);
 
   const filteredBatchStats = useMemo(() => {
-    const settled = batchStats.filter(b => b.settlementBalance === 0);
-    const activeSettled = settled.filter(b => !b.isClosed);
-    return activeSettled.length > 0 ? activeSettled : settled;
+    const activeBatches = batchStats.filter(b => !b.isClosed);
+    return activeBatches.length > 0 ? activeBatches : batchStats;
   }, [batchStats]);
 
   const selectedBatchData = useMemo(() => {
@@ -1815,17 +1814,27 @@ const Dashboard: React.FC<Props> = ({ state }) => {
                     </div>
                   </div>
                   <div className="space-y-2">
-                    {filteredBatchStats.map(batch => (
-                      <label key={batch.id} className="flex items-center gap-3 p-2 hover:bg-slate-50 rounded-xl cursor-pointer transition-colors">
-                        <input 
-                          type="checkbox" 
-                          checked={selectedBatchIds.includes(batch.id)}
-                          onChange={() => toggleBatch(batch.id)}
-                          className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-                        />
-                        <span className="text-xs font-bold text-slate-700 uppercase">{batch.name}</span>
-                      </label>
-                    ))}
+                    {filteredBatchStats.map(batch => {
+                      const isHarvested = batch.stock === 0 && batch.harvested > 0;
+                      return (
+                        <label key={batch.id} className="flex items-center justify-between p-2 hover:bg-slate-50 rounded-xl cursor-pointer transition-colors">
+                          <div className="flex items-center gap-3">
+                            <input 
+                              type="checkbox" 
+                              checked={selectedBatchIds.includes(batch.id)}
+                              onChange={() => toggleBatch(batch.id)}
+                              className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                            />
+                            <span className="text-xs font-bold text-slate-700 uppercase">{batch.name}</span>
+                          </div>
+                          {isHarvested && (
+                            <span className="text-[9px] font-black uppercase text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">
+                              Despescado
+                            </span>
+                          )}
+                        </label>
+                      );
+                    })}
                     {filteredBatchStats.length === 0 && (
                       <div className="text-center py-4 text-[10px] font-bold text-slate-400 uppercase">Nenhum lote encontrado</div>
                     )}

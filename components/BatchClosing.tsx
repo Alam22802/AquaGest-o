@@ -679,7 +679,7 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     if (!confirm('Deseja realmente FECHAR este lote? Esta ação é definitiva para fins de auditoria.')) return;
 
     const updatedBatches = (state.batches || []).map(b => 
-      b.id === selectedBatchId ? { ...b, isClosed: true, closedAt: new Date().toISOString() } : b
+      b.id === selectedBatchId ? { ...b, isClosed: true, closedAt: new Date().toISOString(), updatedAt: Date.now() } : b
     );
 
     const updatedCages = (state.cages || []).map(c => 

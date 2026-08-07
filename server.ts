@@ -51,8 +51,17 @@ let serverFarmState: any = null;
         } else {
           const t1 = Number(existing.updatedAt || 0);
           const t2 = Number(item.updatedAt || 0);
-          if (t2 >= t1) {
-            map.set(item.id, { ...existing, ...item, updatedAt: Math.max(t1, t2) });
+          if (t2 > t1) {
+            map.set(item.id, { ...existing, ...item, updatedAt: t2 });
+          } else if (t1 > t2) {
+            map.set(item.id, { ...item, ...existing, updatedAt: t1 });
+          } else {
+            const mergedItem = { ...existing, ...item };
+            if (existing.isClosed || item.isClosed) {
+              mergedItem.isClosed = true;
+              mergedItem.closedAt = existing.closedAt || item.closedAt;
+            }
+            map.set(item.id, mergedItem);
           }
         }
       }

@@ -121,11 +121,19 @@ function mergeArraysById<T extends { id: string, updatedAt?: number | string }>(
       const itemTime = getTime(item);
       const existingTime = getTime(existing);
       
-      // Symmetrical Last-Write-Wins: item with newer timestamp wins
       if (itemTime > existingTime) {
         map.set(item.id, { ...existing, ...item });
-      } else if (itemTime === existingTime) {
+      } else if (existingTime > itemTime) {
         map.set(item.id, { ...item, ...existing });
+      } else {
+        const primary = priority === 'local' ? existing : item;
+        const secondary = priority === 'local' ? item : existing;
+        const merged: any = { ...secondary, ...primary };
+        if ((existing as any).isClosed || (item as any).isClosed) {
+          merged.isClosed = true;
+          merged.closedAt = (existing as any).closedAt || (item as any).closedAt;
+        }
+        map.set(item.id, merged);
       }
     }
   }
