@@ -60,33 +60,49 @@ const FeedingLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
   }, [selectedLineId]);
 
   const filteredLines = useMemo(() => {
-    if (!formBatchId) return [];
+    if (!formBatchId) return state.lines || [];
+    const cagesInBatch = (state.cages || []).filter(c => c.batchId === formBatchId);
     const harvestedCageIds = new Set(
-      (state.harvestLogs || [])
-        .filter(h => h.batchId === formBatchId)
-        .map(h => h.cageId)
+      (state.harvestLogs || []).filter(h => h.batchId === formBatchId).map(h => h.cageId)
     );
-    const lineIdsInBatch = new Set(
-      (state.cages || [])
-        .filter(c => c.batchId === formBatchId && c.status === 'Ocupada' && !harvestedCageIds.has(c.id))
-        .map(c => c.lineId)
+    const feedingCageIds = new Set(
+      (state.feedingLogs || []).filter(f => f.batchId === formBatchId).map(f => f.cageId)
     );
-    return (state.lines || []).filter(l => lineIdsInBatch.has(l.id));
-  }, [formBatchId, state.cages, state.lines, state.harvestLogs]);
+
+    const lineIdsInBatch = new Set<string>();
+    cagesInBatch.forEach(c => { if (c.lineId) lineIdsInBatch.add(c.lineId); });
+    (state.cages || []).forEach(c => {
+      if (harvestedCageIds.has(c.id) || feedingCageIds.has(c.id)) {
+        if (c.lineId) lineIdsInBatch.add(c.lineId);
+      }
+    });
+
+    const matchedLines = (state.lines || []).filter(l => lineIdsInBatch.has(l.id));
+    return matchedLines.length > 0 ? matchedLines : (state.lines || []);
+  }, [formBatchId, state.cages, state.lines, state.harvestLogs, state.feedingLogs]);
 
   const filteredCages = useMemo(() => {
-    if (!formBatchId || !selectedLineId) return [];
+    if (!formBatchId) return [];
     const harvestedCageIds = new Set(
-      (state.harvestLogs || [])
-        .filter(h => h.batchId === formBatchId)
-        .map(h => h.cageId)
+      (state.harvestLogs || []).filter(h => h.batchId === formBatchId).map(h => h.cageId)
     );
-    return (state.cages || []).filter(c => 
-      c.batchId === formBatchId && 
-      c.lineId === selectedLineId && 
-      (c.id === formData.cageId || (c.status === 'Ocupada' && !harvestedCageIds.has(c.id)))
+    const feedingCageIds = new Set(
+      (state.feedingLogs || []).filter(f => f.batchId === formBatchId).map(f => f.cageId)
     );
-  }, [formBatchId, selectedLineId, state.cages, state.harvestLogs, formData.cageId]);
+
+    let cages = (state.cages || []).filter(c => 
+      c.batchId === formBatchId || 
+      harvestedCageIds.has(c.id) || 
+      feedingCageIds.has(c.id) || 
+      c.id === formData.cageId
+    );
+
+    if (selectedLineId) {
+      cages = cages.filter(c => c.lineId === selectedLineId);
+    }
+
+    return cages.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+  }, [formBatchId, selectedLineId, state.cages, state.harvestLogs, state.feedingLogs, formData.cageId]);
 
   const { cageMap, feedMap, userMap } = useMemo(() => {
     const cages = new Map((state.cages || []).map(c => [c.id, c]));
@@ -124,31 +140,15 @@ const FeedingLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
         if (selectedFilterCageId && log.cageId !== selectedFilterCageId) return false;
         if (selectedBatchId) {
           let bId = log.batchId;
-          const fDate = (log.timestamp || '').split('T')[0];
-
-          if (bId) {
-            const batch = (state.batches || []).find(b => b.id === bId);
-            if (batch && batch.settlementDate && fDate < batch.settlementDate) {
-              bId = undefined;
-            }
-          }
 
           if (!bId && log.cageId) {
             const cage = cageMap.get(log.cageId);
             if (cage?.batchId) {
-              const batch = (state.batches || []).find(b => b.id === cage.batchId);
-              const cageSettlement = cage.settlementDate || batch?.settlementDate;
-              if (cageSettlement && fDate >= cageSettlement) {
-                bId = cage.batchId;
-              }
-            }
-            if (!bId) {
-              const harvest = sortedHarvestLogs.find(h => h.cageId === log.cageId && h.date >= fDate);
+              bId = cage.batchId;
+            } else {
+              const harvest = sortedHarvestLogs.find(h => h.cageId === log.cageId && h.date >= (log.timestamp || '').split('T')[0]);
               if (harvest) {
-                const hBatch = (state.batches || []).find(b => b.id === harvest.batchId);
-                if (!hBatch?.settlementDate || fDate >= hBatch.settlementDate) {
-                  bId = harvest.batchId;
-                }
+                bId = harvest.batchId;
               }
             }
           }
@@ -165,7 +165,7 @@ const FeedingLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
         ? b.timestamp.localeCompare(a.timestamp) 
         : a.timestamp.localeCompare(b.timestamp);
     });
-  }, [state.feedingLogs, sortOrder, selectedBatchId, selectedFilterCageId, startDate, endDate, cageMap, state.harvestLogs, state.batches]);
+  }, [state.feedingLogs, sortOrder, selectedBatchId, selectedFilterCageId, startDate, endDate, cageMap, state.harvestLogs]);
 
   const paginatedLogs = useMemo(() => {
     const startIndex = (currentPage - 1) * itemsPerPage;
@@ -248,8 +248,6 @@ const FeedingLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     if (!selectedFeed) return;
 
     if (editingId) {
-      const oldLog = (state.feedingLogs || []).find(l => l.id === editingId);
-      const cage = cageMap.get(formData.cageId);
       const updatedLogs = (state.feedingLogs || []).map(l => 
         l.id === editingId ? {
           ...l,
@@ -262,20 +260,8 @@ const FeedingLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
         } : l
       );
 
-      const updatedFeeds = (state.feedTypes || []).map(f => {
-        let newStock = f.totalStock;
-        // Refund old amount if this was the old feed type
-        if (oldLog && f.id === oldLog.feedTypeId) {
-          newStock += oldLog.amount;
-        }
-        // Deduct new amount if this is the new feed type
-        if (f.id === formData.feedTypeId) {
-          newStock -= amountNum;
-        }
-        return { ...f, totalStock: newStock, updatedAt: Date.now() };
-      });
-
-      onUpdate({ ...state, feedingLogs: updatedLogs, feedTypes: updatedFeeds });
+      // Ajustes de trato atualizam o lote/cálculos, mas NÃO afetam o saldo do estoque de ração
+      onUpdate({ ...state, feedingLogs: updatedLogs });
       setEditingId(null);
     } else {
       const cagesToProcess = isBulkMode ? Array.from(selectedCageIds) : [formData.cageId];
@@ -320,32 +306,16 @@ const FeedingLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     
     let bId = log.batchId;
     const cage = cageMap.get(log.cageId);
-    const fDate = (log.timestamp || '').split('T')[0];
 
-    if (bId) {
-      const batch = (state.batches || []).find(b => b.id === bId);
-      if (batch && batch.settlementDate && fDate < batch.settlementDate) {
-        bId = undefined;
-      }
-    }
-    
     if (!bId && cage) {
-      const sortedHarvestLogs = [...(state.harvestLogs || [])].sort((a, b) => a.date.localeCompare(b.date));
-      const harvest = sortedHarvestLogs.find(h => h.cageId === log.cageId && h.date >= fDate);
-      if (harvest) {
-        bId = harvest.batchId;
-      } else if (cage.batchId) {
-        const batch = (state.batches || []).find(b => b.id === cage.batchId);
-        const cageSettlement = cage.settlementDate || batch?.settlementDate;
-        if (cageSettlement && fDate >= cageSettlement) {
-          bId = cage.batchId;
-        }
-      }
+      bId = cage.batchId;
     }
     
     setFormBatchId(bId || '');
-    if (cage) {
-      setSelectedLineId(cage.lineId || '');
+    if (cage && cage.lineId) {
+      setSelectedLineId(cage.lineId);
+    } else {
+      setSelectedLineId('');
     }
     
     const [d, t] = log.timestamp.split('T');
@@ -397,8 +367,8 @@ const FeedingLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                 <option value="">Escolher Lote...</option>
                 {(state.batches || []).sort((a, b) => a.name.localeCompare(b.name)).map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
               </select>
-              <select required disabled={!formBatchId} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none" value={selectedLineId} onChange={e => setSelectedLineId(e.target.value)}>
-                <option value="">Escolher Linha...</option>
+              <select disabled={!formBatchId} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none" value={selectedLineId} onChange={e => setSelectedLineId(e.target.value)}>
+                <option value="">Escolher Linha (Opcional)...</option>
                 {filteredLines.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
               </select>
 
@@ -449,7 +419,7 @@ const FeedingLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                   <div className="max-h-48 overflow-y-auto border border-slate-200 rounded-2xl p-3 bg-slate-50 space-y-1.5">
                     {filteredCages.length === 0 ? (
                       <p className="text-[11px] font-bold text-slate-400 uppercase text-center py-4 italic">
-                        {!selectedLineId ? 'Escolha uma linha primeiro...' : 'Nenhuma gaiola encontrada.'}
+                        {!formBatchId ? 'Escolha um lote primeiro...' : 'Nenhuma gaiola encontrada.'}
                       </p>
                     ) : (
                       filteredCages.map(c => {
@@ -480,7 +450,7 @@ const FeedingLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                   </div>
                 </div>
               ) : (
-                <select required disabled={!selectedLineId} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none" value={formData.cageId} onChange={e => setFormData({...formData, cageId: e.target.value})}>
+                <select required disabled={!formBatchId} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none" value={formData.cageId} onChange={e => setFormData({...formData, cageId: e.target.value})}>
                   <option value="">Escolher Gaiola...</option>
                   {filteredCages.map(c => (
                     <option key={c.id} value={c.id}>
