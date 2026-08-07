@@ -2,8 +2,10 @@
 import React, { useState, useMemo } from 'react';
 import { AppState, Cage, User, CageStatus } from '../types';
 import { formatNumber } from '../utils/formatters';
-import { Plus, Trash2, Box, Edit, X, Ruler, Users, Info, Layers, Filter, CheckCircle2, Settings, Eraser, LayoutDashboard, Eye, Target, BarChart3 } from 'lucide-react';
+import { Plus, Trash2, Box, Edit, X, Ruler, Users, Info, Layers, Filter, CheckCircle2, Settings, Eraser, LayoutDashboard, Eye, Target, BarChart3, FileText } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, ReferenceLine, Legend } from 'recharts';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 interface Props {
   state: AppState;
@@ -338,6 +340,150 @@ const CageInventory: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       }));
   }, [state.cages]);
 
+  const handleGeneratePDF = () => {
+    const cagesToExport = selectedIds.length > 0 
+      ? (state.cages || []).filter(c => selectedIds.includes(c.id))
+      : filteredCages;
+
+    if (!cagesToExport || cagesToExport.length === 0) {
+      alert("Nenhuma gaiola encontrada para gerar o relatório PDF.");
+      return;
+    }
+
+    const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+
+    // Premium Header
+    doc.setFillColor(30, 27, 75); // Dark Indigo
+    doc.rect(0, 0, 210, 28, "F");
+
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(13);
+    doc.setFont("helvetica", "bold");
+    doc.text("AQUAGESTÃO - CADASTRO E INVENTÁRIO DE GAIOLAS", 14, 12);
+
+    doc.setFontSize(9);
+    doc.setFont("helvetica", "normal");
+    const subTitle = selectedIds.length > 0 
+      ? `RELATÓRIO DE GAIOLAS SELECIONADAS (${selectedIds.length} UNIDADES)` 
+      : `RELATÓRIO GERAL - FILTRO: ${filterStatus.toUpperCase()}`;
+    doc.text(subTitle, 14, 18);
+    doc.text(`Emissão: ${new Date().toLocaleDateString("pt-BR")} às ${new Date().toLocaleTimeString("pt-BR")}`, 14, 23);
+
+    // Summary Card Box
+    const totalQty = cagesToExport.length;
+    const totalVol = cagesToExport.reduce((acc, c) => {
+      const d = c.dimensions || { length: 0, width: 0, depth: 0 };
+      return acc + (d.length * d.width * d.depth);
+    }, 0);
+    const totalCap = cagesToExport.reduce((acc, c) => acc + (c.stockingCapacity || 0), 0);
+
+    doc.setFillColor(248, 250, 252);
+    doc.setDrawColor(226, 232, 240);
+    doc.roundedRect(14, 32, 182, 16, 2, 2, "FD");
+
+    doc.setTextColor(30, 41, 59);
+    doc.setFontSize(9);
+    doc.setFont("helvetica", "bold");
+    doc.text(`Total de Gaiolas: ${formatNumber(totalQty, 0)} un`, 18, 39);
+    doc.text(`Volume Total: ${formatNumber(totalVol, 2)} m³`, 80, 39);
+    doc.text(`Capacidade Total: ${formatNumber(totalCap, 0)} un`, 145, 39);
+
+    doc.setFontSize(8);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(100, 116, 139);
+    doc.text(`Filtro Status: ${filterStatus} | Média Vol/Gaiola: ${totalQty > 0 ? formatNumber(totalVol / totalQty, 2) : 0} m³`, 18, 44);
+
+    // Prepare table data
+    const tableData = cagesToExport.map((cage, index) => {
+      const d = cage.dimensions || { length: 0, width: 0, depth: 0 };
+      const vol = d.length * d.width * d.depth;
+      const batch = (state.batches || []).find((b) => b.id === cage.batchId);
+      const batchName = batch ? batch.name : "Livre / Sem Lote";
+      
+      const modelDesc = cage.model ? `${cage.model}` : `${d.length}x${d.width}x${d.depth}m`;
+
+      return [
+        (index + 1).toString(),
+        cage.name,
+        modelDesc,
+        `${d.length} x ${d.width} x ${d.depth} m`,
+        `${formatNumber(vol, 2)} m³`,
+        `${formatNumber(cage.stockingCapacity, 0)} un`,
+        cage.status,
+        batchName
+      ];
+    });
+
+    autoTable(doc, {
+      startY: 52,
+      head: [["#", "Identificação", "Modelo", "Medidas (CxLxP)", "Volume", "Capacidade", "Status", "Lote Vinculado"]],
+      body: tableData,
+      theme: "grid",
+      headStyles: {
+        fillColor: [49, 46, 129], // Indigo 900
+        textColor: [255, 255, 255],
+        fontStyle: "bold",
+        fontSize: 8,
+        halign: "center"
+      },
+      bodyStyles: {
+        fontSize: 8,
+        textColor: [30, 41, 59]
+      },
+      columnStyles: {
+        0: { halign: "center", cellWidth: 10 },
+        1: { fontStyle: "bold", halign: "left" }, // Identificação
+        2: { halign: "center" }, // Modelo
+        3: { halign: "center" }, // Medidas
+        4: { halign: "right" }, // Volume
+        5: { halign: "right" }, // Capacidade
+        6: { halign: "center", fontStyle: "bold" }, // Status
+        7: { halign: "left" } // Lote
+      },
+      didParseCell: (data) => {
+        if (data.section === 'body' && data.column.index === 6) {
+          const val = data.cell.raw;
+          if (val === 'Ocupada') {
+            data.cell.styles.textColor = [29, 78, 216]; // Blue 700
+          } else if (val === 'Disponível') {
+            data.cell.styles.textColor = [4, 120, 87]; // Emerald 700
+          } else if (val === 'Manutenção') {
+            data.cell.styles.textColor = [185, 28, 28]; // Red 700
+          } else if (val === 'Limpeza') {
+            data.cell.styles.textColor = [180, 83, 9]; // Amber 700
+          }
+        }
+      },
+      foot: [[
+        "",
+        "TOTAL",
+        "-",
+        "-",
+        `${formatNumber(totalVol, 2)} m³`,
+        `${formatNumber(totalCap, 0)} un`,
+        "-",
+        "-"
+      ]],
+      footStyles: {
+        fillColor: [241, 245, 249],
+        textColor: [15, 23, 42],
+        fontStyle: "bold",
+        fontSize: 8,
+        halign: "right"
+      }
+    });
+
+    const pageCount = (doc as any).internal.getNumberOfPages();
+    for (let i = 1; i <= pageCount; i++) {
+      doc.setPage(i);
+      doc.setFontSize(8);
+      doc.setTextColor(148, 163, 184);
+      doc.text(`Página ${i} de ${pageCount} - Sistema Aquagestão`, 105, 290, { align: "center" });
+    }
+
+    doc.save(`cadastro_gaiolas_${new Date().toISOString().slice(0, 10)}.pdf`);
+  };
+
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start pb-20">
       <div className="lg:col-span-1 lg:sticky lg:top-8">
@@ -436,28 +582,39 @@ const CageInventory: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       </div>
 
       <div className="lg:col-span-2 space-y-6">
-        {/* Filtros de Status */}
-        <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 flex flex-wrap items-center gap-2">
-          <div className="flex items-center gap-2 mr-2">
-            <Filter className="w-4 h-4 text-slate-400" />
-            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Filtrar Status:</span>
-          </div>
-          <button 
-            onClick={() => setFilterStatus('Todos')}
-            className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${filterStatus === 'Todos' ? 'bg-slate-900 text-white shadow-md' : 'bg-slate-50 text-slate-400 hover:bg-slate-100'}`}
-          >
-            Todos
-          </button>
-          {(['Disponível', 'Ocupada', 'Manutenção', 'Limpeza', 'Avaliação', 'Sucata'] as CageStatus[]).map(status => (
+        {/* Filtros de Status e Gerar PDF */}
+        <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex items-center gap-2 mr-2">
+              <Filter className="w-4 h-4 text-slate-400" />
+              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Filtrar Status:</span>
+            </div>
             <button 
-              key={status}
-              onClick={() => setFilterStatus(status)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border ${filterStatus === status ? getStatusColor(status) + ' shadow-md' : 'bg-white text-slate-400 border-slate-100 hover:border-slate-200'}`}
+              onClick={() => setFilterStatus('Todos')}
+              className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${filterStatus === 'Todos' ? 'bg-slate-900 text-white shadow-md' : 'bg-slate-50 text-slate-400 hover:bg-slate-100'}`}
             >
-              {getStatusIcon(status)}
-              {status}
+              Todos
             </button>
-          ))}
+            {(['Disponível', 'Ocupada', 'Manutenção', 'Limpeza', 'Avaliação', 'Sucata'] as CageStatus[]).map(status => (
+              <button 
+                key={status}
+                onClick={() => setFilterStatus(status)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border ${filterStatus === status ? getStatusColor(status) + ' shadow-md' : 'bg-white text-slate-400 border-slate-100 hover:border-slate-200'}`}
+              >
+                {getStatusIcon(status)}
+                {status}
+              </button>
+            ))}
+          </div>
+
+          <button
+            onClick={handleGeneratePDF}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-600 text-white font-black text-[10px] uppercase tracking-widest shadow-md hover:bg-indigo-700 active:scale-95 transition-all ml-auto"
+            title="Gerar PDF das gaiolas com modelo, identificação e status"
+          >
+            <FileText className="w-4 h-4" />
+            Gerar PDF {selectedIds.length > 0 ? `(${selectedIds.length})` : `(${filteredCages.length})`}
+          </button>
         </div>
 
         {filterSummary && (
@@ -603,8 +760,8 @@ const CageInventory: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
           </div>
         )}
 
-        {(state.cages || []).length > 0 && hasPermission && (
-          <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 flex items-center justify-between sticky top-4 z-20">
+        {(state.cages || []).length > 0 && (
+          <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 flex flex-wrap items-center justify-between gap-3 sticky top-4 z-20">
             <div className="flex items-center gap-4">
               <button 
                 onClick={toggleSelectAll}
@@ -618,16 +775,26 @@ const CageInventory: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                 </span>
               )}
             </div>
-            {selectedIds.length > 0 && (
-              <div className="flex items-center gap-2">
+
+            <div className="flex items-center gap-2">
+              <button 
+                onClick={handleGeneratePDF}
+                className="flex items-center gap-2 px-3.5 py-1.5 rounded-lg bg-indigo-600 text-white text-[10px] font-black uppercase tracking-widest hover:bg-indigo-700 shadow-sm active:scale-95 transition-all"
+                title="Gerar PDF das gaiolas com modelo, identificação e status"
+              >
+                <FileText className="w-3.5 h-3.5" />
+                Gerar PDF {selectedIds.length > 0 ? `(${selectedIds.length})` : `(${filteredCages.length})`}
+              </button>
+
+              {selectedIds.length > 0 && hasPermission && (
                 <button 
                   onClick={removeSelected}
                   className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-red-50 text-red-600 border border-red-100 text-[10px] font-black uppercase tracking-widest hover:bg-red-100 transition-all"
                 >
                   <Trash2 className="w-3 h-3" /> Excluir
                 </button>
-              </div>
-            )}
+              )}
+            </div>
           </div>
         )}
 
@@ -635,7 +802,7 @@ const CageInventory: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
           {filteredCages.map(cage => (
             <div 
               key={cage.id} 
-              onClick={() => hasPermission && toggleSelect(cage.id)}
+              onClick={() => toggleSelect(cage.id)}
               className={`bg-white rounded-3xl shadow-sm border overflow-hidden transition-all group cursor-pointer relative ${selectedIds.includes(cage.id) ? 'ring-2 ring-indigo-500 border-transparent shadow-indigo-100' : cage.status === 'Ocupada' ? 'border-blue-100 bg-blue-50/10' : 'border-slate-200 hover:border-indigo-200'}`}
             >
               <div className="p-4 bg-slate-50/50 border-b border-slate-100 flex justify-between items-center">
