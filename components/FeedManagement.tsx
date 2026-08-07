@@ -1290,6 +1290,30 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     saveIndicationRowsToLocals(newRows);
   };
 
+  const handleResetToBiometry = (rowId: string) => {
+    const newRows = indicationRows.map(row => {
+      if (row.id === rowId) {
+        const avgWeight = resolveBatchBiometryWeight(row.batchId);
+        const tableId = row.tableId || (state.feedingTables || [])[0]?.id || '';
+        let weekStr = row.currentWeek;
+        if (tableId) {
+          const closestWeek = findClosestWeek(avgWeight, tableId);
+          if (closestWeek !== null) {
+            weekStr = closestWeek.toString();
+          }
+        }
+        return {
+          ...row,
+          currentWeek: weekStr,
+          manuallyOverridden: false
+        };
+      }
+      return row;
+    });
+    setIndicationRows(newRows);
+    saveIndicationRowsToLocals(newRows);
+  };
+
   const getIndicationRowCalculations = (row: IndicationRow) => {
     const batch = (state.batches || []).find(b => b.id === row.batchId);
     const table = (state.feedingTables || []).find(t => t.id === row.tableId);
@@ -1301,7 +1325,11 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
         feedTypeId: '', 
         feedPercentPV: 0,
         batchLiveFish: 0,
-        batchAvgWeight: 0
+        batchAvgWeight: 0,
+        biometryAvgWeight: 0,
+        expectedWeekWeight: 0,
+        effectiveAvgWeight: 0,
+        isManualWeek: false
       };
     }
 
@@ -1315,15 +1343,21 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     const tableWeekRow = allTableRows.find(item => item.week === week);
     const feedPercentPV = tableWeekRow?.feedPercentagePV || 0;
     const feedTypeId = tableWeekRow?.feedTypeId || '';
+    const expectedWeekWeight = tableWeekRow?.averageWeight || 0;
 
     const batchLiveFish = batch.initialQuantity;
-    const batchAvgWeight = resolveBatchBiometryWeight(row.batchId);
+    const biometryAvgWeight = resolveBatchBiometryWeight(row.batchId);
+
+    const isManualWeek = !!row.manuallyOverridden;
+    const effectiveAvgWeight = isManualWeek && expectedWeekWeight > 0
+      ? expectedWeekWeight
+      : (biometryAvgWeight > 0 ? biometryAvgWeight : (expectedWeekWeight > 0 ? expectedWeekWeight : (batch.initialUnitWeight || 0)));
 
     // Resolve cages belonging to this batch
     const batchCages = (state.cages || []).filter(c => c.batchId === row.batchId && c.status === 'Ocupada');
 
     const cagesData = batchCages.map(cage => {
-      const cageWeight = batchAvgWeight; // Use the batch's latest biometry average weight consistently for all structures
+      const cageWeight = effectiveAvgWeight;
       const initialCount = cage.initialFishCount || 0;
       const dailyFeed = (initialCount * cageWeight / 1000) * (feedPercentPV / 100);
 
@@ -1335,8 +1369,7 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       };
     });
 
-    // Always calculate total daily feed at the batch level based on stocking/povoamento quantity and batch latest average weight
-    const totalDailyFeed = (batch.initialQuantity * batchAvgWeight / 1000) * (feedPercentPV / 100);
+    const totalDailyFeed = (batch.initialQuantity * effectiveAvgWeight / 1000) * (feedPercentPV / 100);
 
     return {
       cagesData,
@@ -1344,7 +1377,11 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       feedTypeId,
       feedPercentPV,
       batchLiveFish,
-      batchAvgWeight
+      batchAvgWeight: effectiveAvgWeight,
+      biometryAvgWeight,
+      expectedWeekWeight,
+      effectiveAvgWeight,
+      isManualWeek
     };
   };
 
@@ -2881,8 +2918,8 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                         <th className="py-3 px-2">Lote</th>
                         <th className="py-3 px-2">Tabela Referência</th>
                         <th className="py-3 px-2 text-center">Qtd Povoada</th>
-                        <th className="py-3 px-2 text-center">Peso Médio (Biometria)</th>
-                        <th className="py-3 px-2 text-center w-32">Semana Indicada</th>
+                        <th className="py-3 px-2 text-center">Peso Médio Utilizado</th>
+                        <th className="py-3 px-2 text-center w-36">Semana Indicada</th>
                         <th className="py-3 px-2 text-center w-32">Tratos/Dia</th>
                         <th className="py-3 px-2 text-right">Trato Diário Total</th>
                         <th className="py-3 px-2 w-12 text-center"></th>
@@ -2892,12 +2929,12 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                       {indicationRows.map((row) => {
                         const calcs = getIndicationRowCalculations(row);
                         const table = (state.feedingTables || []).find(t => t.id === row.tableId);
-                        const allTableWeeks = table ? [
+                        const allTableRows = table ? [
                           ...table.recriaInicial,
                           ...table.recriaFinal,
                           ...table.crescimento,
                           ...table.terminacao
-                        ].map(r => r.week) : [];
+                        ] : [];
 
                         return (
                           <React.Fragment key={row.id}>
@@ -2956,20 +2993,51 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                                 <div className="text-[9px] text-[#e4e4d4]/50 uppercase font-bold">Povoamento</div>
                               </td>
                               <td className="py-4 px-2 text-center">
-                                <div className="text-xs font-black text-white">
-                                  {row.batchId ? `${formatNumber(calcs.batchAvgWeight, 1)}g` : '---'}
-                                </div>
-                                <div className="text-[9px] text-[#e4e4d4]/50 uppercase font-bold">Biometria Recente</div>
+                                {row.batchId ? (
+                                  <div>
+                                    <div className={`text-xs font-black ${calcs.isManualWeek ? 'text-amber-400' : 'text-white'}`}>
+                                      {formatNumber(calcs.effectiveAvgWeight, 1)}g
+                                    </div>
+                                    <div className={`text-[9px] uppercase font-bold ${calcs.isManualWeek ? 'text-amber-300/80' : 'text-emerald-400'}`}>
+                                      {calcs.isManualWeek ? `Esperado Sem. ${row.currentWeek}` : 'Biometria Recente'}
+                                    </div>
+                                    {calcs.isManualWeek ? (
+                                      <div className="mt-1 flex flex-col items-center">
+                                        <span className="text-[9px] text-slate-400 font-medium">
+                                          Biometria: {formatNumber(calcs.biometryAvgWeight, 1)}g
+                                        </span>
+                                        <button
+                                          type="button"
+                                          onClick={() => handleResetToBiometry(row.id)}
+                                          className="mt-0.5 text-[9px] text-emerald-400 hover:text-emerald-300 font-bold underline flex items-center justify-center gap-1"
+                                          title="Voltar a usar a biometria atual do lote"
+                                        >
+                                          <RotateCcw className="w-2.5 h-2.5" /> Usar Biometria
+                                        </button>
+                                      </div>
+                                    ) : (
+                                      calcs.expectedWeekWeight > 0 && (
+                                        <div className="text-[9px] text-[#e4e4d4]/50 font-medium mt-0.5">
+                                          Esperado Sem. {row.currentWeek}: {formatNumber(calcs.expectedWeekWeight, 1)}g
+                                        </div>
+                                      )
+                                    )}
+                                  </div>
+                                ) : '---'}
                               </td>
                               <td className="py-4 px-2 text-center">
-                                {allTableWeeks.length > 0 ? (
+                                {allTableRows.length > 0 ? (
                                   <select
-                                    className="w-full px-2 py-2 bg-black/35 border border-white/10 rounded-xl font-bold text-xs outline-none text-white text-center cursor-pointer"
+                                    className={`w-full px-2 py-2 bg-black/35 border rounded-xl font-bold text-xs outline-none text-white text-center cursor-pointer ${
+                                      calcs.isManualWeek ? 'border-amber-500/50 text-amber-300' : 'border-white/10'
+                                    }`}
                                     value={row.currentWeek}
                                     onChange={(e) => handleIndicationRowFieldChange(row.id, 'currentWeek', e.target.value)}
                                   >
-                                    {allTableWeeks.map(wk => (
-                                      <option key={wk} value={wk}>Semana {wk}</option>
+                                    {allTableRows.map(r => (
+                                      <option key={r.week} value={r.week} className="bg-slate-800 text-white">
+                                        Semana {r.week} ({formatNumber(r.averageWeight, 1)}g)
+                                      </option>
                                     ))}
                                   </select>
                                 ) : (
