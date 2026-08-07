@@ -773,7 +773,7 @@ const BatchManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
   }, [state.batches]);
 
   const filteredBatchStats = useMemo(() => {
-    const activeBatches = batchStats.filter(b => !b.isClosed);
+    const activeBatches = batchStats.filter(b => !b.isClosed && b.settlementBalance === 0);
     if (!filterMonth) return activeBatches;
 
     return activeBatches.filter((batch) => {

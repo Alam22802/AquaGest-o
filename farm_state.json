@@ -7,10 +7,10 @@
       "phone": "00000000000",
       "canEdit": true,
       "isMaster": true,
-      "lastSync": "2026-08-07T11:01:47.392Z",
+      "lastSync": "2026-08-07T11:10:41.635Z",
       "password": "Costafoods@2026",
       "username": "admin",
-      "updatedAt": 1786100507392,
+      "updatedAt": 1786101041635,
       "isApproved": true,
       "receiveNotifications": true
     },
@@ -1001,7 +1001,7 @@
           "invoiceNumber": "050408982"
         }
       ],
-      "updatedAt": 1786100295942,
+      "updatedAt": 1786101262279,
       "protocolId": "02555387-bd30-4618-b77b-acd02c991a57",
       "invoiceValue": 106392,
       "supplierCnpj": "35222378896",
@@ -1010,9 +1010,7 @@
       "initialQuantity": 66000,
       "initialUnitWeight": 28,
       "expectedHarvestDate": "2026-07-19",
-      "isSettlementComplete": true,
-      "isClosed": true,
-      "closedAt": "2026-08-07T10:58:15.941Z"
+      "isSettlementComplete": true
     },
     {
       "id": "e4d7cd18-d1ed-4581-a0a9-b06947cf26e0",
@@ -1270,7 +1268,7 @@
       "lineId": "fe692538-074f-4ec6-a07e-2cbecca7edad",
       "status": "Ocupada",
       "batchId": "718bbf55-aefa-427f-8d4c-79866bfc5df1",
-      "updatedAt": 1786100734083,
+      "updatedAt": 1786100955395,
       "dimensions": {
         "length": 2,
         "width": 2,
@@ -1289,7 +1287,7 @@
       "lineId": "fe692538-074f-4ec6-a07e-2cbecca7edad",
       "status": "Ocupada",
       "batchId": "718bbf55-aefa-427f-8d4c-79866bfc5df1",
-      "updatedAt": 1786100734083,
+      "updatedAt": 1786100955395,
       "dimensions": {
         "length": 2,
         "width": 2,
@@ -1308,7 +1306,7 @@
       "lineId": "fe692538-074f-4ec6-a07e-2cbecca7edad",
       "status": "Ocupada",
       "batchId": "718bbf55-aefa-427f-8d4c-79866bfc5df1",
-      "updatedAt": 1786100734083,
+      "updatedAt": 1786100955395,
       "dimensions": {
         "length": 2,
         "width": 2,
@@ -1327,7 +1325,7 @@
       "lineId": "fe692538-074f-4ec6-a07e-2cbecca7edad",
       "status": "Ocupada",
       "batchId": "718bbf55-aefa-427f-8d4c-79866bfc5df1",
-      "updatedAt": 1786100734083,
+      "updatedAt": 1786100955395,
       "dimensions": {
         "length": 2,
         "width": 2,
@@ -1346,7 +1344,7 @@
       "lineId": "fe692538-074f-4ec6-a07e-2cbecca7edad",
       "status": "Ocupada",
       "batchId": "718bbf55-aefa-427f-8d4c-79866bfc5df1",
-      "updatedAt": 1786100734083,
+      "updatedAt": 1786100955395,
       "dimensions": {
         "length": 2,
         "width": 2,
@@ -1365,7 +1363,7 @@
       "lineId": "fe692538-074f-4ec6-a07e-2cbecca7edad",
       "status": "Ocupada",
       "batchId": "718bbf55-aefa-427f-8d4c-79866bfc5df1",
-      "updatedAt": 1786100734083,
+      "updatedAt": 1786100955395,
       "dimensions": {
         "length": 2,
         "width": 2,
@@ -1384,7 +1382,7 @@
       "lineId": "fe692538-074f-4ec6-a07e-2cbecca7edad",
       "status": "Ocupada",
       "batchId": "718bbf55-aefa-427f-8d4c-79866bfc5df1",
-      "updatedAt": 1786100734083,
+      "updatedAt": 1786100955395,
       "dimensions": {
         "length": 2,
         "width": 2,
@@ -1403,7 +1401,7 @@
       "lineId": "fe692538-074f-4ec6-a07e-2cbecca7edad",
       "status": "Ocupada",
       "batchId": "718bbf55-aefa-427f-8d4c-79866bfc5df1",
-      "updatedAt": 1786100734083,
+      "updatedAt": 1786100955395,
       "dimensions": {
         "length": 2,
         "width": 2,
@@ -1422,7 +1420,7 @@
       "lineId": "fe692538-074f-4ec6-a07e-2cbecca7edad",
       "status": "Ocupada",
       "batchId": "718bbf55-aefa-427f-8d4c-79866bfc5df1",
-      "updatedAt": 1786100734083,
+      "updatedAt": 1786100955395,
       "dimensions": {
         "length": 2,
         "width": 2,
@@ -1441,7 +1439,7 @@
       "lineId": "fe692538-074f-4ec6-a07e-2cbecca7edad",
       "status": "Ocupada",
       "batchId": "718bbf55-aefa-427f-8d4c-79866bfc5df1",
-      "updatedAt": 1786100734083,
+      "updatedAt": 1786100955395,
       "dimensions": {
         "length": 2,
         "width": 2,
@@ -1460,7 +1458,7 @@
       "lineId": "fe692538-074f-4ec6-a07e-2cbecca7edad",
       "status": "Ocupada",
       "batchId": "718bbf55-aefa-427f-8d4c-79866bfc5df1",
-      "updatedAt": 1786100734083,
+      "updatedAt": 1786100955395,
       "dimensions": {
         "length": 2,
         "width": 2,
@@ -1479,7 +1477,7 @@
       "lineId": "fe692538-074f-4ec6-a07e-2cbecca7edad",
       "status": "Ocupada",
       "batchId": "718bbf55-aefa-427f-8d4c-79866bfc5df1",
-      "updatedAt": 1786100734083,
+      "updatedAt": 1786100955395,
       "dimensions": {
         "length": 2,
         "width": 2,
@@ -1498,7 +1496,7 @@
       "lineId": "fe692538-074f-4ec6-a07e-2cbecca7edad",
       "status": "Ocupada",
       "batchId": "718bbf55-aefa-427f-8d4c-79866bfc5df1",
-      "updatedAt": 1786100734083,
+      "updatedAt": 1786100955395,
       "dimensions": {
         "length": 2,
         "width": 2,
@@ -1517,7 +1515,7 @@
       "lineId": "fe692538-074f-4ec6-a07e-2cbecca7edad",
       "status": "Ocupada",
       "batchId": "718bbf55-aefa-427f-8d4c-79866bfc5df1",
-      "updatedAt": 1786100734083,
+      "updatedAt": 1786100955395,
       "dimensions": {
         "length": 2,
         "width": 2,
@@ -1536,7 +1534,7 @@
       "lineId": "fe692538-074f-4ec6-a07e-2cbecca7edad",
       "status": "Ocupada",
       "batchId": "718bbf55-aefa-427f-8d4c-79866bfc5df1",
-      "updatedAt": 1786100734083,
+      "updatedAt": 1786100955395,
       "dimensions": {
         "length": 2,
         "width": 2,
@@ -1555,7 +1553,7 @@
       "lineId": "fe692538-074f-4ec6-a07e-2cbecca7edad",
       "status": "Ocupada",
       "batchId": "718bbf55-aefa-427f-8d4c-79866bfc5df1",
-      "updatedAt": 1786100734083,
+      "updatedAt": 1786100955395,
       "dimensions": {
         "length": 2,
         "width": 2,
@@ -1574,7 +1572,7 @@
       "lineId": "fe692538-074f-4ec6-a07e-2cbecca7edad",
       "status": "Ocupada",
       "batchId": "718bbf55-aefa-427f-8d4c-79866bfc5df1",
-      "updatedAt": 1786100734083,
+      "updatedAt": 1786100955395,
       "dimensions": {
         "length": 2,
         "width": 2,
@@ -1593,7 +1591,7 @@
       "lineId": "fe692538-074f-4ec6-a07e-2cbecca7edad",
       "status": "Ocupada",
       "batchId": "718bbf55-aefa-427f-8d4c-79866bfc5df1",
-      "updatedAt": 1786100734083,
+      "updatedAt": 1786100955395,
       "dimensions": {
         "length": 2,
         "width": 2,
@@ -1612,7 +1610,7 @@
       "lineId": "fe692538-074f-4ec6-a07e-2cbecca7edad",
       "status": "Ocupada",
       "batchId": "718bbf55-aefa-427f-8d4c-79866bfc5df1",
-      "updatedAt": 1786100734083,
+      "updatedAt": 1786100955395,
       "dimensions": {
         "length": 2,
         "width": 2,
@@ -1631,7 +1629,7 @@
       "lineId": "fe692538-074f-4ec6-a07e-2cbecca7edad",
       "status": "Ocupada",
       "batchId": "718bbf55-aefa-427f-8d4c-79866bfc5df1",
-      "updatedAt": 1786100734083,
+      "updatedAt": 1786100955395,
       "dimensions": {
         "length": 2,
         "width": 2,
@@ -1650,7 +1648,7 @@
       "lineId": "2f165eea-0b61-4240-a30d-926222cd015f",
       "status": "Ocupada",
       "batchId": "9570c5b6-c8ca-4176-be27-38977734037d",
-      "updatedAt": 1786100734083,
+      "updatedAt": 1786100955395,
       "dimensions": {
         "length": 2,
         "width": 2,
@@ -1669,7 +1667,7 @@
       "lineId": "2f165eea-0b61-4240-a30d-926222cd015f",
       "status": "Ocupada",
       "batchId": "9570c5b6-c8ca-4176-be27-38977734037d",
-      "updatedAt": 1786100734083,
+      "updatedAt": 1786100955395,
       "dimensions": {
         "length": 2,
         "width": 2,
@@ -1688,7 +1686,7 @@
       "lineId": "2f165eea-0b61-4240-a30d-926222cd015f",
       "status": "Ocupada",
       "batchId": "9570c5b6-c8ca-4176-be27-38977734037d",
-      "updatedAt": 1786100734083,
+      "updatedAt": 1786100955395,
       "dimensions": {
         "length": 2,
         "width": 2,
@@ -1707,7 +1705,7 @@
       "lineId": "c8c5abe8-c72f-4fad-aaed-a9f220ea3e3c",
       "status": "Ocupada",
       "batchId": "9570c5b6-c8ca-4176-be27-38977734037d",
-      "updatedAt": 1786100734083,
+      "updatedAt": 1786100955395,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -1726,7 +1724,7 @@
       "lineId": "c8c5abe8-c72f-4fad-aaed-a9f220ea3e3c",
       "status": "Ocupada",
       "batchId": "9570c5b6-c8ca-4176-be27-38977734037d",
-      "updatedAt": 1786100734083,
+      "updatedAt": 1786100955395,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -1745,7 +1743,7 @@
       "lineId": "c8c5abe8-c72f-4fad-aaed-a9f220ea3e3c",
       "status": "Ocupada",
       "batchId": "9570c5b6-c8ca-4176-be27-38977734037d",
-      "updatedAt": 1786100734083,
+      "updatedAt": 1786100955395,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -1764,7 +1762,7 @@
       "lineId": "24a4d04d-34bd-40b6-8c48-c149bb5c921e",
       "status": "Ocupada",
       "batchId": "0815e94f-97c7-4609-ab02-f7fe5a882e1e",
-      "updatedAt": 1786100734083,
+      "updatedAt": 1786100955395,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -1783,7 +1781,7 @@
       "lineId": "24a4d04d-34bd-40b6-8c48-c149bb5c921e",
       "status": "Ocupada",
       "batchId": "0815e94f-97c7-4609-ab02-f7fe5a882e1e",
-      "updatedAt": 1786100734083,
+      "updatedAt": 1786100955395,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -1802,7 +1800,7 @@
       "lineId": "24a4d04d-34bd-40b6-8c48-c149bb5c921e",
       "status": "Ocupada",
       "batchId": "0815e94f-97c7-4609-ab02-f7fe5a882e1e",
-      "updatedAt": 1786100734083,
+      "updatedAt": 1786100955395,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -1821,7 +1819,7 @@
       "lineId": "24a4d04d-34bd-40b6-8c48-c149bb5c921e",
       "status": "Ocupada",
       "batchId": "0815e94f-97c7-4609-ab02-f7fe5a882e1e",
-      "updatedAt": 1786100734083,
+      "updatedAt": 1786100955395,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -1840,7 +1838,7 @@
       "lineId": "24a4d04d-34bd-40b6-8c48-c149bb5c921e",
       "status": "Ocupada",
       "batchId": "0815e94f-97c7-4609-ab02-f7fe5a882e1e",
-      "updatedAt": 1786100734083,
+      "updatedAt": 1786100955395,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -1859,7 +1857,7 @@
       "lineId": "24a4d04d-34bd-40b6-8c48-c149bb5c921e",
       "status": "Ocupada",
       "batchId": "0815e94f-97c7-4609-ab02-f7fe5a882e1e",
-      "updatedAt": 1786100734083,
+      "updatedAt": 1786100955395,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -1878,7 +1876,7 @@
       "lineId": "24a4d04d-34bd-40b6-8c48-c149bb5c921e",
       "status": "Ocupada",
       "batchId": "0815e94f-97c7-4609-ab02-f7fe5a882e1e",
-      "updatedAt": 1786100734083,
+      "updatedAt": 1786100955395,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -1897,7 +1895,7 @@
       "lineId": "24a4d04d-34bd-40b6-8c48-c149bb5c921e",
       "status": "Ocupada",
       "batchId": "0815e94f-97c7-4609-ab02-f7fe5a882e1e",
-      "updatedAt": 1786100734083,
+      "updatedAt": 1786100955395,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -1916,7 +1914,7 @@
       "lineId": "24a4d04d-34bd-40b6-8c48-c149bb5c921e",
       "status": "Ocupada",
       "batchId": "0815e94f-97c7-4609-ab02-f7fe5a882e1e",
-      "updatedAt": 1786100734083,
+      "updatedAt": 1786100955395,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -1935,7 +1933,7 @@
       "lineId": "24a4d04d-34bd-40b6-8c48-c149bb5c921e",
       "status": "Ocupada",
       "batchId": "0815e94f-97c7-4609-ab02-f7fe5a882e1e",
-      "updatedAt": 1786100734083,
+      "updatedAt": 1786100955395,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -1954,7 +1952,7 @@
       "lineId": "24a4d04d-34bd-40b6-8c48-c149bb5c921e",
       "status": "Ocupada",
       "batchId": "0815e94f-97c7-4609-ab02-f7fe5a882e1e",
-      "updatedAt": 1786100734083,
+      "updatedAt": 1786100955395,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -1973,7 +1971,7 @@
       "lineId": "24a4d04d-34bd-40b6-8c48-c149bb5c921e",
       "status": "Ocupada",
       "batchId": "0815e94f-97c7-4609-ab02-f7fe5a882e1e",
-      "updatedAt": 1786100734083,
+      "updatedAt": 1786100955395,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -1992,7 +1990,7 @@
       "lineId": "24a4d04d-34bd-40b6-8c48-c149bb5c921e",
       "status": "Ocupada",
       "batchId": "0815e94f-97c7-4609-ab02-f7fe5a882e1e",
-      "updatedAt": 1786100734083,
+      "updatedAt": 1786100955395,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -2011,7 +2009,7 @@
       "lineId": "24a4d04d-34bd-40b6-8c48-c149bb5c921e",
       "status": "Ocupada",
       "batchId": "0815e94f-97c7-4609-ab02-f7fe5a882e1e",
-      "updatedAt": 1786100734083,
+      "updatedAt": 1786100955395,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -2030,7 +2028,7 @@
       "lineId": "24a4d04d-34bd-40b6-8c48-c149bb5c921e",
       "status": "Ocupada",
       "batchId": "0815e94f-97c7-4609-ab02-f7fe5a882e1e",
-      "updatedAt": 1786100734083,
+      "updatedAt": 1786100955395,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -2049,7 +2047,7 @@
       "lineId": "24a4d04d-34bd-40b6-8c48-c149bb5c921e",
       "status": "Ocupada",
       "batchId": "0815e94f-97c7-4609-ab02-f7fe5a882e1e",
-      "updatedAt": 1786100734083,
+      "updatedAt": 1786100955395,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -2068,7 +2066,7 @@
       "lineId": "20955303-44d1-41f1-999f-de8fa8466bcd",
       "status": "Ocupada",
       "batchId": "0815e94f-97c7-4609-ab02-f7fe5a882e1e",
-      "updatedAt": 1786100734083,
+      "updatedAt": 1786100955395,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -2087,7 +2085,7 @@
       "lineId": "20955303-44d1-41f1-999f-de8fa8466bcd",
       "status": "Ocupada",
       "batchId": "0815e94f-97c7-4609-ab02-f7fe5a882e1e",
-      "updatedAt": 1786100734083,
+      "updatedAt": 1786100955395,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -2106,7 +2104,7 @@
       "lineId": "20955303-44d1-41f1-999f-de8fa8466bcd",
       "status": "Ocupada",
       "batchId": "0815e94f-97c7-4609-ab02-f7fe5a882e1e",
-      "updatedAt": 1786100734083,
+      "updatedAt": 1786100955395,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -2125,7 +2123,7 @@
       "lineId": "20955303-44d1-41f1-999f-de8fa8466bcd",
       "status": "Ocupada",
       "batchId": "0815e94f-97c7-4609-ab02-f7fe5a882e1e",
-      "updatedAt": 1786100734083,
+      "updatedAt": 1786100955395,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -2144,7 +2142,7 @@
       "lineId": "20955303-44d1-41f1-999f-de8fa8466bcd",
       "status": "Ocupada",
       "batchId": "a4a18692-3a4e-4dfe-afb5-4629cd42c824",
-      "updatedAt": 1786100734083,
+      "updatedAt": 1786100955395,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -2163,7 +2161,7 @@
       "lineId": "20955303-44d1-41f1-999f-de8fa8466bcd",
       "status": "Ocupada",
       "batchId": "a4a18692-3a4e-4dfe-afb5-4629cd42c824",
-      "updatedAt": 1786100734083,
+      "updatedAt": 1786100955395,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -2182,7 +2180,7 @@
       "lineId": "20955303-44d1-41f1-999f-de8fa8466bcd",
       "status": "Ocupada",
       "batchId": "a4a18692-3a4e-4dfe-afb5-4629cd42c824",
-      "updatedAt": 1786100734083,
+      "updatedAt": 1786100955395,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -2201,7 +2199,7 @@
       "lineId": "20955303-44d1-41f1-999f-de8fa8466bcd",
       "status": "Ocupada",
       "batchId": "a4a18692-3a4e-4dfe-afb5-4629cd42c824",
-      "updatedAt": 1786100734083,
+      "updatedAt": 1786100955395,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -2220,7 +2218,7 @@
       "lineId": "20955303-44d1-41f1-999f-de8fa8466bcd",
       "status": "Ocupada",
       "batchId": "a4a18692-3a4e-4dfe-afb5-4629cd42c824",
-      "updatedAt": 1786100734083,
+      "updatedAt": 1786100955395,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -2239,7 +2237,7 @@
       "lineId": "24a4d04d-34bd-40b6-8c48-c149bb5c921e",
       "status": "Ocupada",
       "batchId": "718bbf55-aefa-427f-8d4c-79866bfc5df1",
-      "updatedAt": 1786100734083,
+      "updatedAt": 1786100955395,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -2258,7 +2256,7 @@
       "lineId": "24a4d04d-34bd-40b6-8c48-c149bb5c921e",
       "status": "Ocupada",
       "batchId": "718bbf55-aefa-427f-8d4c-79866bfc5df1",
-      "updatedAt": 1786100734083,
+      "updatedAt": 1786100955395,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -2277,7 +2275,7 @@
       "lineId": "24a4d04d-34bd-40b6-8c48-c149bb5c921e",
       "status": "Ocupada",
       "batchId": "718bbf55-aefa-427f-8d4c-79866bfc5df1",
-      "updatedAt": 1786100734083,
+      "updatedAt": 1786100955395,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -2296,7 +2294,7 @@
       "lineId": "24a4d04d-34bd-40b6-8c48-c149bb5c921e",
       "status": "Ocupada",
       "batchId": "718bbf55-aefa-427f-8d4c-79866bfc5df1",
-      "updatedAt": 1786100734083,
+      "updatedAt": 1786100955395,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -2315,7 +2313,7 @@
       "lineId": "24a4d04d-34bd-40b6-8c48-c149bb5c921e",
       "status": "Ocupada",
       "batchId": "718bbf55-aefa-427f-8d4c-79866bfc5df1",
-      "updatedAt": 1786100734083,
+      "updatedAt": 1786100955395,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -2334,7 +2332,7 @@
       "lineId": "20955303-44d1-41f1-999f-de8fa8466bcd",
       "status": "Ocupada",
       "batchId": "718bbf55-aefa-427f-8d4c-79866bfc5df1",
-      "updatedAt": 1786100734083,
+      "updatedAt": 1786100955395,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -2353,7 +2351,7 @@
       "lineId": "20955303-44d1-41f1-999f-de8fa8466bcd",
       "status": "Ocupada",
       "batchId": "718bbf55-aefa-427f-8d4c-79866bfc5df1",
-      "updatedAt": 1786100734083,
+      "updatedAt": 1786100955395,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -2372,7 +2370,7 @@
       "lineId": "20955303-44d1-41f1-999f-de8fa8466bcd",
       "status": "Ocupada",
       "batchId": "718bbf55-aefa-427f-8d4c-79866bfc5df1",
-      "updatedAt": 1786100734083,
+      "updatedAt": 1786100955395,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -2391,7 +2389,7 @@
       "lineId": "20955303-44d1-41f1-999f-de8fa8466bcd",
       "status": "Ocupada",
       "batchId": "718bbf55-aefa-427f-8d4c-79866bfc5df1",
-      "updatedAt": 1786100734083,
+      "updatedAt": 1786100955395,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -2410,7 +2408,7 @@
       "lineId": "20955303-44d1-41f1-999f-de8fa8466bcd",
       "status": "Ocupada",
       "batchId": "718bbf55-aefa-427f-8d4c-79866bfc5df1",
-      "updatedAt": 1786100734083,
+      "updatedAt": 1786100955395,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -2429,7 +2427,7 @@
       "lineId": "20955303-44d1-41f1-999f-de8fa8466bcd",
       "status": "Ocupada",
       "batchId": "718bbf55-aefa-427f-8d4c-79866bfc5df1",
-      "updatedAt": 1786100734083,
+      "updatedAt": 1786100955395,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -2448,7 +2446,7 @@
       "lineId": "20955303-44d1-41f1-999f-de8fa8466bcd",
       "status": "Ocupada",
       "batchId": "718bbf55-aefa-427f-8d4c-79866bfc5df1",
-      "updatedAt": 1786100734083,
+      "updatedAt": 1786100955395,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -2467,7 +2465,7 @@
       "lineId": "20955303-44d1-41f1-999f-de8fa8466bcd",
       "status": "Ocupada",
       "batchId": "718bbf55-aefa-427f-8d4c-79866bfc5df1",
-      "updatedAt": 1786100734083,
+      "updatedAt": 1786100955395,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -2486,7 +2484,7 @@
       "lineId": "20955303-44d1-41f1-999f-de8fa8466bcd",
       "status": "Ocupada",
       "batchId": "718bbf55-aefa-427f-8d4c-79866bfc5df1",
-      "updatedAt": 1786100734083,
+      "updatedAt": 1786100955395,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -2505,7 +2503,7 @@
       "lineId": "20955303-44d1-41f1-999f-de8fa8466bcd",
       "status": "Ocupada",
       "batchId": "718bbf55-aefa-427f-8d4c-79866bfc5df1",
-      "updatedAt": 1786100734083,
+      "updatedAt": 1786100955395,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -2524,7 +2522,7 @@
       "lineId": "904b6c43-02c6-432a-9247-21428d39dc72",
       "status": "Limpeza",
       "batchId": "9ce0396e-06cf-416d-b795-ae69fc473fae",
-      "updatedAt": 1786100734084,
+      "updatedAt": 1786100955396,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -2543,7 +2541,7 @@
       "lineId": "904b6c43-02c6-432a-9247-21428d39dc72",
       "status": "Limpeza",
       "batchId": "9ce0396e-06cf-416d-b795-ae69fc473fae",
-      "updatedAt": 1786100734084,
+      "updatedAt": 1786100955397,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -2564,7 +2562,7 @@
       "lineId": "904b6c43-02c6-432a-9247-21428d39dc72",
       "status": "Limpeza",
       "batchId": "9ce0396e-06cf-416d-b795-ae69fc473fae",
-      "updatedAt": 1786100734084,
+      "updatedAt": 1786100955397,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -2583,7 +2581,7 @@
       "lineId": "904b6c43-02c6-432a-9247-21428d39dc72",
       "status": "Limpeza",
       "batchId": "9ce0396e-06cf-416d-b795-ae69fc473fae",
-      "updatedAt": 1786100734085,
+      "updatedAt": 1786100955397,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -2602,7 +2600,7 @@
       "lineId": "904b6c43-02c6-432a-9247-21428d39dc72",
       "status": "Limpeza",
       "batchId": "9ce0396e-06cf-416d-b795-ae69fc473fae",
-      "updatedAt": 1786100734085,
+      "updatedAt": 1786100955398,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -2621,7 +2619,7 @@
       "lineId": "904b6c43-02c6-432a-9247-21428d39dc72",
       "status": "Limpeza",
       "batchId": "9ce0396e-06cf-416d-b795-ae69fc473fae",
-      "updatedAt": 1786100734085,
+      "updatedAt": 1786100955398,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -2640,7 +2638,7 @@
       "lineId": "904b6c43-02c6-432a-9247-21428d39dc72",
       "status": "Limpeza",
       "batchId": "9ce0396e-06cf-416d-b795-ae69fc473fae",
-      "updatedAt": 1786100734085,
+      "updatedAt": 1786100955398,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -2659,7 +2657,7 @@
       "lineId": "904b6c43-02c6-432a-9247-21428d39dc72",
       "status": "Limpeza",
       "batchId": "9ce0396e-06cf-416d-b795-ae69fc473fae",
-      "updatedAt": 1786100734085,
+      "updatedAt": 1786100955398,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -2678,7 +2676,7 @@
       "lineId": "904b6c43-02c6-432a-9247-21428d39dc72",
       "status": "Limpeza",
       "batchId": "9ce0396e-06cf-416d-b795-ae69fc473fae",
-      "updatedAt": 1786100734086,
+      "updatedAt": 1786100955398,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -2699,7 +2697,7 @@
       "lineId": "904b6c43-02c6-432a-9247-21428d39dc72",
       "status": "Limpeza",
       "batchId": "9ce0396e-06cf-416d-b795-ae69fc473fae",
-      "updatedAt": 1786100734086,
+      "updatedAt": 1786100955399,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -2718,7 +2716,7 @@
       "lineId": "904b6c43-02c6-432a-9247-21428d39dc72",
       "status": "Limpeza",
       "batchId": "9ce0396e-06cf-416d-b795-ae69fc473fae",
-      "updatedAt": 1786100734086,
+      "updatedAt": 1786100955399,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -2739,7 +2737,7 @@
       "lineId": "904b6c43-02c6-432a-9247-21428d39dc72",
       "status": "Limpeza",
       "batchId": "9ce0396e-06cf-416d-b795-ae69fc473fae",
-      "updatedAt": 1786100734086,
+      "updatedAt": 1786100955399,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -2760,7 +2758,7 @@
       "lineId": "904b6c43-02c6-432a-9247-21428d39dc72",
       "status": "Limpeza",
       "batchId": "9ce0396e-06cf-416d-b795-ae69fc473fae",
-      "updatedAt": 1786100734086,
+      "updatedAt": 1786100955399,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -2779,7 +2777,7 @@
       "lineId": "904b6c43-02c6-432a-9247-21428d39dc72",
       "status": "Limpeza",
       "batchId": "9ce0396e-06cf-416d-b795-ae69fc473fae",
-      "updatedAt": 1786100734086,
+      "updatedAt": 1786100955399,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -2798,7 +2796,7 @@
       "lineId": "904b6c43-02c6-432a-9247-21428d39dc72",
       "status": "Limpeza",
       "batchId": "9ce0396e-06cf-416d-b795-ae69fc473fae",
-      "updatedAt": 1786100734086,
+      "updatedAt": 1786100955399,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -2817,7 +2815,7 @@
       "lineId": "904b6c43-02c6-432a-9247-21428d39dc72",
       "status": "Limpeza",
       "batchId": "9ce0396e-06cf-416d-b795-ae69fc473fae",
-      "updatedAt": 1786100734086,
+      "updatedAt": 1786100955399,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -2836,7 +2834,7 @@
       "lineId": "904b6c43-02c6-432a-9247-21428d39dc72",
       "status": "Limpeza",
       "batchId": "9ce0396e-06cf-416d-b795-ae69fc473fae",
-      "updatedAt": 1786100734086,
+      "updatedAt": 1786100955399,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -2855,7 +2853,7 @@
       "lineId": "904b6c43-02c6-432a-9247-21428d39dc72",
       "status": "Limpeza",
       "batchId": "9ce0396e-06cf-416d-b795-ae69fc473fae",
-      "updatedAt": 1786100734087,
+      "updatedAt": 1786100955399,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -2874,7 +2872,7 @@
       "lineId": "904b6c43-02c6-432a-9247-21428d39dc72",
       "status": "Limpeza",
       "batchId": "9ce0396e-06cf-416d-b795-ae69fc473fae",
-      "updatedAt": 1786100734087,
+      "updatedAt": 1786100955399,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -2893,7 +2891,7 @@
       "lineId": "ea1e156a-e709-4cdf-9c85-6f0e1cdb4658",
       "status": "Limpeza",
       "batchId": "9ce0396e-06cf-416d-b795-ae69fc473fae",
-      "updatedAt": 1786100734087,
+      "updatedAt": 1786100955399,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -2912,7 +2910,7 @@
       "lineId": "ea1e156a-e709-4cdf-9c85-6f0e1cdb4658",
       "status": "Limpeza",
       "batchId": "9ce0396e-06cf-416d-b795-ae69fc473fae",
-      "updatedAt": 1786100734087,
+      "updatedAt": 1786100955400,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -2933,7 +2931,7 @@
       "lineId": "ea1e156a-e709-4cdf-9c85-6f0e1cdb4658",
       "status": "Limpeza",
       "batchId": "9ce0396e-06cf-416d-b795-ae69fc473fae",
-      "updatedAt": 1786100734087,
+      "updatedAt": 1786100955400,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -2954,7 +2952,7 @@
       "lineId": "ea1e156a-e709-4cdf-9c85-6f0e1cdb4658",
       "status": "Limpeza",
       "batchId": "9ce0396e-06cf-416d-b795-ae69fc473fae",
-      "updatedAt": 1786100734088,
+      "updatedAt": 1786100955400,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -2973,7 +2971,7 @@
       "lineId": "ea1e156a-e709-4cdf-9c85-6f0e1cdb4658",
       "status": "Limpeza",
       "batchId": "9ce0396e-06cf-416d-b795-ae69fc473fae",
-      "updatedAt": 1786100734088,
+      "updatedAt": 1786100955400,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -2994,7 +2992,7 @@
       "lineId": "ea1e156a-e709-4cdf-9c85-6f0e1cdb4658",
       "status": "Limpeza",
       "batchId": "9ce0396e-06cf-416d-b795-ae69fc473fae",
-      "updatedAt": 1786100734088,
+      "updatedAt": 1786100955400,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -3015,7 +3013,7 @@
       "lineId": "ea1e156a-e709-4cdf-9c85-6f0e1cdb4658",
       "status": "Limpeza",
       "batchId": "9ce0396e-06cf-416d-b795-ae69fc473fae",
-      "updatedAt": 1786100734089,
+      "updatedAt": 1786100955401,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -3036,7 +3034,7 @@
       "lineId": "ea1e156a-e709-4cdf-9c85-6f0e1cdb4658",
       "status": "Limpeza",
       "batchId": "9ce0396e-06cf-416d-b795-ae69fc473fae",
-      "updatedAt": 1786100734089,
+      "updatedAt": 1786100955401,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -3057,7 +3055,7 @@
       "lineId": "ea1e156a-e709-4cdf-9c85-6f0e1cdb4658",
       "status": "Limpeza",
       "batchId": "9ce0396e-06cf-416d-b795-ae69fc473fae",
-      "updatedAt": 1786100734089,
+      "updatedAt": 1786100955401,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -3078,7 +3076,7 @@
       "lineId": "ea1e156a-e709-4cdf-9c85-6f0e1cdb4658",
       "status": "Limpeza",
       "batchId": "9ce0396e-06cf-416d-b795-ae69fc473fae",
-      "updatedAt": 1786100734089,
+      "updatedAt": 1786100955401,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -3097,7 +3095,7 @@
       "lineId": "ea1e156a-e709-4cdf-9c85-6f0e1cdb4658",
       "status": "Limpeza",
       "batchId": "9ce0396e-06cf-416d-b795-ae69fc473fae",
-      "updatedAt": 1786100734089,
+      "updatedAt": 1786100955401,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -3116,7 +3114,7 @@
       "lineId": "ea1e156a-e709-4cdf-9c85-6f0e1cdb4658",
       "status": "Limpeza",
       "batchId": "9ce0396e-06cf-416d-b795-ae69fc473fae",
-      "updatedAt": 1786100734090,
+      "updatedAt": 1786100955401,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -3137,7 +3135,7 @@
       "lineId": "ea1e156a-e709-4cdf-9c85-6f0e1cdb4658",
       "status": "Limpeza",
       "batchId": "9ce0396e-06cf-416d-b795-ae69fc473fae",
-      "updatedAt": 1786100734090,
+      "updatedAt": 1786100955402,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -3158,7 +3156,7 @@
       "lineId": "ea1e156a-e709-4cdf-9c85-6f0e1cdb4658",
       "status": "Limpeza",
       "batchId": "9ce0396e-06cf-416d-b795-ae69fc473fae",
-      "updatedAt": 1786100734090,
+      "updatedAt": 1786100955402,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -3177,7 +3175,7 @@
       "lineId": "ea1e156a-e709-4cdf-9c85-6f0e1cdb4658",
       "status": "Limpeza",
       "batchId": "9ce0396e-06cf-416d-b795-ae69fc473fae",
-      "updatedAt": 1786100734090,
+      "updatedAt": 1786100955402,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -3196,7 +3194,7 @@
       "lineId": "ea1e156a-e709-4cdf-9c85-6f0e1cdb4658",
       "status": "Limpeza",
       "batchId": "9ce0396e-06cf-416d-b795-ae69fc473fae",
-      "updatedAt": 1786100734090,
+      "updatedAt": 1786100955402,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -3217,7 +3215,7 @@
       "lineId": "ea1e156a-e709-4cdf-9c85-6f0e1cdb4658",
       "status": "Limpeza",
       "batchId": "9ce0396e-06cf-416d-b795-ae69fc473fae",
-      "updatedAt": 1786100734090,
+      "updatedAt": 1786100955402,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -3238,7 +3236,7 @@
       "lineId": "ea1e156a-e709-4cdf-9c85-6f0e1cdb4658",
       "status": "Limpeza",
       "batchId": "9ce0396e-06cf-416d-b795-ae69fc473fae",
-      "updatedAt": 1786100734090,
+      "updatedAt": 1786100955402,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -3259,7 +3257,7 @@
       "lineId": "ea1e156a-e709-4cdf-9c85-6f0e1cdb4658",
       "status": "Limpeza",
       "batchId": "9ce0396e-06cf-416d-b795-ae69fc473fae",
-      "updatedAt": 1786100734090,
+      "updatedAt": 1786100955402,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -3278,7 +3276,7 @@
       "lineId": "ea1e156a-e709-4cdf-9c85-6f0e1cdb4658",
       "status": "Limpeza",
       "batchId": "9ce0396e-06cf-416d-b795-ae69fc473fae",
-      "updatedAt": 1786100734090,
+      "updatedAt": 1786100955402,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -3297,7 +3295,7 @@
       "lineId": "ea1e156a-e709-4cdf-9c85-6f0e1cdb4658",
       "status": "Limpeza",
       "batchId": "9ce0396e-06cf-416d-b795-ae69fc473fae",
-      "updatedAt": 1786100734090,
+      "updatedAt": 1786100955402,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -3316,7 +3314,7 @@
       "lineId": "3d4f713c-3124-4a66-8550-84d6721f4235",
       "status": "Limpeza",
       "batchId": "9ce0396e-06cf-416d-b795-ae69fc473fae",
-      "updatedAt": 1786100734090,
+      "updatedAt": 1786100955402,
       "dimensions": {
         "length": 3,
         "width": 2,
@@ -3337,7 +3335,7 @@
       "lineId": "3d4f713c-3124-4a66-8550-84d6721f4235",
       "status": "Limpeza",
       "batchId": "9ce0396e-06cf-416d-b795-ae69fc473fae",
-      "updatedAt": 1786100734091,
+      "updatedAt": 1786100955402,
       "dimensions": {
         "length": 3,
         "width": 2,
@@ -3356,7 +3354,7 @@
       "lineId": "3d4f713c-3124-4a66-8550-84d6721f4235",
       "status": "Limpeza",
       "batchId": "9ce0396e-06cf-416d-b795-ae69fc473fae",
-      "updatedAt": 1786100734091,
+      "updatedAt": 1786100955403,
       "dimensions": {
         "length": 3,
         "width": 2,
@@ -3377,7 +3375,7 @@
       "lineId": "3d4f713c-3124-4a66-8550-84d6721f4235",
       "status": "Limpeza",
       "batchId": "9ce0396e-06cf-416d-b795-ae69fc473fae",
-      "updatedAt": 1786100734091,
+      "updatedAt": 1786100955403,
       "dimensions": {
         "length": 3,
         "width": 2,
@@ -3396,7 +3394,7 @@
       "lineId": "3d4f713c-3124-4a66-8550-84d6721f4235",
       "status": "Limpeza",
       "batchId": "9ce0396e-06cf-416d-b795-ae69fc473fae",
-      "updatedAt": 1786100734091,
+      "updatedAt": 1786100955403,
       "dimensions": {
         "length": 3,
         "width": 2,
@@ -3417,7 +3415,7 @@
       "lineId": "3d4f713c-3124-4a66-8550-84d6721f4235",
       "status": "Limpeza",
       "batchId": "9ce0396e-06cf-416d-b795-ae69fc473fae",
-      "updatedAt": 1786100734092,
+      "updatedAt": 1786100955403,
       "dimensions": {
         "length": 3,
         "width": 2,
@@ -3436,7 +3434,7 @@
       "lineId": "3d4f713c-3124-4a66-8550-84d6721f4235",
       "status": "Limpeza",
       "batchId": "9ce0396e-06cf-416d-b795-ae69fc473fae",
-      "updatedAt": 1786100734092,
+      "updatedAt": 1786100955403,
       "dimensions": {
         "length": 3,
         "width": 2,
@@ -3457,7 +3455,7 @@
       "lineId": "3d4f713c-3124-4a66-8550-84d6721f4235",
       "status": "Limpeza",
       "batchId": "9ce0396e-06cf-416d-b795-ae69fc473fae",
-      "updatedAt": 1786100734092,
+      "updatedAt": 1786100955404,
       "dimensions": {
         "length": 3,
         "width": 2,
@@ -3476,7 +3474,7 @@
       "lineId": "3d4f713c-3124-4a66-8550-84d6721f4235",
       "status": "Limpeza",
       "batchId": "e4d7cd18-d1ed-4581-a0a9-b06947cf26e0",
-      "updatedAt": 1786100734092,
+      "updatedAt": 1786100955404,
       "dimensions": {
         "length": 3,
         "width": 2,
@@ -3495,7 +3493,7 @@
       "lineId": "3d4f713c-3124-4a66-8550-84d6721f4235",
       "status": "Limpeza",
       "batchId": "e4d7cd18-d1ed-4581-a0a9-b06947cf26e0",
-      "updatedAt": 1786100734092,
+      "updatedAt": 1786100955404,
       "dimensions": {
         "length": 3,
         "width": 2,
@@ -3514,7 +3512,7 @@
       "lineId": "3d4f713c-3124-4a66-8550-84d6721f4235",
       "status": "Limpeza",
       "batchId": "e4d7cd18-d1ed-4581-a0a9-b06947cf26e0",
-      "updatedAt": 1786100734092,
+      "updatedAt": 1786100955404,
       "dimensions": {
         "length": 3,
         "width": 2,
@@ -3533,7 +3531,7 @@
       "lineId": "3d4f713c-3124-4a66-8550-84d6721f4235",
       "status": "Limpeza",
       "batchId": "e4d7cd18-d1ed-4581-a0a9-b06947cf26e0",
-      "updatedAt": 1786100734092,
+      "updatedAt": 1786100955404,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -3552,7 +3550,7 @@
       "lineId": "3d4f713c-3124-4a66-8550-84d6721f4235",
       "status": "Limpeza",
       "batchId": "e4d7cd18-d1ed-4581-a0a9-b06947cf26e0",
-      "updatedAt": 1786100734092,
+      "updatedAt": 1786100955404,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -3571,7 +3569,7 @@
       "lineId": "3d4f713c-3124-4a66-8550-84d6721f4235",
       "status": "Limpeza",
       "batchId": "e4d7cd18-d1ed-4581-a0a9-b06947cf26e0",
-      "updatedAt": 1786100734092,
+      "updatedAt": 1786100955404,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -3590,7 +3588,7 @@
       "lineId": "3d4f713c-3124-4a66-8550-84d6721f4235",
       "status": "Limpeza",
       "batchId": "e4d7cd18-d1ed-4581-a0a9-b06947cf26e0",
-      "updatedAt": 1786100734092,
+      "updatedAt": 1786100955404,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -3609,7 +3607,7 @@
       "lineId": "3d4f713c-3124-4a66-8550-84d6721f4235",
       "status": "Limpeza",
       "batchId": "e4d7cd18-d1ed-4581-a0a9-b06947cf26e0",
-      "updatedAt": 1786100734092,
+      "updatedAt": 1786100955404,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -3628,7 +3626,7 @@
       "lineId": "3d4f713c-3124-4a66-8550-84d6721f4235",
       "status": "Ocupada",
       "batchId": "e4d7cd18-d1ed-4581-a0a9-b06947cf26e0",
-      "updatedAt": 1786100734092,
+      "updatedAt": 1786100955404,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -3647,7 +3645,7 @@
       "lineId": "3d4f713c-3124-4a66-8550-84d6721f4235",
       "status": "Limpeza",
       "batchId": "e4d7cd18-d1ed-4581-a0a9-b06947cf26e0",
-      "updatedAt": 1786100734092,
+      "updatedAt": 1786100955404,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -3666,7 +3664,7 @@
       "lineId": "3d4f713c-3124-4a66-8550-84d6721f4235",
       "status": "Ocupada",
       "batchId": "e4d7cd18-d1ed-4581-a0a9-b06947cf26e0",
-      "updatedAt": 1786100734092,
+      "updatedAt": 1786100955404,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -3685,7 +3683,7 @@
       "lineId": "3d4f713c-3124-4a66-8550-84d6721f4235",
       "status": "Ocupada",
       "batchId": "e4d7cd18-d1ed-4581-a0a9-b06947cf26e0",
-      "updatedAt": 1786100734092,
+      "updatedAt": 1786100955404,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -3704,7 +3702,7 @@
       "lineId": "3d4f713c-3124-4a66-8550-84d6721f4235",
       "status": "Ocupada",
       "batchId": "e4d7cd18-d1ed-4581-a0a9-b06947cf26e0",
-      "updatedAt": 1786100734092,
+      "updatedAt": 1786100955404,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -3723,7 +3721,7 @@
       "lineId": "3d4f713c-3124-4a66-8550-84d6721f4235",
       "status": "Ocupada",
       "batchId": "e4d7cd18-d1ed-4581-a0a9-b06947cf26e0",
-      "updatedAt": 1786100734092,
+      "updatedAt": 1786100955404,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -3742,7 +3740,7 @@
       "lineId": "2f165eea-0b61-4240-a30d-926222cd015f",
       "status": "Ocupada",
       "batchId": "e4d7cd18-d1ed-4581-a0a9-b06947cf26e0",
-      "updatedAt": 1786100734092,
+      "updatedAt": 1786100955404,
       "dimensions": {
         "length": 2,
         "width": 2,
@@ -3761,7 +3759,7 @@
       "lineId": "2f165eea-0b61-4240-a30d-926222cd015f",
       "status": "Ocupada",
       "batchId": "e4d7cd18-d1ed-4581-a0a9-b06947cf26e0",
-      "updatedAt": 1786100734092,
+      "updatedAt": 1786100955404,
       "dimensions": {
         "length": 2,
         "width": 2,
@@ -3780,7 +3778,7 @@
       "lineId": "2f165eea-0b61-4240-a30d-926222cd015f",
       "status": "Ocupada",
       "batchId": "e4d7cd18-d1ed-4581-a0a9-b06947cf26e0",
-      "updatedAt": 1786100734092,
+      "updatedAt": 1786100955404,
       "dimensions": {
         "length": 2,
         "width": 2,
@@ -3799,7 +3797,7 @@
       "lineId": "2f165eea-0b61-4240-a30d-926222cd015f",
       "status": "Ocupada",
       "batchId": "e4d7cd18-d1ed-4581-a0a9-b06947cf26e0",
-      "updatedAt": 1786100734092,
+      "updatedAt": 1786100955404,
       "dimensions": {
         "length": 2,
         "width": 2,
@@ -3818,7 +3816,7 @@
       "lineId": "2f165eea-0b61-4240-a30d-926222cd015f",
       "status": "Ocupada",
       "batchId": "e4d7cd18-d1ed-4581-a0a9-b06947cf26e0",
-      "updatedAt": 1786100734092,
+      "updatedAt": 1786100955404,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -3837,7 +3835,7 @@
       "lineId": "2f165eea-0b61-4240-a30d-926222cd015f",
       "status": "Ocupada",
       "batchId": "e4d7cd18-d1ed-4581-a0a9-b06947cf26e0",
-      "updatedAt": 1786100734092,
+      "updatedAt": 1786100955404,
       "dimensions": {
         "length": 2,
         "width": 2,
@@ -3856,7 +3854,7 @@
       "lineId": "2f165eea-0b61-4240-a30d-926222cd015f",
       "status": "Ocupada",
       "batchId": "e4d7cd18-d1ed-4581-a0a9-b06947cf26e0",
-      "updatedAt": 1786100734092,
+      "updatedAt": 1786100955404,
       "dimensions": {
         "length": 2,
         "width": 2,
@@ -3875,7 +3873,7 @@
       "lineId": "2f165eea-0b61-4240-a30d-926222cd015f",
       "status": "Ocupada",
       "batchId": "e4d7cd18-d1ed-4581-a0a9-b06947cf26e0",
-      "updatedAt": 1786100734092,
+      "updatedAt": 1786100955404,
       "dimensions": {
         "length": 2,
         "width": 2,
@@ -3894,7 +3892,7 @@
       "lineId": "2f165eea-0b61-4240-a30d-926222cd015f",
       "status": "Ocupada",
       "batchId": "e4d7cd18-d1ed-4581-a0a9-b06947cf26e0",
-      "updatedAt": 1786100734092,
+      "updatedAt": 1786100955404,
       "dimensions": {
         "length": 2,
         "width": 2,
@@ -3913,7 +3911,7 @@
       "lineId": "2f165eea-0b61-4240-a30d-926222cd015f",
       "status": "Ocupada",
       "batchId": "e4d7cd18-d1ed-4581-a0a9-b06947cf26e0",
-      "updatedAt": 1786100734092,
+      "updatedAt": 1786100955404,
       "dimensions": {
         "length": 2,
         "width": 2,
@@ -3932,7 +3930,7 @@
       "lineId": "2f165eea-0b61-4240-a30d-926222cd015f",
       "status": "Ocupada",
       "batchId": "e4d7cd18-d1ed-4581-a0a9-b06947cf26e0",
-      "updatedAt": 1786100734092,
+      "updatedAt": 1786100955404,
       "dimensions": {
         "length": 2,
         "width": 2,
@@ -3951,7 +3949,7 @@
       "lineId": "2f165eea-0b61-4240-a30d-926222cd015f",
       "status": "Ocupada",
       "batchId": "e4d7cd18-d1ed-4581-a0a9-b06947cf26e0",
-      "updatedAt": 1786100734092,
+      "updatedAt": 1786100955404,
       "dimensions": {
         "length": 2,
         "width": 2,
@@ -3970,7 +3968,7 @@
       "lineId": "c8c5abe8-c72f-4fad-aaed-a9f220ea3e3c",
       "status": "Ocupada",
       "batchId": "e4d7cd18-d1ed-4581-a0a9-b06947cf26e0",
-      "updatedAt": 1786100734092,
+      "updatedAt": 1786100955404,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -3989,7 +3987,7 @@
       "lineId": "c8c5abe8-c72f-4fad-aaed-a9f220ea3e3c",
       "status": "Limpeza",
       "batchId": "e4d7cd18-d1ed-4581-a0a9-b06947cf26e0",
-      "updatedAt": 1786100734092,
+      "updatedAt": 1786100955404,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -4008,7 +4006,7 @@
       "lineId": "c8c5abe8-c72f-4fad-aaed-a9f220ea3e3c",
       "status": "Limpeza",
       "batchId": "e4d7cd18-d1ed-4581-a0a9-b06947cf26e0",
-      "updatedAt": 1786100734092,
+      "updatedAt": 1786100955404,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -4027,7 +4025,7 @@
       "lineId": "c8c5abe8-c72f-4fad-aaed-a9f220ea3e3c",
       "status": "Ocupada",
       "batchId": "e4d7cd18-d1ed-4581-a0a9-b06947cf26e0",
-      "updatedAt": 1786100734092,
+      "updatedAt": 1786100955404,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -4046,7 +4044,7 @@
       "lineId": "c8c5abe8-c72f-4fad-aaed-a9f220ea3e3c",
       "status": "Ocupada",
       "batchId": "e4d7cd18-d1ed-4581-a0a9-b06947cf26e0",
-      "updatedAt": 1786100734092,
+      "updatedAt": 1786100955404,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -4063,7 +4061,7 @@
       "name": "G149",
       "model": "2x2x2",
       "status": "Manutenção",
-      "updatedAt": 1786100734092,
+      "updatedAt": 1786100955404,
       "dimensions": {
         "length": 2,
         "width": 2,
@@ -4079,7 +4077,7 @@
       "name": "G150",
       "model": "2x2x2",
       "status": "Manutenção",
-      "updatedAt": 1786100734092,
+      "updatedAt": 1786100955404,
       "dimensions": {
         "length": 2,
         "width": 2,
@@ -4095,7 +4093,7 @@
       "name": "G151",
       "model": "2x2x2",
       "status": "Manutenção",
-      "updatedAt": 1786100734092,
+      "updatedAt": 1786100955404,
       "dimensions": {
         "length": 2,
         "width": 2,
@@ -4111,7 +4109,7 @@
       "name": "G152",
       "model": "2x2x2",
       "status": "Manutenção",
-      "updatedAt": 1786100734092,
+      "updatedAt": 1786100955404,
       "dimensions": {
         "length": 2,
         "width": 2,
@@ -4127,7 +4125,7 @@
       "name": "G153",
       "model": "2x2x2",
       "status": "Manutenção",
-      "updatedAt": 1786100734092,
+      "updatedAt": 1786100955404,
       "dimensions": {
         "length": 2,
         "width": 2,
@@ -4143,7 +4141,7 @@
       "name": "G154",
       "model": "2x2x2",
       "status": "Manutenção",
-      "updatedAt": 1786100734092,
+      "updatedAt": 1786100955404,
       "dimensions": {
         "length": 2,
         "width": 2,
@@ -4159,7 +4157,7 @@
       "name": "G155",
       "model": "2x2x2",
       "status": "Manutenção",
-      "updatedAt": 1786100734092,
+      "updatedAt": 1786100955404,
       "dimensions": {
         "length": 2,
         "width": 2,
@@ -4175,7 +4173,7 @@
       "name": "G156",
       "model": "2x2x2",
       "status": "Manutenção",
-      "updatedAt": 1786100734092,
+      "updatedAt": 1786100955404,
       "dimensions": {
         "length": 2,
         "width": 2,
@@ -4191,7 +4189,7 @@
       "name": "G157",
       "model": "2x2x2",
       "status": "Manutenção",
-      "updatedAt": 1786100734092,
+      "updatedAt": 1786100955404,
       "dimensions": {
         "length": 2,
         "width": 2,
@@ -4207,7 +4205,7 @@
       "name": "G158",
       "model": "2x2x2",
       "status": "Manutenção",
-      "updatedAt": 1786100734092,
+      "updatedAt": 1786100955404,
       "dimensions": {
         "length": 2,
         "width": 2,
@@ -4223,7 +4221,7 @@
       "name": "G159",
       "model": "2x2x2",
       "status": "Manutenção",
-      "updatedAt": 1786100734092,
+      "updatedAt": 1786100955404,
       "dimensions": {
         "length": 2,
         "width": 2,
@@ -4239,7 +4237,7 @@
       "name": "G160",
       "model": "2x2x2",
       "status": "Manutenção",
-      "updatedAt": 1786100734092,
+      "updatedAt": 1786100955404,
       "dimensions": {
         "length": 2,
         "width": 2,
@@ -4255,7 +4253,7 @@
       "name": "G161",
       "model": "2x2x2",
       "status": "Manutenção",
-      "updatedAt": 1786100734093,
+      "updatedAt": 1786100955404,
       "dimensions": {
         "length": 2,
         "width": 2,
@@ -4271,7 +4269,7 @@
       "name": "G162",
       "model": "2x2x2",
       "status": "Manutenção",
-      "updatedAt": 1786100734093,
+      "updatedAt": 1786100955404,
       "dimensions": {
         "length": 2,
         "width": 2,
@@ -4287,7 +4285,7 @@
       "name": "G163",
       "model": "2x2x2",
       "status": "Manutenção",
-      "updatedAt": 1786100734093,
+      "updatedAt": 1786100955404,
       "dimensions": {
         "length": 2,
         "width": 2,
@@ -4303,7 +4301,7 @@
       "name": "G164",
       "model": "2x2x2",
       "status": "Avaliação",
-      "updatedAt": 1786100734093,
+      "updatedAt": 1786100955404,
       "dimensions": {
         "length": 2,
         "width": 2,
@@ -4319,7 +4317,7 @@
       "name": "G165",
       "model": "2x2x2",
       "status": "Avaliação",
-      "updatedAt": 1786100734093,
+      "updatedAt": 1786100955404,
       "dimensions": {
         "length": 2,
         "width": 2,
@@ -4335,7 +4333,7 @@
       "name": "G166",
       "model": "2x2x2",
       "status": "Avaliação",
-      "updatedAt": 1786100734093,
+      "updatedAt": 1786100955404,
       "dimensions": {
         "length": 2,
         "width": 2,
@@ -4351,7 +4349,7 @@
       "name": "G167",
       "model": "2x2x2",
       "status": "Avaliação",
-      "updatedAt": 1786100734093,
+      "updatedAt": 1786100955404,
       "dimensions": {
         "length": 2,
         "width": 2,
@@ -4367,7 +4365,7 @@
       "name": "G168",
       "model": "2x2x2",
       "status": "Avaliação",
-      "updatedAt": 1786100734093,
+      "updatedAt": 1786100955404,
       "dimensions": {
         "length": 2,
         "width": 2,
@@ -4383,7 +4381,7 @@
       "name": "G169",
       "model": "2x2x2",
       "status": "Avaliação",
-      "updatedAt": 1786100734093,
+      "updatedAt": 1786100955404,
       "dimensions": {
         "length": 2,
         "width": 2,
@@ -4399,7 +4397,7 @@
       "name": "G170",
       "model": "2x2x2",
       "status": "Avaliação",
-      "updatedAt": 1786100734093,
+      "updatedAt": 1786100955404,
       "dimensions": {
         "length": 2,
         "width": 2,
@@ -4415,7 +4413,7 @@
       "name": "G171",
       "model": "2x2x2",
       "status": "Avaliação",
-      "updatedAt": 1786100734093,
+      "updatedAt": 1786100955404,
       "dimensions": {
         "length": 2,
         "width": 2,
@@ -4431,7 +4429,7 @@
       "name": "G172",
       "model": "2x2x2",
       "status": "Avaliação",
-      "updatedAt": 1786100734093,
+      "updatedAt": 1786100955404,
       "dimensions": {
         "length": 2,
         "width": 2,
@@ -4447,7 +4445,7 @@
       "name": "G173",
       "model": "2x2x2",
       "status": "Avaliação",
-      "updatedAt": 1786100734093,
+      "updatedAt": 1786100955404,
       "dimensions": {
         "length": 2,
         "width": 2,
@@ -4463,7 +4461,7 @@
       "name": "G174",
       "model": "2x2x2",
       "status": "Avaliação",
-      "updatedAt": 1786100734093,
+      "updatedAt": 1786100955404,
       "dimensions": {
         "length": 2,
         "width": 2,
@@ -4479,7 +4477,7 @@
       "name": "G175",
       "model": "2x2x2",
       "status": "Avaliação",
-      "updatedAt": 1786100734093,
+      "updatedAt": 1786100955404,
       "dimensions": {
         "length": 2,
         "width": 2,
@@ -4495,7 +4493,7 @@
       "name": "G176",
       "model": "2x2x2",
       "status": "Avaliação",
-      "updatedAt": 1786100734093,
+      "updatedAt": 1786100955404,
       "dimensions": {
         "length": 2,
         "width": 2,
@@ -4511,7 +4509,7 @@
       "name": "G177",
       "model": "2x2x2",
       "status": "Avaliação",
-      "updatedAt": 1786100734093,
+      "updatedAt": 1786100955404,
       "dimensions": {
         "length": 2,
         "width": 2,
@@ -4527,7 +4525,7 @@
       "name": "G178",
       "model": "2x2x2",
       "status": "Avaliação",
-      "updatedAt": 1786100734093,
+      "updatedAt": 1786100955404,
       "dimensions": {
         "length": 2,
         "width": 2,
@@ -4543,7 +4541,7 @@
       "name": "G179",
       "model": "2x2x2",
       "status": "Avaliação",
-      "updatedAt": 1786100734093,
+      "updatedAt": 1786100955404,
       "dimensions": {
         "length": 2,
         "width": 2,
@@ -4559,7 +4557,7 @@
       "name": "G180",
       "model": "2x2x2",
       "status": "Avaliação",
-      "updatedAt": 1786100734093,
+      "updatedAt": 1786100955404,
       "dimensions": {
         "length": 2,
         "width": 2,
@@ -4575,7 +4573,7 @@
       "name": "G181",
       "model": "2x2x2",
       "status": "Avaliação",
-      "updatedAt": 1786100734093,
+      "updatedAt": 1786100955404,
       "dimensions": {
         "length": 2,
         "width": 2,
@@ -4591,7 +4589,7 @@
       "name": "G182",
       "model": "2x2x2",
       "status": "Avaliação",
-      "updatedAt": 1786100734093,
+      "updatedAt": 1786100955404,
       "dimensions": {
         "length": 2,
         "width": 2,
@@ -4607,7 +4605,7 @@
       "name": "G183",
       "model": "2x2x2",
       "status": "Avaliação",
-      "updatedAt": 1786100734093,
+      "updatedAt": 1786100955404,
       "dimensions": {
         "length": 2,
         "width": 2,
@@ -4623,7 +4621,7 @@
       "name": "G184",
       "model": "2x2x2",
       "status": "Avaliação",
-      "updatedAt": 1786100734093,
+      "updatedAt": 1786100955404,
       "dimensions": {
         "length": 2,
         "width": 2,
@@ -4639,7 +4637,7 @@
       "name": "G185",
       "model": "2x2x2",
       "status": "Avaliação",
-      "updatedAt": 1786100734093,
+      "updatedAt": 1786100955404,
       "dimensions": {
         "length": 2,
         "width": 2,
@@ -4655,7 +4653,7 @@
       "name": "G186",
       "model": "2x2x2",
       "status": "Avaliação",
-      "updatedAt": 1786100734093,
+      "updatedAt": 1786100955404,
       "dimensions": {
         "length": 2,
         "width": 2,
@@ -4671,7 +4669,7 @@
       "name": "G187",
       "model": "2x2x2",
       "status": "Avaliação",
-      "updatedAt": 1786100734093,
+      "updatedAt": 1786100955404,
       "dimensions": {
         "length": 2,
         "width": 2,
@@ -4687,7 +4685,7 @@
       "name": "G188",
       "model": "2x2x2",
       "status": "Avaliação",
-      "updatedAt": 1786100734093,
+      "updatedAt": 1786100955404,
       "dimensions": {
         "length": 2,
         "width": 2,
@@ -4703,7 +4701,7 @@
       "name": "G189",
       "model": "2x2x2",
       "status": "Avaliação",
-      "updatedAt": 1786100734093,
+      "updatedAt": 1786100955404,
       "dimensions": {
         "length": 2,
         "width": 2,
@@ -4719,7 +4717,7 @@
       "name": "G200",
       "model": "2x2x2",
       "status": "Manutenção",
-      "updatedAt": 1786100734093,
+      "updatedAt": 1786100955404,
       "dimensions": {
         "length": 2,
         "width": 2,
@@ -4735,7 +4733,7 @@
       "name": "G201",
       "model": "2x2x2",
       "status": "Manutenção",
-      "updatedAt": 1786100734093,
+      "updatedAt": 1786100955404,
       "dimensions": {
         "length": 2,
         "width": 2,
@@ -4751,7 +4749,7 @@
       "name": "G202",
       "model": "2x2x2",
       "status": "Manutenção",
-      "updatedAt": 1786100734093,
+      "updatedAt": 1786100955404,
       "dimensions": {
         "length": 2,
         "width": 2,
@@ -4767,7 +4765,7 @@
       "name": "G203",
       "model": "2x2x2",
       "status": "Manutenção",
-      "updatedAt": 1786100734093,
+      "updatedAt": 1786100955404,
       "dimensions": {
         "length": 2,
         "width": 2,
@@ -4783,7 +4781,7 @@
       "name": "G204",
       "model": "2x2x2",
       "status": "Manutenção",
-      "updatedAt": 1786100734093,
+      "updatedAt": 1786100955404,
       "dimensions": {
         "length": 2,
         "width": 2,
@@ -4799,7 +4797,7 @@
       "name": "G205",
       "model": "2x2x2",
       "status": "Manutenção",
-      "updatedAt": 1786100734093,
+      "updatedAt": 1786100955404,
       "dimensions": {
         "length": 2,
         "width": 2,
@@ -4815,7 +4813,7 @@
       "name": "G206",
       "model": "2x2x2",
       "status": "Manutenção",
-      "updatedAt": 1786100734093,
+      "updatedAt": 1786100955404,
       "dimensions": {
         "length": 2,
         "width": 2,
@@ -4831,7 +4829,7 @@
       "name": "G207",
       "model": "2x2x2",
       "status": "Manutenção",
-      "updatedAt": 1786100734093,
+      "updatedAt": 1786100955404,
       "dimensions": {
         "length": 2,
         "width": 2,
@@ -4847,7 +4845,7 @@
       "name": "G208",
       "model": "2x2x2",
       "status": "Manutenção",
-      "updatedAt": 1786100734093,
+      "updatedAt": 1786100955404,
       "dimensions": {
         "length": 2,
         "width": 2,
@@ -4863,7 +4861,7 @@
       "name": "G209",
       "model": "2x2x2",
       "status": "Manutenção",
-      "updatedAt": 1786100734093,
+      "updatedAt": 1786100955404,
       "dimensions": {
         "length": 2,
         "width": 2,
@@ -4879,7 +4877,7 @@
       "name": "G210",
       "model": "2x2x2",
       "status": "Manutenção",
-      "updatedAt": 1786100734093,
+      "updatedAt": 1786100955404,
       "dimensions": {
         "length": 2,
         "width": 2,
@@ -4895,7 +4893,7 @@
       "name": "G211",
       "model": "2x2x2",
       "status": "Manutenção",
-      "updatedAt": 1786100734093,
+      "updatedAt": 1786100955404,
       "dimensions": {
         "length": 2,
         "width": 2,
@@ -4911,7 +4909,7 @@
       "name": "G212",
       "model": "2x2x2",
       "status": "Manutenção",
-      "updatedAt": 1786100734093,
+      "updatedAt": 1786100955404,
       "dimensions": {
         "length": 2,
         "width": 2,
@@ -4927,7 +4925,7 @@
       "name": "G213",
       "model": "2x2x2",
       "status": "Sucata",
-      "updatedAt": 1786100734093,
+      "updatedAt": 1786100955404,
       "dimensions": {
         "length": 2,
         "width": 2,
@@ -4941,7 +4939,7 @@
       "name": "G214",
       "model": "2x2x2",
       "status": "Sucata",
-      "updatedAt": 1786100734093,
+      "updatedAt": 1786100955404,
       "dimensions": {
         "length": 2,
         "width": 2,
@@ -4955,7 +4953,7 @@
       "name": "G215",
       "model": "2x2x2",
       "status": "Sucata",
-      "updatedAt": 1786100734093,
+      "updatedAt": 1786100955404,
       "dimensions": {
         "length": 2,
         "width": 2,
@@ -4969,7 +4967,7 @@
       "name": "G216",
       "model": "2x2x2",
       "status": "Sucata",
-      "updatedAt": 1786100734093,
+      "updatedAt": 1786100955404,
       "dimensions": {
         "length": 2,
         "width": 2,
@@ -4983,7 +4981,7 @@
       "name": "G217",
       "model": "2x2x2",
       "status": "Sucata",
-      "updatedAt": 1786100734093,
+      "updatedAt": 1786100955404,
       "dimensions": {
         "length": 2,
         "width": 2,
@@ -4997,7 +4995,7 @@
       "name": "G218",
       "model": "2x2x2",
       "status": "Sucata",
-      "updatedAt": 1786100734093,
+      "updatedAt": 1786100955404,
       "dimensions": {
         "length": 2,
         "width": 2,
@@ -5011,7 +5009,7 @@
       "name": "G220",
       "model": "2x2x2",
       "status": "Sucata",
-      "updatedAt": 1786100734093,
+      "updatedAt": 1786100955404,
       "dimensions": {
         "length": 2,
         "width": 2,
@@ -5025,7 +5023,7 @@
       "name": "G221",
       "model": "2x2x2",
       "status": "Sucata",
-      "updatedAt": 1786100734093,
+      "updatedAt": 1786100955404,
       "dimensions": {
         "length": 2,
         "width": 2,
@@ -5039,7 +5037,7 @@
       "name": "G222",
       "model": "3x2x2,5",
       "status": "Manutenção",
-      "updatedAt": 1786100734093,
+      "updatedAt": 1786100955404,
       "dimensions": {
         "length": 3,
         "width": 2,
@@ -5055,7 +5053,7 @@
       "name": "G223",
       "model": "3x2x2,5",
       "status": "Manutenção",
-      "updatedAt": 1786100734093,
+      "updatedAt": 1786100955404,
       "dimensions": {
         "length": 3,
         "width": 2,
@@ -5071,7 +5069,7 @@
       "name": "G224",
       "model": "3x2x2,5",
       "status": "Manutenção",
-      "updatedAt": 1786100734093,
+      "updatedAt": 1786100955404,
       "dimensions": {
         "length": 3,
         "width": 2,
@@ -5087,7 +5085,7 @@
       "name": "G225",
       "model": "3x2x2,5",
       "status": "Manutenção",
-      "updatedAt": 1786100734093,
+      "updatedAt": 1786100955404,
       "dimensions": {
         "length": 3,
         "width": 2,
@@ -5103,7 +5101,7 @@
       "name": "G226",
       "model": "3x2x2,5",
       "status": "Manutenção",
-      "updatedAt": 1786100734093,
+      "updatedAt": 1786100955404,
       "dimensions": {
         "length": 3,
         "width": 2,
@@ -5119,7 +5117,7 @@
       "name": "G227",
       "model": "3x2x2,5",
       "status": "Manutenção",
-      "updatedAt": 1786100734093,
+      "updatedAt": 1786100955404,
       "dimensions": {
         "length": 3,
         "width": 2,
@@ -5135,7 +5133,7 @@
       "name": "G228",
       "model": "3x2x2,5",
       "status": "Manutenção",
-      "updatedAt": 1786100734093,
+      "updatedAt": 1786100955404,
       "dimensions": {
         "length": 3,
         "width": 2,
@@ -5151,7 +5149,7 @@
       "name": "G229",
       "model": "3x2x2,5",
       "status": "Manutenção",
-      "updatedAt": 1786100734093,
+      "updatedAt": 1786100955404,
       "dimensions": {
         "length": 3,
         "width": 2,
@@ -5167,7 +5165,7 @@
       "name": "G230",
       "model": "3x2x2,5",
       "status": "Manutenção",
-      "updatedAt": 1786100734093,
+      "updatedAt": 1786100955404,
       "dimensions": {
         "length": 3,
         "width": 2,
@@ -5183,7 +5181,7 @@
       "name": "G231",
       "model": "3x2x2,5",
       "status": "Manutenção",
-      "updatedAt": 1786100734093,
+      "updatedAt": 1786100955404,
       "dimensions": {
         "length": 3,
         "width": 2,
@@ -5199,7 +5197,7 @@
       "name": "G232",
       "model": "3x2x2,5",
       "status": "Manutenção",
-      "updatedAt": 1786100734093,
+      "updatedAt": 1786100955404,
       "dimensions": {
         "length": 3,
         "width": 2,
@@ -5215,7 +5213,7 @@
       "name": "G233",
       "model": "3x2x2,5",
       "status": "Manutenção",
-      "updatedAt": 1786100734093,
+      "updatedAt": 1786100955404,
       "dimensions": {
         "length": 3,
         "width": 2,
@@ -5231,7 +5229,7 @@
       "name": "G234",
       "model": "3x2x2,5",
       "status": "Manutenção",
-      "updatedAt": 1786100734093,
+      "updatedAt": 1786100955404,
       "dimensions": {
         "length": 3,
         "width": 2,
@@ -5247,7 +5245,7 @@
       "name": "G235",
       "model": "3x2x2,5",
       "status": "Manutenção",
-      "updatedAt": 1786100734093,
+      "updatedAt": 1786100955404,
       "dimensions": {
         "length": 3,
         "width": 2,
@@ -5263,7 +5261,7 @@
       "name": "G236",
       "model": "3x2x2,5",
       "status": "Manutenção",
-      "updatedAt": 1786100734093,
+      "updatedAt": 1786100955404,
       "dimensions": {
         "length": 3,
         "width": 2,
@@ -5279,7 +5277,7 @@
       "name": "G237",
       "model": "3x2x2,5",
       "status": "Manutenção",
-      "updatedAt": 1786100734093,
+      "updatedAt": 1786100955404,
       "dimensions": {
         "length": 3,
         "width": 2,
@@ -5295,7 +5293,7 @@
       "name": "G238",
       "model": "3x2x2,5",
       "status": "Manutenção",
-      "updatedAt": 1786100734093,
+      "updatedAt": 1786100955404,
       "dimensions": {
         "length": 3,
         "width": 2,
@@ -5311,7 +5309,7 @@
       "name": "G239",
       "model": "3x2x2,5",
       "status": "Manutenção",
-      "updatedAt": 1786100734093,
+      "updatedAt": 1786100955404,
       "dimensions": {
         "length": 3,
         "width": 2,
@@ -5327,7 +5325,7 @@
       "name": "G240",
       "model": "3x2x2,5",
       "status": "Manutenção",
-      "updatedAt": 1786100734093,
+      "updatedAt": 1786100955404,
       "dimensions": {
         "length": 3,
         "width": 2,
@@ -5343,7 +5341,7 @@
       "name": "G241",
       "model": "3x2x2,5",
       "status": "Avaliação",
-      "updatedAt": 1786100734093,
+      "updatedAt": 1786100955404,
       "dimensions": {
         "length": 3,
         "width": 2,
@@ -5359,7 +5357,7 @@
       "name": "G242",
       "model": "3x2x2,5",
       "status": "Avaliação",
-      "updatedAt": 1786100734093,
+      "updatedAt": 1786100955404,
       "dimensions": {
         "length": 3,
         "width": 2,
@@ -5375,7 +5373,7 @@
       "name": "G243",
       "model": "3x2x2,5",
       "status": "Avaliação",
-      "updatedAt": 1786100734093,
+      "updatedAt": 1786100955404,
       "dimensions": {
         "length": 3,
         "width": 2,
@@ -5391,7 +5389,7 @@
       "name": "G244",
       "model": "3x2x2,5",
       "status": "Avaliação",
-      "updatedAt": 1786100734093,
+      "updatedAt": 1786100955404,
       "dimensions": {
         "length": 3,
         "width": 2,
@@ -5407,7 +5405,7 @@
       "name": "G245",
       "model": "3x2x2,5",
       "status": "Avaliação",
-      "updatedAt": 1786100734093,
+      "updatedAt": 1786100955404,
       "dimensions": {
         "length": 3,
         "width": 2,
@@ -5423,7 +5421,7 @@
       "name": "G246",
       "model": "3x2x2,5",
       "status": "Avaliação",
-      "updatedAt": 1786100734093,
+      "updatedAt": 1786100955404,
       "dimensions": {
         "length": 3,
         "width": 2,
@@ -5439,7 +5437,7 @@
       "name": "G247",
       "model": "3x2x2,5",
       "status": "Avaliação",
-      "updatedAt": 1786100734093,
+      "updatedAt": 1786100955404,
       "dimensions": {
         "length": 3,
         "width": 2,
@@ -5455,7 +5453,7 @@
       "name": "G248",
       "model": "3x2x2,5",
       "status": "Avaliação",
-      "updatedAt": 1786100734093,
+      "updatedAt": 1786100955404,
       "dimensions": {
         "length": 3,
         "width": 2,
@@ -5471,7 +5469,7 @@
       "name": "G249",
       "model": "3x2x2,5",
       "status": "Avaliação",
-      "updatedAt": 1786100734093,
+      "updatedAt": 1786100955404,
       "dimensions": {
         "length": 3,
         "width": 2,
@@ -5487,7 +5485,7 @@
       "name": "G250",
       "model": "3x2x2,5",
       "status": "Avaliação",
-      "updatedAt": 1786100734093,
+      "updatedAt": 1786100955404,
       "dimensions": {
         "length": 3,
         "width": 2,
@@ -5503,7 +5501,7 @@
       "name": "G251",
       "model": "3x2x2,5",
       "status": "Avaliação",
-      "updatedAt": 1786100734093,
+      "updatedAt": 1786100955404,
       "dimensions": {
         "length": 3,
         "width": 2,
@@ -5519,7 +5517,7 @@
       "name": "G252",
       "model": "3x2x2,5",
       "status": "Avaliação",
-      "updatedAt": 1786100734093,
+      "updatedAt": 1786100955404,
       "dimensions": {
         "length": 3,
         "width": 2,
@@ -5535,7 +5533,7 @@
       "name": "G253",
       "model": "3x2x2,5",
       "status": "Avaliação",
-      "updatedAt": 1786100734093,
+      "updatedAt": 1786100955404,
       "dimensions": {
         "length": 3,
         "width": 2,
@@ -5551,7 +5549,7 @@
       "name": "G254",
       "model": "3x2x2,5",
       "status": "Avaliação",
-      "updatedAt": 1786100734093,
+      "updatedAt": 1786100955404,
       "dimensions": {
         "length": 3,
         "width": 2,
@@ -5567,7 +5565,7 @@
       "name": "G255",
       "model": "3x2x2,5",
       "status": "Avaliação",
-      "updatedAt": 1786100734093,
+      "updatedAt": 1786100955404,
       "dimensions": {
         "length": 3,
         "width": 2,
@@ -5583,7 +5581,7 @@
       "name": "G256",
       "model": "3x2x2,5",
       "status": "Avaliação",
-      "updatedAt": 1786100734093,
+      "updatedAt": 1786100955405,
       "dimensions": {
         "length": 3,
         "width": 2,
@@ -5599,7 +5597,7 @@
       "name": "G257",
       "model": "3x2x2,5",
       "status": "Avaliação",
-      "updatedAt": 1786100734093,
+      "updatedAt": 1786100955405,
       "dimensions": {
         "length": 3,
         "width": 2,
@@ -5615,7 +5613,7 @@
       "name": "G258",
       "model": "3x2x2,5",
       "status": "Avaliação",
-      "updatedAt": 1786100734093,
+      "updatedAt": 1786100955405,
       "dimensions": {
         "length": 3,
         "width": 2,
@@ -5631,7 +5629,7 @@
       "name": "G259",
       "model": "3x2x2,5",
       "status": "Avaliação",
-      "updatedAt": 1786100734093,
+      "updatedAt": 1786100955405,
       "dimensions": {
         "length": 3,
         "width": 2,
@@ -5647,7 +5645,7 @@
       "name": "G260",
       "model": "3x2x2,5",
       "status": "Avaliação",
-      "updatedAt": 1786100734093,
+      "updatedAt": 1786100955405,
       "dimensions": {
         "length": 3,
         "width": 2,
@@ -5663,7 +5661,7 @@
       "name": "G261",
       "model": "3x2x2,5",
       "status": "Avaliação",
-      "updatedAt": 1786100734093,
+      "updatedAt": 1786100955405,
       "dimensions": {
         "length": 3,
         "width": 2,
@@ -5679,7 +5677,7 @@
       "name": "G262",
       "model": "3x2x2,5",
       "status": "Avaliação",
-      "updatedAt": 1786100734093,
+      "updatedAt": 1786100955405,
       "dimensions": {
         "length": 3,
         "width": 2,
@@ -5695,7 +5693,7 @@
       "name": "G263",
       "model": "3x2x2,5",
       "status": "Avaliação",
-      "updatedAt": 1786100734093,
+      "updatedAt": 1786100955405,
       "dimensions": {
         "length": 3,
         "width": 2,
@@ -5711,7 +5709,7 @@
       "name": "G264",
       "model": "3x2x2,5",
       "status": "Avaliação",
-      "updatedAt": 1786100734093,
+      "updatedAt": 1786100955405,
       "dimensions": {
         "length": 3,
         "width": 2,
@@ -5727,7 +5725,7 @@
       "name": "G265",
       "model": "3x2x2,5",
       "status": "Avaliação",
-      "updatedAt": 1786100734093,
+      "updatedAt": 1786100955405,
       "dimensions": {
         "length": 3,
         "width": 2,
@@ -5743,7 +5741,7 @@
       "name": "G266",
       "model": "3x2x2,5",
       "status": "Manutenção",
-      "updatedAt": 1786100734093,
+      "updatedAt": 1786100955405,
       "dimensions": {
         "length": 3,
         "width": 2,
@@ -5759,7 +5757,7 @@
       "name": "G267",
       "model": "3x2x2,5",
       "status": "Manutenção",
-      "updatedAt": 1786100734093,
+      "updatedAt": 1786100955405,
       "dimensions": {
         "length": 3,
         "width": 2,
@@ -5775,7 +5773,7 @@
       "name": "G268",
       "model": "3x2x2,5",
       "status": "Manutenção",
-      "updatedAt": 1786100734093,
+      "updatedAt": 1786100955405,
       "dimensions": {
         "length": 3,
         "width": 2,
@@ -5791,7 +5789,7 @@
       "name": "G269",
       "model": "3x2x2,5",
       "status": "Manutenção",
-      "updatedAt": 1786100734093,
+      "updatedAt": 1786100955405,
       "dimensions": {
         "length": 3,
         "width": 2,
@@ -5807,7 +5805,7 @@
       "name": "G270",
       "model": "3x2x2,5",
       "status": "Manutenção",
-      "updatedAt": 1786100734093,
+      "updatedAt": 1786100955405,
       "dimensions": {
         "length": 3,
         "width": 2,
@@ -5823,7 +5821,7 @@
       "name": "G271",
       "model": "3x2x2,5",
       "status": "Manutenção",
-      "updatedAt": 1786100734093,
+      "updatedAt": 1786100955405,
       "dimensions": {
         "length": 3,
         "width": 2,
@@ -5839,7 +5837,7 @@
       "name": "G272",
       "model": "3x2x2,5",
       "status": "Manutenção",
-      "updatedAt": 1786100734093,
+      "updatedAt": 1786100955405,
       "dimensions": {
         "length": 3,
         "width": 2,
@@ -5855,7 +5853,7 @@
       "name": "G273",
       "model": "3x2x2,5",
       "status": "Manutenção",
-      "updatedAt": 1786100734093,
+      "updatedAt": 1786100955405,
       "dimensions": {
         "length": 3,
         "width": 2,
@@ -5871,7 +5869,7 @@
       "name": "G274",
       "model": "3x2x2,5",
       "status": "Manutenção",
-      "updatedAt": 1786100734093,
+      "updatedAt": 1786100955405,
       "dimensions": {
         "length": 3,
         "width": 2,
@@ -5887,7 +5885,7 @@
       "name": "G275",
       "model": "3x2x2,5",
       "status": "Manutenção",
-      "updatedAt": 1786100734093,
+      "updatedAt": 1786100955405,
       "dimensions": {
         "length": 3,
         "width": 2,
@@ -5903,7 +5901,7 @@
       "name": "G276",
       "model": "3x2x2,5",
       "status": "Manutenção",
-      "updatedAt": 1786100734093,
+      "updatedAt": 1786100955405,
       "dimensions": {
         "length": 3,
         "width": 2,
@@ -5919,7 +5917,7 @@
       "name": "G277",
       "model": "3x2x2,5",
       "status": "Sucata",
-      "updatedAt": 1786100734093,
+      "updatedAt": 1786100955405,
       "dimensions": {
         "length": 3,
         "width": 2,
@@ -5933,7 +5931,7 @@
       "name": "G278",
       "model": "3x2x2,5",
       "status": "Sucata",
-      "updatedAt": 1786100734093,
+      "updatedAt": 1786100955405,
       "dimensions": {
         "length": 3,
         "width": 2,
@@ -5947,7 +5945,7 @@
       "name": "G279",
       "model": "3x2x2,5",
       "status": "Manutenção",
-      "updatedAt": 1786100734093,
+      "updatedAt": 1786100955405,
       "dimensions": {
         "length": 3,
         "width": 2,
@@ -5965,7 +5963,7 @@
       "lineId": "20955303-44d1-41f1-999f-de8fa8466bcd",
       "status": "Ocupada",
       "batchId": "718bbf55-aefa-427f-8d4c-79866bfc5df1",
-      "updatedAt": 1786100734093,
+      "updatedAt": 1786100955405,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -5984,7 +5982,7 @@
       "lineId": "c8c5abe8-c72f-4fad-aaed-a9f220ea3e3c",
       "status": "Ocupada",
       "batchId": "9570c5b6-c8ca-4176-be27-38977734037d",
-      "updatedAt": 1786100734093,
+      "updatedAt": 1786100955405,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -6003,7 +6001,7 @@
       "lineId": "c8c5abe8-c72f-4fad-aaed-a9f220ea3e3c",
       "status": "Ocupada",
       "batchId": "9570c5b6-c8ca-4176-be27-38977734037d",
-      "updatedAt": 1786100734093,
+      "updatedAt": 1786100955405,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -6022,7 +6020,7 @@
       "lineId": "c8c5abe8-c72f-4fad-aaed-a9f220ea3e3c",
       "status": "Ocupada",
       "batchId": "9570c5b6-c8ca-4176-be27-38977734037d",
-      "updatedAt": 1786100734093,
+      "updatedAt": 1786100955405,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -6041,7 +6039,7 @@
       "lineId": "c8c5abe8-c72f-4fad-aaed-a9f220ea3e3c",
       "status": "Ocupada",
       "batchId": "9570c5b6-c8ca-4176-be27-38977734037d",
-      "updatedAt": 1786100734093,
+      "updatedAt": 1786100955405,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -6060,7 +6058,7 @@
       "lineId": "c8c5abe8-c72f-4fad-aaed-a9f220ea3e3c",
       "status": "Ocupada",
       "batchId": "9570c5b6-c8ca-4176-be27-38977734037d",
-      "updatedAt": 1786100734094,
+      "updatedAt": 1786100955405,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -6079,7 +6077,7 @@
       "lineId": "c8c5abe8-c72f-4fad-aaed-a9f220ea3e3c",
       "status": "Ocupada",
       "batchId": "9570c5b6-c8ca-4176-be27-38977734037d",
-      "updatedAt": 1786100734094,
+      "updatedAt": 1786100955405,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -6098,7 +6096,7 @@
       "lineId": "c8c5abe8-c72f-4fad-aaed-a9f220ea3e3c",
       "status": "Ocupada",
       "batchId": "9570c5b6-c8ca-4176-be27-38977734037d",
-      "updatedAt": 1786100734094,
+      "updatedAt": 1786100955405,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -6117,7 +6115,7 @@
       "lineId": "c8c5abe8-c72f-4fad-aaed-a9f220ea3e3c",
       "status": "Ocupada",
       "batchId": "9570c5b6-c8ca-4176-be27-38977734037d",
-      "updatedAt": 1786100734094,
+      "updatedAt": 1786100955405,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -6136,7 +6134,7 @@
       "lineId": "c8c5abe8-c72f-4fad-aaed-a9f220ea3e3c",
       "status": "Ocupada",
       "batchId": "9570c5b6-c8ca-4176-be27-38977734037d",
-      "updatedAt": 1786100734094,
+      "updatedAt": 1786100955405,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -6155,7 +6153,7 @@
       "lineId": "ddb0d1ef-c4d2-4083-a11b-87f9fa0d9702",
       "status": "Ocupada",
       "batchId": "db8d20a5-84a9-423a-9a36-d0a597be84c3",
-      "updatedAt": 1786100734094,
+      "updatedAt": 1786100955405,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -6174,7 +6172,7 @@
       "lineId": "ddb0d1ef-c4d2-4083-a11b-87f9fa0d9702",
       "status": "Ocupada",
       "batchId": "db8d20a5-84a9-423a-9a36-d0a597be84c3",
-      "updatedAt": 1786100734094,
+      "updatedAt": 1786100955405,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -6193,7 +6191,7 @@
       "lineId": "ddb0d1ef-c4d2-4083-a11b-87f9fa0d9702",
       "status": "Ocupada",
       "batchId": "db8d20a5-84a9-423a-9a36-d0a597be84c3",
-      "updatedAt": 1786100734094,
+      "updatedAt": 1786100955405,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -6212,7 +6210,7 @@
       "lineId": "ddb0d1ef-c4d2-4083-a11b-87f9fa0d9702",
       "status": "Ocupada",
       "batchId": "db8d20a5-84a9-423a-9a36-d0a597be84c3",
-      "updatedAt": 1786100734094,
+      "updatedAt": 1786100955405,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -6231,7 +6229,7 @@
       "lineId": "ddb0d1ef-c4d2-4083-a11b-87f9fa0d9702",
       "status": "Ocupada",
       "batchId": "db8d20a5-84a9-423a-9a36-d0a597be84c3",
-      "updatedAt": 1786100734094,
+      "updatedAt": 1786100955405,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -6250,7 +6248,7 @@
       "lineId": "ddb0d1ef-c4d2-4083-a11b-87f9fa0d9702",
       "status": "Ocupada",
       "batchId": "db8d20a5-84a9-423a-9a36-d0a597be84c3",
-      "updatedAt": 1786100734094,
+      "updatedAt": 1786100955405,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -6269,7 +6267,7 @@
       "lineId": "ddb0d1ef-c4d2-4083-a11b-87f9fa0d9702",
       "status": "Ocupada",
       "batchId": "db8d20a5-84a9-423a-9a36-d0a597be84c3",
-      "updatedAt": 1786100734094,
+      "updatedAt": 1786100955405,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -6288,7 +6286,7 @@
       "lineId": "ddb0d1ef-c4d2-4083-a11b-87f9fa0d9702",
       "status": "Ocupada",
       "batchId": "db8d20a5-84a9-423a-9a36-d0a597be84c3",
-      "updatedAt": 1786100734094,
+      "updatedAt": 1786100955405,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -6307,7 +6305,7 @@
       "lineId": "ddb0d1ef-c4d2-4083-a11b-87f9fa0d9702",
       "status": "Ocupada",
       "batchId": "db8d20a5-84a9-423a-9a36-d0a597be84c3",
-      "updatedAt": 1786100734094,
+      "updatedAt": 1786100955405,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -6326,7 +6324,7 @@
       "lineId": "ddb0d1ef-c4d2-4083-a11b-87f9fa0d9702",
       "status": "Ocupada",
       "batchId": "db8d20a5-84a9-423a-9a36-d0a597be84c3",
-      "updatedAt": 1786100734094,
+      "updatedAt": 1786100955405,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -6345,7 +6343,7 @@
       "lineId": "ddb0d1ef-c4d2-4083-a11b-87f9fa0d9702",
       "status": "Ocupada",
       "batchId": "db8d20a5-84a9-423a-9a36-d0a597be84c3",
-      "updatedAt": 1786100734094,
+      "updatedAt": 1786100955405,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -6364,7 +6362,7 @@
       "lineId": "ddb0d1ef-c4d2-4083-a11b-87f9fa0d9702",
       "status": "Ocupada",
       "batchId": "db8d20a5-84a9-423a-9a36-d0a597be84c3",
-      "updatedAt": 1786100734094,
+      "updatedAt": 1786100955405,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -6383,7 +6381,7 @@
       "lineId": "ddb0d1ef-c4d2-4083-a11b-87f9fa0d9702",
       "status": "Ocupada",
       "batchId": "db8d20a5-84a9-423a-9a36-d0a597be84c3",
-      "updatedAt": 1786100734094,
+      "updatedAt": 1786100955405,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -6402,7 +6400,7 @@
       "lineId": "ddb0d1ef-c4d2-4083-a11b-87f9fa0d9702",
       "status": "Ocupada",
       "batchId": "db8d20a5-84a9-423a-9a36-d0a597be84c3",
-      "updatedAt": 1786100734094,
+      "updatedAt": 1786100955405,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -6421,7 +6419,7 @@
       "lineId": "ddb0d1ef-c4d2-4083-a11b-87f9fa0d9702",
       "status": "Ocupada",
       "batchId": "db8d20a5-84a9-423a-9a36-d0a597be84c3",
-      "updatedAt": 1786100734094,
+      "updatedAt": 1786100955405,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -6440,7 +6438,7 @@
       "lineId": "ddb0d1ef-c4d2-4083-a11b-87f9fa0d9702",
       "status": "Ocupada",
       "batchId": "db8d20a5-84a9-423a-9a36-d0a597be84c3",
-      "updatedAt": 1786100734094,
+      "updatedAt": 1786100955405,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -6459,7 +6457,7 @@
       "lineId": "ddb0d1ef-c4d2-4083-a11b-87f9fa0d9702",
       "status": "Ocupada",
       "batchId": "db8d20a5-84a9-423a-9a36-d0a597be84c3",
-      "updatedAt": 1786100734094,
+      "updatedAt": 1786100955405,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -6478,7 +6476,7 @@
       "lineId": "ddb0d1ef-c4d2-4083-a11b-87f9fa0d9702",
       "status": "Ocupada",
       "batchId": "db8d20a5-84a9-423a-9a36-d0a597be84c3",
-      "updatedAt": 1786100734094,
+      "updatedAt": 1786100955405,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -6497,7 +6495,7 @@
       "lineId": "ddb0d1ef-c4d2-4083-a11b-87f9fa0d9702",
       "status": "Ocupada",
       "batchId": "db8d20a5-84a9-423a-9a36-d0a597be84c3",
-      "updatedAt": 1786100734094,
+      "updatedAt": 1786100955405,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -6516,7 +6514,7 @@
       "lineId": "ddb0d1ef-c4d2-4083-a11b-87f9fa0d9702",
       "status": "Ocupada",
       "batchId": "db8d20a5-84a9-423a-9a36-d0a597be84c3",
-      "updatedAt": 1786100734094,
+      "updatedAt": 1786100955405,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -6533,7 +6531,7 @@
       "name": "G310",
       "model": "3x3x3",
       "status": "Disponível",
-      "updatedAt": 1786100734094,
+      "updatedAt": 1786100955405,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -6547,7 +6545,7 @@
       "name": "G311",
       "model": "3x3x3",
       "status": "Disponível",
-      "updatedAt": 1786100734094,
+      "updatedAt": 1786100955405,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -6561,7 +6559,7 @@
       "name": "G312",
       "model": "3x3x3",
       "status": "Disponível",
-      "updatedAt": 1786100734094,
+      "updatedAt": 1786100955405,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -6575,7 +6573,7 @@
       "name": "G313",
       "model": "3x3x3",
       "status": "Disponível",
-      "updatedAt": 1786100734094,
+      "updatedAt": 1786100955405,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -6589,7 +6587,7 @@
       "name": "G314",
       "model": "3x3x3",
       "status": "Disponível",
-      "updatedAt": 1786100734094,
+      "updatedAt": 1786100955405,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -6603,7 +6601,7 @@
       "name": "G315",
       "model": "3x3x3",
       "status": "Disponível",
-      "updatedAt": 1786100734094,
+      "updatedAt": 1786100955405,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -6617,7 +6615,7 @@
       "name": "G316",
       "model": "3x3x3",
       "status": "Disponível",
-      "updatedAt": 1786100734094,
+      "updatedAt": 1786100955405,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -6631,7 +6629,7 @@
       "name": "G317",
       "model": "3x3x3",
       "status": "Disponível",
-      "updatedAt": 1786100734094,
+      "updatedAt": 1786100955405,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -6647,7 +6645,7 @@
       "lineId": "c8c5abe8-c72f-4fad-aaed-a9f220ea3e3c",
       "status": "Ocupada",
       "batchId": "9570c5b6-c8ca-4176-be27-38977734037d",
-      "updatedAt": 1786100734094,
+      "updatedAt": 1786100955405,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -6664,7 +6662,7 @@
       "name": "G320",
       "model": "3x3x3",
       "status": "Disponível",
-      "updatedAt": 1786100691003,
+      "updatedAt": 1786100955405,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -6680,7 +6678,7 @@
       "name": "G321",
       "model": "3x3x3",
       "status": "Disponível",
-      "updatedAt": 1786100691003,
+      "updatedAt": 1786100955405,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -6696,7 +6694,7 @@
       "name": "G322",
       "model": "3x3x3",
       "status": "Disponível",
-      "updatedAt": 1786100691003,
+      "updatedAt": 1786100955405,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -6714,7 +6712,7 @@
       "lineId": "ddb0d1ef-c4d2-4083-a11b-87f9fa0d9702",
       "status": "Ocupada",
       "batchId": "db8d20a5-84a9-423a-9a36-d0a597be84c3",
-      "updatedAt": 1786100734094,
+      "updatedAt": 1786100955405,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -6733,7 +6731,7 @@
       "lineId": "ddb0d1ef-c4d2-4083-a11b-87f9fa0d9702",
       "status": "Ocupada",
       "batchId": "db8d20a5-84a9-423a-9a36-d0a597be84c3",
-      "updatedAt": 1786100734094,
+      "updatedAt": 1786100955405,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -6750,7 +6748,7 @@
       "name": "G325",
       "model": "3x3x3",
       "status": "Avaliação",
-      "updatedAt": 1786100734094,
+      "updatedAt": 1786100955405,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -6766,7 +6764,7 @@
       "name": "G326",
       "model": "3x3x3",
       "status": "Avaliação",
-      "updatedAt": 1786100734094,
+      "updatedAt": 1786100955405,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -6782,7 +6780,7 @@
       "name": "G327",
       "model": "3x3x3",
       "status": "Avaliação",
-      "updatedAt": 1786100734094,
+      "updatedAt": 1786100955405,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -6798,7 +6796,7 @@
       "name": "G328",
       "model": "3x3x3",
       "status": "Avaliação",
-      "updatedAt": 1786100734094,
+      "updatedAt": 1786100955405,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -6814,7 +6812,7 @@
       "name": "G329",
       "model": "3x3x3",
       "status": "Avaliação",
-      "updatedAt": 1786100734094,
+      "updatedAt": 1786100955405,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -6830,7 +6828,7 @@
       "name": "G330",
       "model": "3x3x3",
       "status": "Avaliação",
-      "updatedAt": 1786100734094,
+      "updatedAt": 1786100955405,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -6846,7 +6844,7 @@
       "name": "G331",
       "model": "3x3x3",
       "status": "Avaliação",
-      "updatedAt": 1786100734094,
+      "updatedAt": 1786100955405,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -6862,7 +6860,7 @@
       "name": "G332",
       "model": "3x3x3",
       "status": "Avaliação",
-      "updatedAt": 1786100734094,
+      "updatedAt": 1786100955405,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -6878,7 +6876,7 @@
       "name": "G333",
       "model": "3x3x3",
       "status": "Avaliação",
-      "updatedAt": 1786100734094,
+      "updatedAt": 1786100955405,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -6894,7 +6892,7 @@
       "name": "G334",
       "model": "3x3x3",
       "status": "Avaliação",
-      "updatedAt": 1786100734094,
+      "updatedAt": 1786100955405,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -6910,7 +6908,7 @@
       "name": "G335",
       "model": "3x3x3",
       "status": "Avaliação",
-      "updatedAt": 1786100734094,
+      "updatedAt": 1786100955405,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -6926,7 +6924,7 @@
       "name": "G336",
       "model": "3x3x3",
       "status": "Avaliação",
-      "updatedAt": 1786100734094,
+      "updatedAt": 1786100955405,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -6942,7 +6940,7 @@
       "name": "G337",
       "model": "3x3x3",
       "status": "Avaliação",
-      "updatedAt": 1786100734094,
+      "updatedAt": 1786100955405,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -6958,7 +6956,7 @@
       "name": "G338",
       "model": "3x3x3",
       "status": "Avaliação",
-      "updatedAt": 1786100734094,
+      "updatedAt": 1786100955405,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -6974,7 +6972,7 @@
       "name": "G339",
       "model": "3x3x3",
       "status": "Avaliação",
-      "updatedAt": 1786100734094,
+      "updatedAt": 1786100955405,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -6990,7 +6988,7 @@
       "name": "G340",
       "model": "3x3x3",
       "status": "Avaliação",
-      "updatedAt": 1786100734094,
+      "updatedAt": 1786100955405,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -7006,7 +7004,7 @@
       "name": "G341",
       "model": "3x3x3",
       "status": "Avaliação",
-      "updatedAt": 1786100734094,
+      "updatedAt": 1786100955405,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -7022,7 +7020,7 @@
       "name": "G342",
       "model": "3x3x3",
       "status": "Avaliação",
-      "updatedAt": 1786100734094,
+      "updatedAt": 1786100955405,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -7038,7 +7036,7 @@
       "name": "G343",
       "model": "3x3x3",
       "status": "Avaliação",
-      "updatedAt": 1786100734094,
+      "updatedAt": 1786100955405,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -7054,7 +7052,7 @@
       "name": "G344",
       "model": "3x3x3",
       "status": "Avaliação",
-      "updatedAt": 1786100734094,
+      "updatedAt": 1786100955405,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -7070,7 +7068,7 @@
       "name": "G345",
       "model": "3x3x3",
       "status": "Avaliação",
-      "updatedAt": 1786100734094,
+      "updatedAt": 1786100955405,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -7086,7 +7084,7 @@
       "name": "G346",
       "model": "3x3x3",
       "status": "Avaliação",
-      "updatedAt": 1786100734094,
+      "updatedAt": 1786100955405,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -7102,7 +7100,7 @@
       "name": "G347",
       "model": "3x3x3",
       "status": "Avaliação",
-      "updatedAt": 1786100734094,
+      "updatedAt": 1786100955405,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -7118,7 +7116,7 @@
       "name": "G348",
       "model": "3x3x3",
       "status": "Avaliação",
-      "updatedAt": 1786100734094,
+      "updatedAt": 1786100955405,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -7134,7 +7132,7 @@
       "name": "G349",
       "model": "3x3x3",
       "status": "Avaliação",
-      "updatedAt": 1786100734094,
+      "updatedAt": 1786100955405,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -7150,7 +7148,7 @@
       "name": "G350",
       "model": "3x3x3",
       "status": "Avaliação",
-      "updatedAt": 1786100734094,
+      "updatedAt": 1786100955405,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -7166,7 +7164,7 @@
       "name": "G351",
       "model": "3x3x3",
       "status": "Avaliação",
-      "updatedAt": 1786100734094,
+      "updatedAt": 1786100955405,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -7182,7 +7180,7 @@
       "name": "G352",
       "model": "3x3x3",
       "status": "Avaliação",
-      "updatedAt": 1786100734094,
+      "updatedAt": 1786100955405,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -7198,7 +7196,7 @@
       "name": "G353",
       "model": "3x3x3",
       "status": "Avaliação",
-      "updatedAt": 1786100734094,
+      "updatedAt": 1786100955405,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -7214,7 +7212,7 @@
       "name": "G354",
       "model": "3x3x3",
       "status": "Avaliação",
-      "updatedAt": 1786100734094,
+      "updatedAt": 1786100955405,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -7230,7 +7228,7 @@
       "name": "G355",
       "model": "3x3x3",
       "status": "Avaliação",
-      "updatedAt": 1786100734094,
+      "updatedAt": 1786100955406,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -7246,7 +7244,7 @@
       "name": "G356",
       "model": "3x3x3",
       "status": "Avaliação",
-      "updatedAt": 1786100734094,
+      "updatedAt": 1786100955406,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -7262,7 +7260,7 @@
       "name": "G357",
       "model": "3x3x3",
       "status": "Avaliação",
-      "updatedAt": 1786100734094,
+      "updatedAt": 1786100955406,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -7278,7 +7276,7 @@
       "name": "G358",
       "model": "3x3x3",
       "status": "Avaliação",
-      "updatedAt": 1786100734094,
+      "updatedAt": 1786100955406,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -7294,7 +7292,7 @@
       "name": "G359",
       "model": "3x3x3",
       "status": "Avaliação",
-      "updatedAt": 1786100734094,
+      "updatedAt": 1786100955406,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -7310,7 +7308,7 @@
       "name": "G360",
       "model": "3x3x3",
       "status": "Avaliação",
-      "updatedAt": 1786100734094,
+      "updatedAt": 1786100955406,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -7326,7 +7324,7 @@
       "name": "G361",
       "model": "3x3x3",
       "status": "Avaliação",
-      "updatedAt": 1786100734094,
+      "updatedAt": 1786100955406,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -7342,7 +7340,7 @@
       "name": "G362",
       "model": "3x3x3",
       "status": "Avaliação",
-      "updatedAt": 1786100734094,
+      "updatedAt": 1786100955406,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -7358,7 +7356,7 @@
       "name": "G363",
       "model": "3x3x3",
       "status": "Avaliação",
-      "updatedAt": 1786100734094,
+      "updatedAt": 1786100955406,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -7374,7 +7372,7 @@
       "name": "G364",
       "model": "3x3x3",
       "status": "Avaliação",
-      "updatedAt": 1786100734094,
+      "updatedAt": 1786100955406,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -7390,7 +7388,7 @@
       "name": "G365",
       "model": "3x3x3",
       "status": "Avaliação",
-      "updatedAt": 1786100734094,
+      "updatedAt": 1786100955406,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -7406,7 +7404,7 @@
       "name": "G366",
       "model": "3x3x3",
       "status": "Avaliação",
-      "updatedAt": 1786100734094,
+      "updatedAt": 1786100955406,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -7422,7 +7420,7 @@
       "name": "G367",
       "model": "3x3x3",
       "status": "Avaliação",
-      "updatedAt": 1786100734094,
+      "updatedAt": 1786100955406,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -7438,7 +7436,7 @@
       "name": "G368",
       "model": "3x3x3",
       "status": "Avaliação",
-      "updatedAt": 1786100734094,
+      "updatedAt": 1786100955406,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -7454,7 +7452,7 @@
       "name": "G369",
       "model": "3x3x3",
       "status": "Avaliação",
-      "updatedAt": 1786100734094,
+      "updatedAt": 1786100955406,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -7470,7 +7468,7 @@
       "name": "G370",
       "model": "3x3x3",
       "status": "Avaliação",
-      "updatedAt": 1786100734094,
+      "updatedAt": 1786100955406,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -7486,7 +7484,7 @@
       "name": "G371",
       "model": "3x3x3",
       "status": "Avaliação",
-      "updatedAt": 1786100734094,
+      "updatedAt": 1786100955406,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -7502,7 +7500,7 @@
       "name": "G372",
       "model": "3x3x3",
       "status": "Avaliação",
-      "updatedAt": 1786100734094,
+      "updatedAt": 1786100955406,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -7518,7 +7516,7 @@
       "name": "G373",
       "model": "3x3x3",
       "status": "Avaliação",
-      "updatedAt": 1786100734094,
+      "updatedAt": 1786100955406,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -7534,7 +7532,7 @@
       "name": "G374",
       "model": "3x3x3",
       "status": "Disponível",
-      "updatedAt": 1786100691003,
+      "updatedAt": 1786100955406,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -7550,7 +7548,7 @@
       "name": "G375",
       "model": "3x3x3",
       "status": "Disponível",
-      "updatedAt": 1786100691003,
+      "updatedAt": 1786100955406,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -7566,7 +7564,7 @@
       "name": "G376",
       "model": "3x3x3",
       "status": "Disponível",
-      "updatedAt": 1786100691003,
+      "updatedAt": 1786100955406,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -7582,7 +7580,7 @@
       "name": "G377",
       "model": "3x3x3",
       "status": "Disponível",
-      "updatedAt": 1786100691003,
+      "updatedAt": 1786100955406,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -7598,7 +7596,7 @@
       "name": "G378",
       "model": "3x3x3",
       "status": "Disponível",
-      "updatedAt": 1786100691003,
+      "updatedAt": 1786100955406,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -7614,7 +7612,7 @@
       "name": "G379",
       "model": "3x3x3",
       "status": "Disponível",
-      "updatedAt": 1786100691003,
+      "updatedAt": 1786100955406,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -7630,7 +7628,7 @@
       "name": "G380",
       "model": "3x3x3",
       "status": "Disponível",
-      "updatedAt": 1786100691003,
+      "updatedAt": 1786100955406,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -7646,7 +7644,7 @@
       "name": "G381",
       "model": "3x3x3",
       "status": "Disponível",
-      "updatedAt": 1786100691003,
+      "updatedAt": 1786100955406,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -7662,7 +7660,7 @@
       "name": "G382",
       "model": "3x3x3",
       "status": "Disponível",
-      "updatedAt": 1786100691003,
+      "updatedAt": 1786100955406,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -7678,7 +7676,7 @@
       "name": "G383",
       "model": "3x3x3",
       "status": "Disponível",
-      "updatedAt": 1786100691003,
+      "updatedAt": 1786100955406,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -7694,7 +7692,7 @@
       "name": "G384",
       "model": "3x3x3",
       "status": "Disponível",
-      "updatedAt": 1786100691003,
+      "updatedAt": 1786100955406,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -7710,7 +7708,7 @@
       "name": "G385",
       "model": "3x3x3",
       "status": "Disponível",
-      "updatedAt": 1786100691003,
+      "updatedAt": 1786100955406,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -7726,7 +7724,7 @@
       "name": "G386",
       "model": "3x3x3",
       "status": "Disponível",
-      "updatedAt": 1786100691003,
+      "updatedAt": 1786100955406,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -7742,7 +7740,7 @@
       "name": "G387",
       "model": "3x3x3",
       "status": "Disponível",
-      "updatedAt": 1786100691003,
+      "updatedAt": 1786100955406,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -7758,7 +7756,7 @@
       "name": "G388",
       "model": "3x3x3",
       "status": "Disponível",
-      "updatedAt": 1786100691003,
+      "updatedAt": 1786100955406,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -7774,7 +7772,7 @@
       "name": "G389",
       "model": "3x3x3",
       "status": "Disponível",
-      "updatedAt": 1786100691003,
+      "updatedAt": 1786100955406,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -7790,7 +7788,7 @@
       "name": "G390",
       "model": "3x3x3",
       "status": "Disponível",
-      "updatedAt": 1786100691003,
+      "updatedAt": 1786100955406,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -7806,7 +7804,7 @@
       "name": "G391",
       "model": "3x3x3",
       "status": "Disponível",
-      "updatedAt": 1786100691003,
+      "updatedAt": 1786100955406,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -7822,7 +7820,7 @@
       "name": "G392",
       "model": "3x3x3",
       "status": "Disponível",
-      "updatedAt": 1786100691003,
+      "updatedAt": 1786100955406,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -7838,7 +7836,7 @@
       "name": "G393",
       "model": "3x3x3",
       "status": "Disponível",
-      "updatedAt": 1786100691003,
+      "updatedAt": 1786100955406,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -7854,7 +7852,7 @@
       "name": "G394",
       "model": "3x3x3",
       "status": "Disponível",
-      "updatedAt": 1786100691003,
+      "updatedAt": 1786100955406,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -7870,7 +7868,7 @@
       "name": "G395",
       "model": "3x3x3",
       "status": "Disponível",
-      "updatedAt": 1786100691003,
+      "updatedAt": 1786100955406,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -7886,7 +7884,7 @@
       "name": "G396",
       "model": "3x3x3",
       "status": "Disponível",
-      "updatedAt": 1786100734095,
+      "updatedAt": 1786100955406,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -7902,7 +7900,7 @@
       "name": "G397",
       "model": "3x3x3",
       "status": "Disponível",
-      "updatedAt": 1786100734095,
+      "updatedAt": 1786100955406,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -7918,7 +7916,7 @@
       "name": "G398",
       "model": "3x3x3",
       "status": "Disponível",
-      "updatedAt": 1786100734095,
+      "updatedAt": 1786100955406,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -7934,7 +7932,7 @@
       "name": "G399",
       "model": "3x3x3",
       "status": "Disponível",
-      "updatedAt": 1786100734095,
+      "updatedAt": 1786100955406,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -7950,7 +7948,7 @@
       "name": "G400",
       "model": "3x3x3",
       "status": "Disponível",
-      "updatedAt": 1786100734095,
+      "updatedAt": 1786100955406,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -7966,7 +7964,7 @@
       "name": "G401",
       "model": "3x3x3",
       "status": "Disponível",
-      "updatedAt": 1786100734095,
+      "updatedAt": 1786100955406,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -7982,7 +7980,7 @@
       "name": "G402",
       "model": "3x3x3",
       "status": "Disponível",
-      "updatedAt": 1786100734095,
+      "updatedAt": 1786100955406,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -7998,7 +7996,7 @@
       "name": "G403",
       "model": "3x3x3",
       "status": "Sucata",
-      "updatedAt": 1786100734095,
+      "updatedAt": 1786100955406,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -8012,7 +8010,7 @@
       "name": "G404",
       "model": "3x3x3",
       "status": "Sucata",
-      "updatedAt": 1786100734095,
+      "updatedAt": 1786100955406,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -8026,7 +8024,7 @@
       "name": "G405",
       "model": "3x3x3",
       "status": "Sucata",
-      "updatedAt": 1786100734095,
+      "updatedAt": 1786100955406,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -8040,7 +8038,7 @@
       "name": "G406",
       "model": "3x3x3",
       "status": "Sucata",
-      "updatedAt": 1786100734095,
+      "updatedAt": 1786100955406,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -8054,7 +8052,7 @@
       "name": "G407",
       "model": "3x3x3",
       "status": "Sucata",
-      "updatedAt": 1786100734095,
+      "updatedAt": 1786100955406,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -8068,7 +8066,7 @@
       "name": "G408",
       "model": "3x3x3",
       "status": "Sucata",
-      "updatedAt": 1786100734095,
+      "updatedAt": 1786100955406,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -8082,7 +8080,7 @@
       "name": "G409",
       "model": "3x3x3",
       "status": "Sucata",
-      "updatedAt": 1786100734095,
+      "updatedAt": 1786100955406,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -8096,7 +8094,7 @@
       "name": "G410",
       "model": "3x3x3",
       "status": "Sucata",
-      "updatedAt": 1786100734095,
+      "updatedAt": 1786100955406,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -8110,7 +8108,7 @@
       "name": "G411",
       "model": "3x3x3",
       "status": "Sucata",
-      "updatedAt": 1786100734095,
+      "updatedAt": 1786100955406,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -8124,7 +8122,7 @@
       "name": "G412",
       "model": "3x3x3",
       "status": "Sucata",
-      "updatedAt": 1786100734095,
+      "updatedAt": 1786100955406,
       "dimensions": {
         "length": 3,
         "width": 3,
@@ -8140,7 +8138,7 @@
       "lineId": "e05c638d-8fd4-4a41-bc8a-d32555fa7414",
       "status": "Ocupada",
       "batchId": "9570c5b6-c8ca-4176-be27-38977734037d",
-      "updatedAt": 1786100734095,
+      "updatedAt": 1786100955406,
       "dimensions": {
         "length": 4,
         "width": 4,
@@ -8159,7 +8157,7 @@
       "lineId": "e05c638d-8fd4-4a41-bc8a-d32555fa7414",
       "status": "Ocupada",
       "batchId": "9570c5b6-c8ca-4176-be27-38977734037d",
-      "updatedAt": 1786100734095,
+      "updatedAt": 1786100955406,
       "dimensions": {
         "length": 4,
         "width": 4,
@@ -8178,7 +8176,7 @@
       "lineId": "e05c638d-8fd4-4a41-bc8a-d32555fa7414",
       "status": "Ocupada",
       "batchId": "9570c5b6-c8ca-4176-be27-38977734037d",
-      "updatedAt": 1786100734095,
+      "updatedAt": 1786100955406,
       "dimensions": {
         "length": 4,
         "width": 4,
@@ -8197,7 +8195,7 @@
       "lineId": "e05c638d-8fd4-4a41-bc8a-d32555fa7414",
       "status": "Ocupada",
       "batchId": "9570c5b6-c8ca-4176-be27-38977734037d",
-      "updatedAt": 1786100734095,
+      "updatedAt": 1786100955406,
       "dimensions": {
         "length": 4,
         "width": 4,
@@ -8216,7 +8214,7 @@
       "lineId": "e05c638d-8fd4-4a41-bc8a-d32555fa7414",
       "status": "Ocupada",
       "batchId": "9570c5b6-c8ca-4176-be27-38977734037d",
-      "updatedAt": 1786100734095,
+      "updatedAt": 1786100955406,
       "dimensions": {
         "length": 4,
         "width": 4,
@@ -8235,7 +8233,7 @@
       "lineId": "e05c638d-8fd4-4a41-bc8a-d32555fa7414",
       "status": "Ocupada",
       "batchId": "9570c5b6-c8ca-4176-be27-38977734037d",
-      "updatedAt": 1786100734095,
+      "updatedAt": 1786100955406,
       "dimensions": {
         "length": 4,
         "width": 4,
@@ -8254,7 +8252,7 @@
       "lineId": "e05c638d-8fd4-4a41-bc8a-d32555fa7414",
       "status": "Ocupada",
       "batchId": "9570c5b6-c8ca-4176-be27-38977734037d",
-      "updatedAt": 1786100734095,
+      "updatedAt": 1786100955406,
       "dimensions": {
         "length": 4,
         "width": 4,
@@ -8273,7 +8271,7 @@
       "lineId": "e05c638d-8fd4-4a41-bc8a-d32555fa7414",
       "status": "Ocupada",
       "batchId": "9570c5b6-c8ca-4176-be27-38977734037d",
-      "updatedAt": 1786100734095,
+      "updatedAt": 1786100955406,
       "dimensions": {
         "length": 4,
         "width": 4,
@@ -8292,7 +8290,7 @@
       "lineId": "e05c638d-8fd4-4a41-bc8a-d32555fa7414",
       "status": "Ocupada",
       "batchId": "9570c5b6-c8ca-4176-be27-38977734037d",
-      "updatedAt": 1786100734095,
+      "updatedAt": 1786100955406,
       "dimensions": {
         "length": 4,
         "width": 4,
@@ -8309,7 +8307,7 @@
       "name": "G423",
       "model": "4x4x4",
       "status": "Disponível",
-      "updatedAt": 1786100734095,
+      "updatedAt": 1786100955406,
       "dimensions": {
         "length": 4,
         "width": 4,
@@ -8325,7 +8323,7 @@
       "lineId": "ddb0d1ef-c4d2-4083-a11b-87f9fa0d9702",
       "status": "Ocupada",
       "batchId": "cad7bc6e-f10e-4ab2-89c9-14fac5f3d4e4",
-      "updatedAt": 1786100734095,
+      "updatedAt": 1786100955406,
       "dimensions": {
         "length": 4,
         "width": 4,
@@ -8344,7 +8342,7 @@
       "lineId": "ddb0d1ef-c4d2-4083-a11b-87f9fa0d9702",
       "status": "Ocupada",
       "batchId": "cad7bc6e-f10e-4ab2-89c9-14fac5f3d4e4",
-      "updatedAt": 1786100734095,
+      "updatedAt": 1786100955406,
       "dimensions": {
         "length": 4,
         "width": 4,
@@ -8363,7 +8361,7 @@
       "lineId": "ddb0d1ef-c4d2-4083-a11b-87f9fa0d9702",
       "status": "Ocupada",
       "batchId": "cad7bc6e-f10e-4ab2-89c9-14fac5f3d4e4",
-      "updatedAt": 1786100734095,
+      "updatedAt": 1786100955406,
       "dimensions": {
         "length": 4,
         "width": 4,
@@ -8382,7 +8380,7 @@
       "lineId": "ddb0d1ef-c4d2-4083-a11b-87f9fa0d9702",
       "status": "Ocupada",
       "batchId": "cad7bc6e-f10e-4ab2-89c9-14fac5f3d4e4",
-      "updatedAt": 1786100734095,
+      "updatedAt": 1786100955406,
       "dimensions": {
         "length": 4,
         "width": 4,
@@ -8401,7 +8399,7 @@
       "lineId": "ddb0d1ef-c4d2-4083-a11b-87f9fa0d9702",
       "status": "Ocupada",
       "batchId": "cad7bc6e-f10e-4ab2-89c9-14fac5f3d4e4",
-      "updatedAt": 1786100734095,
+      "updatedAt": 1786100955406,
       "dimensions": {
         "length": 4,
         "width": 4,
@@ -8420,7 +8418,7 @@
       "lineId": "ddb0d1ef-c4d2-4083-a11b-87f9fa0d9702",
       "status": "Ocupada",
       "batchId": "cad7bc6e-f10e-4ab2-89c9-14fac5f3d4e4",
-      "updatedAt": 1786100734095,
+      "updatedAt": 1786100955406,
       "dimensions": {
         "length": 4,
         "width": 4,
@@ -8439,7 +8437,7 @@
       "lineId": "ddb0d1ef-c4d2-4083-a11b-87f9fa0d9702",
       "status": "Ocupada",
       "batchId": "cad7bc6e-f10e-4ab2-89c9-14fac5f3d4e4",
-      "updatedAt": 1786100734095,
+      "updatedAt": 1786100955406,
       "dimensions": {
         "length": 4,
         "width": 4,
@@ -8458,7 +8456,7 @@
       "lineId": "f3b02271-9db0-4949-86a9-cfd9e3e310dc",
       "status": "Ocupada",
       "batchId": "cad7bc6e-f10e-4ab2-89c9-14fac5f3d4e4",
-      "updatedAt": 1786100734095,
+      "updatedAt": 1786100955406,
       "dimensions": {
         "length": 4,
         "width": 4,
@@ -8477,7 +8475,7 @@
       "lineId": "f3b02271-9db0-4949-86a9-cfd9e3e310dc",
       "status": "Ocupada",
       "batchId": "cad7bc6e-f10e-4ab2-89c9-14fac5f3d4e4",
-      "updatedAt": 1786100734095,
+      "updatedAt": 1786100955406,
       "dimensions": {
         "length": 4,
         "width": 4,
@@ -8496,7 +8494,7 @@
       "lineId": "f3b02271-9db0-4949-86a9-cfd9e3e310dc",
       "status": "Ocupada",
       "batchId": "cad7bc6e-f10e-4ab2-89c9-14fac5f3d4e4",
-      "updatedAt": 1786100734095,
+      "updatedAt": 1786100955406,
       "dimensions": {
         "length": 4,
         "width": 4,
@@ -8515,7 +8513,7 @@
       "lineId": "f3b02271-9db0-4949-86a9-cfd9e3e310dc",
       "status": "Ocupada",
       "batchId": "cad7bc6e-f10e-4ab2-89c9-14fac5f3d4e4",
-      "updatedAt": 1786100734095,
+      "updatedAt": 1786100955406,
       "dimensions": {
         "length": 4,
         "width": 4,
@@ -8534,7 +8532,7 @@
       "lineId": "f3b02271-9db0-4949-86a9-cfd9e3e310dc",
       "status": "Ocupada",
       "batchId": "cad7bc6e-f10e-4ab2-89c9-14fac5f3d4e4",
-      "updatedAt": 1786100734095,
+      "updatedAt": 1786100955406,
       "dimensions": {
         "length": 4,
         "width": 4,
@@ -8553,7 +8551,7 @@
       "lineId": "f3b02271-9db0-4949-86a9-cfd9e3e310dc",
       "status": "Ocupada",
       "batchId": "cad7bc6e-f10e-4ab2-89c9-14fac5f3d4e4",
-      "updatedAt": 1786100734095,
+      "updatedAt": 1786100955407,
       "dimensions": {
         "length": 4,
         "width": 4,
@@ -8572,7 +8570,7 @@
       "lineId": "f3b02271-9db0-4949-86a9-cfd9e3e310dc",
       "status": "Ocupada",
       "batchId": "cad7bc6e-f10e-4ab2-89c9-14fac5f3d4e4",
-      "updatedAt": 1786100734095,
+      "updatedAt": 1786100955407,
       "dimensions": {
         "length": 4,
         "width": 4,
@@ -8591,7 +8589,7 @@
       "lineId": "f3b02271-9db0-4949-86a9-cfd9e3e310dc",
       "status": "Ocupada",
       "batchId": "cad7bc6e-f10e-4ab2-89c9-14fac5f3d4e4",
-      "updatedAt": 1786100734095,
+      "updatedAt": 1786100955407,
       "dimensions": {
         "length": 4,
         "width": 4,
@@ -8610,7 +8608,7 @@
       "lineId": "f3b02271-9db0-4949-86a9-cfd9e3e310dc",
       "status": "Ocupada",
       "batchId": "cad7bc6e-f10e-4ab2-89c9-14fac5f3d4e4",
-      "updatedAt": 1786100734095,
+      "updatedAt": 1786100955407,
       "dimensions": {
         "length": 4,
         "width": 4,
@@ -8627,7 +8625,7 @@
       "name": "G440",
       "model": "4x4x4",
       "status": "Disponível",
-      "updatedAt": 1786100734095,
+      "updatedAt": 1786100955407,
       "dimensions": {
         "length": 4,
         "width": 4,
@@ -8641,7 +8639,7 @@
       "name": "G441",
       "model": "4x4x4",
       "status": "Disponível",
-      "updatedAt": 1786100734095,
+      "updatedAt": 1786100955407,
       "dimensions": {
         "length": 4,
         "width": 4,
@@ -8655,7 +8653,7 @@
       "name": "G442",
       "model": "4x4x4",
       "status": "Disponível",
-      "updatedAt": 1786100734095,
+      "updatedAt": 1786100955407,
       "dimensions": {
         "length": 4,
         "width": 4,
@@ -8669,7 +8667,7 @@
       "name": "G443",
       "model": "4x4x4",
       "status": "Disponível",
-      "updatedAt": 1786100734095,
+      "updatedAt": 1786100955407,
       "dimensions": {
         "length": 4,
         "width": 4,
@@ -8683,7 +8681,7 @@
       "name": "G444",
       "model": "4x4x4",
       "status": "Disponível",
-      "updatedAt": 1786100734095,
+      "updatedAt": 1786100955407,
       "dimensions": {
         "length": 4,
         "width": 4,
@@ -8697,7 +8695,7 @@
       "name": "G445",
       "model": "4x4x4",
       "status": "Disponível",
-      "updatedAt": 1786100734095,
+      "updatedAt": 1786100955407,
       "dimensions": {
         "length": 4,
         "width": 4,
@@ -8711,7 +8709,7 @@
       "name": "G446",
       "model": "4x4x4",
       "status": "Disponível",
-      "updatedAt": 1786100734095,
+      "updatedAt": 1786100955407,
       "dimensions": {
         "length": 4,
         "width": 4,
@@ -8725,7 +8723,7 @@
       "name": "G447",
       "model": "4x4x4",
       "status": "Disponível",
-      "updatedAt": 1786100734095,
+      "updatedAt": 1786100955407,
       "dimensions": {
         "length": 4,
         "width": 4,
@@ -8741,7 +8739,7 @@
       "lineId": "3d4f713c-3124-4a66-8550-84d6721f4235",
       "status": "Ocupada",
       "batchId": "e4d7cd18-d1ed-4581-a0a9-b06947cf26e0",
-      "updatedAt": 1786100734095,
+      "updatedAt": 1786100955407,
       "dimensions": {
         "length": 3,
         "width": 2,
@@ -8760,7 +8758,7 @@
       "lineId": "fe692538-074f-4ec6-a07e-2cbecca7edad",
       "status": "Ocupada",
       "batchId": "718bbf55-aefa-427f-8d4c-79866bfc5df1",
-      "updatedAt": 1786100734095,
+      "updatedAt": 1786100955407,
       "dimensions": {
         "length": 2,
         "width": 2,
@@ -8779,7 +8777,7 @@
       "lineId": "e05c638d-8fd4-4a41-bc8a-d32555fa7414",
       "status": "Ocupada",
       "batchId": "9570c5b6-c8ca-4176-be27-38977734037d",
-      "updatedAt": 1786100734095,
+      "updatedAt": 1786100955407,
       "dimensions": {
         "length": 4,
         "width": 4,
@@ -8798,7 +8796,7 @@
       "lineId": "3d4f713c-3124-4a66-8550-84d6721f4235",
       "status": "Limpeza",
       "batchId": "9ce0396e-06cf-416d-b795-ae69fc473fae",
-      "updatedAt": 1786100734096,
+      "updatedAt": 1786100955407,
       "dimensions": {
         "length": 3,
         "width": 2,
@@ -8817,7 +8815,7 @@
       "model": "2x2x2",
       "status": "Ocupada",
       "batchId": "e4d7cd18-d1ed-4581-a0a9-b06947cf26e0",
-      "updatedAt": 1786100734096,
+      "updatedAt": 1786100955407,
       "dimensions": {
         "length": 2,
         "width": 2,
@@ -53917,4 +53915,6 @@
       "feedTypeId": "412d2bab-052a-40b9-8e3b-136bc7131140"
     },
     {
-      "id": "488b73ac-437c-
+      "id": "488b73ac-437c-4bdf-933b-7b90fb261c01",
+      "amount": 8600,
+      "cageId": "139d29

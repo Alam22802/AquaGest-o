@@ -742,8 +742,7 @@ const Dashboard: React.FC<Props> = ({ state }) => {
   }, [state.batches, state.cages, state.mortalityLogs, state.biometryLogs, state.feedingLogs, state.feedTypes, state.harvestLogs, state.slaughterLogs, state.batchRevenues]);
 
   const filteredBatchStats = useMemo(() => {
-    const activeBatches = batchStats.filter(b => !b.isClosed);
-    return activeBatches.length > 0 ? activeBatches : batchStats;
+    return batchStats.filter(b => !b.isClosed && b.settlementBalance === 0);
   }, [batchStats]);
 
   const selectedBatchData = useMemo(() => {
@@ -810,9 +809,8 @@ const Dashboard: React.FC<Props> = ({ state }) => {
     let expectedHarvestDate = '';
 
     const filteredBatches = (state.batches || []).filter(b => {
-      const isSelected = selectedBatchIds.length === 0 || selectedBatchIds.includes(b.id);
-      if (selectedBatchIds.length > 0) return isSelected;
-      return !b.isClosed;
+      if (selectedBatchIds.length > 0) return selectedBatchIds.includes(b.id);
+      return filteredBatchStats.some(s => s.id === b.id);
     });
     
     // Optimization: Index filtered batches, cages and harvest logs
@@ -1140,9 +1138,8 @@ const Dashboard: React.FC<Props> = ({ state }) => {
     let logs: any[] = [];
 
     const filteredBatches = (state.batches || []).filter(b => {
-      const isSelected = selectedBatchIds.length === 0 || selectedBatchIds.includes(b.id);
-      if (selectedBatchIds.length > 0) return isSelected;
-      return !b.isClosed;
+      if (selectedBatchIds.length > 0) return selectedBatchIds.includes(b.id);
+      return filteredBatchStats.some(s => s.id === b.id);
     });
 
     const filteredBatchMap = new Map((filteredBatches || []).map(b => [b.id, b]));
@@ -1193,9 +1190,8 @@ const Dashboard: React.FC<Props> = ({ state }) => {
     let expectedHarvestDate = '';
 
     const relevantBatches = (state.batches || []).filter(b => {
-      const isSelected = selectedBatchIds.length === 0 || selectedBatchIds.includes(b.id);
-      if (selectedBatchIds.length > 0) return isSelected;
-      return !b.isClosed;
+      if (selectedBatchIds.length > 0) return selectedBatchIds.includes(b.id);
+      return filteredBatchStats.some(s => s.id === b.id);
     });
 
     if (relevantBatches.length > 0) {
