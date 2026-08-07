@@ -177,7 +177,7 @@ const App: React.FC = () => {
         try {
           const remote = await fetchRemoteState(initialConfig);
           if (remote) {
-            const merged = ensureStateIntegrity(data, remote, 'remote');
+            const merged = ensureStateIntegrity(data, remote, 'local');
             data = merged;
           }
           // Garante que todos os dados restaurados ou limpos localmente (como Lote 08) sejam IMEDIATAMENTE salvos na nuvem para que outros usuários vejam
@@ -230,7 +230,7 @@ const App: React.FC = () => {
       const remote = await fetchRemoteState(configToUse);
       
       if (remote) {
-        const merged = ensureStateIntegrity(state, remote, 'remote');
+        const merged = ensureStateIntegrity(state, remote, 'local');
         const nowIso = new Date().toISOString();
         
         const updatedUsers = merged.users.map(u => 
@@ -479,7 +479,7 @@ const App: React.FC = () => {
         if (remote) {
           setState(prev => {
             if (!prev) return remote;
-            const merged = ensureStateIntegrity(prev, remote, 'remote');
+            const merged = ensureStateIntegrity(prev, remote, 'local');
             lastSavedStateRef.current = remote;
             return merged;
           });
@@ -505,7 +505,7 @@ const App: React.FC = () => {
         const remote = await fetchRemoteState(configToUse);
         if (remote) {
           const localState = state || await loadState();
-          const mergedState = ensureStateIntegrity(localState, remote, 'remote');
+          const mergedState = ensureStateIntegrity(localState, remote, 'local');
           setState(mergedState);
           lastSavedStateRef.current = remote;
           return mergedState;

@@ -53,24 +53,22 @@ const CageInventory: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
 
     // Bulk Edit Logic
     if (selectedIds.length > 0 && !editingId) {
-      const updatedCages = (state.cages || []).map(c => 
-        selectedIds.includes(c.id) ? {
+      const updatedCages = (state.cages || []).map(c => {
+        if (!selectedIds.includes(c.id)) return c;
+        const newL = formData.length ? Number(formData.length) : c.dimensions.length;
+        const newW = formData.width ? Number(formData.width) : c.dimensions.width;
+        const newD = formData.depth ? Number(formData.depth) : c.dimensions.depth;
+        return {
           ...c,
-          dimensions: {
-            length: formData.length ? Number(formData.length) : c.dimensions.length,
-            width: formData.width ? Number(formData.width) : c.dimensions.width,
-            depth: formData.depth ? Number(formData.depth) : c.dimensions.depth
-          },
+          dimensions: { length: newL, width: newW, depth: newD },
+          model: getInferredModel(newL, newW, newD, c.name),
           stockingDensity: formData.stockingDensity ? Number(formData.stockingDensity) : c.stockingDensity,
           stockingCapacity: formData.stockingDensity || formData.length || formData.width || formData.depth 
-            ? Math.floor((formData.length ? Number(formData.length) : c.dimensions.length) * 
-                         (formData.width ? Number(formData.width) : c.dimensions.width) * 
-                         (formData.depth ? Number(formData.depth) : c.dimensions.depth) * 
-                         (formData.stockingDensity ? Number(formData.stockingDensity) : c.stockingDensity))
+            ? Math.floor(newL * newW * newD * (formData.stockingDensity ? Number(formData.stockingDensity) : c.stockingDensity))
             : c.stockingCapacity,
           updatedAt: Date.now()
-        } : c
-      );
+        };
+      });
       onUpdate({ ...state, cages: updatedCages });
       setSelectedIds([]);
       resetForm();

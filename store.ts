@@ -280,7 +280,7 @@ export const areStatesEqual = (a: AppState, b: AppState): boolean => {
   return true;
 };
 
-export const ensureStateIntegrity = (state: any, mergeWith?: AppState, priority: 'local' | 'remote' = 'remote'): AppState => {
+export const ensureStateIntegrity = (state: any, mergeWith?: AppState, priority: 'local' | 'remote' = 'local'): AppState => {
   const rawDeletedIds = [
     ...(state?.deletedIds || []),
     ...(mergeWith?.deletedIds || [])
@@ -568,30 +568,20 @@ export const ensureStateIntegrity = (state: any, mergeWith?: AppState, priority:
   });
 
   const getReconciledBatchId = (cageId: string | undefined, logDateStr: string | undefined, currentBatchId?: string): string => {
+    // If currentBatchId is already assigned and exists in batchMap, preserve it!
+    if (currentBatchId && batchMap.has(currentBatchId) && !deletedSet.has(currentBatchId)) {
+      return currentBatchId;
+    }
+
     if (!logDateStr) return currentBatchId || '';
     const logDate = logDateStr.split('T')[0];
-
-    // Check if currentBatchId is valid for logDate
-    if (currentBatchId) {
-      const currentBatch = batchMap.get(currentBatchId);
-      if (currentBatch) {
-        const settDate = currentBatch.settlementDate;
-        const endDate = batchEndDates.get(currentBatchId) || currentBatch.harvestDate;
-        
-        // If the log date is BEFORE the settlement date of currentBatchId, it CANNOT belong to currentBatchId!
-        if (settDate && logDate < settDate) {
-          // Fallthrough to search for the correct historical batch
-        } else if (!endDate || logDate <= endDate || currentBatch.status === 'Ativo') {
-          return currentBatchId;
-        }
-      }
-    }
 
     if (!cageId) return currentBatchId || '';
 
     // Search for a batch that housed cageId on logDate
     let matchingBatchId = '';
     for (const b of allBatches) {
+      if (deletedSet.has(b.id)) continue;
       const isCageInBatch = (b.cageIds || []).includes(cageId) || 
         normalizedCages.some(c => c.id === cageId && c.batchId === b.id);
       const hasHarvestForCage = (finalResult.harvestLogs || []).some(h => h.cageId === cageId && h.batchId === b.id);
@@ -610,7 +600,7 @@ export const ensureStateIntegrity = (state: any, mergeWith?: AppState, priority:
       }
     }
 
-    return matchingBatchId || (currentBatchId && batchMap.has(currentBatchId) && (!batchMap.get(currentBatchId)?.settlementDate || logDate >= (batchMap.get(currentBatchId)?.settlementDate || '')) ? currentBatchId : '');
+    return matchingBatchId || (currentBatchId && batchMap.has(currentBatchId) ? currentBatchId : '');
   };
 
   const purgedLogIds: string[] = [];
@@ -620,8 +610,14 @@ export const ensureStateIntegrity = (state: any, mergeWith?: AppState, priority:
     finalResult.feedingLogs.forEach(f => {
       const fDate = (f.timestamp || '').split('T')[0];
       const correctBatchId = getReconciledBatchId(f.cageId, fDate, f.batchId);
-      if (correctBatchId && batchMap.has(correctBatchId) && !deletedSet.has(correctBatchId)) {
-        validFeedingLogs.push(correctBatchId !== f.batchId ? { ...f, batchId: correctBatchId, updatedAt: Date.now() } : f);
+      const targetBatchId = (correctBatchId && batchMap.has(correctBatchId) && !deletedSet.has(correctBatchId)) 
+        ? correctBatchId 
+        : (f.batchId && batchMap.has(f.batchId) && !deletedSet.has(f.batchId) ? f.batchId : '');
+      
+      if (targetBatchId) {
+        validFeedingLogs.push(targetBatchId !== f.batchId ? { ...f, batchId: targetBatchId, updatedAt: Date.now() } : f);
+      } else if (f.cageId && normalizedCages.some(c => c.id === f.cageId)) {
+        validFeedingLogs.push(f);
       } else {
         if (f.id) purgedLogIds.push(f.id);
       }
@@ -634,8 +630,14 @@ export const ensureStateIntegrity = (state: any, mergeWith?: AppState, priority:
     finalResult.mortalityLogs.forEach(m => {
       const mDate = m.date || '';
       const correctBatchId = getReconciledBatchId(m.cageId, mDate, m.batchId);
-      if (correctBatchId && batchMap.has(correctBatchId) && !deletedSet.has(correctBatchId)) {
-        validMortalityLogs.push(correctBatchId !== m.batchId ? { ...m, batchId: correctBatchId, updatedAt: Date.now() } : m);
+      const targetBatchId = (correctBatchId && batchMap.has(correctBatchId) && !deletedSet.has(correctBatchId))
+        ? correctBatchId
+        : (m.batchId && batchMap.has(m.batchId) && !deletedSet.has(m.batchId) ? m.batchId : '');
+
+      if (targetBatchId) {
+        validMortalityLogs.push(targetBatchId !== m.batchId ? { ...m, batchId: targetBatchId, updatedAt: Date.now() } : m);
+      } else if (m.cageId && normalizedCages.some(c => c.id === m.cageId)) {
+        validMortalityLogs.push(m);
       } else {
         if (m.id) purgedLogIds.push(m.id);
       }
@@ -648,8 +650,14 @@ export const ensureStateIntegrity = (state: any, mergeWith?: AppState, priority:
     finalResult.biometryLogs.forEach(b => {
       const bDate = b.date || '';
       const correctBatchId = getReconciledBatchId(b.cageId, bDate, b.batchId);
-      if (correctBatchId && batchMap.has(correctBatchId) && !deletedSet.has(correctBatchId)) {
-        validBiometryLogs.push(correctBatchId !== b.batchId ? { ...b, batchId: correctBatchId, updatedAt: Date.now() } : b);
+      const targetBatchId = (correctBatchId && batchMap.has(correctBatchId) && !deletedSet.has(correctBatchId))
+        ? correctBatchId
+        : (b.batchId && batchMap.has(b.batchId) && !deletedSet.has(b.batchId) ? b.batchId : '');
+
+      if (targetBatchId) {
+        validBiometryLogs.push(targetBatchId !== b.batchId ? { ...b, batchId: targetBatchId, updatedAt: Date.now() } : b);
+      } else if (b.cageId && normalizedCages.some(c => c.id === b.cageId)) {
+        validBiometryLogs.push(b);
       } else {
         if (b.id) purgedLogIds.push(b.id);
       }
