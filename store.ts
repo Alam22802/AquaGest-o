@@ -79,11 +79,24 @@ const initialState: AppState = {
   deletedIds: []
 };
 
+function isObjectModified(a: any, b: any): boolean {
+  if (a === b) return false;
+  if (!a || !b) return true;
+  const keys = Object.keys(a);
+  for (const key of keys) {
+    if (key === 'updatedAt' || key === 'lastSync') continue;
+    if (JSON.stringify(a[key]) !== JSON.stringify(b[key])) {
+      return true;
+    }
+  }
+  return false;
+}
+
 function mergeArraysById<T extends { id: string, updatedAt?: number | string }>(
   local: T[], 
   remote: T[], 
   deletedIds: string[] = [],
-  priority: 'local' | 'remote' = 'remote'
+  priority: 'local' | 'remote' = 'local'
 ): T[] {
   const safeLocal = local || [];
   const safeRemote = remote || [];
@@ -122,14 +135,21 @@ function mergeArraysById<T extends { id: string, updatedAt?: number | string }>(
       const existingTime = getTime(existing);
       
       if (itemTime > existingTime) {
-        map.set(item.id, { ...existing, ...item });
+        // Remote is newer
+        map.set(item.id, { ...existing, ...item, updatedAt: itemTime });
       } else if (existingTime > itemTime) {
-        map.set(item.id, { ...item, ...existing });
+        // Local is newer
+        map.set(item.id, { ...item, ...existing, updatedAt: existingTime });
       } else {
-        const primary = priority === 'local' ? existing : item;
-        const secondary = priority === 'local' ? item : existing;
-        const merged: any = { ...secondary, ...primary };
-        map.set(item.id, merged);
+        // Equal timestamps: resolve according to priority and keep modified fields
+        const modified = isObjectModified(existing, item);
+        if (priority === 'local') {
+          const newTime = modified ? Date.now() : (existingTime || Date.now());
+          map.set(item.id, { ...item, ...existing, updatedAt: newTime });
+        } else {
+          const newTime = modified ? Date.now() : (itemTime || Date.now());
+          map.set(item.id, { ...existing, ...item, updatedAt: newTime });
+        }
       }
     }
   }

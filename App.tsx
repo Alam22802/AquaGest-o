@@ -270,12 +270,12 @@ const App: React.FC = () => {
     if (!configToUse) return;
 
     const unsubscribe = subscribeToRemoteChanges(configToUse, (remoteState) => {
-      // Don't skip updates, just merge them carefully
+      // Don't skip updates, merge carefully preserving active local edits
       setState(prev => {
         if (!prev) return remoteState;
         
-        const merged = ensureStateIntegrity(prev, remoteState, 'remote');
-        lastSavedStateRef.current = remoteState;
+        const merged = ensureStateIntegrity(prev, remoteState, 'local');
+        lastSavedStateRef.current = merged;
         return merged;
       });
     });
