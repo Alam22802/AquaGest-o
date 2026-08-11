@@ -97,13 +97,6 @@ const MortalityLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
           let bId = log.batchId;
           const mDate = log.date;
 
-          if (bId) {
-            const batch = (state.batches || []).find(b => b.id === bId);
-            if (batch && batch.settlementDate && mDate < batch.settlementDate) {
-              bId = undefined;
-            }
-          }
-
           if (!bId && log.cageId) {
             const cage = cageMap.get(log.cageId);
             if (cage?.batchId) {
@@ -215,13 +208,6 @@ const MortalityLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     const cage = cageMap.get(log.cageId);
     const mDate = log.date;
 
-    if (bId) {
-      const batch = (state.batches || []).find(b => b.id === bId);
-      if (batch && batch.settlementDate && mDate < batch.settlementDate) {
-        bId = undefined;
-      }
-    }
-    
     if (!bId && cage) {
       const sortedHarvestLogs = [...(state.harvestLogs || [])].sort((a, b) => a.date.localeCompare(b.date));
       const harvest = sortedHarvestLogs.find(h => h.cageId === log.cageId && h.date >= mDate);

@@ -472,21 +472,16 @@ export const ensureStateIntegrity = (state: any, mergeWith?: AppState, priority:
     if (status === 'Em Uso') {
       status = 'Ocupada';
     }
+    if (!status) {
+      status = batchId ? 'Ocupada' : 'Disponível';
+    }
     if (batchId) {
       const batch = batches.find(b => b.id === batchId);
       if (batch && !settlementDate) {
         settlementDate = batch.settlementDate;
       }
-      if (!status || status === 'Disponível') {
-        status = 'Ocupada';
-      }
       if (harvest && status === 'Ocupada') {
-        status = 'Limpeza';
         harvestDate = harvest.date || harvestDate;
-      }
-    } else {
-      if (status === 'Ocupada') {
-        status = 'Disponível';
       }
     }
 

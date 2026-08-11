@@ -474,19 +474,14 @@ const Dashboard: React.FC<Props> = ({ state }) => {
     });
 
     const resolveLogBatchId = (logCageId?: string, logDate?: string, explicitBatchId?: string) => {
-      if (!logDate) return explicitBatchId;
-      const cleanDate = logDate.split('T')[0];
-
       if (explicitBatchId) {
-        const batch = batchMap.get(explicitBatchId);
-        if (batch) {
-          if (!batch.settlementDate || cleanDate >= batch.settlementDate) {
-            return explicitBatchId;
-          }
-        } else {
+        if (!batchMap.size || batchMap.has(explicitBatchId)) {
           return explicitBatchId;
         }
       }
+
+      if (!logDate) return explicitBatchId;
+      const cleanDate = logDate.split('T')[0];
 
       if (!logCageId) return undefined;
 

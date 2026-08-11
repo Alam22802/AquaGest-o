@@ -21,6 +21,28 @@ const generateId = () => {
   }
 };
 
+const getInferredModel = (l: number, w: number, d: number, name?: string): Cage['model'] => {
+  const nameLower = (name || '').toLowerCase();
+  if (nameLower.includes('2x2x2') || nameLower.includes('2x2')) return '2x2x2';
+  if (nameLower.includes('3x2x2,5') || nameLower.includes('3x2x2.5') || nameLower.includes('3x2')) return '3x2x2,5';
+  if (nameLower.includes('3x3x3') || nameLower.includes('3x3')) return '3x3x3';
+  if (nameLower.includes('4x4x4') || nameLower.includes('4x4') || nameLower.includes('6x6')) return '4x4x4';
+
+  const dimKey = `${l}x${w}x${d}`;
+  if (dimKey === '2x2x2') return '2x2x2';
+  if (dimKey === '3x2x2.5' || dimKey === '3x2x2,5') return '3x2x2,5';
+  if (dimKey === '3x3x3') return '3x3x3';
+  if (dimKey === '4x4x4') return '4x4x4';
+
+  const vol = l * w * d;
+  if (vol > 0 && vol <= 8) return '2x2x2';
+  if (vol > 8 && vol <= 16) return '3x2x2,5';
+  if (vol > 16 && vol <= 27) return '3x3x3';
+  if (vol > 27) return '4x4x4';
+
+  return '4x4x4'; // Default
+};
+
 const CageInventory: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -81,29 +103,6 @@ const CageInventory: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     // Lógica para detecção de intervalo (ex: G01 - G40)
     const rangeRegex = /^(.+?)(\d+)\s*-\s*(.+?)(\d+)$/;
     const match = formData.name.match(rangeRegex);
-
-    // Inferred model based on dimensions and name
-    const getInferredModel = (l: number, w: number, d: number, name?: string): Cage['model'] => {
-      const nameLower = (name || '').toLowerCase();
-      if (nameLower.includes('2x2x2') || nameLower.includes('2x2')) return '2x2x2';
-      if (nameLower.includes('3x2x2,5') || nameLower.includes('3x2x2.5') || nameLower.includes('3x2')) return '3x2x2,5';
-      if (nameLower.includes('3x3x3') || nameLower.includes('3x3')) return '3x3x3';
-      if (nameLower.includes('4x4x4') || nameLower.includes('4x4') || nameLower.includes('6x6')) return '4x4x4';
-
-      const dimKey = `${l}x${w}x${d}`;
-      if (dimKey === '2x2x2') return '2x2x2';
-      if (dimKey === '3x2x2.5' || dimKey === '3x2x2,5') return '3x2x2,5';
-      if (dimKey === '3x3x3') return '3x3x3';
-      if (dimKey === '4x4x4') return '4x4x4';
-
-      const vol = l * w * d;
-      if (vol > 0 && vol <= 8) return '2x2x2';
-      if (vol > 8 && vol <= 16) return '3x2x2,5';
-      if (vol > 16 && vol <= 27) return '3x3x3';
-      if (vol > 27) return '4x4x4';
-
-      return '4x4x4'; // Default
-    };
 
     if (!editingId && match) {
       const prefix1 = match[1];
