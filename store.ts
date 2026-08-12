@@ -194,15 +194,16 @@ function mergeUsers(
       const exSyncTime = existing.lastSync ? new Date(existing.lastSync).getTime() : 0;
       const latestLastSync = (uSyncTime >= exSyncTime && u.lastSync) ? u.lastSync : existing.lastSync;
 
-      const primary = (localTime > remoteTime || (priority === 'local' && localTime >= remoteTime)) ? u : existing;
+      const isLocalPrimary = (localTime > remoteTime || (priority === 'local' && localTime >= remoteTime));
+      const primary = isLocalPrimary ? u : existing;
 
       const mergedUser: User = {
         ...primary,
         isApproved: mergedApproval,
         lastSync: latestLastSync,
         updatedAt: Math.max(localTime, remoteTime) || Date.now(),
-        canEdit: existing.isApproved ? existing.canEdit : u.canEdit,
-        allowedTabs: existing.isApproved ? existing.allowedTabs : u.allowedTabs,
+        canEdit: primary.isMaster ? true : primary.canEdit,
+        allowedTabs: primary.isMaster ? undefined : primary.allowedTabs,
       };
 
       map.set(u.id, mergedUser);
