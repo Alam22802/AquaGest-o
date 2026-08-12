@@ -77,14 +77,16 @@ const App: React.FC = () => {
         }
 
         let dimensions = c.dimensions;
-        if (newModel === '2x2x2') {
-          dimensions = { length: 2, width: 2, depth: 2 };
-        } else if (newModel === '3x2x2,5') {
-          dimensions = { length: 3, width: 2, depth: 2.5 };
-        } else if (newModel === '3x3x3') {
-          dimensions = { length: 3, width: 3, depth: 3 };
-        } else if (newModel === '4x4x4') {
-          dimensions = { length: 4, width: 4, depth: 4 };
+        if (!dimensions || typeof dimensions !== 'object' || !dimensions.length || !dimensions.width || !dimensions.depth) {
+          if (newModel === '2x2x2') {
+            dimensions = { length: 2, width: 2, depth: 2 };
+          } else if (newModel === '3x2x2,5') {
+            dimensions = { length: 3, width: 2, depth: 2.5 };
+          } else if (newModel === '3x3x3') {
+            dimensions = { length: 3, width: 3, depth: 3 };
+          } else if (newModel === '4x4x4') {
+            dimensions = { length: 4, width: 4, depth: 4 };
+          }
         }
 
         if (newModel !== c.model || JSON.stringify(dimensions) !== JSON.stringify(c.dimensions)) {

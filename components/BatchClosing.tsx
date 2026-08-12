@@ -133,12 +133,16 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
         const closedDate = batch.closedAt.split('T')[0];
         if (fDate > closedDate) return false;
       }
+      if (batch.harvestDate && fDate > batch.harvestDate) return false;
+      if (batch.settlementDate && fDate < batch.settlementDate) return false;
+
+      if (f.cageId && harvestCages.has(f.cageId)) {
+        const harvest = harvestsByBatch.find(h => h.cageId === f.cageId);
+        if (harvest && fDate > harvest.date) return false;
+      }
+
       if (f.batchId === batch.id) return true;
       if (f.cageId) {
-        if (harvestCages.has(f.cageId)) {
-          const harvest = harvestsByBatch.find(h => h.cageId === f.cageId);
-          return harvest && fDate <= harvest.date;
-        }
         const cage = cageMap.get(f.cageId);
         return cage?.batchId === batch.id && fDate >= batch.settlementDate;
       }

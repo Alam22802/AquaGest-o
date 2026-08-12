@@ -474,40 +474,45 @@ const Dashboard: React.FC<Props> = ({ state }) => {
     });
 
     const resolveLogBatchId = (logCageId?: string, logDate?: string, explicitBatchId?: string) => {
+      const cleanDate = logDate ? logDate.split('T')[0] : '';
+
+      const isValidForBatch = (b: Batch): boolean => {
+        if (!b) return false;
+        if (cleanDate) {
+          if (b.settlementDate && cleanDate < b.settlementDate) return false;
+          if (b.isClosed && b.closedAt && cleanDate > b.closedAt.split('T')[0]) return false;
+          if (b.harvestDate && cleanDate > b.harvestDate) return false;
+
+          if (logCageId) {
+            const cageHarvests = harvestLogsByCage.get(logCageId) || [];
+            const batchHarvests = cageHarvests.filter(h => h.batchId === b.id);
+            if (batchHarvests.length > 0) {
+              const maxHarvestDate = batchHarvests.reduce((max, h) => (h.date && h.date > max) ? h.date : max, '');
+              if (maxHarvestDate && cleanDate > maxHarvestDate) return false;
+            }
+          }
+        }
+        return true;
+      };
+
       if (explicitBatchId) {
         const targetBatch = batchMap.get(explicitBatchId);
-        if (targetBatch?.isClosed && targetBatch.closedAt && logDate) {
-          const cleanDate = logDate.split('T')[0];
-          const closedDate = targetBatch.closedAt.split('T')[0];
-          if (cleanDate > closedDate) return undefined;
-        }
-        if (!batchMap.size || batchMap.has(explicitBatchId)) {
+        if (targetBatch && isValidForBatch(targetBatch)) {
           return explicitBatchId;
         }
       }
 
-      if (!logDate) return explicitBatchId;
-      const cleanDate = logDate.split('T')[0];
+      if (!cleanDate || !logCageId) return undefined;
 
-      if (!logCageId) return undefined;
+      for (const b of state.batches || []) {
+        if (!isValidForBatch(b)) continue;
 
-      const cageHarvests = harvestLogsByCage.get(logCageId);
-      if (cageHarvests && cageHarvests.length > 0) {
-        const harvest = cageHarvests.find(h => h.date >= cleanDate);
-        if (harvest) {
-          const harvestBatch = batchMap.get(harvest.batchId);
-          if (!harvestBatch?.settlementDate || cleanDate >= harvestBatch.settlementDate) {
-            return harvest.batchId;
-          }
-        }
-      }
+        const isCageInBatch = (b.cageIds || []).includes(logCageId) ||
+          (state.cages || []).some(c => c.id === logCageId && c.batchId === b.id) ||
+          (harvestLogsByCage.get(logCageId) || []).some(h => h.batchId === b.id);
 
-      const cage = cageMap.get(logCageId);
-      if (cage?.batchId) {
-        const batch = batchMap.get(cage.batchId);
-        const cageSettlement = cage.settlementDate || batch?.settlementDate;
-        if (cageSettlement && cleanDate >= cageSettlement) {
-          return cage.batchId;
+        if (isCageInBatch) {
+          return b.id;
         }
       }
 

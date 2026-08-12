@@ -582,40 +582,54 @@ export const ensureStateIntegrity = (state: any, mergeWith?: AppState, priority:
     }
   });
 
+  const isValidForBatch = (batchId: string, cageId?: string, logDateStr?: string): boolean => {
+    const b = batchMap.get(batchId);
+    if (!b || deletedSet.has(b.id)) return false;
+
+    if (logDateStr) {
+      const cleanDate = logDateStr.split('T')[0];
+      if (b.settlementDate && cleanDate < b.settlementDate) return false;
+      if (b.isClosed && b.closedAt && cleanDate > b.closedAt.split('T')[0]) return false;
+      if (b.harvestDate && cleanDate > b.harvestDate) return false;
+
+      if (cageId) {
+        const cageHarvests = (finalResult.harvestLogs || []).filter(h => h.cageId === cageId && h.batchId === b.id);
+        if (cageHarvests.length > 0) {
+          const maxHarvestDate = cageHarvests.reduce((max, h) => (h.date && h.date > max) ? h.date : max, '');
+          if (maxHarvestDate && cleanDate > maxHarvestDate) return false;
+        }
+      }
+    }
+    return true;
+  };
+
   const getReconciledBatchId = (cageId: string | undefined, logDateStr: string | undefined, currentBatchId?: string): string => {
-    // If currentBatchId is already assigned and exists in batchMap, preserve it!
-    if (currentBatchId && batchMap.has(currentBatchId) && !deletedSet.has(currentBatchId)) {
+    if (currentBatchId && isValidForBatch(currentBatchId, cageId, logDateStr)) {
       return currentBatchId;
     }
 
-    if (!logDateStr) return currentBatchId || '';
+    if (!logDateStr) {
+      return (currentBatchId && isValidForBatch(currentBatchId, cageId)) ? currentBatchId : '';
+    }
+
     const logDate = logDateStr.split('T')[0];
 
-    if (!cageId) return currentBatchId || '';
-
-    // Search for a batch that housed cageId on logDate
-    let matchingBatchId = '';
+    // Search for a batch that housed cageId on logDate and is valid for logDate
     for (const b of allBatches) {
-      if (deletedSet.has(b.id)) continue;
-      const isCageInBatch = (b.cageIds || []).includes(cageId) || 
-        normalizedCages.some(c => c.id === cageId && c.batchId === b.id);
-      const hasHarvestForCage = (finalResult.harvestLogs || []).some(h => h.cageId === cageId && h.batchId === b.id);
+      if (!isValidForBatch(b.id, cageId, logDateStr)) continue;
 
-      if (isCageInBatch || hasHarvestForCage) {
-        const settDate = b.settlementDate;
-        const endDate = batchEndDates.get(b.id) || b.harvestDate;
-        if (settDate && logDate >= settDate) {
-          if (!endDate || logDate <= endDate) {
-            matchingBatchId = b.id;
-            break;
-          } else if (!matchingBatchId) {
-            matchingBatchId = b.id;
-          }
+      if (cageId) {
+        const isCageInBatch = (b.cageIds || []).includes(cageId) || 
+          normalizedCages.some(c => c.id === cageId && c.batchId === b.id) ||
+          (finalResult.harvestLogs || []).some(h => h.cageId === cageId && h.batchId === b.id);
+
+        if (isCageInBatch) {
+          return b.id;
         }
       }
     }
 
-    return matchingBatchId || (currentBatchId && batchMap.has(currentBatchId) ? currentBatchId : '');
+    return '';
   };
 
   const purgedLogIds: string[] = [];
