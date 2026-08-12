@@ -215,7 +215,7 @@ const BiometryLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                       <div className="flex items-center gap-1"><Calendar className="w-3 h-3 opacity-30" /> {format(new Date(log.date + 'T12:00:00'), 'dd/MM/yyyy')}</div>
                     </td>
                     <td className="px-6 py-4 font-black text-blue-600">{formatNumber(log.averageWeight)}g</td>
-                    <td className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase">@{user?.username || '---'}</td>
+                    <td className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase">{user ? `@${user.username}` : 'Usuário Excluído'}</td>
                     {hasPermission && (
                       <td className="px-6 py-4 text-center">
                         <div className="flex justify-center gap-2">

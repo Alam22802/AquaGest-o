@@ -33,6 +33,7 @@ const App: React.FC = () => {
   const [isSyncingBackground, setIsSyncingBackground] = useState(false);
   const [lastAlertCheck, setLastAlertCheck] = useState(0);
   const [activeAlert, setActiveAlert] = useState<{title: string, message: string} | null>(null);
+  const [inactivityNotice, setInactivityNotice] = useState(false);
   
   const isSavingRef = useRef(false);
   const lastSavedStateRef = useRef<AppState | null>(null);
@@ -197,11 +198,20 @@ const App: React.FC = () => {
       
       const savedUser = getSession();
       if (savedUser) {
-        const updatedUser = data.users.find(u => u.id === savedUser.id || (savedUser.username && u.username === savedUser.username));
-        if (updatedUser && (updatedUser.isApproved || updatedUser.isMaster)) {
+        const updatedUser = data.users.find(u => u.id === savedUser.id || (savedUser.username && u.username.toLowerCase() === savedUser.username.toLowerCase()));
+        
+        const now = Date.now();
+        const lastAccess = updatedUser?.lastLoginAt 
+          ? new Date(updatedUser.lastLoginAt).getTime() 
+          : (updatedUser?.updatedAt || now);
+        const daysInactive = (now - lastAccess) / (1000 * 60 * 60 * 24);
+        const isBlockedInactive = updatedUser && !updatedUser.isMaster && (updatedUser.blockedDueToInactivity || daysInactive > 30);
+
+        if (updatedUser && (updatedUser.isApproved || updatedUser.isMaster) && !isBlockedInactive) {
           const nowIso = new Date().toISOString();
           const activeUser = { ...updatedUser, lastSync: nowIso, updatedAt: Date.now() };
           setCurrentUser(activeUser);
+          saveSession(activeUser);
           data = {
             ...data,
             lastSync: nowIso,
@@ -210,6 +220,12 @@ const App: React.FC = () => {
           const configToUse = data.supabaseConfig || getSupabaseConfig();
           saveState(data, configToUse).catch(() => {});
         } else {
+          if (isBlockedInactive && updatedUser) {
+            data = {
+              ...data,
+              users: data.users.map(u => u.id === updatedUser.id ? { ...u, blockedDueToInactivity: true, updatedAt: Date.now() } : u)
+            };
+          }
           setCurrentUser(null);
           saveSession(null);
         }
@@ -326,16 +342,60 @@ const App: React.FC = () => {
 
   useEffect(() => {
     if (state && currentUser) {
-      const updatedUser = state.users.find(u => u.id === currentUser.id);
-      if (!updatedUser || !updatedUser.isApproved) {
+      const updatedUser = state.users.find(u => u.id === currentUser.id || (currentUser.username && u.username.toLowerCase() === currentUser.username.toLowerCase()));
+      
+      if (!updatedUser || (!updatedUser.isApproved && !updatedUser.isMaster)) {
         handleLogout();
         alert("Sua sessão foi encerrada porque sua conta foi excluída ou desativada no sistema.");
-      } else if (JSON.stringify(updatedUser) !== JSON.stringify(currentUser)) {
-        setCurrentUser(updatedUser);
-        saveSession(updatedUser);
+      } else if (!updatedUser.isMaster && updatedUser.blockedDueToInactivity) {
+        handleLogout();
+        alert("Sua conta foi bloqueada por inatividade (> 30 dias). Solicite a liberação ao administrador.");
+      } else {
+        const needsPermissionSync = 
+          updatedUser.canEdit !== currentUser.canEdit ||
+          updatedUser.isMaster !== currentUser.isMaster ||
+          updatedUser.name !== currentUser.name ||
+          updatedUser.email !== currentUser.email ||
+          JSON.stringify(updatedUser.allowedTabs) !== JSON.stringify(currentUser.allowedTabs);
+
+        if (needsPermissionSync) {
+          const merged = { ...currentUser, ...updatedUser };
+          setCurrentUser(merged);
+          saveSession(merged);
+        }
       }
     }
-  }, [state, currentUser]);
+  }, [state?.users, currentUser]);
+
+  // Deslogar usuários sem movimentação na página por mais de 10 minutos
+  useEffect(() => {
+    if (!currentUser) return;
+
+    let timeoutId: NodeJS.Timeout;
+
+    const resetInactivityTimer = () => {
+      if (timeoutId) clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => {
+        handleLogout();
+        setInactivityNotice(true);
+      }, 10 * 60 * 1000); // 10 minutos sem atividade
+    };
+
+    const activityEvents = ['mousemove', 'keydown', 'click', 'touchstart', 'scroll'];
+
+    activityEvents.forEach(event => {
+      window.addEventListener(event, resetInactivityTimer, { passive: true });
+    });
+
+    resetInactivityTimer();
+
+    return () => {
+      if (timeoutId) clearTimeout(timeoutId);
+      activityEvents.forEach(event => {
+        window.removeEventListener(event, resetInactivityTimer);
+      });
+    };
+  }, [currentUser]);
 
   useEffect(() => {
     (window as any).forceSync = backgroundSync;
@@ -650,7 +710,22 @@ const App: React.FC = () => {
         </div>
       )}
       {!currentUser ? (
-        <Login state={state!} onLogin={handleLogin} onRegister={handleRegister} onUpdateState={handleStateUpdate} onSync={handleLoginSync} />
+        <div className="relative">
+          {inactivityNotice && (
+            <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[200] bg-amber-600 text-white px-6 py-4 rounded-2xl shadow-2xl flex items-center justify-between gap-4 max-w-md w-[90%] border border-amber-500 animate-in slide-in-from-top-4 duration-300">
+              <div className="flex items-center gap-3">
+                <AlertTriangle className="w-5 h-5 shrink-0 text-amber-200" />
+                <span className="text-xs font-bold uppercase tracking-wider leading-snug">
+                  Sessão encerrada após 10 minutos sem atividade na página para garantir a sincronização. Faça login novamente.
+                </span>
+              </div>
+              <button onClick={() => setInactivityNotice(false)} className="p-1 hover:bg-white/20 rounded-lg transition-colors shrink-0">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          )}
+          <Login state={state!} onLogin={(u) => { setInactivityNotice(false); handleLogin(u); }} onRegister={handleRegister} onUpdateState={handleStateUpdate} onSync={handleLoginSync} />
+        </div>
       ) : (
         <Layout activeTab={activeTab} setActiveTab={setActiveTab} currentUser={currentUser} onLogout={handleLogout} state={state!}>
           <ErrorBoundary>

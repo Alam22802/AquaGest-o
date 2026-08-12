@@ -31,6 +31,7 @@ const Login: React.FC<Props> = ({ state, onLogin, onRegister, onUpdateState, onS
   const [newPassword, setNewPassword] = useState('');
   const [confirmNewPassword, setConfirmNewPassword] = useState('');
   const [tempUser, setTempUser] = useState<User | null>(null);
+  const [blockedUserForRequest, setBlockedUserForRequest] = useState<User | null>(null);
 
   const isCloudActive = !!state.supabaseConfig?.url;
 
@@ -106,16 +107,63 @@ const Login: React.FC<Props> = ({ state, onLogin, onRegister, onUpdateState, onS
         return;
       }
 
+      // Verifica inatividade superior a 30 dias (30 * 24 * 60 * 60 * 1000 ms)
+      const now = Date.now();
+      const lastAccess = foundUser.lastLoginAt 
+        ? new Date(foundUser.lastLoginAt).getTime() 
+        : (foundUser.updatedAt || now);
+      const daysInactive = (now - lastAccess) / (1000 * 60 * 60 * 24);
+
+      if (!foundUser.isMaster && (foundUser.blockedDueToInactivity || daysInactive > 30)) {
+        if (!foundUser.blockedDueToInactivity) {
+          const updatedUsers = currentState.users.map(u => 
+            u.id === foundUser.id ? { ...u, blockedDueToInactivity: true, updatedAt: Date.now() } : u
+          );
+          onUpdateState({ ...currentState, users: updatedUsers });
+        }
+        setBlockedUserForRequest(foundUser);
+        setError('Acesso bloqueado por inatividade superior a 30 dias.');
+        return;
+      }
+
       if (foundUser.needsPasswordReset) {
         setTempUser(foundUser);
         setIsChangingPassword(true);
         return;
       }
 
-      onLogin(foundUser);
+      // Atualiza o registro do último login no banco
+      const updatedUserWithLogin = {
+        ...foundUser,
+        lastLoginAt: new Date().toISOString(),
+        blockedDueToInactivity: false,
+        accessUnlockRequested: false,
+        updatedAt: Date.now()
+      };
+      
+      const updatedUsers = currentState.users.map(u => u.id === foundUser.id ? updatedUserWithLogin : u);
+      onUpdateState({ ...currentState, users: updatedUsers });
+
+      onLogin(updatedUserWithLogin);
     } else {
       setError('Usuário ou senha incorretos.');
     }
+  };
+
+  const handleRequestUnlock = () => {
+    if (!blockedUserForRequest) return;
+    const updatedUsers = state.users.map(u => 
+      u.id === blockedUserForRequest.id ? { 
+        ...u, 
+        blockedDueToInactivity: true,
+        accessUnlockRequested: true, 
+        updatedAt: Date.now() 
+      } : u
+    );
+    onUpdateState({ ...state, users: updatedUsers });
+    setSuccessMessage('Solicitação de liberação de acesso enviada com sucesso ao Administrador!');
+    setError('');
+    setBlockedUserForRequest(null);
   };
 
   const handleForgotPassword = (e: React.FormEvent) => {
@@ -282,7 +330,23 @@ const Login: React.FC<Props> = ({ state, onLogin, onRegister, onUpdateState, onS
             </div>
           )}
 
-          {error && <div className="bg-red-50 text-red-600 p-4 rounded-2xl text-xs font-bold border border-red-100 mb-6 flex items-center gap-3 animate-pulse">{error}</div>}
+          {error && (
+            <div className="bg-red-50 text-red-600 p-4 rounded-2xl text-xs font-bold border border-red-100 mb-6 space-y-3">
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 text-red-500 shrink-0" />
+                <span>{error}</span>
+              </div>
+              {blockedUserForRequest && (
+                <button
+                  type="button"
+                  onClick={handleRequestUnlock}
+                  className="w-full py-3 bg-red-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-red-700 transition-all shadow-md active:scale-95"
+                >
+                  Solicitar Liberação ao Administrador
+                </button>
+              )}
+            </div>
+          )}
           {successMessage && <div className="bg-emerald-50 text-emerald-600 p-4 rounded-2xl text-xs font-bold border border-emerald-100 mb-6 flex items-center gap-3">{successMessage}</div>}
 
           {isChangingPassword ? (

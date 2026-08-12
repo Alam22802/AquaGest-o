@@ -234,13 +234,29 @@ const UserManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     alert(`Senha temporária gerada para ${user?.name}: ${tempPass}\n\nEnvie esta senha ao usuário por e-mail.`);
   };
 
+  const unlockUserAccess = (id: string) => {
+    onUpdate({
+      ...state,
+      users: state.users.map(u => u.id === id ? {
+        ...u,
+        blockedDueToInactivity: false,
+        accessUnlockRequested: false,
+        isApproved: true,
+        lastLoginAt: new Date().toISOString(),
+        updatedAt: Date.now()
+      } : u)
+    });
+    const user = state.users.find(u => u.id === id);
+    alert(`Acesso do usuário ${user?.name || ''} liberado com sucesso!`);
+  };
+
   const removeUser = (id: string) => {
     const user = state.users.find(u => u.id === id);
     if (user?.isMaster) {
       alert('Não é possível remover o administrador mestre.');
       return;
     }
-    if (!confirm(`Deseja remover permanentemente o usuário ${user?.name}?`)) return;
+    if (!confirm(`Deseja remover o usuário ${user?.name}? Ele perderá o acesso ao sistema, mas os lançamentos históricos serão preservados.`)) return;
     
     // Marcar como deletado para a sincronização na nuvem
     const updatedDeletedIds = Array.from(new Set([...(state.deletedIds || []), id]));
@@ -254,7 +270,8 @@ const UserManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
 
   const pendingUsers = state.users.filter(u => !u.isApproved);
   const resetRequests = state.users.filter(u => u.passwordResetRequested);
-  const approvedUsers = state.users.filter(u => u.isApproved);
+  const blockedUsers = state.users.filter(u => u.blockedDueToInactivity || u.accessUnlockRequested);
+  const approvedUsers = state.users.filter(u => u.isApproved && !u.blockedDueToInactivity);
 
   return (
     <div className="space-y-8 pb-20">
@@ -436,6 +453,49 @@ const UserManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                     className="p-2.5 bg-slate-100 text-slate-400 rounded-xl hover:bg-slate-200 transition-all"
                   >
                     <X className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Seção de Usuários Bloqueados por Inatividade */}
+      {blockedUsers.length > 0 && (
+        <div className="bg-rose-50 border border-rose-200 rounded-[2rem] p-6 shadow-lg shadow-rose-200/5">
+          <h3 className="text-rose-800 font-black uppercase tracking-widest text-xs flex items-center gap-2 mb-4 italic">
+            <AlertTriangle className="w-4 h-4 text-rose-600 animate-pulse" /> Usuários Bloqueados por Inatividade / Solicitando Liberação ({blockedUsers.length})
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {blockedUsers.map(user => (
+              <div key={user.id} className="bg-white p-5 rounded-2xl shadow-sm border border-rose-100 flex flex-col justify-between">
+                <div className="mb-4">
+                  <div className="flex justify-between items-start mb-2">
+                    <h4 className="font-black text-slate-800 uppercase tracking-tighter text-sm">{user.name}</h4>
+                    <span className={`text-[8px] font-black px-2 py-0.5 rounded uppercase ${user.accessUnlockRequested ? 'bg-amber-100 text-amber-800' : 'bg-rose-100 text-rose-700'}`}>
+                      {user.accessUnlockRequested ? 'Solicitou Liberação' : 'Inativo > 30 Dias'}
+                    </span>
+                  </div>
+                  <div className="space-y-1 text-[11px] text-slate-500 font-bold">
+                    <div className="flex items-center gap-2"><UserIcon className="w-3 h-3 opacity-30"/> @{user.username}</div>
+                    <div className="flex items-center gap-2"><Mail className="w-3 h-3 opacity-30"/> {user.email}</div>
+                    <div className="flex items-center gap-2 text-rose-600"><Clock className="w-3 h-3 opacity-60"/> Úl. Acesso: {user.lastLoginAt ? new Date(user.lastLoginAt).toLocaleDateString('pt-BR') : 'Sem registro'}</div>
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <button 
+                    onClick={() => unlockUserAccess(user.id)}
+                    className="flex-1 bg-emerald-600 text-white py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-emerald-700 shadow-lg shadow-emerald-600/10"
+                  >
+                    <CheckCircle className="w-3 h-3" /> Liberar Acesso
+                  </button>
+                  <button 
+                    onClick={() => removeUser(user.id)}
+                    className="p-2.5 bg-slate-100 text-slate-400 rounded-xl hover:bg-red-50 hover:text-red-500 transition-all"
+                    title="Excluir Usuário"
+                  >
+                    <Trash2 className="w-4 h-4" />
                   </button>
                 </div>
               </div>

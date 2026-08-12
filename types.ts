@@ -13,6 +13,9 @@ export interface User {
   receiveNotifications: boolean; 
   passwordResetRequested?: boolean;
   needsPasswordReset?: boolean;
+  lastLoginAt?: string;
+  blockedDueToInactivity?: boolean;
+  accessUnlockRequested?: boolean;
   supabaseConfig?: { url: string; key: string };
   lastSync?: string;
   updatedAt?: number;
