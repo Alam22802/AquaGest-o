@@ -605,7 +605,7 @@ export const ensureStateIntegrity = (state: any, mergeWith?: AppState, priority:
   };
 
   const getReconciledBatchId = (cageId: string | undefined, logDateStr: string | undefined, currentBatchId?: string): string => {
-    if (currentBatchId && isValidForBatch(currentBatchId, cageId, logDateStr)) {
+    if (currentBatchId && batchMap.has(currentBatchId) && !deletedSet.has(currentBatchId)) {
       return currentBatchId;
     }
 

@@ -54,8 +54,8 @@ const safeDateFormat = (dateStr: string | undefined, formatStr: string) => {
 const checkIsFeedingLogForBatch = (f: any, batch: any, harvestLogs: any[] = [], cages: any[] = []) => {
   if (!batch || !f) return false;
   
-  if (f.batchId === batch.id) {
-    return true;
+  if (f.batchId) {
+    return f.batchId === batch.id;
   }
 
   const fDate = (f.timestamp || '').split('T')[0];
@@ -174,12 +174,15 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     
     const feeding = feedingLogs.reduce((acc, curr) => acc + curr.amount, 0);
 
-    const feedingByType = feedingLogs.reduce((acc, curr) => {
+    const feedingByTypeId: Record<string, number> = {};
+    const feedingByType: Record<string, number> = {};
+
+    feedingLogs.forEach(curr => {
+      feedingByTypeId[curr.feedTypeId] = (feedingByTypeId[curr.feedTypeId] || 0) + curr.amount;
       const feedType = state.feedTypes?.find(t => t.id === curr.feedTypeId);
       const typeName = feedType?.name || 'Não especificado';
-      acc[typeName] = (acc[typeName] || 0) + curr.amount;
-      return acc;
-    }, {} as Record<string, number>);
+      feedingByType[typeName] = (feedingByType[typeName] || 0) + curr.amount;
+    });
 
     const rawHarvestedFish = harvestsByBatch.reduce((acc, curr) => acc + curr.fishCount, 0);
     const harvestedWeight = harvestsByBatch.reduce((acc, curr) => acc + curr.totalWeight, 0);
@@ -527,6 +530,7 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       mortality,
       feeding,
       feedingByType,
+      feedingByTypeId,
       harvestedFish,
       harvestedWeight,
       totalRevenue,
@@ -565,7 +569,7 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     if (!batchData) return;
     const initialForm: Record<string, string> = {};
     (state.feedTypes || []).forEach(ft => {
-      const amountGrams = batchData.feedingByType[ft.name] || 0;
+      const amountGrams = (batchData as any).feedingByTypeId?.[ft.id] || batchData.feedingByType[ft.name] || 0;
       initialForm[ft.id] = amountGrams > 0 ? (amountGrams / 1000).toString() : '0';
     });
     setAdjustFeedForm(initialForm);
