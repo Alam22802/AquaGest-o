@@ -558,7 +558,24 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     if (!batchData || !selectedBatchId) return;
     const currentBatch = batchData.batch;
     
-    const otherLogs = (state.feedingLogs || []).filter(f => f.batchId !== selectedBatchId);
+    // Remove ALL feeding logs that belong to selectedBatchId (either explicitly or via cage/date matching)
+    const otherLogs = (state.feedingLogs || []).filter(f => {
+      if (f.batchId === selectedBatchId) return false;
+
+      const fDate = (f.timestamp || '').split('T')[0];
+      if (currentBatch.settlementDate && fDate < currentBatch.settlementDate) return true;
+      if (currentBatch.isClosed && currentBatch.closedAt && fDate > currentBatch.closedAt.split('T')[0]) return true;
+      if (currentBatch.harvestDate && fDate > currentBatch.harvestDate) return true;
+
+      if (f.cageId) {
+        const cage = (state.cages || []).find(c => c.id === f.cageId);
+        if (cage?.batchId === selectedBatchId && currentBatch.settlementDate && fDate >= currentBatch.settlementDate) {
+          return false;
+        }
+      }
+
+      return true;
+    });
     
     const cageId = (currentBatch.cageIds && currentBatch.cageIds.length > 0) 
       ? currentBatch.cageIds[0] 
