@@ -51,11 +51,38 @@ const safeDateFormat = (dateStr: string | undefined, formatStr: string) => {
   }
 };
 
-const checkIsFeedingLogForBatch = (f: any, batch: any, harvestLogs: any[] = [], cages: any[] = []) => {
+const isBatchMatch = (targetIdOrName: string | undefined, batch: any): boolean => {
+  if (!targetIdOrName || !batch) return false;
+  const tid = targetIdOrName.trim().toLowerCase();
+  if (tid === batch.id?.toLowerCase()) return true;
+
+  const bn = (batch.name || '').trim().toLowerCase();
+  if (tid === bn) return true;
+
+  const tidNorm = tid.replace(/[^a-z0-9]/g, '');
+  const bnNorm = bn.replace(/[^a-z0-9]/g, '');
+  if (tidNorm.length > 0 && tidNorm === bnNorm) return true;
+
+  const tidNoLote = tid.replace(/^lote\s*/i, '').trim();
+  const bnNoLote = bn.replace(/^lote\s*/i, '').trim();
+  if (tidNoLote.length > 0 && tidNoLote === bnNoLote) return true;
+
+  const tidNum = tidNoLote.replace(/^0+/, '');
+  const bnNum = bnNoLote.replace(/^0+/, '');
+  if (tidNum.length > 0 && tidNum === bnNum) return true;
+
+  return false;
+};
+
+const checkIsFeedingLogForBatch = (f: any, batch: any, harvestLogs: any[] = [], cages: any[] = [], allBatches: any[] = []) => {
   if (!batch || !f) return false;
   
-  if (f.batchId) {
-    return f.batchId === batch.id;
+  if (f.batchId && isBatchMatch(f.batchId, batch)) {
+    return true;
+  }
+
+  if (f.batchId && allBatches.some(b => b.id !== batch.id && isBatchMatch(f.batchId, b))) {
+    return false;
   }
 
   const fDate = (f.timestamp || '').split('T')[0];
@@ -66,7 +93,7 @@ const checkIsFeedingLogForBatch = (f: any, batch: any, harvestLogs: any[] = [], 
   if (batch.harvestDate && fDate > batch.harvestDate) return false;
   if (batch.settlementDate && fDate < batch.settlementDate) return false;
 
-  const harvestsByBatch = (harvestLogs || []).filter(h => h.batchId === batch.id);
+  const harvestsByBatch = (harvestLogs || []).filter(h => h.batchId === batch.id || isBatchMatch(h.batchId, batch));
   const harvestCages = new Set(harvestsByBatch.map(h => h.cageId));
   if (f.cageId && harvestCages.has(f.cageId)) {
     const harvest = harvestsByBatch.find(h => h.cageId === f.cageId);
@@ -76,7 +103,7 @@ const checkIsFeedingLogForBatch = (f: any, batch: any, harvestLogs: any[] = [], 
 
   if (f.cageId) {
     const cage = (cages || []).find(c => c.id === f.cageId);
-    if (cage?.batchId === batch.id && (!batch.settlementDate || fDate >= batch.settlementDate)) {
+    if (cage && (cage.batchId === batch.id || isBatchMatch(cage.batchId, batch))) {
       return true;
     }
     if (batch.cageIds && batch.cageIds.includes(f.cageId)) {
@@ -169,7 +196,7 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
 
     // Optimized feeding filtering using unified helper
     const feedingLogs = (state.feedingLogs || []).filter(f => 
-      checkIsFeedingLogForBatch(f, batch, state.harvestLogs, state.cages)
+      checkIsFeedingLogForBatch(f, batch, state.harvestLogs, state.cages, state.batches)
     );
     
     const feeding = feedingLogs.reduce((acc, curr) => acc + curr.amount, 0);
@@ -583,7 +610,7 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     // Remove ALL feeding logs that belong to selectedBatchId using unified helper
     const removedLogIds: string[] = [];
     const otherLogs = (state.feedingLogs || []).filter(f => {
-      const isForThisBatch = checkIsFeedingLogForBatch(f, currentBatch, state.harvestLogs, state.cages);
+      const isForThisBatch = checkIsFeedingLogForBatch(f, currentBatch, state.harvestLogs, state.cages, state.batches);
       if (isForThisBatch) {
         if (f.id) removedLogIds.push(f.id);
         return false;

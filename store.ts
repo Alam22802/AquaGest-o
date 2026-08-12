@@ -605,8 +605,28 @@ export const ensureStateIntegrity = (state: any, mergeWith?: AppState, priority:
   };
 
   const getReconciledBatchId = (cageId: string | undefined, logDateStr: string | undefined, currentBatchId?: string): string => {
-    if (currentBatchId && batchMap.has(currentBatchId) && !deletedSet.has(currentBatchId)) {
-      return currentBatchId;
+    if (currentBatchId) {
+      if (batchMap.has(currentBatchId) && !deletedSet.has(currentBatchId)) {
+        return currentBatchId;
+      }
+      const matched = allBatches.find(b => {
+        const tid = currentBatchId.trim().toLowerCase();
+        if (b.id?.toLowerCase() === tid) return true;
+        const bn = (b.name || '').trim().toLowerCase();
+        if (bn === tid) return true;
+        const tidNorm = tid.replace(/[^a-z0-9]/g, '');
+        const bnNorm = bn.replace(/[^a-z0-9]/g, '');
+        if (tidNorm.length > 0 && tidNorm === bnNorm) return true;
+        const tidNoLote = tid.replace(/^lote\s*/i, '').trim();
+        const bnNoLote = bn.replace(/^lote\s*/i, '').trim();
+        if (tidNoLote.length > 0 && tidNoLote === bnNoLote) return true;
+        const tidNum = tidNoLote.replace(/^0+/, '');
+        const bnNum = bnNoLote.replace(/^0+/, '');
+        return tidNum.length > 0 && tidNum === bnNum;
+      });
+      if (matched && !deletedSet.has(matched.id)) {
+        return matched.id;
+      }
     }
 
     if (!logDateStr) {
