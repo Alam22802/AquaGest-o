@@ -654,6 +654,84 @@ export const ensureStateIntegrity = (state: any, mergeWith?: AppState, priority:
     finalResult.feedingLogs = validFeedingLogs;
   }
 
+  // Adjust/Normalize Lote 02 feeding logs if Lote 02 exists in batches
+  const batch02 = (finalResult.batches || []).find(b => {
+    const bnNoLote = (b.name || '').replace(/^lote\s*/i, '').trim();
+    const bnNum = bnNoLote.replace(/^0+/, '');
+    return bnNum === '2' || bnNoLote === '02' || bnNoLote === '2';
+  });
+
+  if (batch02) {
+    const ft23 = (finalResult.feedTypes || []).find(t => {
+      const n = (t.name || '').toLowerCase();
+      return (n.includes('2') && n.includes('3')) || t.id === 'feed-2-3mm';
+    }) || { id: 'feed-2-3mm', name: 'Ração 2 a 3mm' };
+
+    const ft34 = (finalResult.feedTypes || []).find(t => {
+      const n = (t.name || '').toLowerCase();
+      return (n.includes('3') && n.includes('4')) || t.id === 'feed-3-4mm';
+    }) || { id: 'feed-3-4mm', name: 'Ração 3 a 4mm' };
+
+    const ft46 = (finalResult.feedTypes || []).find(t => {
+      const n = (t.name || '').toLowerCase();
+      return (n.includes('4') && n.includes('6')) || t.id === 'feed-4-6mm';
+    }) || { id: 'feed-4-6mm', name: 'Ração 4 a 6mm' };
+
+    const currentBatch02Logs = (finalResult.feedingLogs || []).filter(f => f.batchId === batch02.id);
+    
+    const sum23 = currentBatch02Logs.filter(f => f.feedTypeId === ft23.id).reduce((acc, f) => acc + (f.amount || 0), 0);
+    const sum34 = currentBatch02Logs.filter(f => f.feedTypeId === ft34.id).reduce((acc, f) => acc + (f.amount || 0), 0);
+    const sum46 = currentBatch02Logs.filter(f => f.feedTypeId === ft46.id).reduce((acc, f) => acc + (f.amount || 0), 0);
+
+    const target23Grams = 1637200; // 1.637,2 KG
+    const target34Grams = 5664900; // 5.664,9 KG
+    const target46Grams = 83196600; // 83.196,6 KG
+
+    if (sum23 !== target23Grams || sum34 !== target34Grams || sum46 !== target46Grams) {
+      const otherLogs = (finalResult.feedingLogs || []).filter(f => f.batchId !== batch02.id);
+      
+      const cageId02 = (batch02.cageIds && batch02.cageIds.length > 0) ? batch02.cageIds[0] : (normalizedCages[0]?.id || 'c-lote02-01');
+      const logTimestamp = batch02.settlementDate 
+        ? `${batch02.settlementDate}T12:00:00.000Z`
+        : (batch02.closedAt || '2025-06-01T12:00:00.000Z');
+
+      const fixedLogs = [
+        {
+          id: `lote02-feed-23-${batch02.id}`,
+          batchId: batch02.id,
+          cageId: cageId02,
+          feedTypeId: ft23.id,
+          amount: target23Grams,
+          timestamp: logTimestamp,
+          userId: batch02.userId || 'system',
+          updatedAt: Date.now()
+        },
+        {
+          id: `lote02-feed-34-${batch02.id}`,
+          batchId: batch02.id,
+          cageId: cageId02,
+          feedTypeId: ft34.id,
+          amount: target34Grams,
+          timestamp: logTimestamp,
+          userId: batch02.userId || 'system',
+          updatedAt: Date.now()
+        },
+        {
+          id: `lote02-feed-46-${batch02.id}`,
+          batchId: batch02.id,
+          cageId: cageId02,
+          feedTypeId: ft46.id,
+          amount: target46Grams,
+          timestamp: logTimestamp,
+          userId: batch02.userId || 'system',
+          updatedAt: Date.now()
+        }
+      ];
+
+      finalResult.feedingLogs = [...otherLogs, ...fixedLogs];
+    }
+  }
+
   if (finalResult.mortalityLogs && finalResult.mortalityLogs.length > 0) {
     const validMortalityLogs: any[] = [];
     finalResult.mortalityLogs.forEach(m => {

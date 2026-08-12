@@ -14,6 +14,9 @@ import {
   Plus, 
   Trash2, 
   Edit2,
+  Edit3,
+  X,
+  Save,
   AlertCircle,
   CheckCircle2,
   Target,
@@ -69,6 +72,8 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
   const [filterCategory, setFilterCategory] = useState('');
   const [filterItem, setFilterItem] = useState('');
   const [printOrientation, setPrintOrientation] = useState<'portrait' | 'landscape'>('portrait');
+  const [showAdjustFeedModal, setShowAdjustFeedModal] = useState(false);
+  const [adjustFeedForm, setAdjustFeedForm] = useState<Record<string, string>>({});
 
   const hasPermission = currentUser.isMaster || currentUser.canEdit;
 
@@ -537,6 +542,54 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       totalReceptionWeight
     };
   }, [selectedBatchId, state.batches, state.mortalityLogs, state.feedingLogs, state.harvestLogs, state.slaughterLogs, state.batchExpenses, state.batchRevenues, state.protocols, state.biometryLogs, state.cages, state.feedTypes, state.feedStockLogs, filterCategory, filterItem]);
+
+  const handleOpenAdjustFeed = () => {
+    if (!batchData) return;
+    const initialForm: Record<string, string> = {};
+    (state.feedTypes || []).forEach(ft => {
+      const amountGrams = batchData.feedingByType[ft.name] || 0;
+      initialForm[ft.id] = amountGrams > 0 ? (amountGrams / 1000).toString() : '0';
+    });
+    setAdjustFeedForm(initialForm);
+    setShowAdjustFeedModal(true);
+  };
+
+  const handleSaveAdjustFeed = () => {
+    if (!batchData || !selectedBatchId) return;
+    const currentBatch = batchData.batch;
+    
+    const otherLogs = (state.feedingLogs || []).filter(f => f.batchId !== selectedBatchId);
+    
+    const cageId = (currentBatch.cageIds && currentBatch.cageIds.length > 0) 
+      ? currentBatch.cageIds[0] 
+      : ((state.cages || [])[0]?.id || 'c-closed-batch');
+    const timestamp = currentBatch.settlementDate 
+      ? `${currentBatch.settlementDate}T12:00:00.000Z` 
+      : `${new Date().toISOString().split('T')[0]}T12:00:00.000Z`;
+
+    const newLogs: any[] = [];
+    (state.feedTypes || []).forEach(ft => {
+      const valKg = parseFloat((adjustFeedForm[ft.id] || '0').replace(',', '.'));
+      if (!isNaN(valKg) && valKg > 0) {
+        newLogs.push({
+          id: `feed-adj-${selectedBatchId}-${ft.id}-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+          batchId: selectedBatchId,
+          cageId,
+          feedTypeId: ft.id,
+          amount: Math.round(valKg * 1000),
+          timestamp,
+          userId: currentUser.id,
+          updatedAt: Date.now()
+        });
+      }
+    });
+
+    onUpdate({
+      ...state,
+      feedingLogs: [...otherLogs, ...newLogs]
+    });
+    setShowAdjustFeedModal(false);
+  };
 
   const handleAddExpense = (e: React.FormEvent) => {
     e.preventDefault();
@@ -1007,7 +1060,18 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                 </div>
 
                 <div className="pt-6 border-t border-slate-100">
-                  <h4 className="text-[10px] font-black text-slate-600 uppercase tracking-widest mb-4">Consumo Estratificado por Modelo</h4>
+                  <div className="flex items-center justify-between mb-4">
+                    <h4 className="text-[10px] font-black text-slate-600 uppercase tracking-widest">Consumo Estratificado por Modelo</h4>
+                    {hasPermission && (
+                      <button
+                        type="button"
+                        onClick={handleOpenAdjustFeed}
+                        className="px-3 py-1 bg-amber-500 hover:bg-amber-600 text-white font-bold text-[10px] uppercase rounded-lg shadow-sm transition-colors flex items-center gap-1"
+                      >
+                        <Edit3 className="w-3.5 h-3.5" /> Ajustar Consumo do Lote
+                      </button>
+                    )}
+                  </div>
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                     {Object.entries(batchData.feedingByType).map(([type, amount]) => (
                       <div key={type} className="bg-slate-50 p-3 rounded-xl border border-slate-100">
@@ -1604,6 +1668,68 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
           <div>
             <h3 className="text-lg font-black text-slate-600 uppercase tracking-widest italic">Nenhum Lote Selecionado</h3>
             <p className="text-xs font-bold text-slate-600 uppercase tracking-widest mt-2">Selecione um lote acima para visualizar o fechamento</p>
+          </div>
+        </div>
+      )}
+
+      {showAdjustFeedModal && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl p-6 max-w-md w-full shadow-2xl border border-slate-100 space-y-6">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+              <div className="flex items-center gap-2">
+                <Utensils className="w-5 h-5 text-amber-500" />
+                <h3 className="text-base font-black text-slate-800 uppercase tracking-tight">
+                  Ajustar Consumo de Ração
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowAdjustFeedModal(false)}
+                className="p-2 text-slate-400 hover:text-slate-600 rounded-full hover:bg-slate-100 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <p className="text-xs font-bold text-slate-500">
+              Informe a quantidade total consumida (em KG) por tipo de ração para o lote{' '}
+              <span className="text-slate-800 font-black">{batchData?.batch.name}</span>.
+            </p>
+
+            <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-1">
+              {(state.feedTypes || []).map(ft => (
+                <div key={ft.id} className="space-y-1">
+                  <label className="block text-[10px] font-black text-slate-600 uppercase tracking-wider">
+                    {ft.name} (KG)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    min="0"
+                    value={adjustFeedForm[ft.id] || '0'}
+                    onChange={e => setAdjustFeedForm({ ...adjustFeedForm, [ft.id]: e.target.value })}
+                    className="w-full px-3 py-2 border border-slate-200 rounded-xl font-bold text-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
+                  />
+                </div>
+              ))}
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setShowAdjustFeedModal(false)}
+                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold text-xs uppercase rounded-xl transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveAdjustFeed}
+                className="px-5 py-2 bg-amber-500 hover:bg-amber-600 text-white font-black text-xs uppercase rounded-xl shadow-md transition-colors flex items-center gap-1.5"
+              >
+                <Save className="w-4 h-4" /> Salvar Ajustes
+              </button>
+            </div>
           </div>
         </div>
       )}
