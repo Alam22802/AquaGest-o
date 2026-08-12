@@ -83,7 +83,8 @@ const Maintenance: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
           status: formData.status,
           maintenanceStartDate: ['Manutenção', 'Limpeza', 'Avaliação'].includes(formData.status) ? formData.startDate : undefined,
           maintenanceEndDate: ['Manutenção', 'Limpeza', 'Avaliação'].includes(formData.status) ? formData.endDate : undefined,
-          harvestDate: undefined // Clear harvest date after status update
+          harvestDate: undefined, // Clear harvest date after status update
+          updatedAt: Date.now()
         };
       }
       return c;

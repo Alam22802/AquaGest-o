@@ -194,27 +194,11 @@ const FeedingLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
 
   const removeSelectedLogs = () => {
     if (!hasPermission || selectedLogIds.size === 0) return;
-    if (!confirm(`Deseja excluir ${selectedLogIds.size} tratos selecionados? O estoque será devolvido.`)) return;
-
-    const logsToRemove = (state.feedingLogs || []).filter(l => selectedLogIds.has(l.id));
-    
-    // Group by feed type to update stock
-    const feedUpdates = new Map<string, number>();
-    logsToRemove.forEach(log => {
-      const current = feedUpdates.get(log.feedTypeId) || 0;
-      feedUpdates.set(log.feedTypeId, current + log.amount);
-    });
-
-    const updatedFeeds = (state.feedTypes || []).map(f => {
-      const refund = feedUpdates.get(f.id);
-      if (refund) return { ...f, totalStock: f.totalStock + refund, updatedAt: Date.now() };
-      return f;
-    });
+    if (!confirm(`Deseja excluir ${selectedLogIds.size} trato(s) selecionado(s) do histórico do lote?`)) return;
 
     onUpdate({
       ...state,
       feedingLogs: (state.feedingLogs || []).filter(l => !selectedLogIds.has(l.id)),
-      feedTypes: updatedFeeds,
       deletedIds: [...(state.deletedIds || []), ...Array.from(selectedLogIds)]
     });
     setSelectedLogIds(new Set());
@@ -223,6 +207,13 @@ const FeedingLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
     if (!hasPermission) return;
+
+    const targetBatch = (state.batches || []).find(b => b.id === formBatchId);
+    if (targetBatch?.isClosed) {
+      alert('Atenção: Não é possível registrar ou alterar trato para um lote já fechado.');
+      return;
+    }
+
     const amountNum = Number(formData.amount);
     
     const isBulkMode = isBulk && !editingId;
@@ -260,7 +251,7 @@ const FeedingLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
         } : l
       );
 
-      // Ajustes de trato atualizam o lote/cálculos, mas NÃO afetam o saldo do estoque de ração
+      // Ajustes de trato atualizam o lote/histórico, mas NÃO afetam o saldo real do estoque de ração
       onUpdate({ ...state, feedingLogs: updatedLogs });
       setEditingId(null);
     } else {
@@ -334,18 +325,13 @@ const FeedingLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
 
   const removeLog = (logId: string) => {
     if (!hasPermission) return;
-    if (!confirm('Deseja excluir este trato? O estoque será devolvido.')) return;
+    if (!confirm('Deseja excluir este trato do histórico do lote?')) return;
     const log = (state.feedingLogs || []).find(l => l.id === logId);
     if (!log) return;
-    
-    const updatedFeeds = (state.feedTypes || []).map(f => 
-      f.id === log.feedTypeId ? { ...f, totalStock: f.totalStock + log.amount, updatedAt: Date.now() } : f
-    );
     
     onUpdate({ 
       ...state, 
       feedingLogs: (state.feedingLogs || []).filter(l => l.id !== logId), 
-      feedTypes: updatedFeeds,
       deletedIds: [...(state.deletedIds || []), logId]
     });
   };
@@ -365,7 +351,10 @@ const FeedingLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
             <form onSubmit={handleSave} className="space-y-4">
               <select required className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none" value={formBatchId} onChange={e => setFormBatchId(e.target.value)}>
                 <option value="">Escolher Lote...</option>
-                {(state.batches || []).sort((a, b) => a.name.localeCompare(b.name)).map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                {(state.batches || [])
+                  .filter(b => !b.isClosed || b.id === formBatchId)
+                  .sort((a, b) => a.name.localeCompare(b.name))
+                  .map(b => <option key={b.id} value={b.id}>{b.name}{b.isClosed ? ' (Fechado)' : ''}</option>)}
               </select>
               <select disabled={!formBatchId} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none" value={selectedLineId} onChange={e => setSelectedLineId(e.target.value)}>
                 <option value="">Escolher Linha (Opcional)...</option>

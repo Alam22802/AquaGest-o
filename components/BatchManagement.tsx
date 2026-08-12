@@ -369,6 +369,12 @@ const BatchManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       explicitBatchId?: string,
     ) => {
       if (explicitBatchId) {
+        const targetBatch = batchMap.get(explicitBatchId);
+        if (targetBatch?.isClosed && targetBatch.closedAt && logDate) {
+          const cleanDate = logDate.split('T')[0];
+          const closedDate = targetBatch.closedAt.split('T')[0];
+          if (cleanDate > closedDate) return undefined;
+        }
         if (!batchMap.size || batchMap.has(explicitBatchId)) {
           return explicitBatchId;
         }

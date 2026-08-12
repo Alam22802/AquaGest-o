@@ -402,33 +402,23 @@ const App: React.FC = () => {
           }
           
           let itemChanged = false;
-          if (item.updatedAt && oldItem.updatedAt && item.updatedAt > oldItem.updatedAt) {
-            itemChanged = true;
-          } else {
-            const currentKeys = Object.keys(item);
-            for (let i = 0; i < currentKeys.length; i++) {
-              const k = currentKeys[i];
-              if (k !== 'updatedAt') {
-                const val1 = (item as any)[k];
-                const val2 = (oldItem as any)[k];
-                if (typeof val1 === 'object' && val1 !== null && typeof val2 === 'object' && val2 !== null) {
-                  if (JSON.stringify(val1) !== JSON.stringify(val2)) {
-                    itemChanged = true;
-                    break;
-                  }
-                } else if (val1 !== val2) {
-                  itemChanged = true;
-                  break;
-                }
-              }
+          // Compare object fields
+          const keys = new Set([...Object.keys(item), ...Object.keys(oldItem)]);
+          for (const k of keys) {
+            if (k === 'updatedAt' || k === 'lastSync') continue;
+            const v1 = (item as any)[k];
+            const v2 = (oldItem as any)[k];
+            if (JSON.stringify(v1) !== JSON.stringify(v2)) {
+              itemChanged = true;
+              break;
             }
           }
           
           if (itemChanged) {
             anyChanged = true;
-            return { ...item, updatedAt: Math.max(item.updatedAt || 0, Date.now()) };
+            return { ...item, updatedAt: Date.now() };
           }
-          return oldItem; 
+          return item; 
         });
 
         return anyChanged ? processedList : (oldList || []);

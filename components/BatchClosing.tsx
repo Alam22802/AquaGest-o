@@ -128,9 +128,13 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
 
     // Optimized feeding filtering
     const feedingLogs = (state.feedingLogs || []).filter(f => {
+      const fDate = (f.timestamp || '').split('T')[0];
+      if (batch.isClosed && batch.closedAt) {
+        const closedDate = batch.closedAt.split('T')[0];
+        if (fDate > closedDate) return false;
+      }
       if (f.batchId === batch.id) return true;
       if (f.cageId) {
-        const fDate = (f.timestamp || '').split('T')[0];
         if (harvestCages.has(f.cageId)) {
           const harvest = harvestsByBatch.find(h => h.cageId === f.cageId);
           return harvest && fDate <= harvest.date;
