@@ -146,10 +146,12 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
         if (harvest && fDate > harvest.date) return false;
       }
 
-      if (f.batchId === batch.id) return true;
+      if (f.batchId) {
+        return f.batchId === batch.id;
+      }
       if (f.cageId) {
         const cage = cageMap.get(f.cageId);
-        return cage?.batchId === batch.id && fDate >= batch.settlementDate;
+        return cage?.batchId === batch.id && (!batch.settlementDate || fDate >= batch.settlementDate);
       }
       return false;
     });
@@ -559,19 +561,27 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     const currentBatch = batchData.batch;
     
     // Remove ALL feeding logs that belong to selectedBatchId (either explicitly or via cage/date matching)
+    const removedLogIds: string[] = [];
     const otherLogs = (state.feedingLogs || []).filter(f => {
-      if (f.batchId === selectedBatchId) return false;
-
-      const fDate = (f.timestamp || '').split('T')[0];
-      if (currentBatch.settlementDate && fDate < currentBatch.settlementDate) return true;
-      if (currentBatch.isClosed && currentBatch.closedAt && fDate > currentBatch.closedAt.split('T')[0]) return true;
-      if (currentBatch.harvestDate && fDate > currentBatch.harvestDate) return true;
-
-      if (f.cageId) {
-        const cage = (state.cages || []).find(c => c.id === f.cageId);
-        if (cage?.batchId === selectedBatchId && currentBatch.settlementDate && fDate >= currentBatch.settlementDate) {
-          return false;
+      let isForThisBatch = false;
+      if (f.batchId === selectedBatchId) {
+        isForThisBatch = true;
+      } else if (!f.batchId && f.cageId) {
+        const fDate = (f.timestamp || '').split('T')[0];
+        const inDateRange = (!currentBatch.settlementDate || fDate >= currentBatch.settlementDate) &&
+                            (!currentBatch.isClosed || !currentBatch.closedAt || fDate <= currentBatch.closedAt.split('T')[0]) &&
+                            (!currentBatch.harvestDate || fDate <= currentBatch.harvestDate);
+        if (inDateRange) {
+          const cage = (state.cages || []).find(c => c.id === f.cageId);
+          if (cage?.batchId === selectedBatchId) {
+            isForThisBatch = true;
+          }
         }
+      }
+
+      if (isForThisBatch) {
+        if (f.id) removedLogIds.push(f.id);
+        return false;
       }
 
       return true;
@@ -603,7 +613,8 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
 
     onUpdate({
       ...state,
-      feedingLogs: [...otherLogs, ...newLogs]
+      feedingLogs: [...otherLogs, ...newLogs],
+      deletedIds: Array.from(new Set([...(state.deletedIds || []), ...removedLogIds]))
     });
     setShowAdjustFeedModal(false);
   };

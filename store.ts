@@ -687,7 +687,11 @@ export const ensureStateIntegrity = (state: any, mergeWith?: AppState, priority:
     const target34Grams = 5664900; // 5.664,9 KG
     const target46Grams = 83196600; // 83.196,6 KG
 
-    if (currentBatch02Logs.length === 0) {
+    const hasCustomAdj = currentBatch02Logs.some(f => f.id.startsWith('feed-adj-'));
+    const isExactTarget = sum23 === target23Grams && sum34 === target34Grams && sum46 === target46Grams && currentBatch02Logs.length === 3;
+
+    if (!hasCustomAdj && !isExactTarget) {
+      const removedLogIds = currentBatch02Logs.map(f => f.id);
       const otherLogs = (finalResult.feedingLogs || []).filter(f => f.batchId !== batch02.id);
       
       const cageId02 = (batch02.cageIds && batch02.cageIds.length > 0) ? batch02.cageIds[0] : (normalizedCages[0]?.id || 'c-lote02-01');
@@ -729,6 +733,7 @@ export const ensureStateIntegrity = (state: any, mergeWith?: AppState, priority:
       ];
 
       finalResult.feedingLogs = [...otherLogs, ...fixedLogs];
+      finalResult.deletedIds = Array.from(new Set([...(finalResult.deletedIds || []), ...removedLogIds]));
     }
   }
 
