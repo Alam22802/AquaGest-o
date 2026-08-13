@@ -312,7 +312,7 @@ const HarvestManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
     const updatedCages = state.cages.map(c => 
       cageIdsToRelease.has(c.id) ? {
         ...c,
-        status: 'Disponível' as const,
+        status: 'Limpeza' as const,
         batchId: undefined,
         initialFishCount: undefined,
         settlementDate: undefined,
@@ -638,7 +638,7 @@ const HarvestManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
                   {fb.cagesToRelease.length > 0 && (
                     <div className="mt-4 pt-4 border-t border-white/5 space-y-3">
                       <div className="flex items-center justify-between">
-                        <span className="text-[10px] font-black text-indigo-300 uppercase tracking-widest">Gaiolas em Limpeza/Manutenção</span>
+                        <span className="text-[10px] font-black text-indigo-300 uppercase tracking-widest">Gaiolas do Lote (Para Limpeza)</span>
                         <span className="text-[10px] font-black text-white bg-indigo-500 px-2 py-0.5 rounded-full">{fb.cagesToRelease.length}</span>
                       </div>
                       <div className="flex flex-wrap gap-1.5">
@@ -650,10 +650,10 @@ const HarvestManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
                       </div>
                       <button 
                         onClick={() => handleReleaseCages(fb.id)}
-                        className="w-full py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-emerald-500/20 transition-all active:scale-95 flex items-center justify-center gap-2"
+                        className="w-full py-2.5 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-amber-500/20 transition-all active:scale-95 flex items-center justify-center gap-2"
                       >
-                        <CheckCircle2 className="w-3.5 h-3.5" />
-                        Liberar Gaiolas para Novos Povoamentos
+                        <Eraser className="w-3.5 h-3.5" />
+                        Enviar Gaiolas para Limpeza
                       </button>
                     </div>
                   )}

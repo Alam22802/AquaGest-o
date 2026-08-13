@@ -497,7 +497,7 @@ const Dashboard: React.FC<Props> = ({ state }) => {
 
       if (explicitBatchId) {
         const targetBatch = batchMap.get(explicitBatchId);
-        if (targetBatch && isValidForBatch(targetBatch)) {
+        if (targetBatch) {
           return explicitBatchId;
         }
       }

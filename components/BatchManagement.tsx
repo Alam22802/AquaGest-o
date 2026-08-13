@@ -276,7 +276,7 @@ const BatchManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
               initialFishCount: undefined,
               settlementDate: undefined,
               harvestDate: undefined,
-              status: 'Disponível' as const,
+              status: 'Limpeza' as const,
               updatedAt: Date.now(),
             }
           : c,
@@ -410,7 +410,7 @@ const BatchManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
 
       if (explicitBatchId) {
         const targetBatch = batchMap.get(explicitBatchId);
-        if (targetBatch && isValidForBatch(targetBatch)) {
+        if (targetBatch) {
           return explicitBatchId;
         }
       }

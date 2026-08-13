@@ -145,7 +145,7 @@ const CageManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
 
   const releaseCage = (id: string) => {
     if (!hasPermission) return;
-    if (!confirm('Deseja desocupar e desvincular esta gaiola do lote? Ela retornará para o inventário como "Disponível".')) return;
+    if (!confirm('Deseja desocupar e desvincular esta gaiola do lote? Seu status será alterado para "Limpeza".')) return;
     onUpdate({
       ...state,
       cages: (state.cages || []).map(c => c.id === id ? {
@@ -154,7 +154,7 @@ const CageManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
         initialFishCount: undefined,
         settlementDate: undefined,
         harvestDate: undefined,
-        status: 'Disponível' as const,
+        status: 'Limpeza' as const,
         updatedAt: Date.now()
       } : c)
     });
@@ -162,7 +162,7 @@ const CageManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
 
   const handleBulkRelease = () => {
     if (!hasPermission || selectedCages.length === 0) return;
-    if (!confirm(`Deseja desocupar e desvincular as ${selectedCages.length} gaiolas selecionadas? Elas retornarão para o inventário como "Disponível".`)) return;
+    if (!confirm(`Deseja desocupar e desvincular as ${selectedCages.length} gaiolas selecionadas? O status delas será alterado para "Limpeza".`)) return;
 
     const updatedCages = (state.cages || []).map(c => {
       if (selectedCages.includes(c.id)) {
@@ -172,7 +172,7 @@ const CageManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
           initialFishCount: undefined,
           settlementDate: undefined,
           harvestDate: undefined,
-          status: 'Disponível' as const,
+          status: 'Limpeza' as const,
           updatedAt: Date.now()
         };
       }
