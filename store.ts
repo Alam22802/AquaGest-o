@@ -13,7 +13,7 @@ const initialMaster: User = {
   username: 'admin',
   phone: '00000000000',
   email: 'mestre@fazenda.com',
-  password: 'admin',
+  password: 'Costafoods@2026',
   isMaster: true,
   isApproved: true,
   canEdit: true,
