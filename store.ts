@@ -1092,24 +1092,28 @@ export const saveState = async (state: AppState, userConfig?: {url: string, key:
   // Save to LocalStorage immediately for instant UI responsiveness
   try {
     const jsonStr = JSON.stringify(integrityState);
-    const compressed = LZString.compressToUTF16(jsonStr);
-    localStorage.setItem(STORAGE_KEY, compressed);
+    localStorage.setItem(STORAGE_KEY, jsonStr);
   } catch (err) {
-    console.error('Erro de Quota no localStorage:', err);
     try {
-      const minimizedState = {
-        ...integrityState,
-        feedingLogs: integrityState.feedingLogs.slice(-500),
-        mortalityLogs: integrityState.mortalityLogs.slice(-500),
-        biometryLogs: integrityState.biometryLogs.slice(-500),
-        feedStockLogs: (integrityState.feedStockLogs || []).slice(-500),
-        slaughterLogs: integrityState.slaughterLogs.slice(-500),
-        slaughterExpenses: (integrityState.slaughterExpenses || []).slice(-500),
-      };
-      const compressed = LZString.compressToUTF16(JSON.stringify(minimizedState));
+      const jsonStr = JSON.stringify(integrityState);
+      const compressed = LZString.compressToUTF16(jsonStr);
       localStorage.setItem(STORAGE_KEY, compressed);
-    } catch (e) {
-      console.warn('Não foi possível salvar nem o estado reduzido no cache local.');
+    } catch (e2) {
+      console.error('Erro de Quota no localStorage:', e2);
+      try {
+        const minimizedState = {
+          ...integrityState,
+          feedingLogs: integrityState.feedingLogs.slice(-500),
+          mortalityLogs: integrityState.mortalityLogs.slice(-500),
+          biometryLogs: integrityState.biometryLogs.slice(-500),
+          feedStockLogs: (integrityState.feedStockLogs || []).slice(-500),
+          slaughterLogs: integrityState.slaughterLogs.slice(-500),
+          slaughterExpenses: (integrityState.slaughterExpenses || []).slice(-500),
+        };
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(minimizedState));
+      } catch (e3) {
+        console.warn('Não foi possível salvar nem o estado reduzido no cache local.');
+      }
     }
   }
 
@@ -1149,10 +1153,10 @@ export const saveState = async (state: AppState, userConfig?: {url: string, key:
     }
   }
 
-  // Update local cache with merged state
+  // Update local cache with merged state fast
   try {
     const mergedJson = JSON.stringify(mergedStateToSave);
-    localStorage.setItem(STORAGE_KEY, LZString.compressToUTF16(mergedJson));
+    localStorage.setItem(STORAGE_KEY, mergedJson);
   } catch (e) {
     // ignore quota error
   }
