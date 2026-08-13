@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { AppState, User, HarvestLog } from '../types';
-import { Tag, Box, Scale, Calendar, Trash2, Plus, Info, CheckCircle2, AlertCircle, TrendingUp, Edit3, X, CheckSquare, Square } from 'lucide-react';
+import { Tag, Box, Scale, Calendar, Trash2, Plus, Info, CheckCircle2, AlertCircle, TrendingUp, Edit3, X, CheckSquare, Square, Eraser } from 'lucide-react';
 import { format } from 'date-fns';
 
 interface Props {
