@@ -596,7 +596,10 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     if (!batchData) return;
     const initialForm: Record<string, string> = {};
     (state.feedTypes || []).forEach(ft => {
-      const amountGrams = (batchData as any).feedingByTypeId?.[ft.id] || batchData.feedingByType[ft.name] || 0;
+      let amountGrams = (batchData as any).feedingByTypeId?.[ft.id] || 0;
+      if (!amountGrams && ft.name) {
+        amountGrams = batchData.feedingByType[ft.name] || 0;
+      }
       initialForm[ft.id] = amountGrams > 0 ? (amountGrams / 1000).toString() : '0';
     });
     setAdjustFeedForm(initialForm);
@@ -645,8 +648,13 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       }
     });
 
+    const updatedBatches = (state.batches || []).map(b => 
+      b.id === selectedBatchId ? { ...b, updatedAt: Date.now() } : b
+    );
+
     onUpdate({
       ...state,
+      batches: updatedBatches,
       feedingLogs: [...otherLogs, ...newLogs],
       deletedIds: Array.from(new Set([...(state.deletedIds || []), ...removedLogIds]))
     });
@@ -1777,6 +1785,19 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
               Informe a quantidade total consumida (em KG) por tipo de ração para o lote{' '}
               <span className="text-slate-800 font-black">{batchData?.batch.name}</span>.
             </p>
+
+            <div className="bg-amber-50/80 p-3.5 rounded-2xl border border-amber-200 flex items-center justify-between">
+              <span className="text-[10px] font-black text-amber-900 uppercase tracking-wider">Total Consumo Ração</span>
+              <span className="text-base font-black text-amber-900 italic">
+                {formatNumber(
+                  Object.values(adjustFeedForm).reduce((acc, val) => {
+                    const v = parseFloat((val || '0').replace(',', '.'));
+                    return acc + (isNaN(v) ? 0 : v);
+                  }, 0),
+                  1
+                )} kg
+              </span>
+            </div>
 
             <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-1">
               {(state.feedTypes || []).map(ft => (
