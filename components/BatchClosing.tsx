@@ -23,7 +23,8 @@ import {
   Clock,
   Percent,
   Printer,
-  Lock
+  Lock,
+  Unlock
 } from 'lucide-react';
 
 interface Props {
@@ -832,6 +833,20 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     });
   };
 
+  const handleReopenBatch = () => {
+    if (!selectedBatchId || !currentUser.isMaster) return;
+    if (!confirm('Deseja realmente REABRIR este lote? Ao reabrir, o lote voltará ao status em aberto e permitirá edições, lançamentos e ajustes.')) return;
+
+    const updatedBatches = (state.batches || []).map(b => 
+      b.id === selectedBatchId ? { ...b, isClosed: false, closedAt: undefined, updatedAt: Date.now() } : b
+    );
+
+    onUpdate({
+      ...state,
+      batches: updatedBatches
+    });
+  };
+
   const handleDeleteBatch = () => {
     if (!selectedBatchId || !currentUser.isMaster) return;
     if (!confirm('Deseja realmente EXCLUIR este lote PERMANENTEMENTE? Todos os dados (lançamentos, tratos, mortalidade, biometria e despescas) associados a ele serão apagados para liberar espaço e tornar o sistema mais leve. Esta ação não pode ser desfeita.')) return;
@@ -1316,17 +1331,28 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                   <div className="space-y-4">
                     <div className="p-4 bg-slate-100 rounded-2xl border border-slate-200 text-center">
                       <p className="text-[10px] font-black text-slate-600 uppercase tracking-widest">Lote Encerrado</p>
-                      <p className="text-[9px] font-bold text-slate-600 uppercase mt-1">Nenhuma alteração permitida</p>
+                      <p className="text-[9px] font-bold text-slate-600 uppercase mt-1">
+                        {currentUser.isMaster ? 'Utilize a opção abaixo para reabrir caso precise fazer alterações' : 'Nenhuma alteração permitida'}
+                      </p>
                     </div>
                     
                     {currentUser.isMaster && (
-                      <button 
-                        onClick={handleDeleteBatch}
-                        className="w-full py-4 bg-red-50 text-red-600 border border-red-100 rounded-2xl font-black uppercase tracking-widest text-xs hover:bg-red-600 hover:text-white transition-all active:scale-95 flex items-center justify-center gap-2"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                        Excluir Lote Permanentemente
-                      </button>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <button 
+                          onClick={handleReopenBatch}
+                          className="w-full py-3.5 bg-amber-500 text-white rounded-2xl font-black uppercase tracking-widest text-xs shadow-md shadow-amber-200 hover:bg-amber-600 transition-all active:scale-95 flex items-center justify-center gap-2"
+                        >
+                          <Unlock className="w-4 h-4" />
+                          Reabrir Lote
+                        </button>
+                        <button 
+                          onClick={handleDeleteBatch}
+                          className="w-full py-3.5 bg-red-50 text-red-600 border border-red-100 rounded-2xl font-black uppercase tracking-widest text-xs hover:bg-red-600 hover:text-white transition-all active:scale-95 flex items-center justify-center gap-2"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                          Excluir Lote
+                        </button>
+                      </div>
                     )}
                   </div>
                 )}
