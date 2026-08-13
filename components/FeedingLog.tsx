@@ -83,26 +83,27 @@ const FeedingLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
 
   const filteredCages = useMemo(() => {
     if (!formBatchId) return [];
+    const batch = (state.batches || []).find(b => b.id === formBatchId);
+    if (batch?.isClosed && !editingId) return [];
+
     const harvestedCageIds = new Set(
       (state.harvestLogs || []).filter(h => h.batchId === formBatchId).map(h => h.cageId)
     );
-    const feedingCageIds = new Set(
-      (state.feedingLogs || []).filter(f => f.batchId === formBatchId).map(f => f.cageId)
-    );
 
-    let cages = (state.cages || []).filter(c => 
-      c.batchId === formBatchId || 
-      harvestedCageIds.has(c.id) || 
-      feedingCageIds.has(c.id) || 
-      c.id === formData.cageId
-    );
+    let cages = (state.cages || []).filter(c => {
+      if (c.id === formData.cageId && editingId) return true;
+      if (c.batchId !== formBatchId) return false;
+      if (harvestedCageIds.has(c.id)) return false;
+      if (c.status !== 'Ocupada') return false;
+      return true;
+    });
 
     if (selectedLineId) {
       cages = cages.filter(c => c.lineId === selectedLineId);
     }
 
     return cages.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
-  }, [formBatchId, selectedLineId, state.cages, state.harvestLogs, state.feedingLogs, formData.cageId]);
+  }, [formBatchId, selectedLineId, state.cages, state.harvestLogs, state.batches, formData.cageId, editingId]);
 
   const { cageMap, feedMap, userMap } = useMemo(() => {
     const cages = new Map((state.cages || []).map(c => [c.id, c]));

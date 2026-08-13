@@ -756,9 +756,18 @@ export const ensureStateIntegrity = (state: any, mergeWith?: AppState, priority:
 
   if (finalResult.harvestSchedules && finalResult.harvestSchedules.length > 0) {
     const validHarvestSchedules: any[] = [];
+    const harvestLogsArr = finalResult.harvestLogs || [];
     finalResult.harvestSchedules.forEach(hs => {
-      if (hs.batchId && batchMap.has(hs.batchId) && !deletedSet.has(hs.batchId)) {
-        validHarvestSchedules.push(hs);
+      if (hs.batchId && batchMap.has(hs.batchId) && !deletedSet.has(hs.batchId) && !deletedSet.has(hs.id)) {
+        const harvestedCageIds = new Set(
+          harvestLogsArr.filter(h => h.batchId === hs.batchId).map(h => h.cageId)
+        );
+        const remainingCagesInSchedule = (hs.cageIds || []).filter(cId => !harvestedCageIds.has(cId));
+        if (remainingCagesInSchedule.length > 0) {
+          validHarvestSchedules.push(hs);
+        } else {
+          if (hs.id) purgedLogIds.push(hs.id);
+        }
       } else {
         if (hs.id) purgedLogIds.push(hs.id);
       }
