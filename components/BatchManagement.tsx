@@ -216,17 +216,28 @@ const BatchManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     )
       return;
 
-    const feedingLogsToRemove = (state.feedingLogs || []).filter((f) => f.batchId === id).map(f => f.id);
-    const mortalityLogsToRemove = (state.mortalityLogs || []).filter((m) => m.batchId === id).map(m => m.id);
-    const biometryLogsToRemove = (state.biometryLogs || []).filter((b) => b.batchId === id).map(b => b.id);
-    const harvestLogsToRemove = (state.harvestLogs || []).filter((h) => h.batchId === id).map(h => h.id);
-    const batchExpensesToRemove = (state.batchExpenses || []).filter((e) => e.batchId === id).map(e => e.id);
-    const batchRevenuesToRemove = (state.batchRevenues || []).filter((r) => r.batchId === id).map(r => r.id);
-    const slaughterLogsToRemove = (state.slaughterLogs || []).filter((s: any) => s.batchId === id).map((s: any) => s.id);
-    const harvestSchedulesToRemove = (state.harvestSchedules || []).filter((hs) => hs.batchId === id).map(hs => hs.id);
+    const targetBatch = (state.batches || []).find((b) => b.id === id || (b.name && b.name.toLowerCase() === id.toLowerCase()));
+
+    const isMatch = (itemBatchId?: string) => {
+      if (!itemBatchId) return false;
+      if (itemBatchId === id) return true;
+      if (targetBatch && (itemBatchId === targetBatch.id || itemBatchId === targetBatch.name)) return true;
+      return false;
+    };
+
+    const feedingLogsToRemove = (state.feedingLogs || []).filter((f) => isMatch(f.batchId)).map(f => f.id);
+    const mortalityLogsToRemove = (state.mortalityLogs || []).filter((m) => isMatch(m.batchId)).map(m => m.id);
+    const biometryLogsToRemove = (state.biometryLogs || []).filter((b) => isMatch(b.batchId)).map(b => b.id);
+    const harvestLogsToRemove = (state.harvestLogs || []).filter((h) => isMatch(h.batchId)).map(h => h.id);
+    const batchExpensesToRemove = (state.batchExpenses || []).filter((e) => isMatch(e.batchId)).map(e => e.id);
+    const batchRevenuesToRemove = (state.batchRevenues || []).filter((r) => isMatch(r.batchId)).map(r => r.id);
+    const slaughterLogsToRemove = (state.slaughterLogs || []).filter((s: any) => isMatch(s.batchId)).map((s: any) => s.id);
+    const harvestSchedulesToRemove = (state.harvestSchedules || []).filter((hs) => isMatch(hs.batchId)).map(hs => hs.id);
 
     const allRemovedIds = [
       id,
+      ...(targetBatch?.id && targetBatch.id !== id ? [targetBatch.id] : []),
+      ...(targetBatch?.name ? [targetBatch.name] : []),
       ...feedingLogsToRemove,
       ...mortalityLogsToRemove,
       ...biometryLogsToRemove,
@@ -237,19 +248,28 @@ const BatchManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       ...harvestSchedulesToRemove,
     ];
 
+    const feedingRemoveSet = new Set(feedingLogsToRemove);
+    const mortalityRemoveSet = new Set(mortalityLogsToRemove);
+    const biometryRemoveSet = new Set(biometryLogsToRemove);
+    const harvestRemoveSet = new Set(harvestLogsToRemove);
+    const expenseRemoveSet = new Set(batchExpensesToRemove);
+    const revenueRemoveSet = new Set(batchRevenuesToRemove);
+    const slaughterRemoveSet = new Set(slaughterLogsToRemove);
+    const scheduleRemoveSet = new Set(harvestSchedulesToRemove);
+
     onUpdate({
       ...state,
-      batches: (state.batches || []).filter((b) => b.id !== id),
-      feedingLogs: (state.feedingLogs || []).filter((f) => f.batchId !== id),
-      mortalityLogs: (state.mortalityLogs || []).filter((m) => m.batchId !== id),
-      biometryLogs: (state.biometryLogs || []).filter((b) => b.batchId !== id),
-      harvestLogs: (state.harvestLogs || []).filter((h) => h.batchId !== id),
-      batchExpenses: (state.batchExpenses || []).filter((e) => e.batchId !== id),
-      batchRevenues: (state.batchRevenues || []).filter((r) => r.batchId !== id),
-      slaughterLogs: (state.slaughterLogs || []).filter((s: any) => s.batchId !== id),
-      harvestSchedules: (state.harvestSchedules || []).filter((hs) => hs.batchId !== id),
+      batches: (state.batches || []).filter((b) => b.id !== id && (!targetBatch || b.id !== targetBatch.id)),
+      feedingLogs: (state.feedingLogs || []).filter((f) => !feedingRemoveSet.has(f.id)),
+      mortalityLogs: (state.mortalityLogs || []).filter((m) => !mortalityRemoveSet.has(m.id)),
+      biometryLogs: (state.biometryLogs || []).filter((b) => !biometryRemoveSet.has(b.id)),
+      harvestLogs: (state.harvestLogs || []).filter((h) => !harvestRemoveSet.has(h.id)),
+      batchExpenses: (state.batchExpenses || []).filter((e) => !expenseRemoveSet.has(e.id)),
+      batchRevenues: (state.batchRevenues || []).filter((r) => !revenueRemoveSet.has(r.id)),
+      slaughterLogs: (state.slaughterLogs || []).filter((s: any) => !slaughterRemoveSet.has(s.id)),
+      harvestSchedules: (state.harvestSchedules || []).filter((hs) => !scheduleRemoveSet.has(hs.id)),
       cages: (state.cages || []).map((c) =>
-        c.batchId === id
+        isMatch(c.batchId)
           ? {
               ...c,
               batchId: undefined,

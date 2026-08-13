@@ -28,6 +28,29 @@ const defaultNotificationSettings: NotificationSettings = {
   updatedAt: 1
 };
 
+export const isBatchMatch = (targetIdOrName: string | undefined, batch: any): boolean => {
+  if (!targetIdOrName || !batch) return false;
+  const tid = targetIdOrName.trim().toLowerCase();
+  if (tid === batch.id?.toLowerCase()) return true;
+
+  const bn = (batch.name || '').trim().toLowerCase();
+  if (tid === bn) return true;
+
+  const tidNorm = tid.replace(/[^a-z0-9]/g, '');
+  const bnNorm = bn.replace(/[^a-z0-9]/g, '');
+  if (tidNorm.length > 0 && tidNorm === bnNorm) return true;
+
+  const tidNoLote = tid.replace(/^lote\s*/i, '').trim();
+  const bnNoLote = bn.replace(/^lote\s*/i, '').trim();
+  if (tidNoLote.length > 0 && tidNoLote === bnNoLote) return true;
+
+  const tidNum = tidNoLote.replace(/^0+/, '');
+  const bnNum = bnNoLote.replace(/^0+/, '');
+  if (tidNum.length > 0 && tidNum === bnNum) return true;
+
+  return false;
+};
+
 const initialState: AppState = {
   users: [initialMaster],
   lines: [],
@@ -288,10 +311,7 @@ export const areStatesEqual = (a: AppState, b: AppState): boolean => {
         if (itemA.timestamp !== itemB.timestamp) return false;
         if (itemA.averageWeight !== itemB.averageWeight) return false;
 
-        // If updatedAt exists and is non-zero, matching upA === upB guarantees equality for updated objects
-        if (upA === 0 || upB === 0) {
-          if (JSON.stringify(itemA) !== JSON.stringify(itemB)) return false;
-        }
+        if (JSON.stringify(itemA) !== JSON.stringify(itemB)) return false;
       } else {
         if (itemA !== itemB) return false;
       }
@@ -453,23 +473,28 @@ export const ensureStateIntegrity = (state: any, mergeWith?: AppState, priority:
   const cagesWithResolvedBatch = rawCages.map(cage => {
     let batchId = cage.batchId;
     if (batchId) {
-      const existingBatch = batches.find(b => b.id === batchId);
-      if (!existingBatch && batches.length > 0) {
+      const existingBatch = batches.find(b => b.id === batchId || isBatchMatch(b.id, { id: batchId, name: batchId }));
+      if (!existingBatch || existingBatch.isClosed || deletedSet.has(existingBatch.id)) {
         batchId = undefined;
       }
     }
-    if (!batchId) {
-      for (const b of batches) {
-        const hasLogs = (finalResult.feedingLogs || []).some(f => f.cageId === cage.id && f.batchId === b.id) ||
-                        (finalResult.mortalityLogs || []).some(m => m.cageId === cage.id && m.batchId === b.id) ||
-                        (finalResult.biometryLogs || []).some(bio => bio.cageId === cage.id && bio.batchId === b.id) ||
-                        (finalResult.harvestLogs || []).some(h => h.cageId === cage.id && h.batchId === b.id);
-        if (hasLogs) {
-          batchId = b.id;
-          break;
-        }
+
+    // Unlink cage if it has been harvested for this batch
+    if (batchId) {
+      const isHarvestedInBatch = harvestLogs.some(h =>
+        h.cageId === cage.id &&
+        (h.batchId === batchId || isBatchMatch(h.batchId, { id: batchId, name: batchId }))
+      );
+      if (isHarvestedInBatch) {
+        batchId = undefined;
       }
     }
+
+    // Unlink cage if its status is non-occupied (Limpeza, Disponível, Manutenção, Avaliação, Sucata)
+    if (cage.status && ['Limpeza', 'Disponível', 'Manutenção', 'Avaliação', 'Sucata'].includes(cage.status)) {
+      batchId = undefined;
+    }
+
     return { ...cage, batchId };
   });
 
@@ -487,53 +512,55 @@ export const ensureStateIntegrity = (state: any, mergeWith?: AppState, priority:
   const normalizedCages = cagesWithResolvedBatch.map(cage => {
     let { batchId, initialFishCount, status, harvestDate, settlementDate } = cage;
 
-    // Check if this cage has a harvest log for this batch
-    let harvest = batchId ? harvestLogs.find(h => h.cageId === cage.id && h.batchId === batchId) : null;
-
     if (status === 'Em Uso') {
       status = 'Ocupada';
     }
-    if (!status) {
-      status = batchId ? 'Ocupada' : 'Disponível';
-    }
-    if (batchId) {
-      const batch = batches.find(b => b.id === batchId);
+
+    if (!batchId) {
+      initialFishCount = undefined;
+      settlementDate = undefined;
+      harvestDate = undefined;
+
+      if (!status || status === 'Ocupada') {
+        status = 'Limpeza';
+      }
+    } else {
+      if (!status || status === 'Limpeza' || status === 'Disponível') {
+        status = 'Ocupada';
+      }
+      const batch = batches.find(b => b.id === batchId || isBatchMatch(b.id, { id: batchId, name: batchId }));
       if (batch && !settlementDate) {
         settlementDate = batch.settlementDate;
       }
-      if (harvest && status === 'Ocupada') {
-        harvestDate = harvest.date || harvestDate;
-      }
-    }
 
-    if (batchId && (!initialFishCount || initialFishCount <= 0)) {
-      const batch = batches.find(b => b.id === batchId);
-      if (batch && batch.initialQuantity > 0) {
-        const batchCages = cagesByBatchMap.get(batch.id) || [];
-        const knownFishSum = batchCages
-          .filter(c => c.id !== cage.id && c.initialFishCount && c.initialFishCount > 0)
-          .reduce((a, c) => a + (c.initialFishCount || 0), 0);
+      if (!initialFishCount || initialFishCount <= 0) {
+        if (batch && batch.initialQuantity > 0) {
+          const batchCages = cagesByBatchMap.get(batch.id) || [];
+          const knownFishSum = batchCages
+            .filter(c => c.id !== cage.id && c.initialFishCount && c.initialFishCount > 0)
+            .reduce((a, c) => a + (c.initialFishCount || 0), 0);
 
-        const harvestSum = harvestLogs
-          .filter(h => h.batchId === batch.id)
-          .reduce((a, h) => a + (h.initialFishCount || h.fishCount || 0), 0);
+          const harvestSum = harvestLogs
+            .filter(h => h.batchId === batch.id || isBatchMatch(h.batchId, batch))
+            .reduce((a, h) => a + (h.initialFishCount || h.fishCount || 0), 0);
 
-        const nurseryMort = mortalityLogs
-          .filter(m => m.batchId === batch.id && !m.cageId)
-          .reduce((a, m) => a + m.count, 0);
+          const nurseryMort = mortalityLogs
+            .filter(m => (m.batchId === batch.id || isBatchMatch(m.batchId, batch)) && !m.cageId)
+            .reduce((a, m) => a + m.count, 0);
 
-        const uncountedCages = batchCages.filter(c => !c.initialFishCount || c.initialFishCount <= 0);
-        const remainingFish = Math.max(0, batch.initialQuantity - knownFishSum - harvestSum - nurseryMort);
+          const uncountedCages = batchCages.filter(c => !c.initialFishCount || c.initialFishCount <= 0);
+          const remainingFish = Math.max(0, batch.initialQuantity - knownFishSum - harvestSum - nurseryMort);
 
-        if (uncountedCages.length > 0 && remainingFish > 0) {
-          let calculated = Math.round(remainingFish / uncountedCages.length);
-          if (cage.stockingCapacity && cage.stockingCapacity > 0 && calculated > cage.stockingCapacity) {
-            calculated = cage.stockingCapacity;
+          if (uncountedCages.length > 0 && remainingFish > 0) {
+            let calculated = Math.round(remainingFish / uncountedCages.length);
+            if (cage.stockingCapacity && cage.stockingCapacity > 0 && calculated > cage.stockingCapacity) {
+              calculated = cage.stockingCapacity;
+            }
+            initialFishCount = calculated > 0 ? calculated : (cage.stockingCapacity || 10000);
           }
-          initialFishCount = calculated > 0 ? calculated : (cage.stockingCapacity || 10000);
+        } else {
+          initialFishCount = cage.stockingCapacity || 10000;
         }
-      } else {
-        initialFishCount = cage.stockingCapacity || 10000;
       }
     }
 
@@ -673,89 +700,6 @@ export const ensureStateIntegrity = (state: any, mergeWith?: AppState, priority:
       }
     });
     finalResult.feedingLogs = validFeedingLogs;
-  }
-
-  // Adjust/Normalize Lote 02 feeding logs if Lote 02 exists in batches
-  const batch02 = (finalResult.batches || []).find(b => {
-    const bnNoLote = (b.name || '').replace(/^lote\s*/i, '').trim();
-    const bnNum = bnNoLote.replace(/^0+/, '');
-    return bnNum === '2' || bnNoLote === '02' || bnNoLote === '2';
-  });
-
-  if (batch02) {
-    const ft23 = (finalResult.feedTypes || []).find(t => {
-      const n = (t.name || '').toLowerCase();
-      return (n.includes('2') && n.includes('3')) || t.id === 'feed-2-3mm';
-    }) || { id: 'feed-2-3mm', name: 'Ração 2 a 3mm' };
-
-    const ft34 = (finalResult.feedTypes || []).find(t => {
-      const n = (t.name || '').toLowerCase();
-      return (n.includes('3') && n.includes('4')) || t.id === 'feed-3-4mm';
-    }) || { id: 'feed-3-4mm', name: 'Ração 3 a 4mm' };
-
-    const ft46 = (finalResult.feedTypes || []).find(t => {
-      const n = (t.name || '').toLowerCase();
-      return (n.includes('4') && n.includes('6')) || t.id === 'feed-4-6mm';
-    }) || { id: 'feed-4-6mm', name: 'Ração 4 a 6mm' };
-
-    const currentBatch02Logs = (finalResult.feedingLogs || []).filter(f => f.batchId === batch02.id);
-    
-    const sum23 = currentBatch02Logs.filter(f => f.feedTypeId === ft23.id).reduce((acc, f) => acc + (f.amount || 0), 0);
-    const sum34 = currentBatch02Logs.filter(f => f.feedTypeId === ft34.id).reduce((acc, f) => acc + (f.amount || 0), 0);
-    const sum46 = currentBatch02Logs.filter(f => f.feedTypeId === ft46.id).reduce((acc, f) => acc + (f.amount || 0), 0);
-
-    const target23Grams = 1637200; // 1.637,2 KG
-    const target34Grams = 5664900; // 5.664,9 KG
-    const target46Grams = 83196600; // 83.196,6 KG
-
-    const hasCustomAdj = currentBatch02Logs.some(f => f.id.startsWith('feed-adj-'));
-    const isExactTarget = sum23 === target23Grams && sum34 === target34Grams && sum46 === target46Grams && currentBatch02Logs.length === 3;
-
-    if (!hasCustomAdj && !isExactTarget) {
-      const removedLogIds = currentBatch02Logs.map(f => f.id);
-      const otherLogs = (finalResult.feedingLogs || []).filter(f => f.batchId !== batch02.id);
-      
-      const cageId02 = (batch02.cageIds && batch02.cageIds.length > 0) ? batch02.cageIds[0] : (normalizedCages[0]?.id || 'c-lote02-01');
-      const logTimestamp = batch02.settlementDate 
-        ? `${batch02.settlementDate}T12:00:00.000Z`
-        : (batch02.closedAt || '2025-06-01T12:00:00.000Z');
-
-      const fixedLogs = [
-        {
-          id: `lote02-feed-23-${batch02.id}`,
-          batchId: batch02.id,
-          cageId: cageId02,
-          feedTypeId: ft23.id,
-          amount: target23Grams,
-          timestamp: logTimestamp,
-          userId: batch02.userId || 'system',
-          updatedAt: Date.now()
-        },
-        {
-          id: `lote02-feed-34-${batch02.id}`,
-          batchId: batch02.id,
-          cageId: cageId02,
-          feedTypeId: ft34.id,
-          amount: target34Grams,
-          timestamp: logTimestamp,
-          userId: batch02.userId || 'system',
-          updatedAt: Date.now()
-        },
-        {
-          id: `lote02-feed-46-${batch02.id}`,
-          batchId: batch02.id,
-          cageId: cageId02,
-          feedTypeId: ft46.id,
-          amount: target46Grams,
-          timestamp: logTimestamp,
-          userId: batch02.userId || 'system',
-          updatedAt: Date.now()
-        }
-      ];
-
-      finalResult.feedingLogs = [...otherLogs, ...fixedLogs];
-      finalResult.deletedIds = Array.from(new Set([...(finalResult.deletedIds || []), ...removedLogIds]));
-    }
   }
 
   if (finalResult.mortalityLogs && finalResult.mortalityLogs.length > 0) {

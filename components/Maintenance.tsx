@@ -78,12 +78,16 @@ const Maintenance: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
 
     const updatedCages = state.cages.map(c => {
       if (targetIds.includes(c.id)) {
+        const isOccupied = formData.status === 'Ocupada';
         return {
           ...c,
           status: formData.status,
+          batchId: isOccupied ? c.batchId : undefined,
+          initialFishCount: isOccupied ? c.initialFishCount : undefined,
+          settlementDate: isOccupied ? c.settlementDate : undefined,
+          harvestDate: undefined, // Clear harvest date after status update
           maintenanceStartDate: ['Manutenção', 'Limpeza', 'Avaliação'].includes(formData.status) ? formData.startDate : undefined,
           maintenanceEndDate: ['Manutenção', 'Limpeza', 'Avaliação'].includes(formData.status) ? formData.endDate : undefined,
-          harvestDate: undefined, // Clear harvest date after status update
           updatedAt: Date.now()
         };
       }

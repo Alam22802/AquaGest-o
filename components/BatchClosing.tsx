@@ -828,17 +828,28 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     if (!selectedBatchId || !currentUser.isMaster) return;
     if (!confirm('Deseja realmente EXCLUIR este lote PERMANENTEMENTE? Todos os dados (lançamentos, tratos, mortalidade, biometria e despescas) associados a ele serão apagados para liberar espaço e tornar o sistema mais leve. Esta ação não pode ser desfeita.')) return;
 
-    const feedingLogsToRemove = (state.feedingLogs || []).filter((f) => f.batchId === selectedBatchId).map(f => f.id);
-    const mortalityLogsToRemove = (state.mortalityLogs || []).filter((m) => m.batchId === selectedBatchId).map(m => m.id);
-    const biometryLogsToRemove = (state.biometryLogs || []).filter((b) => b.batchId === selectedBatchId).map(b => b.id);
-    const harvestLogsToRemove = (state.harvestLogs || []).filter((h) => h.batchId === selectedBatchId).map(h => h.id);
-    const batchExpensesToRemove = (state.batchExpenses || []).filter((e) => e.batchId === selectedBatchId).map(e => e.id);
-    const batchRevenuesToRemove = (state.batchRevenues || []).filter((r) => r.batchId === selectedBatchId).map(r => r.id);
-    const slaughterLogsToRemove = (state.slaughterLogs || []).filter((s: any) => s.batchId === selectedBatchId).map((s: any) => s.id);
-    const harvestSchedulesToRemove = (state.harvestSchedules || []).filter((hs) => hs.batchId === selectedBatchId).map(hs => hs.id);
+    const targetBatch = (state.batches || []).find(b => b.id === selectedBatchId || isBatchMatch(b.id, { id: selectedBatchId, name: selectedBatchId }));
+
+    const isMatch = (itemBatchId?: string) => {
+      if (!itemBatchId) return false;
+      if (itemBatchId === selectedBatchId) return true;
+      if (targetBatch && (itemBatchId === targetBatch.id || itemBatchId === targetBatch.name || isBatchMatch(itemBatchId, targetBatch))) return true;
+      return false;
+    };
+
+    const feedingLogsToRemove = (state.feedingLogs || []).filter((f) => isMatch(f.batchId) || (targetBatch && checkIsFeedingLogForBatch(f, targetBatch, state.harvestLogs, state.cages, state.batches))).map(f => f.id);
+    const mortalityLogsToRemove = (state.mortalityLogs || []).filter((m) => isMatch(m.batchId)).map(m => m.id);
+    const biometryLogsToRemove = (state.biometryLogs || []).filter((b) => isMatch(b.batchId)).map(b => b.id);
+    const harvestLogsToRemove = (state.harvestLogs || []).filter((h) => isMatch(h.batchId)).map(h => h.id);
+    const batchExpensesToRemove = (state.batchExpenses || []).filter((e) => isMatch(e.batchId)).map(e => e.id);
+    const batchRevenuesToRemove = (state.batchRevenues || []).filter((r) => isMatch(r.batchId)).map(r => r.id);
+    const slaughterLogsToRemove = (state.slaughterLogs || []).filter((s: any) => isMatch(s.batchId)).map((s: any) => s.id);
+    const harvestSchedulesToRemove = (state.harvestSchedules || []).filter((hs) => isMatch(hs.batchId)).map(hs => hs.id);
 
     const allRemovedIds = [
       selectedBatchId,
+      ...(targetBatch?.id && targetBatch.id !== selectedBatchId ? [targetBatch.id] : []),
+      ...(targetBatch?.name ? [targetBatch.name] : []),
       ...feedingLogsToRemove,
       ...mortalityLogsToRemove,
       ...biometryLogsToRemove,
@@ -849,18 +860,27 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       ...harvestSchedulesToRemove,
     ];
 
+    const feedingRemoveSet = new Set(feedingLogsToRemove);
+    const mortalityRemoveSet = new Set(mortalityLogsToRemove);
+    const biometryRemoveSet = new Set(biometryLogsToRemove);
+    const harvestRemoveSet = new Set(harvestLogsToRemove);
+    const expenseRemoveSet = new Set(batchExpensesToRemove);
+    const revenueRemoveSet = new Set(batchRevenuesToRemove);
+    const slaughterRemoveSet = new Set(slaughterLogsToRemove);
+    const scheduleRemoveSet = new Set(harvestSchedulesToRemove);
+
     onUpdate({
       ...state,
-      batches: (state.batches || []).filter(b => b.id !== selectedBatchId),
-      feedingLogs: (state.feedingLogs || []).filter(f => f.batchId !== selectedBatchId),
-      mortalityLogs: (state.mortalityLogs || []).filter(m => m.batchId !== selectedBatchId),
-      biometryLogs: (state.biometryLogs || []).filter(b => b.batchId !== selectedBatchId),
-      harvestLogs: (state.harvestLogs || []).filter(h => h.batchId !== selectedBatchId),
-      batchExpenses: (state.batchExpenses || []).filter(e => e.batchId !== selectedBatchId),
-      batchRevenues: (state.batchRevenues || []).filter(r => r.batchId !== selectedBatchId),
-      slaughterLogs: (state.slaughterLogs || []).filter((s: any) => s.batchId !== selectedBatchId),
-      harvestSchedules: (state.harvestSchedules || []).filter(hs => hs.batchId !== selectedBatchId),
-      cages: (state.cages || []).map(c => c.batchId === selectedBatchId ? { ...c, batchId: undefined, initialFishCount: undefined, settlementDate: undefined, harvestDate: undefined } : c),
+      batches: (state.batches || []).filter(b => b.id !== selectedBatchId && (!targetBatch || b.id !== targetBatch.id)),
+      feedingLogs: (state.feedingLogs || []).filter(f => !feedingRemoveSet.has(f.id)),
+      mortalityLogs: (state.mortalityLogs || []).filter(m => !mortalityRemoveSet.has(m.id)),
+      biometryLogs: (state.biometryLogs || []).filter(b => !biometryRemoveSet.has(b.id)),
+      harvestLogs: (state.harvestLogs || []).filter(h => !harvestRemoveSet.has(h.id)),
+      batchExpenses: (state.batchExpenses || []).filter(e => !expenseRemoveSet.has(e.id)),
+      batchRevenues: (state.batchRevenues || []).filter(r => !revenueRemoveSet.has(r.id)),
+      slaughterLogs: (state.slaughterLogs || []).filter((s: any) => !slaughterRemoveSet.has(s.id)),
+      harvestSchedules: (state.harvestSchedules || []).filter(hs => !scheduleRemoveSet.has(hs.id)),
+      cages: (state.cages || []).map(c => (isMatch(c.batchId) || (targetBatch && c.batchId === targetBatch.id)) ? { ...c, batchId: undefined, initialFishCount: undefined, settlementDate: undefined, harvestDate: undefined, updatedAt: Date.now() } : c),
       deletedIds: Array.from(new Set([...(state.deletedIds || []), ...allRemovedIds])),
     });
 
