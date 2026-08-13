@@ -1,7 +1,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { User, AppState, NotificationSettings } from '../types';
-import { UserPlus, Trash2, Shield, Phone, Mail, Key, Eye, Edit3, User as UserIcon, CheckCircle, XCircle, Clock, Bell, Settings2, Save, X, AlertTriangle, Cloud, Database, Copy, RefreshCw } from 'lucide-react';
+import { UserPlus, Trash2, Shield, Phone, Mail, Key, Eye, Edit3, User as UserIcon, CheckCircle, XCircle, Clock, Bell, Settings2, Save, X, AlertTriangle, Cloud, Database, Copy, RefreshCw, Share2, Link as LinkIcon, CheckCircle2, Layers } from 'lucide-react';
+import { generateInviteLink, forceAdminMassSync } from '../store';
 
 interface Props {
   state: AppState;
@@ -50,12 +51,44 @@ const UserManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     }
   );
 
+  const [copiedInviteLink, setCopiedInviteLink] = useState(false);
+  const [isSyncingMass, setIsSyncingMass] = useState(false);
+
   // Sincroniza o e-mail do mestre se houver mudança externa
   useEffect(() => {
     if (masterUser?.email) {
       setMasterEmail(masterUser.email);
     }
   }, [masterUser?.email]);
+
+  const handleCopyInviteLink = () => {
+    const inviteUrl = generateInviteLink(state.supabaseConfig);
+    navigator.clipboard.writeText(inviteUrl);
+    setCopiedInviteLink(true);
+    setTimeout(() => setCopiedInviteLink(false), 3500);
+  };
+
+  const handleForceMassSync = async () => {
+    if (!confirm('Deseja realizar a Sincronização em Massa com o Login Admin?\n\nEsta ação enviará todos os dados atuais do Administrador Mestre para a nuvem como fonte única da verdade. Todos os outros usuários passarão a ver exatamente as mesmas informações do Admin.')) {
+      return;
+    }
+
+    setIsSyncingMass(true);
+    try {
+      const res = await forceAdminMassSync(state, state.supabaseConfig);
+      if (res.success) {
+        onUpdate({
+          ...state,
+          lastSync: Date.now()
+        });
+      }
+      alert(res.message);
+    } catch (err: any) {
+      alert('Erro ao realizar sincronização em massa: ' + (err?.message || err));
+    } finally {
+      setIsSyncingMass(false);
+    }
+  };
 
   const handleSaveUser = (e: React.FormEvent) => {
     e.preventDefault();
@@ -376,6 +409,97 @@ const UserManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
           </div>
         </div>
         <Bell className="absolute -right-10 -bottom-10 w-48 h-48 opacity-5 rotate-12" />
+      </div>
+
+      {/* Ações do Administrador: Sincronismo em Massa e Link de Convite (24h) */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        
+        {/* Card 1: Sincronismo em Massa */}
+        <div className="bg-gradient-to-br from-indigo-950 via-slate-900 to-indigo-900 p-8 rounded-[2.5rem] text-white shadow-2xl border border-indigo-500/20 relative overflow-hidden flex flex-col justify-between space-y-6">
+          <div className="relative z-10 space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-3 bg-indigo-500/20 text-indigo-400 rounded-2xl border border-indigo-500/30">
+                  <Layers className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black uppercase tracking-tight italic">Sincronismo em Massa</h3>
+                  <p className="text-[10px] font-bold text-indigo-300 uppercase tracking-widest">Login Admin • Espelhamento Global</p>
+                </div>
+              </div>
+              <span className="px-3 py-1 bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 rounded-full text-[9px] font-black uppercase tracking-widest">
+                Visão Única
+              </span>
+            </div>
+
+            <p className="text-xs font-medium text-slate-300 leading-relaxed">
+              Replica e força os dados do **Administrador Mestre** para a nuvem e servidor central. Utilize esta função para garantir que todos os funcionários e usuários vejam exatamente as mesmas informações e relatórios.
+            </p>
+          </div>
+
+          <div className="relative z-10 pt-2">
+            <button
+              onClick={handleForceMassSync}
+              disabled={isSyncingMass}
+              className="w-full py-4 px-6 bg-indigo-500 hover:bg-indigo-400 disabled:opacity-50 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-indigo-500/25 transition-all active:scale-95 flex items-center justify-center gap-3"
+            >
+              <RefreshCw className={`w-4 h-4 ${isSyncingMass ? 'animate-spin' : ''}`} />
+              {isSyncingMass ? 'Sincronizando em Massa...' : 'Sincronizar Todos os Usuários com Dados Admin'}
+            </button>
+          </div>
+          
+          <Layers className="absolute -right-8 -bottom-8 w-40 h-40 opacity-5 -rotate-12 pointer-events-none" />
+        </div>
+
+        {/* Card 2: Link de Convite (Validade 24h) */}
+        <div className="bg-gradient-to-br from-emerald-950 via-slate-900 to-emerald-900 p-8 rounded-[2.5rem] text-white shadow-2xl border border-emerald-500/20 relative overflow-hidden flex flex-col justify-between space-y-6">
+          <div className="relative z-10 space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-3 bg-emerald-500/20 text-emerald-400 rounded-2xl border border-emerald-500/30">
+                  <Share2 className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black uppercase tracking-tight italic">Convite para Novos Usuários</h3>
+                  <p className="text-[10px] font-bold text-emerald-300 uppercase tracking-widest">Link com Validade de 24h</p>
+                </div>
+              </div>
+              <span className="px-3 py-1 bg-amber-500/20 text-amber-300 border border-amber-500/30 rounded-full text-[9px] font-black uppercase tracking-widest flex items-center gap-1">
+                <Clock className="w-3 h-3" /> Expira em 24h
+              </span>
+            </div>
+
+            <p className="text-xs font-medium text-slate-300 leading-relaxed">
+              Gere o link de compartilhamento para que novos operadores e funcionários vinculem automaticamente a nuvem ao abrir a URL. **Se não for utilizado dentro de 24 horas, o link expira automaticamente.**
+            </p>
+          </div>
+
+          <div className="relative z-10 pt-2">
+            <button
+              onClick={handleCopyInviteLink}
+              className={`w-full py-4 px-6 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl transition-all active:scale-95 flex items-center justify-center gap-3 ${
+                copiedInviteLink
+                  ? 'bg-emerald-400 text-slate-950 shadow-emerald-400/30'
+                  : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-600/25'
+              }`}
+            >
+              {copiedInviteLink ? (
+                <>
+                  <CheckCircle2 className="w-4 h-4 text-slate-950" />
+                  Link Copiado! (Validade de 24 Horas)
+                </>
+              ) : (
+                <>
+                  <LinkIcon className="w-4 h-4" />
+                  Copiar Link de Convite (Válido por 24h)
+                </>
+              )}
+            </button>
+          </div>
+
+          <Share2 className="absolute -right-8 -bottom-8 w-40 h-40 opacity-5 -rotate-12 pointer-events-none" />
+        </div>
+
       </div>
 
       {/* Seção de Pendentes */}

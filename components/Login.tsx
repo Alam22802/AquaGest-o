@@ -66,11 +66,12 @@ const Login: React.FC<Props> = ({ state, onLogin, onRegister, onUpdateState, onS
   };
 
   const handleApplyInviteLink = () => {
-    if (applyConfigFromLink(inviteLink)) {
-      setSuccessMessage('Configuração de nuvem aplicada! Reiniciando...');
+    const res = applyConfigFromLink(inviteLink);
+    if (res.success) {
+      setSuccessMessage(res.message);
       setTimeout(() => window.location.reload(), 1500);
     } else {
-      setError('Link de convite inválido. Certifique-se de copiar o link completo.');
+      setError(res.message);
     }
   };
 

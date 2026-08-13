@@ -6,7 +6,7 @@ import {
   FileUp, Globe, AlertCircle, AlertTriangle, Copy, Import, Server, Save, 
   ExternalLink, Info, Activity, ShieldCheck, XCircle, Terminal
 } from 'lucide-react';
-import { exportData, getSupabase, ensureStateIntegrity, applyConfigFromLink } from '../store';
+import { exportData, getSupabase, ensureStateIntegrity, applyConfigFromLink, generateInviteLink } from '../store';
 
 interface Props {
   state: AppState;
@@ -131,11 +131,12 @@ const CloudSettings: React.FC<Props> = ({ state, onUpdate, currentUser, onSync, 
   };
 
   const handleManualLinkImport = () => {
-    if (applyConfigFromLink(manualLink)) {
-      alert('Configuração importada! O app irá reiniciar.');
+    const res = applyConfigFromLink(manualLink);
+    if (res.success) {
+      alert(res.message);
       window.location.reload();
     } else {
-      alert('Link de convite inválido.');
+      alert(res.message);
     }
   };
 
@@ -185,9 +186,11 @@ create policy "Allow All Access" on farm_data for all using (true) with check (t
   };
 
   const copyInviteLink = () => {
-    const baseUrl = window.location.origin + window.location.pathname;
-    const inviteUrl = `${baseUrl}?s_url=${encodeURIComponent(config.url)}&s_key=${encodeURIComponent(config.key)}`;
-    // Fix: Removed incorrect navigator.clipboard.get() call as it is not a standard method and was unused
+    if (!config.url || !config.key) {
+      alert('Configure primeiro a URL e a Chave API do Supabase para gerar o link de convite.');
+      return;
+    }
+    const inviteUrl = generateInviteLink(config);
     navigator.clipboard.writeText(inviteUrl);
     setCopiedLink(true);
     setTimeout(() => setCopiedLink(false), 3000);
@@ -298,7 +301,7 @@ create policy "Allow All Access" on farm_data for all using (true) with check (t
                  <h3 className="text-lg font-black uppercase italic tracking-tight">Vincular Equipe</h3>
               </div>
               <p className="text-xs font-medium opacity-70 leading-relaxed max-w-sm">
-                Gere o link e envie para os funcionários. O app deles se configurará automaticamente.
+                Gere o link seguro de acesso (válido por 24 horas) e envie para os funcionários. O app deles se configurará automaticamente ao abrir o link.
               </p>
               <button onClick={copyInviteLink} className="w-full bg-[#e4e4d4] text-[#344434] py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-3 active:scale-95 shadow-lg">
                 {copiedLink ? <CheckCircle2 className="w-4 h-4 text-emerald-600" /> : <LinkIcon className="w-4 h-4" />}

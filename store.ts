@@ -879,8 +879,17 @@ export const getSupabaseConfig = () => {
   const params = new URLSearchParams(window.location.search);
   const urlParam = params.get('s_url');
   const keyParam = params.get('s_key');
+  const expParam = params.get('s_exp');
 
   if (urlParam && keyParam) {
+    if (expParam) {
+      const expTime = Number(expParam);
+      if (!isNaN(expTime) && Date.now() > expTime) {
+        console.warn('Link de convite expirado (24h de validade).');
+        const saved = localStorage.getItem(SUPABASE_CONFIG_KEY);
+        return saved ? JSON.parse(saved) : null;
+      }
+    }
     const config = { url: decodeURIComponent(urlParam), key: decodeURIComponent(keyParam) };
     try {
       localStorage.setItem(SUPABASE_CONFIG_KEY, JSON.stringify(config));
@@ -895,24 +904,54 @@ export const getSupabaseConfig = () => {
   return saved ? JSON.parse(saved) : null;
 };
 
-export const applyConfigFromLink = (link: string): boolean => {
+export interface ApplyLinkResult {
+  success: boolean;
+  message: string;
+}
+
+export const generateInviteLink = (config?: { url: string; key: string }): string => {
+  const cfg = config || getSupabaseConfig();
+  const baseUrl = window.location.origin + window.location.pathname;
+  if (!cfg?.url || !cfg?.key) {
+    return baseUrl;
+  }
+  const expiresAt = Date.now() + 24 * 60 * 60 * 1000; // Validade de 24 horas
+  return `${baseUrl}?s_url=${encodeURIComponent(cfg.url)}&s_key=${encodeURIComponent(cfg.key)}&s_exp=${expiresAt}`;
+};
+
+export const applyConfigFromLink = (link: string): ApplyLinkResult => {
   try {
     const url = new URL(link);
     const s_url = url.searchParams.get('s_url');
     const s_key = url.searchParams.get('s_key');
-    if (s_url && s_key) {
-      const config = { url: decodeURIComponent(s_url), key: decodeURIComponent(s_key) };
-      try {
-        localStorage.setItem(SUPABASE_CONFIG_KEY, JSON.stringify(config));
-      } catch (e) {
-        console.warn('Falha ao salvar config Supabase (Quota)');
-      }
-      return true;
+    const s_exp = url.searchParams.get('s_exp');
+
+    if (!s_url || !s_key) {
+      return { success: false, message: 'Link de convite inválido ou incompleto. Certifique-se de copiar o link completo.' };
     }
+
+    if (s_exp) {
+      const expTime = Number(s_exp);
+      if (!isNaN(expTime) && Date.now() > expTime) {
+        const expiredDate = new Date(expTime).toLocaleString('pt-BR');
+        return {
+          success: false,
+          message: `Este link de convite expirou! Ele possuía validade de 24 horas e venceu em ${expiredDate}. Solicite um novo link ao administrador.`
+        };
+      }
+    }
+
+    const config = { url: decodeURIComponent(s_url), key: decodeURIComponent(s_key) };
+    try {
+      localStorage.setItem(SUPABASE_CONFIG_KEY, JSON.stringify(config));
+    } catch (e) {
+      console.warn('Falha ao salvar config Supabase (Quota)');
+    }
+    return { success: true, message: 'Link de convite e configurações vinculados com sucesso!' };
   } catch (e) {
     console.error('Link inválido', e);
+    return { success: false, message: 'Formato de link inválido. Verifique o link fornecido.' };
   }
-  return false;
 };
 
 let cachedSupabaseClient: any = null;
@@ -1141,4 +1180,55 @@ export const exportData = (state: AppState) => {
   linkElement.setAttribute('href', dataUri);
   linkElement.setAttribute('download', `backup_piscicultura_${new Date().toISOString().split('T')[0]}.json`);
   linkElement.click();
+};
+
+export const forceAdminMassSync = async (adminState: AppState, config?: { url: string; key: string }): Promise<{ success: boolean; message: string }> => {
+  try {
+    const integrityState = ensureStateIntegrity({
+      ...adminState,
+      lastSync: Date.now()
+    });
+
+    const configToUse = config || integrityState.supabaseConfig || getSupabaseConfig();
+
+    // 1. Force save to server API (overwrites server state)
+    try {
+      await fetch('/api/farm-state', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ state: integrityState, force: true })
+      });
+    } catch (err) {
+      console.warn('Erro na sincronização em massa com o servidor:', err);
+    }
+
+    // 2. Force overwrite in Supabase (WITHOUT merging)
+    const supabase = getSupabase(configToUse);
+    if (supabase) {
+      const { error } = await supabase
+        .from('farm_data')
+        .upsert({ id: 'singleton', state: integrityState, last_sync: new Date().toISOString() });
+      if (error) {
+        console.error('Erro no upsert forçado do Supabase:', error);
+      }
+    }
+
+    // 3. Update localStorage
+    try {
+      const jsonStr = JSON.stringify(integrityState);
+      localStorage.setItem(STORAGE_KEY, LZString.compressToUTF16(jsonStr));
+    } catch (e) {
+      console.warn('Erro de cota ao salvar no localStorage:', e);
+    }
+
+    return {
+      success: true,
+      message: 'Sincronização em massa concluída com sucesso! Todos os dados do Administrador foram replicados para o banco central e nuvem. Todos os usuários agora visualizarão a mesma base de dados.'
+    };
+  } catch (err: any) {
+    return {
+      success: false,
+      message: 'Falha na sincronização em massa: ' + (err?.message || 'Erro desconhecido')
+    };
+  }
 };

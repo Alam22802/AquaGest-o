@@ -278,7 +278,21 @@ const App: React.FC = () => {
     }
   }, [state, currentUser, isSyncingBackground]);
 
-  useEffect(() => { initApp(); }, [initApp]);
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const expParam = params.get('s_exp');
+    if (expParam) {
+      const expTime = Number(expParam);
+      if (!isNaN(expTime) && Date.now() > expTime) {
+        const expiredDate = new Date(expTime).toLocaleString('pt-BR');
+        setActiveAlert({
+          title: 'Link de Convite Expirado',
+          message: `O link de convite acessado possuía validade de 24 horas e venceu em ${expiredDate}. Solicite um novo link ao administrador para vincular o aplicativo.`
+        });
+      }
+    }
+    initApp();
+  }, [initApp]);
 
   // Realtime Subscription
   useEffect(() => {

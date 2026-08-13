@@ -152,12 +152,12 @@ let serverFarmState: any = null;
 
   app.post("/api/farm-state", (req, res) => {
     try {
-      const { state: clientState } = req.body;
+      const { state: clientState, force } = req.body;
       if (!clientState) {
         return res.status(400).json({ error: "Missing state" });
       }
 
-      if (!serverFarmState) {
+      if (!serverFarmState || force) {
         serverFarmState = clientState;
       } else {
         serverFarmState = mergeFarmStates(serverFarmState, clientState);
