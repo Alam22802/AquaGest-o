@@ -964,11 +964,32 @@ const Dashboard: React.FC<Props> = ({ state }) => {
         let continueWeight = undefined;
         if (showContinueCurve && day >= lastActualDay) {
           const gainBatch = currentBatchRate * (day - lastActualDay);
-          const gainStd = (getWeightAtDay(standardCurvePoints, day) || 0) - stdWeightAtStart;
-          const gainSup = (getWeightAtDay(supplierCurvePoints, day) || 0) - supWeightAtStart;
-          
-          continueWeight = lastWeight + (gainBatch + gainStd + gainSup) / 3;
-          if (continueWeight > targetW + 50) continueWeight = undefined;
+          const stdWDay = getWeightAtDay(standardCurvePoints, day);
+          const stdWStart = getWeightAtDay(standardCurvePoints, lastActualDay);
+          const supWDay = getWeightAtDay(supplierCurvePoints, day);
+          const supWStart = getWeightAtDay(supplierCurvePoints, lastActualDay);
+
+          const validGains: number[] = [gainBatch];
+          if (stdWDay !== null && stdWStart !== null) {
+            validGains.push(stdWDay - stdWStart);
+          }
+          if (supWDay !== null && supWStart !== null) {
+            validGains.push(supWDay - supWStart);
+          }
+
+          const avgGain = validGains.reduce((a, b) => a + b, 0) / validGains.length;
+          const projWeight = lastWeight + avgGain;
+
+          const harvestDay = expectedHarvestDate ? differenceInDays(parseISO(expectedHarvestDate), start) : null;
+          if (harvestDay !== null && harvestDay >= lastActualDay) {
+            if (day <= harvestDay) {
+              continueWeight = projWeight;
+            }
+          } else {
+            if (projWeight <= targetW + 100) {
+              continueWeight = projWeight;
+            }
+          }
         }
 
         let dateLabel = d;
@@ -1421,12 +1442,31 @@ const Dashboard: React.FC<Props> = ({ state }) => {
         let continueBiomass = undefined;
         if (showContinueCurve && day >= lastActualDay) {
           const gainBatch = currentBatchRate * (day - lastActualDay);
-          const gainStd = (getWeightAtDay(standardCurvePoints, day) || 0) - stdWeightAtStart;
-          const gainSup = (getWeightAtDay(supplierCurvePoints, day) || 0) - supWeightAtStart;
-          
-          const projectedWeight = lastWeight + (gainBatch + gainStd + gainSup) / 3;
-          if (projectedWeight <= targetW + 50) {
-            continueBiomass = Number(((estimatedPop * projectedWeight) / 1000).toFixed(1));
+          const stdWDay = getWeightAtDay(standardCurvePoints, day);
+          const stdWStart = getWeightAtDay(standardCurvePoints, lastActualDay);
+          const supWDay = getWeightAtDay(supplierCurvePoints, day);
+          const supWStart = getWeightAtDay(supplierCurvePoints, lastActualDay);
+
+          const validGains: number[] = [gainBatch];
+          if (stdWDay !== null && stdWStart !== null) {
+            validGains.push(stdWDay - stdWStart);
+          }
+          if (supWDay !== null && supWStart !== null) {
+            validGains.push(supWDay - supWStart);
+          }
+
+          const avgGain = validGains.reduce((a, b) => a + b, 0) / validGains.length;
+          const projWeight = lastWeight + avgGain;
+
+          const harvestDay = expectedHarvestDate ? differenceInDays(parseISO(expectedHarvestDate), start) : null;
+          if (harvestDay !== null && harvestDay >= lastActualDay) {
+            if (day <= harvestDay) {
+              continueBiomass = Number(((estimatedPop * projWeight) / 1000).toFixed(1));
+            }
+          } else {
+            if (projWeight <= targetW + 100) {
+              continueBiomass = Number(((estimatedPop * projWeight) / 1000).toFixed(1));
+            }
           }
         }
 

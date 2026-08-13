@@ -1161,14 +1161,21 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     const day = Math.max(0, differenceInDays(parseISO(closestDateStr), start));
 
     if (day >= lastActualDay) {
-      const stdWeightAtStart = getWeightAtDay(standardCurvePoints, lastActualDay) || 0;
-      const supWeightAtStart = getWeightAtDay(supplierCurvePoints, lastActualDay) || 0;
+      const stdWDay = getWeightAtDay(standardCurvePoints, day);
+      const stdWStart = getWeightAtDay(standardCurvePoints, lastActualDay);
+      const supWDay = getWeightAtDay(supplierCurvePoints, day);
+      const supWStart = getWeightAtDay(supplierCurvePoints, lastActualDay);
 
-      const gainBatch = currentBatchRate * (day - lastActualDay);
-      const gainStd = (getWeightAtDay(standardCurvePoints, day) || 0) - stdWeightAtStart;
-      const gainSup = (getWeightAtDay(supplierCurvePoints, day) || 0) - supWeightAtStart;
-      
-      const projectedWeight = lastWeight + (gainBatch + gainStd + gainSup) / 3;
+      const validGains: number[] = [currentBatchRate * (day - lastActualDay)];
+      if (stdWDay !== null && stdWStart !== null) {
+        validGains.push(stdWDay - stdWStart);
+      }
+      if (supWDay !== null && supWStart !== null) {
+        validGains.push(supWDay - supWStart);
+      }
+
+      const avgGain = validGains.reduce((a, b) => a + b, 0) / validGains.length;
+      const projectedWeight = lastWeight + avgGain;
       return Math.round(projectedWeight * 10) / 10;
     } else {
       const actualOnDate = actualData.find(ad => ad.fullDate === closestDateStr);
