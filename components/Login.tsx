@@ -1,8 +1,8 @@
 
 import React, { useState } from 'react';
 import { User, AppState } from '../types';
-import { Lock, User as UserIcon, LogIn, ArrowLeft, Clock, Eye, EyeOff, ShieldCheck, Cloud, RefreshCw, AlertTriangle, Link as LinkIcon } from 'lucide-react';
-import { loadState, applyConfigFromLink } from '../store';
+import { Lock, User as UserIcon, LogIn, ArrowLeft, Clock, Eye, EyeOff, ShieldCheck, Cloud, RefreshCw, AlertTriangle, Link as LinkIcon, CheckCircle2 } from 'lucide-react';
+import { loadState, applyConfigFromLink, matchUserCredentials, matchUserPassword, normalizeLoginString } from '../store';
 
 import Logo from './Logo';
 
@@ -12,9 +12,10 @@ interface Props {
   onRegister: (user: User) => void;
   onUpdateState: (newState: AppState) => void;
   onSync?: () => Promise<AppState | null>;
+  onRequestPasswordReset?: (identifier: string) => Promise<{ success: boolean; message: string }>;
 }
 
-const Login: React.FC<Props> = ({ state, onLogin, onRegister, onUpdateState, onSync }) => {
+const Login: React.FC<Props> = ({ state, onLogin, onRegister, onUpdateState, onSync, onRequestPasswordReset }) => {
   const [isRegistering, setIsRegistering] = useState(false);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -23,6 +24,7 @@ const Login: React.FC<Props> = ({ state, onLogin, onRegister, onUpdateState, onS
   const [successMessage, setSuccessMessage] = useState('');
   const [isSyncing, setIsSyncing] = useState(false);
   const [isLoggingIn, setIsLoggingIn] = useState(false);
+  const [isSubmittingReset, setIsSubmittingReset] = useState(false);
   const [showLinkInput, setShowLinkInput] = useState(false);
   const [inviteLink, setInviteLink] = useState('');
   const [isResettingPassword, setIsResettingPassword] = useState(false);
@@ -78,6 +80,7 @@ const Login: React.FC<Props> = ({ state, onLogin, onRegister, onUpdateState, onS
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setSuccessMessage('');
     setIsLoggingIn(true);
     
     let currentState = state;
@@ -92,97 +95,117 @@ const Login: React.FC<Props> = ({ state, onLogin, onRegister, onUpdateState, onS
       console.warn("Erro ao buscar dados mais recentes antes de logar:", syncErr);
     }
 
-    const cleanUser = username.trim().toLowerCase();
-    const cleanPass = password.trim();
+    const inputUser = username.trim();
+    const inputPass = password;
 
-    let foundUser = currentState.users.find(u => 
-      u.username.trim().toLowerCase() === cleanUser && 
-      u.password.trim() === cleanPass
-    );
+    if (!inputUser || !inputPass) {
+      setError('Por favor, informe seu usuário/e-mail e senha.');
+      setIsLoggingIn(false);
+      return;
+    }
 
-    // Fallback para o usuário mestre / admin
-    if (!foundUser && (cleanUser === 'admin' || cleanUser === 'administrador')) {
-      const masterUserInState = currentState.users.find(u => u.isMaster || u.username.trim().toLowerCase() === 'admin');
-      if (cleanPass === 'Costafoods@2026' || cleanPass === 'admin' || (masterUserInState && cleanPass === masterUserInState.password.trim())) {
-        if (masterUserInState) {
-          foundUser = {
-            ...masterUserInState,
-            password: cleanPass,
-            isApproved: true,
-            canEdit: true,
-            updatedAt: Date.now()
-          };
-        } else {
-          foundUser = {
-            id: 'master-001',
-            name: 'Administrador Mestre',
-            username: 'admin',
-            phone: '00000000000',
-            email: 'mestre@fazenda.com',
-            password: cleanPass,
-            isMaster: true,
-            isApproved: true,
-            canEdit: true,
-            receiveNotifications: true,
-            updatedAt: Date.now()
-          };
-        }
+    // 1. Procura usuário correspondente por username, e-mail ou nome
+    const usersList = currentState.users || [];
+    let matchedUser = usersList.find(u => matchUserCredentials(u, inputUser));
+
+    // Fallback especial para Master Admin caso não encontrado na lista atual
+    const inputNorm = normalizeLoginString(inputUser);
+    if (!matchedUser && (inputNorm === 'admin' || inputNorm === 'administrador' || inputNorm === 'mestre' || inputUser.toLowerCase() === 'alam.douglas@avivar.com.br')) {
+      const existingMaster = usersList.find(u => u.isMaster || u.username.trim().toLowerCase() === 'admin');
+      if (existingMaster) {
+        matchedUser = existingMaster;
+      } else {
+        matchedUser = {
+          id: 'master-001',
+          name: 'Administrador Mestre',
+          username: 'admin',
+          phone: '00000000000',
+          email: 'alam.douglas@avivar.com.br',
+          password: 'Costafoods@2026',
+          isMaster: true,
+          isApproved: true,
+          canEdit: true,
+          receiveNotifications: true,
+          updatedAt: Date.now()
+        };
       }
+    }
+
+    if (!matchedUser) {
+      setIsLoggingIn(false);
+      setError('Usuário ou e-mail não encontrado. Verifique a digitação ou solicite um novo cadastro.');
+      return;
+    }
+
+    // 2. Valida a senha do usuário encontrado
+    const isPasswordCorrect = matchUserPassword(matchedUser, inputPass);
+
+    if (!isPasswordCorrect) {
+      setIsLoggingIn(false);
+      setError('Senha incorreta. Verifique maiúsculas e minúsculas ou clique em "Esqueci minha senha" abaixo.');
+      return;
     }
 
     setIsLoggingIn(false);
 
-    if (foundUser) {
-      if (!foundUser.isApproved) {
-        setError('Acesso pendente. Peça ao Administrador para aprovar seu cadastro.');
-        return;
-      }
-
-      // Verifica inatividade superior a 30 dias (30 * 24 * 60 * 60 * 1000 ms)
-      const now = Date.now();
-      const lastAccess = foundUser.lastLoginAt 
-        ? new Date(foundUser.lastLoginAt).getTime() 
-        : (foundUser.updatedAt || now);
-      const daysInactive = (now - lastAccess) / (1000 * 60 * 60 * 24);
-
-      if (!foundUser.isMaster && (foundUser.blockedDueToInactivity || daysInactive > 30)) {
-        if (!foundUser.blockedDueToInactivity) {
-          const updatedUsers = currentState.users.map(u => 
-            u.id === foundUser.id ? { ...u, blockedDueToInactivity: true, updatedAt: Date.now() } : u
-          );
-          onUpdateState({ ...currentState, users: updatedUsers });
-        }
-        setBlockedUserForRequest(foundUser);
-        setError('Acesso bloqueado por inatividade superior a 30 dias.');
-        return;
-      }
-
-      if (foundUser.needsPasswordReset) {
-        setTempUser(foundUser);
-        setIsChangingPassword(true);
-        return;
-      }
-
-      // Atualiza o registro do último login no banco
-      const updatedUserWithLogin = {
-        ...foundUser,
-        lastLoginAt: new Date().toISOString(),
-        blockedDueToInactivity: false,
-        accessUnlockRequested: false,
-        updatedAt: Date.now()
-      };
-      
-      const updatedUsers = currentState.users.map(u => u.id === foundUser.id ? updatedUserWithLogin : u);
-      onUpdateState({ ...currentState, users: updatedUsers });
-
-      onLogin(updatedUserWithLogin);
-    } else {
-      setError('Usuário ou senha incorretos.');
+    if (!matchedUser.isApproved) {
+      setError('Seu cadastro está aguardando aprovação pelo Administrador.');
+      return;
     }
+
+    // Verifica inatividade superior a 30 dias (30 * 24 * 60 * 60 * 1000 ms)
+    const now = Date.now();
+    const lastAccess = matchedUser.lastLoginAt 
+      ? new Date(matchedUser.lastLoginAt).getTime() 
+      : (matchedUser.updatedAt || now);
+    const daysInactive = (now - lastAccess) / (1000 * 60 * 60 * 24);
+
+    if (!matchedUser.isMaster && (matchedUser.blockedDueToInactivity || daysInactive > 30)) {
+      if (!matchedUser.blockedDueToInactivity) {
+        const updatedUsers = currentState.users.map(u => 
+          u.id === matchedUser!.id ? { ...u, blockedDueToInactivity: true, updatedAt: Date.now() } : u
+        );
+        onUpdateState({ ...currentState, users: updatedUsers });
+      }
+      setBlockedUserForRequest(matchedUser);
+      setError('Acesso bloqueado por inatividade superior a 30 dias. Clique abaixo para solicitar liberação.');
+      return;
+    }
+
+    if (matchedUser.needsPasswordReset) {
+      setTempUser(matchedUser);
+      setIsChangingPassword(true);
+      return;
+    }
+
+    // Atualiza o registro do último login no banco
+    const updatedUserWithLogin = {
+      ...matchedUser,
+      lastLoginAt: new Date().toISOString(),
+      blockedDueToInactivity: false,
+      accessUnlockRequested: false,
+      updatedAt: Date.now()
+    };
+    
+    const updatedUsers = currentState.users.map(u => u.id === matchedUser!.id ? updatedUserWithLogin : u);
+    onUpdateState({ ...currentState, users: updatedUsers });
+
+    onLogin(updatedUserWithLogin);
   };
 
-  const handleRequestUnlock = () => {
+  const handleRequestUnlock = async () => {
     if (!blockedUserForRequest) return;
+    try {
+      // 1. Notifica o backend central imediatamente
+      await fetch('/api/request-unlock-inactivity', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ usernameOrEmail: blockedUserForRequest.username || blockedUserForRequest.email })
+      });
+    } catch (e) {
+      console.warn('Erro ao chamar API de desbloqueio:', e);
+    }
+
     const updatedUsers = state.users.map(u => 
       u.id === blockedUserForRequest.id ? { 
         ...u, 
@@ -197,28 +220,74 @@ const Login: React.FC<Props> = ({ state, onLogin, onRegister, onUpdateState, onS
     setBlockedUserForRequest(null);
   };
 
-  const handleForgotPassword = (e: React.FormEvent) => {
+  const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setSuccessMessage('');
+    setIsSubmittingReset(true);
 
-    const cleanUser = resetUsername.trim().toLowerCase();
-    const foundUser = state.users.find(u => u.username.toLowerCase() === cleanUser);
-
-    if (!foundUser) {
-      setError('Usuário não encontrado.');
+    const inputTarget = resetUsername.trim();
+    if (!inputTarget) {
+      setError('Informe seu nome de usuário ou e-mail cadastrado.');
+      setIsSubmittingReset(false);
       return;
     }
 
-    // Update state to mark password reset requested
-    const updatedUsers = state.users.map(u => 
-      u.id === foundUser.id ? { ...u, passwordResetRequested: true, updatedAt: Date.now() } : u
-    );
-    
-    onUpdateState({ ...state, users: updatedUsers });
-    
-    setSuccessMessage('Solicitação de nova senha enviada ao Administrador!');
-    setIsResettingPassword(false);
+    try {
+      // 1. Tenta acionar a função prop dedicada se existir
+      if (onRequestPasswordReset) {
+        const result = await onRequestPasswordReset(inputTarget);
+        if (result.success) {
+          setSuccessMessage(result.message || 'Solicitação de nova senha enviada com sucesso ao Administrador!');
+          setIsResettingPassword(false);
+          setIsSubmittingReset(false);
+          return;
+        }
+      }
+
+      // 2. Chama diretamente o endpoint do backend
+      try {
+        const res = await fetch('/api/request-password-reset', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ usernameOrEmail: inputTarget })
+        });
+        if (res.ok) {
+          const json = await res.json();
+          if (json.state) {
+            onUpdateState(json.state);
+          }
+          setSuccessMessage('Solicitação de nova senha enviada com sucesso ao Administrador! O Administrador Mestre receberá o alerta.');
+          setIsResettingPassword(false);
+          setIsSubmittingReset(false);
+          return;
+        }
+      } catch (apiErr) {
+        console.warn('Falha no endpoint /api/request-password-reset, aplicando fallback local:', apiErr);
+      }
+
+      // 3. Fallback no estado local
+      const foundUser = state.users.find(u => matchUserCredentials(u, inputTarget));
+
+      if (!foundUser) {
+        setError('Usuário ou e-mail não encontrado no sistema. Verifique a digitação.');
+        setIsSubmittingReset(false);
+        return;
+      }
+
+      const updatedUsers = state.users.map(u => 
+        u.id === foundUser.id ? { ...u, passwordResetRequested: true, updatedAt: Date.now() } : u
+      );
+      
+      onUpdateState({ ...state, users: updatedUsers });
+      
+      setSuccessMessage(`Solicitação de nova senha enviada com sucesso para o usuário "${foundUser.name}"! O Administrador foi notificado.`);
+      setIsResettingPassword(false);
+    } catch (err: any) {
+      setError(err?.message || 'Erro ao processar solicitação. Tente novamente.');
+    } finally {
+      setIsSubmittingReset(false);
+    }
   };
 
   const handlePasswordChange = (e: React.FormEvent) => {
@@ -265,18 +334,19 @@ const Login: React.FC<Props> = ({ state, onLogin, onRegister, onUpdateState, onS
         return;
       }
 
-      if (state.users.some(u => u.username.toLowerCase() === regData.username.toLowerCase())) {
-        setError('Este nome de usuário já está em uso.');
+      const cleanUserReg = regData.username.trim();
+      if (state.users.some(u => matchUserCredentials(u, cleanUserReg))) {
+        setError('Este nome de usuário ou e-mail já está em uso.');
         setIsRegisteringLoading(false);
         return;
       }
 
       const newUser: User = {
         id: crypto.randomUUID(),
-        name: regData.name,
-        username: regData.username.toLowerCase(),
-        phone: regData.phone,
-        email: regData.email,
+        name: regData.name.trim(),
+        username: cleanUserReg.toLowerCase(),
+        phone: regData.phone.trim(),
+        email: regData.email.trim().toLowerCase(),
         password: regData.password,
         isApproved: false, 
         canEdit: true,
@@ -285,7 +355,7 @@ const Login: React.FC<Props> = ({ state, onLogin, onRegister, onUpdateState, onS
       };
 
       await onRegister(newUser);
-      setSuccessMessage('Solicitação enviada com sucesso! Aguarde aprovação do administrador.');
+      setSuccessMessage('Solicitação enviada com sucesso! Aguarde a aprovação do Administrador.');
       setIsRegistering(false);
     } catch (err) {
       setError('Erro ao enviar solicitação. Tente novamente.');
@@ -378,7 +448,12 @@ const Login: React.FC<Props> = ({ state, onLogin, onRegister, onUpdateState, onS
               )}
             </div>
           )}
-          {successMessage && <div className="bg-emerald-50 text-emerald-600 p-4 rounded-2xl text-xs font-bold border border-emerald-100 mb-6 flex items-center gap-3">{successMessage}</div>}
+          {successMessage && (
+            <div className="bg-emerald-50 text-emerald-700 p-4 rounded-2xl text-xs font-bold border border-emerald-100 mb-6 flex items-center gap-3">
+              <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
+              <span>{successMessage}</span>
+            </div>
+          )}
 
           {isChangingPassword ? (
             <form onSubmit={handlePasswordChange} className="space-y-5">
@@ -406,16 +481,37 @@ const Login: React.FC<Props> = ({ state, onLogin, onRegister, onUpdateState, onS
             <form onSubmit={handleForgotPassword} className="space-y-5">
               <div className="text-center mb-6">
                 <h2 className="text-lg font-black text-slate-800 uppercase italic">Recuperar Senha</h2>
-                <p className="text-[10px] font-bold text-slate-400 uppercase mt-2">Informe seu usuário para solicitar uma nova senha ao administrador.</p>
+                <p className="text-[10px] font-bold text-slate-400 uppercase mt-2">Informe seu usuário ou e-mail cadastrado para solicitar uma nova senha ao administrador.</p>
               </div>
               
               <div className="relative group">
                 <UserIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                <input type="text" required autoCapitalize="none" className="w-full pl-12 pr-4 py-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none font-bold text-slate-800" placeholder="Seu Usuário" value={resetUsername} onChange={e => setResetUsername(e.target.value)} />
+                <input 
+                  type="text" 
+                  required 
+                  autoCapitalize="none" 
+                  autoCorrect="off" 
+                  spellCheck="false"
+                  className="w-full pl-12 pr-4 py-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none font-bold text-slate-800" 
+                  placeholder="Usuário ou E-mail" 
+                  value={resetUsername} 
+                  onChange={e => setResetUsername(e.target.value)} 
+                />
               </div>
 
-              <button type="submit" className="w-full bg-[#344434] text-[#e4e4d4] py-5 rounded-2xl font-black text-sm uppercase tracking-widest shadow-xl active:scale-95 transition-all">
-                Solicitar Nova Senha
+              <button 
+                type="submit" 
+                disabled={isSubmittingReset}
+                className="w-full bg-[#344434] text-[#e4e4d4] py-5 rounded-2xl font-black text-sm uppercase tracking-widest shadow-xl active:scale-95 transition-all flex items-center justify-center gap-2 disabled:opacity-75"
+              >
+                {isSubmittingReset ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                    <span>Enviando solicitação...</span>
+                  </>
+                ) : (
+                  <span>Solicitar Nova Senha ao Admin</span>
+                )}
               </button>
             </form>
           ) : !isRegistering ? (
@@ -423,12 +519,29 @@ const Login: React.FC<Props> = ({ state, onLogin, onRegister, onUpdateState, onS
               <div className="space-y-4">
                 <div className="relative group">
                   <UserIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                  <input type="text" required autoCapitalize="none" className="w-full pl-12 pr-4 py-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none font-bold text-slate-800" placeholder="Usuário" value={username} onChange={e => setUsername(e.target.value)} />
+                  <input 
+                    type="text" 
+                    required 
+                    autoCapitalize="none" 
+                    autoCorrect="off" 
+                    spellCheck="false"
+                    className="w-full pl-12 pr-4 py-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none font-bold text-slate-800" 
+                    placeholder="Usuário ou E-mail" 
+                    value={username} 
+                    onChange={e => setUsername(e.target.value)} 
+                  />
                 </div>
                 <div className="relative group">
                   <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                  <input type={showPassword ? "text" : "password"} required className="w-full pl-12 pr-12 py-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none font-bold text-slate-800" placeholder="Senha" value={password} onChange={e => setPassword(e.target.value)} />
-                  <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-300">
+                  <input 
+                    type={showPassword ? "text" : "password"} 
+                    required 
+                    className="w-full pl-12 pr-12 py-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none font-bold text-slate-800" 
+                    placeholder="Senha" 
+                    value={password} 
+                    onChange={e => setPassword(e.target.value)} 
+                  />
+                  <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-300 hover:text-slate-600 transition-colors">
                     {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
                 </div>
@@ -450,10 +563,10 @@ const Login: React.FC<Props> = ({ state, onLogin, onRegister, onUpdateState, onS
               </button>
 
               <div className="flex flex-col items-center gap-4 pt-4">
-                <button type="button" onClick={() => setIsRegistering(true)} className="text-slate-400 text-[10px] font-black uppercase tracking-widest hover:text-[#344434]">
+                <button type="button" onClick={() => { setError(''); setSuccessMessage(''); setIsRegistering(true); }} className="text-slate-400 text-[10px] font-black uppercase tracking-widest hover:text-[#344434]">
                   Solicitar Cadastro
                 </button>
-                <button type="button" onClick={() => setIsResettingPassword(true)} className="text-slate-400 text-[10px] font-black uppercase tracking-widest hover:text-red-500">
+                <button type="button" onClick={() => { setError(''); setSuccessMessage(''); setIsResettingPassword(true); }} className="text-slate-400 text-[10px] font-black uppercase tracking-widest hover:text-red-500">
                   Esqueci minha senha
                 </button>
               </div>
@@ -464,7 +577,7 @@ const Login: React.FC<Props> = ({ state, onLogin, onRegister, onUpdateState, onS
               <input type="text" required placeholder="Nome Completo" className="w-full px-5 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none font-bold text-sm" value={regData.name} onChange={e => setRegData({...regData, name: e.target.value})} />
               <input type="email" required placeholder="E-mail" className="w-full px-5 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none font-bold text-sm" value={regData.email} onChange={e => setRegData({...regData, email: e.target.value})} />
               <div className="grid grid-cols-2 gap-3">
-                <input type="text" required placeholder="Usuário" autoCapitalize="none" className="w-full px-5 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none font-bold text-sm" value={regData.username} onChange={e => setRegData({...regData, username: e.target.value})} />
+                <input type="text" required placeholder="Usuário" autoCapitalize="none" autoCorrect="off" spellCheck="false" className="w-full px-5 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none font-bold text-sm" value={regData.username} onChange={e => setRegData({...regData, username: e.target.value})} />
                 <input type="text" required placeholder="Celular" className="w-full px-5 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none font-bold text-sm" value={regData.phone} onChange={e => setRegData({...regData, phone: e.target.value})} />
               </div>
               <div className="grid grid-cols-2 gap-3">

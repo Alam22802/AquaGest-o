@@ -53,6 +53,18 @@ const UserManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
 
   const [copiedInviteLink, setCopiedInviteLink] = useState(false);
   const [isSyncingMass, setIsSyncingMass] = useState(false);
+  const [tempPassModalData, setTempPassModalData] = useState<{
+    userId: string;
+    userName: string;
+    username: string;
+    phone?: string;
+    email?: string;
+    tempPass: string;
+    isCustom?: boolean;
+  } | null>(null);
+  const [copiedTempPass, setCopiedTempPass] = useState(false);
+  const [customPasswordUser, setCustomPasswordUser] = useState<User | null>(null);
+  const [customPasswordValue, setCustomPasswordValue] = useState('');
 
   // Sincroniza o e-mail do mestre se houver mudança externa
   useEffect(() => {
@@ -246,7 +258,7 @@ const UserManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
   };
 
   const generateTempPassword = (id: string) => {
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
     let tempPass = '';
     for (let i = 0; i < 6; i++) {
       tempPass += chars.charAt(Math.floor(Math.random() * chars.length));
@@ -264,7 +276,63 @@ const UserManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     });
     
     const user = state.users.find(u => u.id === id);
-    alert(`Senha temporária gerada para ${user?.name}: ${tempPass}\n\nEnvie esta senha ao usuário por e-mail.`);
+    if (user) {
+      setTempPassModalData({
+        userId: user.id,
+        userName: user.name,
+        username: user.username,
+        phone: user.phone,
+        email: user.email,
+        tempPass: tempPass,
+        isCustom: false
+      });
+      setCopiedTempPass(false);
+    }
+  };
+
+  const handleSaveCustomPassword = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!customPasswordUser || !customPasswordValue.trim()) return;
+
+    const newPass = customPasswordValue.trim();
+
+    onUpdate({
+      ...state,
+      users: state.users.map(u => u.id === customPasswordUser.id ? {
+        ...u,
+        password: newPass,
+        needsPasswordReset: true,
+        passwordResetRequested: false,
+        updatedAt: Date.now()
+      } : u)
+    });
+
+    setTempPassModalData({
+      userId: customPasswordUser.id,
+      userName: customPasswordUser.name,
+      username: customPasswordUser.username,
+      phone: customPasswordUser.phone,
+      email: customPasswordUser.email,
+      tempPass: newPass,
+      isCustom: true
+    });
+    setCopiedTempPass(false);
+    setCustomPasswordUser(null);
+    setCustomPasswordValue('');
+  };
+
+  const handleCopyTempPass = (pass: string) => {
+    navigator.clipboard.writeText(pass);
+    setCopiedTempPass(true);
+    setTimeout(() => setCopiedTempPass(false), 3000);
+  };
+
+  const handleSendWhatsApp = (userPhone: string | undefined, userName: string, pass: string) => {
+    const cleanPhone = (userPhone || '').replace(/\D/g, '');
+    const phoneWithCountry = cleanPhone.startsWith('55') ? cleanPhone : `55${cleanPhone}`;
+    const text = encodeURIComponent(`Olá ${userName},\n\nSua nova senha de acesso ao sistema *AquaGestão* é:\n🔑 *${pass}*\n\nAo fazer o primeiro login com essa senha, o sistema solicitará que você cadastre sua nova senha definitiva.`);
+    const waUrl = cleanPhone.length >= 10 ? `https://wa.me/${phoneWithCountry}?text=${text}` : `https://wa.me/?text=${text}`;
+    window.open(waUrl, '_blank');
   };
 
   const unlockUserAccess = (id: string) => {
@@ -359,6 +427,128 @@ const UserManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                   </button>
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Senha Gerada / Definida */}
+      {tempPassModalData && (
+        <div className="fixed inset-0 z-[220] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white w-full max-w-lg rounded-[2.5rem] shadow-2xl overflow-hidden border border-emerald-100">
+            <div className="bg-emerald-600 p-6 text-white text-center relative">
+              <button 
+                onClick={() => setTempPassModalData(null)}
+                className="absolute right-4 top-4 p-2 bg-white/20 hover:bg-white/30 rounded-full text-white transition-all"
+              >
+                <X className="w-4 h-4" />
+              </button>
+              <div className="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center mx-auto mb-2 text-white shadow-inner">
+                <Key className="w-6 h-6" />
+              </div>
+              <h3 className="text-base font-black uppercase tracking-tight">Nova Senha de Acesso Pronta</h3>
+              <p className="text-xs text-emerald-100 font-bold mt-1">
+                {tempPassModalData.userName} (@{tempPassModalData.username})
+              </p>
+            </div>
+
+            <div className="p-6 space-y-5">
+              <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200 text-center space-y-2">
+                <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Senha de Acesso</span>
+                <div className="flex items-center justify-center gap-3">
+                  <span className="text-2xl font-black tracking-widest font-mono text-slate-800 bg-white px-4 py-2 rounded-xl border border-slate-200 shadow-sm select-all">
+                    {tempPassModalData.tempPass}
+                  </span>
+                  <button
+                    onClick={() => handleCopyTempPass(tempPassModalData.tempPass)}
+                    className={`p-3 rounded-xl font-black text-xs flex items-center gap-1.5 transition-all ${
+                      copiedTempPass ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-white hover:bg-slate-700'
+                    }`}
+                    title="Copiar Senha"
+                  >
+                    {copiedTempPass ? <CheckCircle2 className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                    <span className="text-[10px] uppercase font-bold">{copiedTempPass ? 'Copiada!' : 'Copiar'}</span>
+                  </button>
+                </div>
+                <p className="text-[10px] text-slate-500 font-medium">
+                  Ao realizar o login com esta senha, o sistema exigirá que o usuário cadastre sua senha definitiva.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <button
+                  onClick={() => handleSendWhatsApp(tempPassModalData.phone, tempPassModalData.userName, tempPassModalData.tempPass)}
+                  className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl font-black text-[11px] uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/20 transition-all active:scale-95"
+                >
+                  <Share2 className="w-4 h-4" /> Enviar no WhatsApp
+                </button>
+
+                <button
+                  onClick={() => setTempPassModalData(null)}
+                  className="w-full py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-2xl font-black text-[11px] uppercase tracking-wider transition-all"
+                >
+                  Concluir
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Digitar Nova Senha Manual */}
+      {customPasswordUser && (
+        <div className="fixed inset-0 z-[220] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white w-full max-w-md rounded-[2.5rem] shadow-2xl overflow-hidden border border-slate-200">
+            <div className="p-7">
+              <div className="flex items-center justify-between mb-5">
+                <h3 className="text-base font-black text-slate-800 flex items-center gap-2.5 uppercase tracking-tighter italic">
+                  <Key className="w-5 h-5 text-amber-500" /> Definir Senha Manualmente
+                </h3>
+                <button 
+                  onClick={() => { setCustomPasswordUser(null); setCustomPasswordValue(''); }} 
+                  className="p-2 bg-slate-50 rounded-full text-slate-400 hover:text-red-500 transition-all"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <p className="text-xs text-slate-500 mb-4 font-bold">
+                Defina uma nova senha para <span className="text-slate-800 font-black">{customPasswordUser.name}</span> (@{customPasswordUser.username}).
+              </p>
+
+              <form onSubmit={handleSaveCustomPassword} className="space-y-4">
+                <div>
+                  <label className="block text-[10px] font-black text-slate-400 uppercase mb-1.5 ml-1 tracking-widest">Nova Senha</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Digite a nova senha..."
+                    value={customPasswordValue}
+                    onChange={(e) => setCustomPasswordValue(e.target.value)}
+                    className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl outline-none font-bold text-sm focus:bg-white focus:border-amber-500/40 transition-all"
+                  />
+                </div>
+
+                <div className="pt-2 flex flex-col gap-2">
+                  <button
+                    type="submit"
+                    className="w-full py-4 bg-amber-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-amber-600/20 hover:bg-amber-700 transition-all active:scale-95 flex items-center justify-center gap-2"
+                  >
+                    <CheckCircle className="w-4 h-4" /> Salvar e Notificar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      generateTempPassword(customPasswordUser.id);
+                      setCustomPasswordUser(null);
+                      setCustomPasswordValue('');
+                    }}
+                    className="w-full py-3 bg-slate-100 text-slate-600 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-slate-200 transition-all flex items-center justify-center gap-1.5"
+                  >
+                    <RefreshCw className="w-3.5 h-3.5" /> Ou Gerar Senha Aleatória
+                  </button>
+                </div>
+              </form>
             </div>
           </div>
         </div>
@@ -544,9 +734,14 @@ const UserManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       {/* Seção de Recuperação de Senha */}
       {resetRequests.length > 0 && (
         <div className="bg-red-50 border border-red-200 rounded-[2rem] p-6 shadow-lg shadow-red-200/5">
-          <h3 className="text-red-800 font-black uppercase tracking-widest text-xs flex items-center gap-2 mb-4 italic">
-            <AlertTriangle className="w-4 h-4 animate-pulse" /> Solicitações de Nova Senha ({resetRequests.length})
-          </h3>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-red-800 font-black uppercase tracking-widest text-xs flex items-center gap-2 italic">
+              <AlertTriangle className="w-4 h-4 animate-pulse" /> Solicitações de Nova Senha ({resetRequests.length})
+            </h3>
+            <span className="text-[10px] font-bold text-red-600 bg-red-100/80 px-3 py-1 rounded-full uppercase tracking-wider">
+              Ação Requerida
+            </span>
+          </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {resetRequests.map(user => (
               <div key={user.id} className="bg-white p-5 rounded-2xl shadow-sm border border-red-100 flex flex-col justify-between">
@@ -558,26 +753,38 @@ const UserManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                   <div className="space-y-1 text-[11px] text-slate-500 font-bold">
                     <div className="flex items-center gap-2"><UserIcon className="w-3 h-3 opacity-30"/> @{user.username}</div>
                     <div className="flex items-center gap-2"><Mail className="w-3 h-3 opacity-30"/> {user.email}</div>
+                    {user.phone && <div className="flex items-center gap-2"><Phone className="w-3 h-3 opacity-30"/> {user.phone}</div>}
                   </div>
                 </div>
-                <div className="flex gap-2">
-                  <button 
-                    onClick={() => generateTempPassword(user.id)}
-                    className="flex-1 bg-red-600 text-white py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-red-700 shadow-lg shadow-red-600/10"
-                  >
-                    <RefreshCw className="w-3 h-3" /> Gerar Senha Temporária
-                  </button>
-                  <button 
-                    onClick={() => {
-                      onUpdate({
-                        ...state,
-                        users: state.users.map(u => u.id === user.id ? { ...u, passwordResetRequested: false, updatedAt: Date.now() } : u)
-                      });
-                    }}
-                    className="p-2.5 bg-slate-100 text-slate-400 rounded-xl hover:bg-slate-200 transition-all"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
+                <div className="space-y-2">
+                  <div className="flex gap-2">
+                    <button 
+                      onClick={() => generateTempPassword(user.id)}
+                      className="flex-1 bg-red-600 text-white py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-1.5 hover:bg-red-700 shadow-lg shadow-red-600/10 transition-all active:scale-95"
+                      title="Gerar senha temporária automática"
+                    >
+                      <RefreshCw className="w-3 h-3" /> Gerar Senha
+                    </button>
+                    <button 
+                      onClick={() => { setCustomPasswordUser(user); setCustomPasswordValue(''); }}
+                      className="flex-1 bg-slate-800 text-white py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-1.5 hover:bg-slate-700 shadow-sm transition-all active:scale-95"
+                      title="Digitar uma senha específica para o usuário"
+                    >
+                      <Key className="w-3 h-3" /> Digitar Senha
+                    </button>
+                    <button 
+                      onClick={() => {
+                        onUpdate({
+                          ...state,
+                          users: state.users.map(u => u.id === user.id ? { ...u, passwordResetRequested: false, updatedAt: Date.now() } : u)
+                        });
+                      }}
+                      className="p-2.5 bg-slate-100 text-slate-400 rounded-xl hover:bg-slate-200 transition-all"
+                      title="Dispensar solicitação"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
                 </div>
               </div>
             ))}
@@ -785,6 +992,13 @@ const UserManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                     </div>
                   </div>
                   <div className="flex gap-1">
+                    <button 
+                      onClick={() => { setCustomPasswordUser(user); setCustomPasswordValue(''); }} 
+                      className="p-2.5 bg-slate-50 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-xl transition-all" 
+                      title="Redefinir / Alterar Senha"
+                    >
+                      <Key className="w-4 h-4" />
+                    </button>
                     <button onClick={() => startEditDbConfig(user)} className={`p-2.5 rounded-xl transition-all ${user.supabaseConfig ? 'bg-blue-50 text-blue-500' : 'bg-slate-50 text-slate-300'} hover:bg-blue-100`} title="Configurar Banco de Dados">
                       <Database className="w-4 h-4" />
                     </button>

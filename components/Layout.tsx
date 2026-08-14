@@ -19,7 +19,10 @@ interface Props {
 const Layout: React.FC<Props> = ({ children, activeTab, setActiveTab, currentUser, onLogout, state }) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
-  const pendingUsersCount = state?.users?.filter(u => !u.isApproved).length || 0;
+  const pendingApprovalsCount = state?.users?.filter(u => !u.isApproved).length || 0;
+  const passwordResetRequestsCount = state?.users?.filter(u => u.passwordResetRequested).length || 0;
+  const unlockRequestsCount = state?.users?.filter(u => u.accessUnlockRequested).length || 0;
+  const totalUserAlertsCount = pendingApprovalsCount + passwordResetRequestsCount + unlockRequestsCount;
 
   const menuItems = [
     { id: 'dashboard', label: 'Visão Geral', icon: <LayoutDashboard className="w-5 h-5" /> },
@@ -41,9 +44,9 @@ const Layout: React.FC<Props> = ({ children, activeTab, setActiveTab, currentUse
       icon: (
         <div className="relative">
           <Users className="w-5 h-5" />
-          {currentUser.isMaster && pendingUsersCount > 0 && (
+          {currentUser.isMaster && totalUserAlertsCount > 0 && (
             <span className="absolute -top-2 -right-2 bg-red-500 text-white text-[9px] font-black w-4 h-4 rounded-full flex items-center justify-center animate-bounce border border-[#344434]">
-              {pendingUsersCount}
+              {totalUserAlertsCount}
             </span>
           )}
         </div>
@@ -129,7 +132,7 @@ const Layout: React.FC<Props> = ({ children, activeTab, setActiveTab, currentUse
               className="p-2 bg-slate-50 rounded-xl text-slate-600 active:scale-95 transition-all relative"
             >
               <Menu className="w-6 h-6" />
-              {currentUser.isMaster && pendingUsersCount > 0 && (
+              {currentUser.isMaster && totalUserAlertsCount > 0 && (
                 <span className="absolute top-1 right-1 w-3 h-3 bg-red-500 rounded-full border-2 border-white"></span>
               )}
             </button>
@@ -155,10 +158,12 @@ const Layout: React.FC<Props> = ({ children, activeTab, setActiveTab, currentUse
             <h1 className="text-3xl font-black text-slate-800 uppercase tracking-tighter italic leading-none">Controle de Produção</h1>
           </div>
           <div className="flex items-center gap-4">
-            {currentUser.isMaster && pendingUsersCount > 0 && (
+            {currentUser.isMaster && totalUserAlertsCount > 0 && (
               <div className="flex items-center gap-2 px-3 py-1.5 bg-red-50 border border-red-100 rounded-xl text-red-600 animate-pulse cursor-pointer" onClick={() => setActiveTab('users')}>
                 <Bell className="w-4 h-4" />
-                <span className="text-[10px] font-black uppercase">{pendingUsersCount} Pendentes</span>
+                <span className="text-[10px] font-black uppercase">
+                  {totalUserAlertsCount} {totalUserAlertsCount === 1 ? 'Solicitação' : 'Solicitações'}
+                </span>
               </div>
             )}
             <div className="text-right">

@@ -178,17 +178,66 @@ async function scheduleSafeFarmStatePersist(stateToSave: any) {
     return Array.from(map.values()).filter(i => !isServerItemDeleted(i, deletedSet, preserveOnBatchDeletion));
   }
 
+  function normalizeLoginString(str?: string): string {
+    if (!str) return '';
+    return str
+      .trim()
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/\s+/g, ' ');
+  }
+
+  function matchServerUserCredentials(user: any, inputUsername: string): boolean {
+    if (!user || !inputUsername) return false;
+    const inputRaw = inputUsername.trim();
+    const inputNorm = normalizeLoginString(inputUsername);
+    const inputCompact = inputNorm.replace(/\s+/g, '');
+
+    const uName = user.username ? user.username.trim() : '';
+    const uNameNorm = normalizeLoginString(user.username);
+    const uNameCompact = uNameNorm.replace(/\s+/g, '');
+
+    const uEmail = user.email ? user.email.trim().toLowerCase() : '';
+    const uFullNameNorm = normalizeLoginString(user.name);
+
+    if (uName.toLowerCase() === inputRaw.toLowerCase()) return true;
+    if (uNameNorm === inputNorm) return true;
+    if (uNameCompact.length > 0 && uNameCompact === inputCompact) return true;
+    if (uEmail && (uEmail === inputRaw.toLowerCase() || uEmail === inputNorm)) return true;
+
+    if (user.isMaster || uNameNorm === 'admin') {
+      if (['admin', 'administrador', 'mestre', 'master'].includes(inputNorm)) return true;
+      if (uEmail && uEmail === inputRaw.toLowerCase()) return true;
+    }
+
+    if (uFullNameNorm === inputNorm && inputNorm.length > 2) return true;
+    return false;
+  }
+
   function mergeServerUsers(arr1: any[], arr2: any[], deletedSet: Set<string>): any[] {
     const map = new Map<string, any>();
     const safe1 = arr1 || [];
     const safe2 = arr2 || [];
 
     safe1.forEach(u => {
-      if (u && u.id && !deletedSet.has(u.id)) map.set(u.id, u);
+      if (u && u.id && !deletedSet.has(u.id)) {
+        map.set(u.id, {
+          ...u,
+          username: u.username ? u.username.trim() : '',
+          name: u.name ? u.name.trim() : ''
+        });
+      }
     });
 
-    safe2.forEach(u => {
-      if (!u || !u.id || deletedSet.has(u.id)) return;
+    safe2.forEach(rawU => {
+      if (!rawU || !rawU.id || deletedSet.has(rawU.id)) return;
+      const u = {
+        ...rawU,
+        username: rawU.username ? rawU.username.trim() : '',
+        name: rawU.name ? rawU.name.trim() : ''
+      };
+
       const existing = map.get(u.id);
       if (!existing) {
         map.set(u.id, u);
@@ -201,10 +250,28 @@ async function scheduleSafeFarmStatePersist(stateToSave: any) {
         const latestLastSync = (s2 >= s1 && u.lastSync) ? u.lastSync : existing.lastSync;
 
         const primary = (t2 >= t1) ? u : existing;
+        const secondary = (t2 >= t1) ? existing : u;
+
+        let mergedPasswordResetRequested = (existing.passwordResetRequested || u.passwordResetRequested) || false;
+        if (primary.passwordResetRequested === false && (primary.needsPasswordReset || (secondary.password !== primary.password && primary.password))) {
+          mergedPasswordResetRequested = false;
+        }
+
+        let mergedUnlockRequested = (existing.accessUnlockRequested || u.accessUnlockRequested) || false;
+        if (primary.accessUnlockRequested === false && !primary.blockedDueToInactivity) {
+          mergedUnlockRequested = false;
+        }
+
+        const mergedNeedsPasswordReset = (primary.needsPasswordReset !== undefined)
+          ? primary.needsPasswordReset
+          : (existing.needsPasswordReset || u.needsPasswordReset || false);
 
         map.set(u.id, {
           ...primary,
           isApproved: existing.isApproved || u.isApproved,
+          passwordResetRequested: mergedPasswordResetRequested,
+          accessUnlockRequested: mergedUnlockRequested,
+          needsPasswordReset: mergedNeedsPasswordReset,
           lastSync: latestLastSync,
           updatedAt: Math.max(t1, t2, Date.now()),
           canEdit: existing.isApproved ? existing.canEdit : u.canEdit,
@@ -306,6 +373,96 @@ async function scheduleSafeFarmStatePersist(stateToSave: any) {
     } catch (err) {
       console.error("Error saving farm state:", err);
       return res.status(500).json({ error: "Failed to save state" });
+    }
+  });
+
+  app.post("/api/request-password-reset", (req, res) => {
+    try {
+      const { usernameOrEmail } = req.body;
+      if (!usernameOrEmail || typeof usernameOrEmail !== "string") {
+        return res.status(400).json({ success: false, error: "Identificador de usuário ou e-mail é obrigatório." });
+      }
+
+      if (!serverFarmState || !Array.isArray(serverFarmState.users)) {
+        return res.status(500).json({ success: false, error: "Base de usuários não inicializada." });
+      }
+
+      const users: any[] = serverFarmState.users;
+      const targetUserIndex = users.findIndex(u => matchServerUserCredentials(u, usernameOrEmail));
+
+      if (targetUserIndex === -1) {
+        return res.status(404).json({ success: false, error: "Usuário ou e-mail não encontrado no sistema." });
+      }
+
+      const user = users[targetUserIndex];
+      const updatedUser = {
+        ...user,
+        passwordResetRequested: true,
+        updatedAt: Date.now()
+      };
+
+      users[targetUserIndex] = updatedUser;
+      serverFarmState.users = users;
+      serverFarmState.lastSync = new Date().toISOString();
+
+      scheduleSafeFarmStatePersist(serverFarmState);
+
+      return res.json({
+        success: true,
+        message: "Solicitação de nova senha enviada com sucesso ao Administrador!",
+        user: {
+          id: updatedUser.id,
+          name: updatedUser.name,
+          username: updatedUser.username
+        },
+        state: serverFarmState
+      });
+    } catch (err) {
+      console.error("Error handling password reset request:", err);
+      return res.status(500).json({ success: false, error: "Erro interno ao processar solicitação de senha." });
+    }
+  });
+
+  app.post("/api/request-unlock-inactivity", (req, res) => {
+    try {
+      const { usernameOrEmail } = req.body;
+      if (!usernameOrEmail || typeof usernameOrEmail !== "string") {
+        return res.status(400).json({ success: false, error: "Identificador de usuário ou e-mail é obrigatório." });
+      }
+
+      if (!serverFarmState || !Array.isArray(serverFarmState.users)) {
+        return res.status(500).json({ success: false, error: "Base de usuários não inicializada." });
+      }
+
+      const users: any[] = serverFarmState.users;
+      const targetUserIndex = users.findIndex(u => matchServerUserCredentials(u, usernameOrEmail));
+
+      if (targetUserIndex === -1) {
+        return res.status(404).json({ success: false, error: "Usuário não encontrado." });
+      }
+
+      const user = users[targetUserIndex];
+      const updatedUser = {
+        ...user,
+        blockedDueToInactivity: true,
+        accessUnlockRequested: true,
+        updatedAt: Date.now()
+      };
+
+      users[targetUserIndex] = updatedUser;
+      serverFarmState.users = users;
+      serverFarmState.lastSync = new Date().toISOString();
+
+      scheduleSafeFarmStatePersist(serverFarmState);
+
+      return res.json({
+        success: true,
+        message: "Solicitação de liberação enviada com sucesso ao Administrador!",
+        state: serverFarmState
+      });
+    } catch (err) {
+      console.error("Error handling unlock request:", err);
+      return res.status(500).json({ success: false, error: "Erro interno ao processar solicitação de desbloqueio." });
     }
   });
 

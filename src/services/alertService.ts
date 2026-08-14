@@ -37,9 +37,27 @@ export const checkAndTriggerAlerts = (state: AppState): {title: string, message:
     }
   }
 
-  // 2. Alerta de Novos Usuários
+  // 2. Alerta de Solicitações de Troca/Recuperação de Senha
+  const resetCount = (state.users || []).filter((u: User) => u.passwordResetRequested).length;
+  if (resetCount > 0) {
+    const title = `SOLICITAÇÃO DE SENHA PENDENTE`;
+    const message = `Há ${resetCount} usuário(s) solicitando redefinição/troca de senha no sistema.`;
+    sendEmailAlert(targetEmail, title, message, settings);
+    return { title, message };
+  }
+
+  // 3. Alerta de Solicitações de Desbloqueio por Inatividade
+  const unlockCount = (state.users || []).filter((u: User) => u.accessUnlockRequested).length;
+  if (unlockCount > 0) {
+    const title = `SOLICITAÇÃO DE DESBLOQUEIO DE ACESSO`;
+    const message = `Há ${unlockCount} usuário(s) solicitando liberação de acesso após inatividade.`;
+    sendEmailAlert(targetEmail, title, message, settings);
+    return { title, message };
+  }
+
+  // 4. Alerta de Novos Usuários
   if (settings.notifyMasterOnNewUser) {
-    const pendingCount = state.users.filter((u: User) => !u.isApproved).length;
+    const pendingCount = (state.users || []).filter((u: User) => !u.isApproved).length;
     if (pendingCount > 0) {
       const title = `ALERTA: Novos Usuários Pendentes`;
       const message = `Existem ${pendingCount} usuários aguardando aprovação no sistema.`;

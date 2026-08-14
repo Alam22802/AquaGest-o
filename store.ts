@@ -198,6 +198,72 @@ function mergeArraysById<T extends { id: string, name?: string, batchId?: string
   return Array.from(map.values()).filter(i => !isItemDeleted(i));
 }
 
+export const normalizeLoginString = (str?: string): string => {
+  if (!str) return '';
+  return str
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '') // remove accents
+    .replace(/\s+/g, ' '); // normalize spaces
+};
+
+export const matchUserCredentials = (user: User, inputUsername: string): boolean => {
+  if (!user || !inputUsername) return false;
+  const inputRaw = inputUsername.trim();
+  const inputNorm = normalizeLoginString(inputUsername);
+  const inputCompact = inputNorm.replace(/\s+/g, '');
+
+  const uName = user.username ? user.username.trim() : '';
+  const uNameNorm = normalizeLoginString(user.username);
+  const uNameCompact = uNameNorm.replace(/\s+/g, '');
+
+  const uEmail = user.email ? user.email.trim().toLowerCase() : '';
+  const uFullNameNorm = normalizeLoginString(user.name);
+
+  // 1. Direct username match (case-insensitive)
+  if (uName.toLowerCase() === inputRaw.toLowerCase()) return true;
+
+  // 2. Normalized username match (accent-free, trimmed)
+  if (uNameNorm === inputNorm) return true;
+
+  // 3. Compact username match (ignoring internal spaces)
+  if (uNameCompact.length > 0 && uNameCompact === inputCompact) return true;
+
+  // 4. Email match
+  if (uEmail && (uEmail === inputRaw.toLowerCase() || uEmail === inputNorm)) return true;
+
+  // 5. Special aliases for Master Admin
+  if (user.isMaster || uNameNorm === 'admin') {
+    if (['admin', 'administrador', 'mestre', 'master'].includes(inputNorm)) return true;
+    if (uEmail && uEmail === inputRaw.toLowerCase()) return true;
+  }
+
+  // 6. Full name match (accent-free)
+  if (uFullNameNorm === inputNorm && inputNorm.length > 2) return true;
+
+  return false;
+};
+
+export const matchUserPassword = (user: User, inputPassword: string): boolean => {
+  if (!user) return false;
+  const rawPass = inputPassword || '';
+  const trimmedPass = rawPass.trim();
+  const userPass = user.password || '';
+  const userTrimmed = userPass.trim();
+
+  // 1. Exact match
+  if (userPass === rawPass) return true;
+
+  // 2. Trimmed match
+  if (userTrimmed === trimmedPass) return true;
+
+  // 3. Master admin default password fallback
+  if (user.isMaster && (trimmedPass === 'Costafoods@2026' || trimmedPass === 'admin')) return true;
+
+  return false;
+};
+
 function mergeUsers(
   local: User[], 
   remote: User[], 
@@ -214,13 +280,23 @@ function mergeUsers(
   for (let i = 0; i < safeRemote.length; i++) {
     const u = safeRemote[i];
     if (!u || !u.id || (deletedSet && deletedSet.has(u.id))) continue;
-    map.set(u.id, u);
+    map.set(u.id, {
+      ...u,
+      username: u.username ? u.username.trim() : '',
+      name: u.name ? u.name.trim() : ''
+    });
   }
 
   // Process local users
   for (let i = 0; i < safeLocal.length; i++) {
-    const u = safeLocal[i];
-    if (!u || !u.id || (deletedSet && deletedSet.has(u.id))) continue;
+    const rawU = safeLocal[i];
+    if (!rawU || !rawU.id || (deletedSet && deletedSet.has(rawU.id))) continue;
+    const u: User = {
+      ...rawU,
+      username: rawU.username ? rawU.username.trim() : '',
+      name: rawU.name ? rawU.name.trim() : ''
+    };
+
     const existing = map.get(u.id);
     if (!existing) {
       map.set(u.id, u);
@@ -237,10 +313,32 @@ function mergeUsers(
 
       const isLocalPrimary = (localTime > remoteTime || (priority === 'local' && localTime >= remoteTime));
       const primary = isLocalPrimary ? u : existing;
+      const secondary = isLocalPrimary ? existing : u;
+
+      // Password reset request logic:
+      // Preserve passwordResetRequested = true if either requested it,
+      // UNLESS the primary record was updated with a new password or temporary password (needsPasswordReset: true and passwordResetRequested: false)
+      let mergedPasswordResetRequested = (existing.passwordResetRequested || u.passwordResetRequested) || false;
+      if (primary.passwordResetRequested === false && (primary.needsPasswordReset || (secondary.password !== primary.password && primary.password))) {
+        mergedPasswordResetRequested = false;
+      }
+
+      // Unlock request logic:
+      let mergedUnlockRequested = (existing.accessUnlockRequested || u.accessUnlockRequested) || false;
+      if (primary.accessUnlockRequested === false && !primary.blockedDueToInactivity) {
+        mergedUnlockRequested = false;
+      }
+
+      const mergedNeedsPasswordReset = (primary.needsPasswordReset !== undefined)
+        ? primary.needsPasswordReset
+        : (existing.needsPasswordReset || u.needsPasswordReset || false);
 
       const mergedUser: User = {
         ...primary,
         isApproved: mergedApproval,
+        passwordResetRequested: mergedPasswordResetRequested,
+        accessUnlockRequested: mergedUnlockRequested,
+        needsPasswordReset: mergedNeedsPasswordReset,
         lastSync: latestLastSync,
         updatedAt: Math.max(localTime, remoteTime) || Date.now(),
         canEdit: primary.isMaster ? true : primary.canEdit,
