@@ -137,12 +137,9 @@ async function scheduleSafeFarmStatePersist(stateToSave: any) {
           const t1 = Number(existing.updatedAt || 0);
           const t2 = Number(item.updatedAt || 0);
           if (t2 > t1) {
-            map.set(item.id, { ...existing, ...item, updatedAt: t2 });
-          } else if (t1 > t2) {
-            map.set(item.id, { ...item, ...existing, updatedAt: t1 });
+            map.set(item.id, item);
           } else {
-            const mergedItem = { ...existing, ...item };
-            map.set(item.id, mergedItem);
+            map.set(item.id, existing);
           }
         }
       }

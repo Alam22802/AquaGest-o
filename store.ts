@@ -119,7 +119,7 @@ function mergeArraysById<T extends { id: string, updatedAt?: number | string }>(
   local: T[], 
   remote: T[], 
   deletedIds: string[] = [],
-  priority: 'local' | 'remote' = 'local'
+  priority: 'local' | 'remote' = 'remote'
 ): T[] {
   const safeLocal = local || [];
   const safeRemote = remote || [];
@@ -158,20 +158,17 @@ function mergeArraysById<T extends { id: string, updatedAt?: number | string }>(
       const existingTime = getTime(existing);
       
       if (itemTime > existingTime) {
-        // Remote is newer
-        map.set(item.id, { ...existing, ...item, updatedAt: itemTime });
+        // Remote is strictly newer
+        map.set(item.id, item);
       } else if (existingTime > itemTime) {
-        // Local is newer
-        map.set(item.id, { ...item, ...existing, updatedAt: existingTime });
+        // Local is strictly newer
+        map.set(item.id, existing);
       } else {
-        // Equal timestamps: resolve according to priority and keep modified fields
-        const modified = isObjectModified(existing, item);
-        if (priority === 'local') {
-          const newTime = modified ? Date.now() : (existingTime || Date.now());
-          map.set(item.id, { ...item, ...existing, updatedAt: newTime });
+        // Equal timestamps: resolve according to priority
+        if (priority === 'remote') {
+          map.set(item.id, item);
         } else {
-          const newTime = modified ? Date.now() : (itemTime || Date.now());
-          map.set(item.id, { ...existing, ...item, updatedAt: newTime });
+          map.set(item.id, existing);
         }
       }
     }
@@ -321,7 +318,7 @@ export const areStatesEqual = (a: AppState, b: AppState): boolean => {
   return true;
 };
 
-export const ensureStateIntegrity = (state: any, mergeWith?: AppState, priority: 'local' | 'remote' = 'local'): AppState => {
+export const ensureStateIntegrity = (state: any, mergeWith?: AppState, priority: 'local' | 'remote' = 'remote'): AppState => {
   const rawDeletedIds = [
     ...(state?.deletedIds || []),
     ...(mergeWith?.deletedIds || [])
@@ -680,123 +677,65 @@ export const ensureStateIntegrity = (state: any, mergeWith?: AppState, priority:
     return '';
   };
 
-  const purgedLogIds: string[] = [];
-
   if (finalResult.feedingLogs && finalResult.feedingLogs.length > 0) {
-    const validFeedingLogs: any[] = [];
-    finalResult.feedingLogs.forEach(f => {
+    finalResult.feedingLogs = finalResult.feedingLogs.map(f => {
       const fDate = (f.timestamp || '').split('T')[0];
       const correctBatchId = getReconciledBatchId(f.cageId, fDate, f.batchId);
       const targetBatchId = (correctBatchId && batchMap.has(correctBatchId) && !deletedSet.has(correctBatchId)) 
         ? correctBatchId 
-        : (f.batchId && batchMap.has(f.batchId) && !deletedSet.has(f.batchId) ? f.batchId : '');
+        : (f.batchId && batchMap.has(f.batchId) && !deletedSet.has(f.batchId) ? f.batchId : (f.batchId || ''));
       
-      if (targetBatchId) {
-        validFeedingLogs.push(targetBatchId !== f.batchId ? { ...f, batchId: targetBatchId, updatedAt: Date.now() } : f);
-      } else if (f.cageId && normalizedCages.some(c => c.id === f.cageId)) {
-        validFeedingLogs.push(f);
-      } else {
-        if (f.id) purgedLogIds.push(f.id);
+      if (targetBatchId && targetBatchId !== f.batchId) {
+        return { ...f, batchId: targetBatchId, updatedAt: f.updatedAt || Date.now() };
       }
+      return f;
     });
-    finalResult.feedingLogs = validFeedingLogs;
   }
 
   if (finalResult.mortalityLogs && finalResult.mortalityLogs.length > 0) {
-    const validMortalityLogs: any[] = [];
-    finalResult.mortalityLogs.forEach(m => {
+    finalResult.mortalityLogs = finalResult.mortalityLogs.map(m => {
       const mDate = m.date || '';
       const correctBatchId = getReconciledBatchId(m.cageId, mDate, m.batchId);
       const targetBatchId = (correctBatchId && batchMap.has(correctBatchId) && !deletedSet.has(correctBatchId))
         ? correctBatchId
-        : (m.batchId && batchMap.has(m.batchId) && !deletedSet.has(m.batchId) ? m.batchId : '');
+        : (m.batchId && batchMap.has(m.batchId) && !deletedSet.has(m.batchId) ? m.batchId : (m.batchId || ''));
 
-      if (targetBatchId) {
-        validMortalityLogs.push(targetBatchId !== m.batchId ? { ...m, batchId: targetBatchId, updatedAt: Date.now() } : m);
-      } else if (m.cageId && normalizedCages.some(c => c.id === m.cageId)) {
-        validMortalityLogs.push(m);
-      } else {
-        if (m.id) purgedLogIds.push(m.id);
+      if (targetBatchId && targetBatchId !== m.batchId) {
+        return { ...m, batchId: targetBatchId, updatedAt: m.updatedAt || Date.now() };
       }
+      return m;
     });
-    finalResult.mortalityLogs = validMortalityLogs;
   }
 
   if (finalResult.biometryLogs && finalResult.biometryLogs.length > 0) {
-    const validBiometryLogs: any[] = [];
-    finalResult.biometryLogs.forEach(b => {
+    finalResult.biometryLogs = finalResult.biometryLogs.map(b => {
       const bDate = b.date || '';
       const correctBatchId = getReconciledBatchId(b.cageId, bDate, b.batchId);
       const targetBatchId = (correctBatchId && batchMap.has(correctBatchId) && !deletedSet.has(correctBatchId))
         ? correctBatchId
-        : (b.batchId && batchMap.has(b.batchId) && !deletedSet.has(b.batchId) ? b.batchId : '');
+        : (b.batchId && batchMap.has(b.batchId) && !deletedSet.has(b.batchId) ? b.batchId : (b.batchId || ''));
 
-      if (targetBatchId) {
-        validBiometryLogs.push(targetBatchId !== b.batchId ? { ...b, batchId: targetBatchId, updatedAt: Date.now() } : b);
-      } else if (b.cageId && normalizedCages.some(c => c.id === b.cageId)) {
-        validBiometryLogs.push(b);
-      } else {
-        if (b.id) purgedLogIds.push(b.id);
+      if (targetBatchId && targetBatchId !== b.batchId) {
+        return { ...b, batchId: targetBatchId, updatedAt: b.updatedAt || Date.now() };
       }
+      return b;
     });
-    finalResult.biometryLogs = validBiometryLogs;
   }
 
   if (finalResult.harvestLogs && finalResult.harvestLogs.length > 0) {
-    const validHarvestLogs: any[] = [];
-    finalResult.harvestLogs.forEach(h => {
-      if (h.batchId && batchMap.has(h.batchId) && !deletedSet.has(h.batchId)) {
-        validHarvestLogs.push(h);
-      } else {
-        if (h.id) purgedLogIds.push(h.id);
-      }
-    });
-    finalResult.harvestLogs = validHarvestLogs;
+    finalResult.harvestLogs = finalResult.harvestLogs.filter(h => !deletedSet.has(h.id));
   }
 
   if (finalResult.harvestSchedules && finalResult.harvestSchedules.length > 0) {
-    const validHarvestSchedules: any[] = [];
-    const harvestLogsArr = finalResult.harvestLogs || [];
-    finalResult.harvestSchedules.forEach(hs => {
-      if (hs.batchId && batchMap.has(hs.batchId) && !deletedSet.has(hs.batchId) && !deletedSet.has(hs.id)) {
-        const harvestedCageIds = new Set(
-          harvestLogsArr.filter(h => h.batchId === hs.batchId).map(h => h.cageId)
-        );
-        const remainingCagesInSchedule = (hs.cageIds || []).filter(cId => !harvestedCageIds.has(cId));
-        if (remainingCagesInSchedule.length > 0) {
-          validHarvestSchedules.push(hs);
-        } else {
-          if (hs.id) purgedLogIds.push(hs.id);
-        }
-      } else {
-        if (hs.id) purgedLogIds.push(hs.id);
-      }
-    });
-    finalResult.harvestSchedules = validHarvestSchedules;
+    finalResult.harvestSchedules = finalResult.harvestSchedules.filter(hs => !deletedSet.has(hs.id));
   }
 
   if (finalResult.batchExpenses && finalResult.batchExpenses.length > 0) {
-    const validExpenses: any[] = [];
-    finalResult.batchExpenses.forEach(e => {
-      if (e.batchId && batchMap.has(e.batchId) && !deletedSet.has(e.batchId)) {
-        validExpenses.push(e);
-      } else {
-        if (e.id) purgedLogIds.push(e.id);
-      }
-    });
-    finalResult.batchExpenses = validExpenses;
+    finalResult.batchExpenses = finalResult.batchExpenses.filter(e => !deletedSet.has(e.id));
   }
 
   if (finalResult.batchRevenues && finalResult.batchRevenues.length > 0) {
-    const validRevenues: any[] = [];
-    finalResult.batchRevenues.forEach(r => {
-      if (r.batchId && batchMap.has(r.batchId) && !deletedSet.has(r.batchId)) {
-        validRevenues.push(r);
-      } else {
-        if (r.id) purgedLogIds.push(r.id);
-      }
-    });
-    finalResult.batchRevenues = validRevenues;
+    finalResult.batchRevenues = finalResult.batchRevenues.filter(r => !deletedSet.has(r.id));
   }
 
   if (finalResult.slaughterLogs && finalResult.slaughterLogs.length > 0) {
@@ -814,13 +753,6 @@ export const ensureStateIntegrity = (state: any, mergeWith?: AppState, priority:
       }
     });
     finalResult.slaughterLogs = validSlaughterLogs;
-  }
-
-  if (purgedLogIds.length > 0) {
-    finalResult.deletedIds = Array.from(new Set([
-      ...(finalResult.deletedIds || []),
-      ...purgedLogIds
-    ]));
   }
 
   // Ensure default feed types exist on initial state, but do not overwrite existing feed stock
@@ -1015,37 +947,41 @@ export const getSession = (): User | null => {
 };
 
 export const fetchRemoteState = async (config?: {url: string, key: string}): Promise<AppState | null> => {
-  let remoteData: AppState | null = null;
+  let serverData: AppState | null = null;
+  let supabaseData: AppState | null = null;
 
-  // 1. Try Supabase first if configured
-  const supabase = getSupabase(config);
-  if (supabase) {
-    try {
-      const { data } = await supabase.from('farm_data').select('state').eq('id', 'singleton').maybeSingle();
-      if (data?.state) {
-        remoteData = data.state;
-      }
-    } catch (err) {
-      // ignore error
-    }
-  }
-
-  // 2. Fetch from central server persistence (/api/farm-state)
+  // 1. Fetch from central server persistence (/api/farm-state)
   try {
     const res = await fetch('/api/farm-state');
     if (res.ok) {
       const json = await res.json();
       if (json && json.state) {
-        remoteData = remoteData 
-          ? ensureStateIntegrity(remoteData, json.state, 'remote')
-          : json.state;
+        serverData = json.state;
       }
     }
   } catch (err) {
     // server API offline or unreachable
   }
 
-  return remoteData;
+  // 2. Try Supabase if configured
+  const configToUse = config || serverData?.supabaseConfig || getSupabaseConfig();
+  const supabase = getSupabase(configToUse);
+  if (supabase) {
+    try {
+      const { data } = await supabase.from('farm_data').select('state').eq('id', 'singleton').maybeSingle();
+      if (data?.state) {
+        supabaseData = data.state;
+      }
+    } catch (err) {
+      // ignore error
+    }
+  }
+
+  if (serverData && supabaseData) {
+    return ensureStateIntegrity(serverData, supabaseData, 'remote');
+  }
+
+  return supabaseData || serverData || null;
 };
 
 export const loadState = async (): Promise<AppState> => {
@@ -1134,7 +1070,7 @@ export const saveState = async (state: AppState, userConfig?: {url: string, key:
     if (res.ok) {
       const json = await res.json();
       if (json && json.state) {
-        mergedStateToSave = ensureStateIntegrity(mergedStateToSave, json.state, 'local');
+        mergedStateToSave = json.state;
       }
     }
   } catch (e) {
@@ -1149,7 +1085,7 @@ export const saveState = async (state: AppState, userConfig?: {url: string, key:
       const remoteState = data?.state as AppState | undefined;
       
       mergedStateToSave = remoteState 
-        ? ensureStateIntegrity(mergedStateToSave, remoteState, 'local') 
+        ? ensureStateIntegrity(mergedStateToSave, remoteState, 'remote') 
         : mergedStateToSave;
 
       await supabase.from('farm_data').upsert({ id: 'singleton', state: mergedStateToSave, last_sync: new Date().toISOString() });

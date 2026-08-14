@@ -172,27 +172,22 @@ const App: React.FC = () => {
         pcmPlannedImprovements: inject(data.pcmPlannedImprovements || []),
       };
 
-      // 1. Sempre que houver configuração de nuvem, sincronizar com o banco remoto na inicialização,
-      // mesmo se não houver um usuário logado ainda, para que o Login exiba a situação correta de aprovação e usuários atualizados.
-      const initialConfig = data.supabaseConfig || getSupabaseConfig();
-      if (initialConfig) {
-        setIsSyncingBackground(true);
-        try {
-          const remote = await fetchRemoteState(initialConfig);
-          if (remote) {
-            const merged = ensureStateIntegrity(data, remote, 'local');
-            data = merged;
+      // 1. Sempre buscar o estado canônico do servidor/nuvem na inicialização
+      setIsSyncingBackground(true);
+      try {
+        const initialConfig = data.supabaseConfig || getSupabaseConfig();
+        const remote = await fetchRemoteState(initialConfig);
+        if (remote) {
+          const merged = ensureStateIntegrity(data, remote, 'remote');
+          data = merged;
+          if (remote.supabaseConfig) {
+            saveSupabaseConfig(remote.supabaseConfig);
           }
-          // Garante que todos os dados restaurados ou limpos localmente (como Lote 08) sejam IMEDIATAMENTE salvos na nuvem para que outros usuários vejam
-          const syncedState = await saveState(data, initialConfig);
-          if (syncedState) {
-            data = syncedState;
-          }
-        } catch (syncErr) {
-          console.warn('Erro na sincronização inicial:', syncErr);
-        } finally {
-          setIsSyncingBackground(false);
         }
+      } catch (syncErr) {
+        console.warn('Erro na sincronização inicial:', syncErr);
+      } finally {
+        setIsSyncingBackground(false);
       }
 
       setState(data);
@@ -248,12 +243,12 @@ const App: React.FC = () => {
       const remote = await fetchRemoteState(configToUse);
       
       if (remote) {
-        const merged = ensureStateIntegrity(state, remote, 'local');
+        const merged = ensureStateIntegrity(state, remote, 'remote');
         const nowIso = new Date().toISOString();
         
         const updatedUsers = merged.users.map(u => 
           currentUser && (u.id === currentUser.id || (currentUser.username && u.username === currentUser.username))
-            ? { ...u, lastSync: nowIso, updatedAt: Date.now() } 
+            ? { ...u, lastSync: nowIso, updatedAt: Math.max(Number(u.updatedAt) || 0, Date.now()) } 
             : u
         );
         
@@ -267,9 +262,6 @@ const App: React.FC = () => {
 
         setState(finalMerged);
         lastSavedStateRef.current = finalMerged;
-
-        // Persist back to server/Supabase to keep both sides 100% aligned
-        await saveState(finalMerged, configToUse);
       }
     } catch (err) {
       console.warn('Erro na sincronização de background:', err);
@@ -302,11 +294,11 @@ const App: React.FC = () => {
     if (!configToUse) return;
 
     const unsubscribe = subscribeToRemoteChanges(configToUse, (remoteState) => {
-      // Don't skip updates, merge carefully preserving active local edits
+      // Don't skip updates, merge carefully with remote priority
       setState(prev => {
         if (!prev) return remoteState;
         
-        const merged = ensureStateIntegrity(prev, remoteState, 'local');
+        const merged = ensureStateIntegrity(prev, remoteState, 'remote');
         lastSavedStateRef.current = merged;
         return merged;
       });
@@ -332,7 +324,7 @@ const App: React.FC = () => {
         saveState(state, configToUse).then((finalState) => {
           if (finalState) {
             lastSavedStateRef.current = finalState;
-            setState(prev => prev ? ensureStateIntegrity(prev, finalState, 'local') : finalState);
+            setState(prev => prev ? ensureStateIntegrity(prev, finalState, 'remote') : finalState);
           }
         }).finally(() => {
           isSavingRef.current = false;
@@ -430,7 +422,7 @@ const App: React.FC = () => {
 
     const interval = setInterval(() => {
       handleSyncTrigger();
-    }, 60000); 
+    }, 15000); // 15s sync interval for continuous synchronization across all devices
 
     return () => {
       window.removeEventListener('focus', handleSyncTrigger);
@@ -536,25 +528,23 @@ const App: React.FC = () => {
     setCurrentUser(user);
     saveSession(user);
     
-    // Sincronizar imediatamente após o login se houver configuração de banco de dados
-    const configToUse = user.supabaseConfig || state?.supabaseConfig;
-    if (configToUse && state) {
-      setIsSyncingBackground(true);
-      try {
-        const remote = await fetchRemoteState(configToUse);
-        if (remote) {
-          setState(prev => {
-            if (!prev) return remote;
-            const merged = ensureStateIntegrity(prev, remote, 'local');
-            lastSavedStateRef.current = remote;
-            return merged;
-          });
-        }
-      } catch (err) {
-        console.warn('Erro ao sincronizar após login:', err);
-      } finally {
-        setIsSyncingBackground(false);
+    // Sincronizar imediatamente após o login buscando estado canônico do servidor/nuvem
+    setIsSyncingBackground(true);
+    try {
+      const configToUse = user.supabaseConfig || state?.supabaseConfig || getSupabaseConfig();
+      const remote = await fetchRemoteState(configToUse);
+      if (remote) {
+        setState(prev => {
+          if (!prev) return remote;
+          const merged = ensureStateIntegrity(prev, remote, 'remote');
+          lastSavedStateRef.current = merged;
+          return merged;
+        });
       }
+    } catch (err) {
+      console.warn('Erro ao sincronizar após login:', err);
+    } finally {
+      setIsSyncingBackground(false);
     }
   }, [state]);
 
@@ -565,20 +555,18 @@ const App: React.FC = () => {
   };
 
   const handleLoginSync = useCallback(async () => {
-    const configToUse = state?.supabaseConfig || getSupabaseConfig();
-    if (configToUse) {
-      try {
-        const remote = await fetchRemoteState(configToUse);
-        if (remote) {
-          const localState = state || await loadState();
-          const mergedState = ensureStateIntegrity(localState, remote, 'local');
-          setState(mergedState);
-          lastSavedStateRef.current = remote;
-          return mergedState;
-        }
-      } catch (err) {
-        console.warn('Erro ao sincronizar login:', err);
+    try {
+      const configToUse = state?.supabaseConfig || getSupabaseConfig();
+      const remote = await fetchRemoteState(configToUse);
+      if (remote) {
+        const localState = state || await loadState();
+        const mergedState = ensureStateIntegrity(localState, remote, 'remote');
+        setState(mergedState);
+        lastSavedStateRef.current = mergedState;
+        return mergedState;
       }
+    } catch (err) {
+      console.warn('Erro ao sincronizar login:', err);
     }
     return state;
   }, [state]);
