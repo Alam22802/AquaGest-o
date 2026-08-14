@@ -105,8 +105,15 @@ const initialState: AppState = {
 function isObjectModified(a: any, b: any): boolean {
   if (a === b) return false;
   if (!a || !b) return true;
-  const keys = Object.keys(a);
-  for (const key of keys) {
+  const keysA = Object.keys(a);
+  for (const key of keysA) {
+    if (key === 'updatedAt' || key === 'lastSync') continue;
+    if (JSON.stringify(a[key]) !== JSON.stringify(b[key])) {
+      return true;
+    }
+  }
+  const keysB = Object.keys(b);
+  for (const key of keysB) {
     if (key === 'updatedAt' || key === 'lastSync') continue;
     if (JSON.stringify(a[key]) !== JSON.stringify(b[key])) {
       return true;
@@ -115,20 +122,18 @@ function isObjectModified(a: any, b: any): boolean {
   return false;
 }
 
-function mergeArraysById<T extends { id: string, updatedAt?: number | string }>(
+function mergeArraysById<T extends { id: string, name?: string, batchId?: string, updatedAt?: number | string }>(
   local: T[], 
   remote: T[], 
   deletedIds: string[] = [],
-  priority: 'local' | 'remote' = 'remote'
+  priority: 'local' | 'remote' = 'local',
+  preserveOnBatchDeletion: boolean = false
 ): T[] {
   const safeLocal = local || [];
   const safeRemote = remote || [];
   
-  if (safeRemote.length === 0 && deletedIds.length === 0) return safeLocal;
-  if (safeLocal.length === 0 && deletedIds.length === 0) return safeRemote;
-  
   const map = new Map<string, T>();
-  const deletedSet = deletedIds.length > 0 ? new Set(deletedIds) : null;
+  const deletedSet = new Set(deletedIds || []);
 
   const now = Date.now();
   const getTime = (item: T): number => {
@@ -139,23 +144,35 @@ function mergeArraysById<T extends { id: string, updatedAt?: number | string }>(
     return t;
   };
 
+  const isItemDeleted = (item: any): boolean => {
+    if (!item || !item.id) return true;
+    if (deletedSet.has(item.id)) return true;
+    if (!preserveOnBatchDeletion) {
+      if (item.name && deletedSet.has(item.name)) return true;
+      if (item.batchId && deletedSet.has(item.batchId)) return true;
+    }
+    return false;
+  };
+
   // 1. Process local items first
   for (let i = 0; i < safeLocal.length; i++) {
     const item = safeLocal[i];
-    if (!item || !item.id || (deletedSet && deletedSet.has(item.id))) continue;
+    if (isItemDeleted(item)) continue;
     map.set(item.id, item);
   }
 
   // 2. Process remote items
   for (let i = 0; i < safeRemote.length; i++) {
     const item = safeRemote[i];
-    if (!item || !item.id || (deletedSet && deletedSet.has(item.id))) continue;
+    if (isItemDeleted(item)) continue;
+    
     const existing = map.get(item.id);
     if (!existing) {
       map.set(item.id, item);
     } else {
       const itemTime = getTime(item);
       const existingTime = getTime(existing);
+      const modified = isObjectModified(existing, item);
       
       if (itemTime > existingTime) {
         // Remote is strictly newer
@@ -164,17 +181,21 @@ function mergeArraysById<T extends { id: string, updatedAt?: number | string }>(
         // Local is strictly newer
         map.set(item.id, existing);
       } else {
-        // Equal timestamps: resolve according to priority
-        if (priority === 'remote') {
-          map.set(item.id, item);
+        // Equal timestamps: resolve according to modification and priority
+        if (modified) {
+          if (priority === 'remote') {
+            map.set(item.id, item);
+          } else {
+            map.set(item.id, existing);
+          }
         } else {
-          map.set(item.id, existing);
+          map.set(item.id, priority === 'remote' ? item : existing);
         }
       }
     }
   }
 
-  return Array.from(map.values());
+  return Array.from(map.values()).filter(i => !isItemDeleted(i));
 }
 
 function mergeUsers(
@@ -318,7 +339,7 @@ export const areStatesEqual = (a: AppState, b: AppState): boolean => {
   return true;
 };
 
-export const ensureStateIntegrity = (state: any, mergeWith?: AppState, priority: 'local' | 'remote' = 'remote'): AppState => {
+export const ensureStateIntegrity = (state: any, mergeWith?: AppState, priority: 'local' | 'remote' = 'local'): AppState => {
   const rawDeletedIds = [
     ...(state?.deletedIds || []),
     ...(mergeWith?.deletedIds || [])
@@ -328,7 +349,7 @@ export const ensureStateIntegrity = (state: any, mergeWith?: AppState, priority:
   const combinedDeletedIdsArray = Array.from(new Set(
     repairedDeletedIdsArr.filter(id => typeof id === 'string' && id.trim() !== '')
   ));
-  const trimmedDeletedIds = combinedDeletedIdsArray.length > 2000 ? combinedDeletedIdsArray.slice(-2000) : combinedDeletedIdsArray;
+  const trimmedDeletedIds = combinedDeletedIdsArray.length > 10000 ? combinedDeletedIdsArray.slice(-10000) : combinedDeletedIdsArray;
 
   const deletedSet = new Set(trimmedDeletedIds);
 
@@ -344,10 +365,18 @@ export const ensureStateIntegrity = (state: any, mergeWith?: AppState, priority:
     users: repairArray(state?.users || initialState.users)
   };
   
-  const filterByTombstone = (arr: any[]) => {
+  const filterByTombstone = (arr: any[], preserveOnBatchDeletion: boolean = false) => {
     if (!arr) return [];
     if (deletedSet.size === 0) return arr;
-    return arr.filter(i => !deletedSet.has(i.id));
+    return arr.filter(i => {
+      if (!i || !i.id) return false;
+      if (deletedSet.has(i.id)) return false;
+      if (!preserveOnBatchDeletion) {
+        if (i.name && deletedSet.has(i.name)) return false;
+        if (i.batchId && deletedSet.has(i.batchId)) return false;
+      }
+      return true;
+    });
   };
 
   const result: AppState = {
@@ -361,21 +390,21 @@ export const ensureStateIntegrity = (state: any, mergeWith?: AppState, priority:
     feedStockLogs: filterByTombstone(base.feedStockLogs || []),
     mortalityLogs: filterByTombstone(base.mortalityLogs || []),
     biometryLogs: filterByTombstone(base.biometryLogs || []),
-    slaughterLogs: filterByTombstone(base.slaughterLogs || []),
-    slaughterExpenses: filterByTombstone(base.slaughterExpenses || []),
-    slaughterEmployees: filterByTombstone(base.slaughterEmployees || []),
-    slaughterHRIndicators: filterByTombstone(base.slaughterHRIndicators || []),
-    slaughterHREntries: filterByTombstone(base.slaughterHREntries || []),
-    slaughterHRVacancies: filterByTombstone(base.slaughterHRVacancies || []),
+    slaughterLogs: filterByTombstone(base.slaughterLogs || [], true),
+    slaughterExpenses: filterByTombstone(base.slaughterExpenses || [], true),
+    slaughterEmployees: filterByTombstone(base.slaughterEmployees || [], true),
+    slaughterHRIndicators: filterByTombstone(base.slaughterHRIndicators || [], true),
+    slaughterHREntries: filterByTombstone(base.slaughterHREntries || [], true),
+    slaughterHRVacancies: filterByTombstone(base.slaughterHRVacancies || [], true),
     slaughterExpenseCategories: base.slaughterExpenseCategories || initialState.slaughterExpenseCategories,
     slaughterHREntryTypes: base.slaughterHREntryTypes || initialState.slaughterHREntryTypes,
     slaughterHRDepartments: base.slaughterHRDepartments || initialState.slaughterHRDepartments,
     slaughterHRRoles: base.slaughterHRRoles || initialState.slaughterHRRoles,
-    slaughterSupplyItems: filterByTombstone(base.slaughterSupplyItems || []),
-    slaughterSuppliers: filterByTombstone(base.slaughterSuppliers || []),
-    slaughterSupplyRequests: filterByTombstone(base.slaughterSupplyRequests || []),
-    slaughterPurchaseOrders: filterByTombstone(base.slaughterPurchaseOrders || []),
-    slaughterSupplyInvoices: filterByTombstone(base.slaughterSupplyInvoices || []),
+    slaughterSupplyItems: filterByTombstone(base.slaughterSupplyItems || [], true),
+    slaughterSuppliers: filterByTombstone(base.slaughterSuppliers || [], true),
+    slaughterSupplyRequests: filterByTombstone(base.slaughterSupplyRequests || [], true),
+    slaughterPurchaseOrders: filterByTombstone(base.slaughterPurchaseOrders || [], true),
+    slaughterSupplyInvoices: filterByTombstone(base.slaughterSupplyInvoices || [], true),
     slaughterSupplyCategories: base.slaughterSupplyCategories || initialState.slaughterSupplyCategories,
     slaughterSupplyCategoriesUpdated: base.slaughterSupplyCategoriesUpdated || 0,
     protocols: filterByTombstone(base.protocols || []),
@@ -388,24 +417,24 @@ export const ensureStateIntegrity = (state: any, mergeWith?: AppState, priority:
     harvestSchedules: filterByTombstone(base.harvestSchedules || []),
     batchExpenses: filterByTombstone(base.batchExpenses || []),
     batchRevenues: filterByTombstone(base.batchRevenues || []),
-    coldStorageLogs: filterByTombstone(base.coldStorageLogs || []),
-    utilityLogs: filterByTombstone(base.utilityLogs || []),
-    coldChambers: filterByTombstone(base.coldChambers || []),
-    pcpSuppliers: filterByTombstone(base.pcpSuppliers || []),
-    pcpSlaughterSchedules: filterByTombstone(base.pcpSlaughterSchedules || []),
+    coldStorageLogs: filterByTombstone(base.coldStorageLogs || [], true),
+    utilityLogs: filterByTombstone(base.utilityLogs || [], true),
+    coldChambers: filterByTombstone(base.coldChambers || [], true),
+    pcpSuppliers: filterByTombstone(base.pcpSuppliers || [], true),
+    pcpSlaughterSchedules: filterByTombstone(base.pcpSlaughterSchedules || [], true),
     feedingTables: filterByTombstone(base.feedingTables || []),
     costCenters: filterByTombstone(base.costCenters || []),
-    pcmEquipments: filterByTombstone(base.pcmEquipments || []),
-    pcmStoppageReasons: filterByTombstone(base.pcmStoppageReasons || []),
-    pcmProductionStoppages: filterByTombstone(base.pcmProductionStoppages || []),
-    pcmPlannedImprovements: filterByTombstone(base.pcmPlannedImprovements || []),
+    pcmEquipments: filterByTombstone(base.pcmEquipments || [], true),
+    pcmStoppageReasons: filterByTombstone(base.pcmStoppageReasons || [], true),
+    pcmProductionStoppages: filterByTombstone(base.pcmProductionStoppages || [], true),
+    pcmPlannedImprovements: filterByTombstone(base.pcmPlannedImprovements || [], true),
     farmTargetCapacity: base.farmTargetCapacity || 0,
   };
 
   const finalResult = mergeWith ? {
     ...result,
     users: mergeUsers(result.users, mergeWith.users, combinedDeletedIdsArray, priority),
-    slaughterLogs: mergeArraysById(result.slaughterLogs, mergeWith.slaughterLogs, combinedDeletedIdsArray, priority),
+    slaughterLogs: mergeArraysById(result.slaughterLogs, mergeWith.slaughterLogs, combinedDeletedIdsArray, priority, true),
     feedTypes: mergeArraysById(result.feedTypes, mergeWith.feedTypes, combinedDeletedIdsArray, priority),
     lines: mergeArraysById(result.lines, mergeWith.lines, combinedDeletedIdsArray, priority),
     batches: mergeArraysById(result.batches, mergeWith.batches, combinedDeletedIdsArray, priority),
@@ -414,16 +443,16 @@ export const ensureStateIntegrity = (state: any, mergeWith?: AppState, priority:
     feedStockLogs: mergeArraysById(result.feedStockLogs || [], mergeWith.feedStockLogs || [], combinedDeletedIdsArray, priority),
     mortalityLogs: mergeArraysById(result.mortalityLogs, mergeWith.mortalityLogs, combinedDeletedIdsArray, priority),
     biometryLogs: mergeArraysById(result.biometryLogs, mergeWith.biometryLogs, combinedDeletedIdsArray, priority),
-    slaughterExpenses: mergeArraysById(result.slaughterExpenses || [], mergeWith.slaughterExpenses || [], combinedDeletedIdsArray, priority),
-    slaughterEmployees: mergeArraysById(result.slaughterEmployees || [], mergeWith.slaughterEmployees || [], combinedDeletedIdsArray, priority),
-    slaughterHRIndicators: mergeArraysById(result.slaughterHRIndicators || [], mergeWith.slaughterHRIndicators || [], combinedDeletedIdsArray, priority),
-    slaughterHREntries: mergeArraysById(result.slaughterHREntries || [], mergeWith.slaughterHREntries || [], combinedDeletedIdsArray, priority),
-    slaughterHRVacancies: mergeArraysById(result.slaughterHRVacancies || [], mergeWith.slaughterHRVacancies || [], combinedDeletedIdsArray, priority),
-    slaughterSupplyItems: mergeArraysById(result.slaughterSupplyItems || [], mergeWith.slaughterSupplyItems || [], combinedDeletedIdsArray, priority),
-    slaughterSuppliers: mergeArraysById(result.slaughterSuppliers || [], mergeWith.slaughterSuppliers || [], combinedDeletedIdsArray, priority),
-    slaughterSupplyRequests: mergeArraysById(result.slaughterSupplyRequests || [], mergeWith.slaughterSupplyRequests || [], combinedDeletedIdsArray, priority),
-    slaughterPurchaseOrders: mergeArraysById(result.slaughterPurchaseOrders || [], mergeWith.slaughterPurchaseOrders || [], combinedDeletedIdsArray, priority),
-    slaughterSupplyInvoices: mergeArraysById(result.slaughterSupplyInvoices || [], mergeWith.slaughterSupplyInvoices || [], combinedDeletedIdsArray, priority),
+    slaughterExpenses: mergeArraysById(result.slaughterExpenses || [], mergeWith.slaughterExpenses || [], combinedDeletedIdsArray, priority, true),
+    slaughterEmployees: mergeArraysById(result.slaughterEmployees || [], mergeWith.slaughterEmployees || [], combinedDeletedIdsArray, priority, true),
+    slaughterHRIndicators: mergeArraysById(result.slaughterHRIndicators || [], mergeWith.slaughterHRIndicators || [], combinedDeletedIdsArray, priority, true),
+    slaughterHREntries: mergeArraysById(result.slaughterHREntries || [], mergeWith.slaughterHREntries || [], combinedDeletedIdsArray, priority, true),
+    slaughterHRVacancies: mergeArraysById(result.slaughterHRVacancies || [], mergeWith.slaughterHRVacancies || [], combinedDeletedIdsArray, priority, true),
+    slaughterSupplyItems: mergeArraysById(result.slaughterSupplyItems || [], mergeWith.slaughterSupplyItems || [], combinedDeletedIdsArray, priority, true),
+    slaughterSuppliers: mergeArraysById(result.slaughterSuppliers || [], mergeWith.slaughterSuppliers || [], combinedDeletedIdsArray, priority, true),
+    slaughterSupplyRequests: mergeArraysById(result.slaughterSupplyRequests || [], mergeWith.slaughterSupplyRequests || [], combinedDeletedIdsArray, priority, true),
+    slaughterPurchaseOrders: mergeArraysById(result.slaughterPurchaseOrders || [], mergeWith.slaughterPurchaseOrders || [], combinedDeletedIdsArray, priority, true),
+    slaughterSupplyInvoices: mergeArraysById(result.slaughterSupplyInvoices || [], mergeWith.slaughterSupplyInvoices || [], combinedDeletedIdsArray, priority, true),
     slaughterSupplyCategories: Array.from(new Set([...(result.slaughterSupplyCategories || []), ...(mergeWith.slaughterSupplyCategories || [])])),
     slaughterSupplyCategoriesUpdated: Math.max(result.slaughterSupplyCategoriesUpdated || 0, mergeWith.slaughterSupplyCategoriesUpdated || 0),
     slaughterExpenseCategories: Array.from(new Set([...(result.slaughterExpenseCategories || []), ...(mergeWith.slaughterExpenseCategories || [])])),
@@ -444,17 +473,17 @@ export const ensureStateIntegrity = (state: any, mergeWith?: AppState, priority:
     harvestSchedules: mergeArraysById(result.harvestSchedules || [], mergeWith.harvestSchedules || [], combinedDeletedIdsArray, priority),
     batchExpenses: mergeArraysById(result.batchExpenses || [], mergeWith.batchExpenses || [], combinedDeletedIdsArray, priority),
     batchRevenues: mergeArraysById(result.batchRevenues || [], mergeWith.batchRevenues || [], combinedDeletedIdsArray, priority),
-    coldStorageLogs: mergeArraysById(result.coldStorageLogs || [], mergeWith.coldStorageLogs || [], combinedDeletedIdsArray, priority),
-    utilityLogs: mergeArraysById(result.utilityLogs || [], mergeWith.utilityLogs || [], combinedDeletedIdsArray, priority),
-    coldChambers: mergeArraysById(result.coldChambers || [], mergeWith.coldChambers || [], combinedDeletedIdsArray, priority),
-    pcpSuppliers: mergeArraysById(result.pcpSuppliers || [], mergeWith.pcpSuppliers || [], combinedDeletedIdsArray, priority),
-    pcpSlaughterSchedules: mergeArraysById(result.pcpSlaughterSchedules || [], mergeWith.pcpSlaughterSchedules || [], combinedDeletedIdsArray, priority),
+    coldStorageLogs: mergeArraysById(result.coldStorageLogs || [], mergeWith.coldStorageLogs || [], combinedDeletedIdsArray, priority, true),
+    utilityLogs: mergeArraysById(result.utilityLogs || [], mergeWith.utilityLogs || [], combinedDeletedIdsArray, priority, true),
+    coldChambers: mergeArraysById(result.coldChambers || [], mergeWith.coldChambers || [], combinedDeletedIdsArray, priority, true),
+    pcpSuppliers: mergeArraysById(result.pcpSuppliers || [], mergeWith.pcpSuppliers || [], combinedDeletedIdsArray, priority, true),
+    pcpSlaughterSchedules: mergeArraysById(result.pcpSlaughterSchedules || [], mergeWith.pcpSlaughterSchedules || [], combinedDeletedIdsArray, priority, true),
     feedingTables: mergeArraysById(result.feedingTables || [], mergeWith.feedingTables || [], combinedDeletedIdsArray, priority),
     costCenters: mergeArraysById(result.costCenters || [], mergeWith.costCenters || [], combinedDeletedIdsArray, priority),
-    pcmEquipments: mergeArraysById(result.pcmEquipments || [], mergeWith.pcmEquipments || [], combinedDeletedIdsArray, priority),
-    pcmStoppageReasons: mergeArraysById(result.pcmStoppageReasons || [], mergeWith.pcmStoppageReasons || [], combinedDeletedIdsArray, priority),
-    pcmProductionStoppages: mergeArraysById(result.pcmProductionStoppages || [], mergeWith.pcmProductionStoppages || [], combinedDeletedIdsArray, priority),
-    pcmPlannedImprovements: mergeArraysById(result.pcmPlannedImprovements || [], mergeWith.pcmPlannedImprovements || [], combinedDeletedIdsArray, priority),
+    pcmEquipments: mergeArraysById(result.pcmEquipments || [], mergeWith.pcmEquipments || [], combinedDeletedIdsArray, priority, true),
+    pcmStoppageReasons: mergeArraysById(result.pcmStoppageReasons || [], mergeWith.pcmStoppageReasons || [], combinedDeletedIdsArray, priority, true),
+    pcmProductionStoppages: mergeArraysById(result.pcmProductionStoppages || [], mergeWith.pcmProductionStoppages || [], combinedDeletedIdsArray, priority, true),
+    pcmPlannedImprovements: mergeArraysById(result.pcmPlannedImprovements || [], mergeWith.pcmPlannedImprovements || [], combinedDeletedIdsArray, priority, true),
     farmTargetCapacity: priority === 'remote' 
       ? (mergeWith.farmTargetCapacity !== undefined ? mergeWith.farmTargetCapacity : result.farmTargetCapacity)
       : (result.farmTargetCapacity !== undefined ? result.farmTargetCapacity : mergeWith.farmTargetCapacity),
@@ -678,64 +707,70 @@ export const ensureStateIntegrity = (state: any, mergeWith?: AppState, priority:
   };
 
   if (finalResult.feedingLogs && finalResult.feedingLogs.length > 0) {
-    finalResult.feedingLogs = finalResult.feedingLogs.map(f => {
-      const fDate = (f.timestamp || '').split('T')[0];
-      const correctBatchId = getReconciledBatchId(f.cageId, fDate, f.batchId);
-      const targetBatchId = (correctBatchId && batchMap.has(correctBatchId) && !deletedSet.has(correctBatchId)) 
-        ? correctBatchId 
-        : (f.batchId && batchMap.has(f.batchId) && !deletedSet.has(f.batchId) ? f.batchId : (f.batchId || ''));
-      
-      if (targetBatchId && targetBatchId !== f.batchId) {
-        return { ...f, batchId: targetBatchId, updatedAt: f.updatedAt || Date.now() };
-      }
-      return f;
-    });
+    finalResult.feedingLogs = finalResult.feedingLogs
+      .filter(f => !deletedSet.has(f.id) && (!f.batchId || !deletedSet.has(f.batchId)))
+      .map(f => {
+        const fDate = (f.timestamp || '').split('T')[0];
+        const correctBatchId = getReconciledBatchId(f.cageId, fDate, f.batchId);
+        const targetBatchId = (correctBatchId && batchMap.has(correctBatchId) && !deletedSet.has(correctBatchId)) 
+          ? correctBatchId 
+          : (f.batchId && batchMap.has(f.batchId) && !deletedSet.has(f.batchId) ? f.batchId : (f.batchId || ''));
+        
+        if (targetBatchId && targetBatchId !== f.batchId) {
+          return { ...f, batchId: targetBatchId, updatedAt: f.updatedAt || Date.now() };
+        }
+        return f;
+      });
   }
 
   if (finalResult.mortalityLogs && finalResult.mortalityLogs.length > 0) {
-    finalResult.mortalityLogs = finalResult.mortalityLogs.map(m => {
-      const mDate = m.date || '';
-      const correctBatchId = getReconciledBatchId(m.cageId, mDate, m.batchId);
-      const targetBatchId = (correctBatchId && batchMap.has(correctBatchId) && !deletedSet.has(correctBatchId))
-        ? correctBatchId
-        : (m.batchId && batchMap.has(m.batchId) && !deletedSet.has(m.batchId) ? m.batchId : (m.batchId || ''));
+    finalResult.mortalityLogs = finalResult.mortalityLogs
+      .filter(m => !deletedSet.has(m.id) && (!m.batchId || !deletedSet.has(m.batchId)))
+      .map(m => {
+        const mDate = m.date || '';
+        const correctBatchId = getReconciledBatchId(m.cageId, mDate, m.batchId);
+        const targetBatchId = (correctBatchId && batchMap.has(correctBatchId) && !deletedSet.has(correctBatchId))
+          ? correctBatchId
+          : (m.batchId && batchMap.has(m.batchId) && !deletedSet.has(m.batchId) ? m.batchId : (m.batchId || ''));
 
-      if (targetBatchId && targetBatchId !== m.batchId) {
-        return { ...m, batchId: targetBatchId, updatedAt: m.updatedAt || Date.now() };
-      }
-      return m;
-    });
+        if (targetBatchId && targetBatchId !== m.batchId) {
+          return { ...m, batchId: targetBatchId, updatedAt: m.updatedAt || Date.now() };
+        }
+        return m;
+      });
   }
 
   if (finalResult.biometryLogs && finalResult.biometryLogs.length > 0) {
-    finalResult.biometryLogs = finalResult.biometryLogs.map(b => {
-      const bDate = b.date || '';
-      const correctBatchId = getReconciledBatchId(b.cageId, bDate, b.batchId);
-      const targetBatchId = (correctBatchId && batchMap.has(correctBatchId) && !deletedSet.has(correctBatchId))
-        ? correctBatchId
-        : (b.batchId && batchMap.has(b.batchId) && !deletedSet.has(b.batchId) ? b.batchId : (b.batchId || ''));
+    finalResult.biometryLogs = finalResult.biometryLogs
+      .filter(b => !deletedSet.has(b.id) && (!b.batchId || !deletedSet.has(b.batchId)))
+      .map(b => {
+        const bDate = b.date || '';
+        const correctBatchId = getReconciledBatchId(b.cageId, bDate, b.batchId);
+        const targetBatchId = (correctBatchId && batchMap.has(correctBatchId) && !deletedSet.has(correctBatchId))
+          ? correctBatchId
+          : (b.batchId && batchMap.has(b.batchId) && !deletedSet.has(b.batchId) ? b.batchId : (b.batchId || ''));
 
-      if (targetBatchId && targetBatchId !== b.batchId) {
-        return { ...b, batchId: targetBatchId, updatedAt: b.updatedAt || Date.now() };
-      }
-      return b;
-    });
+        if (targetBatchId && targetBatchId !== b.batchId) {
+          return { ...b, batchId: targetBatchId, updatedAt: b.updatedAt || Date.now() };
+        }
+        return b;
+      });
   }
 
   if (finalResult.harvestLogs && finalResult.harvestLogs.length > 0) {
-    finalResult.harvestLogs = finalResult.harvestLogs.filter(h => !deletedSet.has(h.id));
+    finalResult.harvestLogs = finalResult.harvestLogs.filter(h => !deletedSet.has(h.id) && (!h.batchId || !deletedSet.has(h.batchId)));
   }
 
   if (finalResult.harvestSchedules && finalResult.harvestSchedules.length > 0) {
-    finalResult.harvestSchedules = finalResult.harvestSchedules.filter(hs => !deletedSet.has(hs.id));
+    finalResult.harvestSchedules = finalResult.harvestSchedules.filter(hs => !deletedSet.has(hs.id) && (!hs.batchId || !deletedSet.has(hs.batchId)));
   }
 
   if (finalResult.batchExpenses && finalResult.batchExpenses.length > 0) {
-    finalResult.batchExpenses = finalResult.batchExpenses.filter(e => !deletedSet.has(e.id));
+    finalResult.batchExpenses = finalResult.batchExpenses.filter(e => !deletedSet.has(e.id) && (!e.batchId || !deletedSet.has(e.batchId)));
   }
 
   if (finalResult.batchRevenues && finalResult.batchRevenues.length > 0) {
-    finalResult.batchRevenues = finalResult.batchRevenues.filter(r => !deletedSet.has(r.id));
+    finalResult.batchRevenues = finalResult.batchRevenues.filter(r => !deletedSet.has(r.id) && (!r.batchId || !deletedSet.has(r.batchId)));
   }
 
   if (finalResult.slaughterLogs && finalResult.slaughterLogs.length > 0) {
@@ -1085,7 +1120,7 @@ export const saveState = async (state: AppState, userConfig?: {url: string, key:
       const remoteState = data?.state as AppState | undefined;
       
       mergedStateToSave = remoteState 
-        ? ensureStateIntegrity(mergedStateToSave, remoteState, 'remote') 
+        ? ensureStateIntegrity(mergedStateToSave, remoteState, 'local') 
         : mergedStateToSave;
 
       await supabase.from('farm_data').upsert({ id: 'singleton', state: mergedStateToSave, last_sync: new Date().toISOString() });

@@ -324,7 +324,7 @@ const App: React.FC = () => {
         saveState(state, configToUse).then((finalState) => {
           if (finalState) {
             lastSavedStateRef.current = finalState;
-            setState(prev => prev ? ensureStateIntegrity(prev, finalState, 'remote') : finalState);
+            setState(prev => prev ? ensureStateIntegrity(prev, finalState, 'local') : finalState);
           }
         }).finally(() => {
           isSavingRef.current = false;

@@ -119,33 +119,63 @@ async function scheduleSafeFarmStatePersist(stateToSave: any) {
   isSavingFarmState = false;
 }
 
-  function mergeObjectsById(localArr: any[], remoteArr: any[], deletedSet: Set<string>): any[] {
+  function isServerObjectModified(a: any, b: any): boolean {
+    if (a === b) return false;
+    if (!a || !b) return true;
+    const keysA = Object.keys(a);
+    for (const k of keysA) {
+      if (k === 'updatedAt' || k === 'lastSync') continue;
+      if (JSON.stringify(a[k]) !== JSON.stringify(b[k])) return true;
+    }
+    const keysB = Object.keys(b);
+    for (const k of keysB) {
+      if (k === 'updatedAt' || k === 'lastSync') continue;
+      if (JSON.stringify(a[k]) !== JSON.stringify(b[k])) return true;
+    }
+    return false;
+  }
+
+  function isServerItemDeleted(item: any, deletedSet: Set<string>, preserveOnBatchDeletion: boolean = false): boolean {
+    if (!item || !item.id) return true;
+    if (deletedSet.has(item.id)) return true;
+    if (!preserveOnBatchDeletion) {
+      if (item.name && deletedSet.has(item.name)) return true;
+      if (item.batchId && deletedSet.has(item.batchId)) return true;
+    }
+    return false;
+  }
+
+  function mergeObjectsById(localArr: any[], remoteArr: any[], deletedSet: Set<string>, preserveOnBatchDeletion: boolean = false): any[] {
     const map = new Map<string, any>();
     
     (localArr || []).forEach(item => {
-      if (item && item.id && !deletedSet.has(item.id)) {
+      if (!isServerItemDeleted(item, deletedSet, preserveOnBatchDeletion)) {
         map.set(item.id, item);
       }
     });
 
     (remoteArr || []).forEach(item => {
-      if (item && item.id && !deletedSet.has(item.id)) {
-        const existing = map.get(item.id);
-        if (!existing) {
-          map.set(item.id, item);
+      if (isServerItemDeleted(item, deletedSet, preserveOnBatchDeletion)) return;
+      
+      const existing = map.get(item.id);
+      if (!existing) {
+        map.set(item.id, item);
+      } else {
+        const t1 = Number(existing.updatedAt || 0);
+        const t2 = Number(item.updatedAt || 0);
+        const isModified = isServerObjectModified(existing, item);
+
+        // When client sends modified data or equal/newer timestamp, client edits must take precedence
+        if (t2 > t1 || isModified || t2 >= t1) {
+          const finalTime = Math.max(t1, t2, Date.now());
+          map.set(item.id, { ...existing, ...item, updatedAt: finalTime });
         } else {
-          const t1 = Number(existing.updatedAt || 0);
-          const t2 = Number(item.updatedAt || 0);
-          if (t2 > t1) {
-            map.set(item.id, item);
-          } else {
-            map.set(item.id, existing);
-          }
+          map.set(item.id, existing);
         }
       }
     });
 
-    return Array.from(map.values());
+    return Array.from(map.values()).filter(i => !isServerItemDeleted(i, deletedSet, preserveOnBatchDeletion));
   }
 
   function mergeServerUsers(arr1: any[], arr2: any[], deletedSet: Set<string>): any[] {
@@ -176,14 +206,14 @@ async function scheduleSafeFarmStatePersist(stateToSave: any) {
           ...primary,
           isApproved: existing.isApproved || u.isApproved,
           lastSync: latestLastSync,
-          updatedAt: Math.max(t1, t2) || Date.now(),
+          updatedAt: Math.max(t1, t2, Date.now()),
           canEdit: existing.isApproved ? existing.canEdit : u.canEdit,
           allowedTabs: existing.isApproved ? existing.allowedTabs : u.allowedTabs,
         });
       }
     });
 
-    return Array.from(map.values());
+    return Array.from(map.values()).filter(u => !deletedSet.has(u.id));
   }
 
   function mergeFarmStates(s1: any, s2: any) {
@@ -195,8 +225,8 @@ async function scheduleSafeFarmStatePersist(stateToSave: any) {
       ...(s2.deletedIds || [])
     ])).filter(id => typeof id === 'string' && id.trim() !== '');
 
-    // Keep only the last 2000 deleted IDs to prevent infinite array growth
-    const trimmedDeletedIds = rawDeletedIds.length > 2000 ? rawDeletedIds.slice(-2000) : rawDeletedIds;
+    // Allow up to 10000 deleted IDs for robust tombstone preservation
+    const trimmedDeletedIds = rawDeletedIds.length > 10000 ? rawDeletedIds.slice(-10000) : rawDeletedIds;
     const deletedSet = new Set(trimmedDeletedIds);
 
     const arrayKeys = [
@@ -221,8 +251,32 @@ async function scheduleSafeFarmStatePersist(stateToSave: any) {
       lastSync: new Date().toISOString()
     };
 
+    const frigorificoAndMaintenanceKeys = new Set([
+      'slaughterLogs',
+      'slaughterExpenses',
+      'slaughterEmployees',
+      'slaughterHRIndicators',
+      'slaughterHREntries',
+      'slaughterHRVacancies',
+      'slaughterSupplyItems',
+      'slaughterSuppliers',
+      'slaughterSupplyRequests',
+      'slaughterPurchaseOrders',
+      'slaughterSupplyInvoices',
+      'coldStorageLogs',
+      'utilityLogs',
+      'coldChambers',
+      'pcpSuppliers',
+      'pcpSlaughterSchedules',
+      'pcmEquipments',
+      'pcmStoppageReasons',
+      'pcmProductionStoppages',
+      'pcmPlannedImprovements'
+    ]);
+
     arrayKeys.forEach(key => {
-      merged[key] = mergeObjectsById(s1[key], s2[key], deletedSet);
+      const preserve = frigorificoAndMaintenanceKeys.has(key);
+      merged[key] = mergeObjectsById(s1[key], s2[key], deletedSet, preserve);
     });
 
     return merged;
