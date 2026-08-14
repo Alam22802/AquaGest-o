@@ -22,17 +22,102 @@ app.get("/sw.js", (req, res) => {
 
 // Central Farm State Persistence & Synchronization
 const FARM_STATE_FILE = path.join(process.cwd(), "farm_state.json");
-let serverFarmState: any = null;
+const FARM_STATE_BAK_FILE = path.join(process.cwd(), "farm_state.json.bak");
 
+function loadInitialFarmState(): any {
+  // Clean up any stale temp files from previous crashes/restarts
   try {
-    if (fs.existsSync(FARM_STATE_FILE)) {
-      const content = fs.readFileSync(FARM_STATE_FILE, "utf-8");
-      serverFarmState = JSON.parse(content);
-      console.log("Loaded Farm State from persistent storage file.");
+    const dir = process.cwd();
+    const files = fs.readdirSync(dir);
+    for (const file of files) {
+      if (file.startsWith("farm_state.json.") && file.endsWith(".tmp")) {
+        try { fs.unlinkSync(path.join(dir, file)); } catch (_) {}
+      }
     }
-  } catch (e) {
-    console.warn("Failed to read farm_state.json:", e);
+  } catch (_) {}
+
+  // 1. Try reading primary file
+  if (fs.existsSync(FARM_STATE_FILE)) {
+    try {
+      const content = fs.readFileSync(FARM_STATE_FILE, "utf-8");
+      const parsed = JSON.parse(content);
+      console.log("Loaded Farm State from persistent storage file.");
+      
+      // Keep backup file synchronized on healthy read
+      try {
+        fs.writeFileSync(FARM_STATE_BAK_FILE, content, "utf-8");
+      } catch (_) {}
+
+      return parsed;
+    } catch (e) {
+      console.warn("Primary farm_state.json was corrupted or unreadable:", e);
+      // Quarantine corrupted file to avoid repeated parse errors
+      try {
+        const corruptPath = `${FARM_STATE_FILE}.corrupt.${Date.now()}`;
+        fs.renameSync(FARM_STATE_FILE, corruptPath);
+        console.warn(`Quarantined corrupted state file to ${corruptPath}`);
+      } catch (_) {}
+    }
   }
+
+  // 2. Try restoring from backup if primary was missing or corrupted
+  if (fs.existsSync(FARM_STATE_BAK_FILE)) {
+    try {
+      const bakContent = fs.readFileSync(FARM_STATE_BAK_FILE, "utf-8");
+      const parsedBak = JSON.parse(bakContent);
+      console.log("Successfully recovered Farm State from backup file (farm_state.json.bak).");
+      try {
+        fs.writeFileSync(FARM_STATE_FILE, bakContent, "utf-8");
+      } catch (_) {}
+      return parsedBak;
+    } catch (e) {
+      console.warn("Backup farm_state.json.bak was also unreadable:", e);
+    }
+  }
+
+  return null;
+}
+
+let serverFarmState: any = loadInitialFarmState();
+
+// Sequential persistence queue to prevent concurrent filesystem write collisions
+let isSavingFarmState = false;
+let queuedFarmStateToSave: any = null;
+
+async function scheduleSafeFarmStatePersist(stateToSave: any) {
+  queuedFarmStateToSave = stateToSave;
+  if (isSavingFarmState) return;
+
+  isSavingFarmState = true;
+  while (queuedFarmStateToSave !== null) {
+    const currentState = queuedFarmStateToSave;
+    queuedFarmStateToSave = null;
+
+    try {
+      const jsonStr = JSON.stringify(currentState);
+      const tempFile = path.join(
+        process.cwd(),
+        `farm_state.json.${Date.now()}.${Math.random().toString(36).substring(2, 8)}.tmp`
+      );
+
+      // Write to temp file first
+      await fs.promises.writeFile(tempFile, jsonStr, "utf-8");
+
+      // Update backup file before replacing primary
+      if (fs.existsSync(FARM_STATE_FILE)) {
+        try {
+          await fs.promises.copyFile(FARM_STATE_FILE, FARM_STATE_BAK_FILE);
+        } catch (_) {}
+      }
+
+      // Atomic rename
+      await fs.promises.rename(tempFile, FARM_STATE_FILE);
+    } catch (err) {
+      console.warn("Atomic save to farm_state.json failed:", err);
+    }
+  }
+  isSavingFarmState = false;
+}
 
   function mergeObjectsById(localArr: any[], remoteArr: any[], deletedSet: Set<string>): any[] {
     const map = new Map<string, any>();
@@ -163,10 +248,8 @@ let serverFarmState: any = null;
         serverFarmState = mergeFarmStates(serverFarmState, clientState);
       }
 
-      // Non-blocking async save using compact JSON format
-      fs.promises.writeFile(FARM_STATE_FILE, JSON.stringify(serverFarmState), "utf-8").catch(e => {
-        console.warn("Async save to farm_state.json failed:", e);
-      });
+      // Non-blocking serialized safe atomic save
+      scheduleSafeFarmStatePersist(serverFarmState);
 
       return res.json({ state: serverFarmState });
     } catch (err) {
