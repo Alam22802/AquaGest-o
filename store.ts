@@ -802,10 +802,15 @@ export const ensureStateIntegrity = (state: any, mergeWith?: AppState, priority:
   if (finalResult.slaughterLogs && finalResult.slaughterLogs.length > 0) {
     const validSlaughterLogs: any[] = [];
     finalResult.slaughterLogs.forEach((s: any) => {
-      if (!s.batchId || (batchMap.has(s.batchId) && !deletedSet.has(s.batchId))) {
-        validSlaughterLogs.push(s);
-      } else {
-        if (s.id) purgedLogIds.push(s.id);
+      // Keep slaughter logs permanently for slaughterhouse tracking/history
+      // Only purge if the specific slaughter log id itself was deleted directly
+      if (!deletedSet.has(s.id)) {
+        const batch = s.batchId ? batchMap.get(s.batchId) : undefined;
+        const slaughterBatchName = s.slaughterBatch || (batch ? batch.name : s.batchId) || 'Lote';
+        validSlaughterLogs.push({
+          ...s,
+          slaughterBatch: slaughterBatchName
+        });
       }
     });
     finalResult.slaughterLogs = validSlaughterLogs;

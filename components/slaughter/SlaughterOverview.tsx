@@ -963,7 +963,10 @@ const SlaughterOverview: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
                   }));
                 }}
               >
-                <option value="">Nenhum</option>
+                <option value="">Nenhum / Externo</option>
+                {formData.batchId && !(state.batches || []).some(b => b.id === formData.batchId) && (
+                  <option value={formData.batchId}>{formData.slaughterBatch || 'Lote Histórico'}</option>
+                )}
                 {(state.batches || []).sort((a, b) => b.id.localeCompare(a.id)).map(b => (
                   <option key={b.id} value={b.id}>{b.name} {b.isClosed ? '(Encerrado)' : ''}</option>
                 ))}

@@ -211,7 +211,7 @@ const BatchManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     if (!hasPermission) return;
     if (
       !confirm(
-        "Deseja excluir este lote PERMANENTEMENTE? Todos os dados (lançamentos, tratos, mortalidade, biometria e despescas) associados a ele serão apagados para liberar espaço. Esta ação não pode ser desfeita.",
+        "Deseja excluir este lote PERMANENTEMENTE? Os lançamentos de produção da fazenda (tratos, mortalidade, biometria e despescas) associados a ele serão apagados para liberar espaço. Os registros de peso e recepção da aba Frigorífico serão mantidos para controle histórico. Esta ação não pode ser desfeita.",
       )
     )
       return;
@@ -231,7 +231,6 @@ const BatchManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     const harvestLogsToRemove = (state.harvestLogs || []).filter((h) => isMatch(h.batchId)).map(h => h.id);
     const batchExpensesToRemove = (state.batchExpenses || []).filter((e) => isMatch(e.batchId)).map(e => e.id);
     const batchRevenuesToRemove = (state.batchRevenues || []).filter((r) => isMatch(r.batchId)).map(r => r.id);
-    const slaughterLogsToRemove = (state.slaughterLogs || []).filter((s: any) => isMatch(s.batchId)).map((s: any) => s.id);
     const harvestSchedulesToRemove = (state.harvestSchedules || []).filter((hs) => isMatch(hs.batchId)).map(hs => hs.id);
 
     const allRemovedIds = [
@@ -244,7 +243,6 @@ const BatchManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       ...harvestLogsToRemove,
       ...batchExpensesToRemove,
       ...batchRevenuesToRemove,
-      ...slaughterLogsToRemove,
       ...harvestSchedulesToRemove,
     ];
 
@@ -254,8 +252,19 @@ const BatchManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     const harvestRemoveSet = new Set(harvestLogsToRemove);
     const expenseRemoveSet = new Set(batchExpensesToRemove);
     const revenueRemoveSet = new Set(batchRevenuesToRemove);
-    const slaughterRemoveSet = new Set(slaughterLogsToRemove);
     const scheduleRemoveSet = new Set(harvestSchedulesToRemove);
+
+    // Keep all slaughter logs (reception weights and slaughterhouse tracking), preserving the batch name
+    const preservedSlaughterLogs = (state.slaughterLogs || []).map((s: any) => {
+      if (isMatch(s.batchId) || (s.slaughterBatch && (s.slaughterBatch === id || (targetBatch && s.slaughterBatch === targetBatch.name)))) {
+        return {
+          ...s,
+          slaughterBatch: s.slaughterBatch || targetBatch?.name || id,
+          updatedAt: Date.now(),
+        };
+      }
+      return s;
+    });
 
     onUpdate({
       ...state,
@@ -266,7 +275,7 @@ const BatchManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       harvestLogs: (state.harvestLogs || []).filter((h) => !harvestRemoveSet.has(h.id)),
       batchExpenses: (state.batchExpenses || []).filter((e) => !expenseRemoveSet.has(e.id)),
       batchRevenues: (state.batchRevenues || []).filter((r) => !revenueRemoveSet.has(r.id)),
-      slaughterLogs: (state.slaughterLogs || []).filter((s: any) => !slaughterRemoveSet.has(s.id)),
+      slaughterLogs: preservedSlaughterLogs,
       harvestSchedules: (state.harvestSchedules || []).filter((hs) => !scheduleRemoveSet.has(hs.id)),
       cages: (state.cages || []).map((c) =>
         isMatch(c.batchId)
