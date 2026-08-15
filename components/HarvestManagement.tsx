@@ -107,7 +107,7 @@ const HarvestManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
         settlementDate: undefined,
         harvestDate: undefined,
         status: 'Limpeza' as const,
-        maintenanceStartDate: undefined,
+        maintenanceStartDate: date || new Date().toISOString().split('T')[0],
         maintenanceEndDate: undefined,
         updatedAt: Date.now()
       } : c

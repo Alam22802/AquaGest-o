@@ -634,7 +634,7 @@ export const ensureStateIntegrity = (state: any, mergeWith?: AppState, priority:
 
   // Step 3: Normalize cages
   const normalizedCages = cagesWithResolvedBatch.map(cage => {
-    let { batchId, initialFishCount, status, harvestDate, settlementDate } = cage;
+    let { batchId, initialFishCount, status, harvestDate, settlementDate, maintenanceStartDate, maintenanceEndDate } = cage;
 
     if (status === 'Em Uso') {
       status = 'Ocupada';
@@ -688,6 +688,24 @@ export const ensureStateIntegrity = (state: any, mergeWith?: AppState, priority:
       }
     }
 
+    // Set maintenance dates cleanly
+    if (['Limpeza', 'Manutenção', 'Avaliação'].includes(status)) {
+      if (!maintenanceStartDate) {
+        const cageHarvests = harvestLogs.filter(h => h.cageId === cage.id);
+        if (cageHarvests.length > 0) {
+          const latestHarvest = cageHarvests.reduce((latest, h) => (h.date > latest.date ? h : latest), cageHarvests[0]);
+          if (latestHarvest && latestHarvest.date) {
+            maintenanceStartDate = latestHarvest.date;
+          }
+        } else if (cage.harvestDate) {
+          maintenanceStartDate = cage.harvestDate;
+        }
+      }
+    } else {
+      maintenanceStartDate = undefined;
+      maintenanceEndDate = undefined;
+    }
+
     let updatedAt = typeof cage.updatedAt === 'number'
       ? cage.updatedAt
       : (cage.updatedAt ? new Date(cage.updatedAt).getTime() : 1);
@@ -699,6 +717,8 @@ export const ensureStateIntegrity = (state: any, mergeWith?: AppState, priority:
       initialFishCount !== oldCage.initialFishCount || 
       settlementDate !== oldCage.settlementDate ||
       harvestDate !== oldCage.harvestDate ||
+      maintenanceStartDate !== oldCage.maintenanceStartDate ||
+      maintenanceEndDate !== oldCage.maintenanceEndDate ||
       cage.name !== oldCage.name ||
       cage.model !== oldCage.model ||
       cage.stockingDensity !== oldCage.stockingDensity ||
@@ -716,6 +736,8 @@ export const ensureStateIntegrity = (state: any, mergeWith?: AppState, priority:
       settlementDate,
       status,
       harvestDate,
+      maintenanceStartDate,
+      maintenanceEndDate,
       updatedAt
     };
   });

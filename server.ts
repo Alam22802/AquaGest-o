@@ -24,6 +24,44 @@ app.get("/sw.js", (req, res) => {
 const FARM_STATE_FILE = path.join(process.cwd(), "farm_state.json");
 const FARM_STATE_BAK_FILE = path.join(process.cwd(), "farm_state.json.bak");
 
+function tryParseOrRepairJson(content: string): any {
+  if (!content || !content.trim()) return null;
+  try {
+    return JSON.parse(content);
+  } catch (e) {
+    // Attempt graceful JSON structure repair if file was truncated mid-write
+    try {
+      const lastObjIdx = content.lastIndexOf("},");
+      if (lastObjIdx !== -1) {
+        const truncated = content.substring(0, lastObjIdx + 1);
+        let openBraces = 0;
+        let openBrackets = 0;
+        let inString = false;
+        let escaped = false;
+        for (let i = 0; i < truncated.length; i++) {
+          const c = truncated[i];
+          if (escaped) { escaped = false; continue; }
+          if (c === "\\") { escaped = true; continue; }
+          if (c === '"') { inString = !inString; continue; }
+          if (!inString) {
+            if (c === "{") openBraces++;
+            else if (c === "}") openBraces--;
+            else if (c === "[") openBrackets++;
+            else if (c === "]") openBrackets--;
+          }
+        }
+        let closing = "";
+        for (let i = 0; i < openBrackets; i++) closing += "]";
+        for (let i = 0; i < openBraces; i++) closing += "}";
+        const repaired = JSON.parse(truncated + closing);
+        console.log("Successfully auto-repaired partially truncated farm state JSON.");
+        return repaired;
+      }
+    } catch (_) {}
+    throw e;
+  }
+}
+
 function loadInitialFarmState(): any {
   // Clean up any stale temp files from previous crashes/restarts
   try {
@@ -40,15 +78,15 @@ function loadInitialFarmState(): any {
   if (fs.existsSync(FARM_STATE_FILE)) {
     try {
       const content = fs.readFileSync(FARM_STATE_FILE, "utf-8");
-      const parsed = JSON.parse(content);
-      console.log("Loaded Farm State from persistent storage file.");
-      
-      // Keep backup file synchronized on healthy read
-      try {
-        fs.writeFileSync(FARM_STATE_BAK_FILE, content, "utf-8");
-      } catch (_) {}
-
-      return parsed;
+      const parsed = tryParseOrRepairJson(content);
+      if (parsed) {
+        console.log("Loaded Farm State from persistent storage file.");
+        // Keep backup file synchronized on healthy read
+        try {
+          fs.writeFileSync(FARM_STATE_BAK_FILE, JSON.stringify(parsed, null, 2), "utf-8");
+        } catch (_) {}
+        return parsed;
+      }
     } catch (e) {
       console.warn("Primary farm_state.json was corrupted or unreadable:", e);
       // Quarantine corrupted file to avoid repeated parse errors
@@ -64,12 +102,14 @@ function loadInitialFarmState(): any {
   if (fs.existsSync(FARM_STATE_BAK_FILE)) {
     try {
       const bakContent = fs.readFileSync(FARM_STATE_BAK_FILE, "utf-8");
-      const parsedBak = JSON.parse(bakContent);
-      console.log("Successfully recovered Farm State from backup file (farm_state.json.bak).");
-      try {
-        fs.writeFileSync(FARM_STATE_FILE, bakContent, "utf-8");
-      } catch (_) {}
-      return parsedBak;
+      const parsedBak = tryParseOrRepairJson(bakContent);
+      if (parsedBak) {
+        console.log("Successfully recovered Farm State from backup file (farm_state.json.bak).");
+        try {
+          fs.writeFileSync(FARM_STATE_FILE, JSON.stringify(parsedBak, null, 2), "utf-8");
+        } catch (_) {}
+        return parsedBak;
+      }
     } catch (e) {
       console.warn("Backup farm_state.json.bak was also unreadable:", e);
     }

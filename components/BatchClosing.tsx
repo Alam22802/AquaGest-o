@@ -822,6 +822,8 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
         settlementDate: undefined,
         harvestDate: undefined,
         status: 'Limpeza' as const,
+        maintenanceStartDate: new Date().toISOString().split('T')[0],
+        maintenanceEndDate: undefined,
         updatedAt: Date.now()
       } : c
     );
@@ -912,7 +914,7 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       batchRevenues: (state.batchRevenues || []).filter(r => !revenueRemoveSet.has(r.id)),
       slaughterLogs: preservedSlaughterLogs,
       harvestSchedules: (state.harvestSchedules || []).filter(hs => !scheduleRemoveSet.has(hs.id)),
-      cages: (state.cages || []).map(c => (isMatch(c.batchId) || (targetBatch && c.batchId === targetBatch.id)) ? { ...c, batchId: undefined, initialFishCount: undefined, settlementDate: undefined, harvestDate: undefined, updatedAt: Date.now() } : c),
+      cages: (state.cages || []).map(c => (isMatch(c.batchId) || (targetBatch && c.batchId === targetBatch.id)) ? { ...c, batchId: undefined, initialFishCount: undefined, settlementDate: undefined, harvestDate: undefined, status: 'Limpeza' as const, maintenanceStartDate: new Date().toISOString().split('T')[0], maintenanceEndDate: undefined, updatedAt: Date.now() } : c),
       deletedIds: Array.from(new Set([...(state.deletedIds || []), ...allRemovedIds])),
     });
 

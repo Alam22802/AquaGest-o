@@ -86,8 +86,12 @@ const Maintenance: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
           initialFishCount: isOccupied ? c.initialFishCount : undefined,
           settlementDate: isOccupied ? c.settlementDate : undefined,
           harvestDate: undefined, // Clear harvest date after status update
-          maintenanceStartDate: ['Manutenção', 'Limpeza', 'Avaliação'].includes(formData.status) ? formData.startDate : undefined,
-          maintenanceEndDate: ['Manutenção', 'Limpeza', 'Avaliação'].includes(formData.status) ? formData.endDate : undefined,
+          maintenanceStartDate: ['Manutenção', 'Limpeza', 'Avaliação'].includes(formData.status) 
+            ? (formData.startDate || new Date().toISOString().split('T')[0]) 
+            : undefined,
+          maintenanceEndDate: ['Manutenção', 'Limpeza', 'Avaliação'].includes(formData.status) 
+            ? (formData.endDate || undefined) 
+            : undefined,
           updatedAt: Date.now()
         };
       }
@@ -474,24 +478,46 @@ const Maintenance: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                       </div>
                     </div>
                     <div className="p-5">
-                      {['Manutenção', 'Limpeza', 'Avaliação'].includes(cage.status) && cage.maintenanceStartDate ? (
-                        <div className="space-y-3">
-                          <div className="flex items-center gap-2 text-slate-500">
-                            <Calendar className="w-3 h-3" />
-                            <span className="text-[10px] font-bold uppercase">Entrada:</span>
-                            <span className="text-xs font-black text-slate-700">{format(new Date(cage.maintenanceStartDate + 'T12:00:00'), 'dd/MM/yyyy')}</span>
-                          </div>
-                          {cage.maintenanceEndDate && (
-                            <div className="flex items-center gap-2 text-amber-600">
-                              <Clock className="w-3 h-3" />
-                              <span className="text-[10px] font-bold uppercase">Previsão:</span>
-                              <span className="text-xs font-black">{format(new Date(cage.maintenanceEndDate + 'T12:00:00'), 'dd/MM/yyyy')}</span>
+                      {['Manutenção', 'Limpeza', 'Avaliação'].includes(cage.status) ? (
+                        cage.maintenanceStartDate ? (
+                          <div className="space-y-3">
+                            <div className="flex items-center gap-2 text-slate-500">
+                              <Calendar className="w-3.5 h-3.5 text-slate-400" />
+                              <span className="text-[10px] font-bold uppercase">Entrada:</span>
+                              <span className="text-xs font-black text-slate-700">{format(new Date(cage.maintenanceStartDate + 'T12:00:00'), 'dd/MM/yyyy')}</span>
                             </div>
-                          )}
+                            {cage.maintenanceEndDate && (
+                              <div className="flex items-center gap-2 text-amber-600">
+                                <Clock className="w-3.5 h-3.5 text-amber-500" />
+                                <span className="text-[10px] font-bold uppercase">Previsão:</span>
+                                <span className="text-xs font-black">{format(new Date(cage.maintenanceEndDate + 'T12:00:00'), 'dd/MM/yyyy')}</span>
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="text-[10px] font-bold text-amber-700 uppercase tracking-wider italic flex items-center gap-1.5 bg-amber-50/70 p-2.5 rounded-xl border border-amber-100">
+                            <Eraser className="w-3.5 h-3.5 flex-shrink-0 text-amber-500" />
+                            <span>
+                              {cage.status === 'Limpeza' ? 'Gaiola despescada em processo de limpeza e higienização.' : 
+                               cage.status === 'Manutenção' ? 'Gaiola em processo de manutenção e reparos.' : 
+                               'Gaiola em processo de avaliação técnica de rede.'}
+                            </span>
+                          </div>
+                        )
+                      ) : cage.status === 'Disponível' ? (
+                        <div className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider italic flex items-center gap-1.5 bg-emerald-50/70 p-2.5 rounded-xl border border-emerald-100">
+                          <CheckCircle2 className="w-3.5 h-3.5 flex-shrink-0 text-emerald-500" />
+                          <span>Gaiola higienizada e disponível para novo povoamento.</span>
+                        </div>
+                      ) : cage.status === 'Sucata' ? (
+                        <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider italic flex items-center gap-1.5 bg-slate-100 p-2.5 rounded-xl border border-slate-200">
+                          <Trash2 className="w-3.5 h-3.5 flex-shrink-0 text-slate-400" />
+                          <span>Gaiola descartada / sucata.</span>
                         </div>
                       ) : (
-                        <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest italic">
-                          {cage.status === 'Sucata' ? 'Gaiola descartada/sucata.' : 'Gaiola operacional ou em povoamento.'}
+                        <div className="text-[10px] font-bold text-blue-700 uppercase tracking-wider italic flex items-center gap-1.5 bg-blue-50/70 p-2.5 rounded-xl border border-blue-100">
+                          <Box className="w-3.5 h-3.5 flex-shrink-0 text-blue-500" />
+                          <span>Gaiola operacional em povoamento (Lote ativo).</span>
                         </div>
                       )}
                     </div>
