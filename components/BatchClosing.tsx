@@ -709,9 +709,13 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     e.preventDefault();
     if (!selectedBatchId || revenueForm.receptionWeight === '') return;
 
+    const targetBatch = (state.batches || []).find(b => b.id === selectedBatchId);
+    const batchName = targetBatch ? targetBatch.name : selectedBatchId;
+    const recWeight = Number(revenueForm.receptionWeight);
+
     const revenueData = {
       batchId: selectedBatchId,
-      receptionWeight: Number(revenueForm.receptionWeight),
+      receptionWeight: recWeight,
       unitPrice: 0,
       date: revenueForm.date,
       userId: currentUser.id,
@@ -731,9 +735,44 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       updatedRevenues = [...(state.batchRevenues || []), newRevenue];
     }
 
+    // Automatically synchronize/preserve reception weight in slaughterhouse records (slaughterLogs)
+    let updatedSlaughterLogs = [...(state.slaughterLogs || [])];
+    if (recWeight > 0) {
+      const existingIdx = updatedSlaughterLogs.findIndex(s => 
+        (s.batchId === selectedBatchId || s.slaughterBatch === batchName) && s.date === revenueForm.date
+      );
+
+      if (existingIdx >= 0) {
+        updatedSlaughterLogs[existingIdx] = {
+          ...updatedSlaughterLogs[existingIdx],
+          receptionWeight: recWeight,
+          slaughterBatch: batchName,
+          date: revenueForm.date,
+          updatedAt: Date.now()
+        };
+      } else {
+        const newSlaughter: any = {
+          id: generateId(),
+          batchId: selectedBatchId,
+          slaughterBatch: batchName,
+          producer: targetBatch?.producer || 'Fazenda Própria',
+          date: revenueForm.date,
+          receptionWeight: recWeight,
+          packedQuantity: Math.round(recWeight * 0.32),
+          renderingWeight: Math.round(recWeight * 0.60),
+          gtaWeight: recWeight,
+          packingList: recWeight,
+          userId: currentUser.id,
+          updatedAt: Date.now()
+        };
+        updatedSlaughterLogs.unshift(newSlaughter);
+      }
+    }
+
     onUpdate({
       ...state,
-      batchRevenues: updatedRevenues
+      batchRevenues: updatedRevenues,
+      slaughterLogs: updatedSlaughterLogs
     });
 
     setRevenueForm({
@@ -873,7 +912,6 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     const allRemovedIds = [
       selectedBatchId,
       ...(targetBatch?.id && targetBatch.id !== selectedBatchId ? [targetBatch.id] : []),
-      ...(targetBatch?.name ? [targetBatch.name] : []),
       ...feedingLogsToRemove,
       ...mortalityLogsToRemove,
       ...biometryLogsToRemove,
@@ -891,12 +929,40 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     const revenueRemoveSet = new Set(batchRevenuesToRemove);
     const scheduleRemoveSet = new Set(harvestSchedulesToRemove);
 
-    // Keep all slaughter logs (reception weights and slaughterhouse tracking), preserving the batch name
-    const preservedSlaughterLogs = (state.slaughterLogs || []).map((s: any) => {
+    const batchName = targetBatch?.name || selectedBatchId;
+
+    // Convert any batch revenues with receptionWeight into permanent slaughter logs if not already present
+    const existingSlaughterLogs = [...(state.slaughterLogs || [])];
+    const revenuesForBatch = (state.batchRevenues || []).filter(r => isMatch(r.batchId) && r.receptionWeight > 0);
+    
+    revenuesForBatch.forEach(rev => {
+      const alreadyHas = existingSlaughterLogs.some(s => 
+        (isMatch(s.batchId) || s.slaughterBatch === batchName) && s.date === rev.date
+      );
+      if (!alreadyHas) {
+        existingSlaughterLogs.unshift({
+          id: generateId(),
+          batchId: selectedBatchId,
+          slaughterBatch: batchName,
+          producer: targetBatch?.producer || 'Fazenda Própria',
+          date: rev.date,
+          receptionWeight: rev.receptionWeight,
+          packedQuantity: Math.round(rev.receptionWeight * 0.32),
+          renderingWeight: Math.round(rev.receptionWeight * 0.60),
+          gtaWeight: rev.receptionWeight,
+          packingList: rev.receptionWeight,
+          userId: currentUser.id,
+          updatedAt: Date.now()
+        } as any);
+      }
+    });
+
+    // Keep all slaughter logs (reception weights and slaughterhouse tracking), permanently preserving the batch name
+    const preservedSlaughterLogs = existingSlaughterLogs.map((s: any) => {
       if (isMatch(s.batchId) || (s.slaughterBatch && (s.slaughterBatch === selectedBatchId || (targetBatch && s.slaughterBatch === targetBatch.name)))) {
         return {
           ...s,
-          slaughterBatch: s.slaughterBatch || targetBatch?.name || selectedBatchId,
+          slaughterBatch: s.slaughterBatch || batchName,
           updatedAt: Date.now(),
         };
       }

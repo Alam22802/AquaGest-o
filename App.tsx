@@ -612,7 +612,6 @@ const App: React.FC = () => {
         const harvestLogsToRemove = (state.harvestLogs || []).filter((h) => batchIdsToRemove.has(h.batchId)).map(h => h.id);
         const batchExpensesToRemove = (state.batchExpenses || []).filter((e) => batchIdsToRemove.has(e.batchId)).map(e => e.id);
         const batchRevenuesToRemove = (state.batchRevenues || []).filter((r) => batchIdsToRemove.has(r.batchId)).map(r => r.id);
-        const slaughterLogsToRemove = (state.slaughterLogs || []).filter((s: any) => batchIdsToRemove.has(s.batchId || '')).map((s: any) => s.id);
         const harvestSchedulesToRemove = (state.harvestSchedules || []).filter((hs) => batchIdsToRemove.has(hs.batchId)).map(hs => hs.id);
 
         const allRemovedIds = [
@@ -623,7 +622,6 @@ const App: React.FC = () => {
           ...harvestLogsToRemove,
           ...batchExpensesToRemove,
           ...batchRevenuesToRemove,
-          ...slaughterLogsToRemove,
           ...harvestSchedulesToRemove,
         ];
 
@@ -637,7 +635,7 @@ const App: React.FC = () => {
           harvestSchedules: (state.harvestSchedules || []).filter(l => !batchIdsToRemove.has(l.batchId)),
           batchExpenses: (state.batchExpenses || []).filter(l => !batchIdsToRemove.has(l.batchId)),
           batchRevenues: (state.batchRevenues || []).filter(l => !batchIdsToRemove.has(l.batchId)),
-          slaughterLogs: (state.slaughterLogs || []).filter(l => !batchIdsToRemove.has(l.batchId || '')),
+          slaughterLogs: state.slaughterLogs || [],
           cages: (state.cages || []).map(c => c.batchId && batchIdsToRemove.has(c.batchId) ? { ...c, batchId: undefined, initialFishCount: undefined, settlementDate: undefined, harvestDate: undefined } : c),
           deletedIds: Array.from(new Set([...(state.deletedIds || []), ...allRemovedIds]))
         };

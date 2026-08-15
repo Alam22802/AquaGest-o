@@ -236,7 +236,6 @@ const BatchManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     const allRemovedIds = [
       id,
       ...(targetBatch?.id && targetBatch.id !== id ? [targetBatch.id] : []),
-      ...(targetBatch?.name ? [targetBatch.name] : []),
       ...feedingLogsToRemove,
       ...mortalityLogsToRemove,
       ...biometryLogsToRemove,
@@ -254,12 +253,40 @@ const BatchManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     const revenueRemoveSet = new Set(batchRevenuesToRemove);
     const scheduleRemoveSet = new Set(harvestSchedulesToRemove);
 
-    // Keep all slaughter logs (reception weights and slaughterhouse tracking), preserving the batch name
-    const preservedSlaughterLogs = (state.slaughterLogs || []).map((s: any) => {
+    const batchName = targetBatch?.name || id;
+
+    // Convert any batch revenues with receptionWeight into permanent slaughter logs if not already present
+    const existingSlaughterLogs = [...(state.slaughterLogs || [])];
+    const revenuesForBatch = (state.batchRevenues || []).filter(r => isMatch(r.batchId) && r.receptionWeight > 0);
+    
+    revenuesForBatch.forEach(rev => {
+      const alreadyHas = existingSlaughterLogs.some(s => 
+        (isMatch(s.batchId) || s.slaughterBatch === batchName) && s.date === rev.date
+      );
+      if (!alreadyHas) {
+        existingSlaughterLogs.unshift({
+          id: generateId(),
+          batchId: id,
+          slaughterBatch: batchName,
+          producer: targetBatch?.producer || 'Fazenda Própria',
+          date: rev.date,
+          receptionWeight: rev.receptionWeight,
+          packedQuantity: Math.round(rev.receptionWeight * 0.32),
+          renderingWeight: Math.round(rev.receptionWeight * 0.60),
+          gtaWeight: rev.receptionWeight,
+          packingList: rev.receptionWeight,
+          userId: currentUser.id,
+          updatedAt: Date.now()
+        } as any);
+      }
+    });
+
+    // Keep all slaughter logs (reception weights and slaughterhouse tracking), permanently preserving the batch name
+    const preservedSlaughterLogs = existingSlaughterLogs.map((s: any) => {
       if (isMatch(s.batchId) || (s.slaughterBatch && (s.slaughterBatch === id || (targetBatch && s.slaughterBatch === targetBatch.name)))) {
         return {
           ...s,
-          slaughterBatch: s.slaughterBatch || targetBatch?.name || id,
+          slaughterBatch: s.slaughterBatch || batchName,
           updatedAt: Date.now(),
         };
       }

@@ -53,26 +53,22 @@ const SlaughterSummary = React.memo(({ stats, startDate, endDate, onStartDateCha
                 <h2 className="text-3xl font-black uppercase italic tracking-tighter leading-none">Resultados Finais</h2>
              </div>
              
-             <div className="bg-white/10 backdrop-blur-md p-4 rounded-2xl border border-white/10 flex flex-col sm:flex-row items-center gap-3">
-                <div className="flex items-center gap-2">
-                   <Calendar className="w-4 h-4 opacity-50" />
-                   <span className="text-[9px] font-black uppercase tracking-widest opacity-60">Apuração:</span>
-                </div>
-                <div className="flex items-center gap-2">
-                   <input 
-                      type="date" 
-                      value={startDate} 
-                      onChange={e => onStartDateChange(e.target.value)}
-                      className="bg-transparent border-none text-[11px] font-black uppercase outline-none focus:ring-0 cursor-pointer text-white"
-                   />
-                   <span className="opacity-30">/</span>
-                   <input 
-                      type="date" 
-                      value={endDate} 
-                      onChange={e => onEndDateChange(e.target.value)}
-                      className="bg-transparent border-none text-[11px] font-black uppercase outline-none focus:ring-0 cursor-pointer text-white"
-                   />
-                </div>
+             <div className="bg-white/10 backdrop-blur-md p-4 rounded-2xl border border-white/10 flex items-center gap-3">
+                <Calendar className="w-4 h-4 opacity-50" />
+                <span className="text-[9px] font-black uppercase tracking-widest opacity-60">Apuração:</span>
+                <input 
+                   type="date" 
+                   value={startDate} 
+                   onChange={e => onStartDateChange(e.target.value)}
+                   className="bg-transparent border-none text-[11px] font-black uppercase outline-none focus:ring-0 cursor-pointer text-white"
+                />
+                <span className="opacity-30">/</span>
+                <input 
+                   type="date" 
+                   value={endDate} 
+                   onChange={e => onEndDateChange(e.target.value)}
+                   className="bg-transparent border-none text-[11px] font-black uppercase outline-none focus:ring-0 cursor-pointer text-white"
+                />
              </div>
           </div>
 
@@ -519,7 +515,7 @@ const SlaughterOverview: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
   const [editingId, setEditingId] = useState<string | null>(null);
   const [filterStartDate, setFilterStartDate] = useState('');
   const [filterEndDate, setFilterEndDate] = useState('');
-  const [filterProducer, setFilterProducer] = useState('');
+  const [filterSearch, setFilterSearch] = useState('');
   const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
   const [saveSuccess, setSaveSuccess] = useState(false);
 
@@ -528,21 +524,21 @@ const SlaughterOverview: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
 
   const [chartMonth, setChartMonth] = useState(new Date().getMonth());
   const [chartYear, setChartYear] = useState(new Date().getFullYear());
-  const [selectedBatches, setSelectedBatches] = useState<string[]>([]);
 
   const allBatches = useMemo(() => {
     const logs = Array.isArray(state.slaughterLogs) ? state.slaughterLogs : [];
-    const batches = Array.from(new Set(logs.map(l => l.slaughterBatch).filter(Boolean)));
-    return batches.sort((a, b) => a.localeCompare(b));
-  }, [state.slaughterLogs]);
+    const farmBatches = (state.batches || []).map(b => b.name);
+    const slaughterBatches = logs.map(l => l.slaughterBatch).filter(Boolean);
+    const combined = Array.from(new Set([...farmBatches, ...slaughterBatches]));
+    return combined.sort((a, b) => a.localeCompare(b));
+  }, [state.slaughterLogs, state.batches]);
 
-  const toggleBatch = (batch: string) => {
-    setSelectedBatches(prev => 
-      prev.includes(batch) 
-        ? prev.filter(b => b !== batch) 
-        : [...prev, batch]
-    );
-  };
+  const uniqueProducers = useMemo(() => {
+    const logs = Array.isArray(state.slaughterLogs) ? state.slaughterLogs : [];
+    const fromBatches = (state.batches || []).map(b => b.producer).filter(Boolean);
+    const fromLogs = logs.map(l => l.producer).filter(Boolean);
+    return Array.from(new Set(['Fazenda Própria (Thiago)', ...fromBatches, ...fromLogs]));
+  }, [state.slaughterLogs, state.batches]);
 
   const [formData, setFormData] = useState({
     producer: '',
@@ -696,7 +692,6 @@ const SlaughterOverview: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
     const logsByDate = new Map<string, SlaughterLog[]>();
     logs.forEach(log => {
       if (!log.date) return;
-      if (selectedBatches.length > 0 && !selectedBatches.includes(log.slaughterBatch)) return;
       if (!logsByDate.has(log.date)) {
         logsByDate.set(log.date, []);
       }
@@ -718,7 +713,7 @@ const SlaughterOverview: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
         packed: dayPacked || 0
       };
     }); 
-  }, [state.slaughterLogs, chartMonth, chartYear, selectedBatches]);
+  }, [state.slaughterLogs, chartMonth, chartYear]);
 
   const hasPermission = currentUser.isMaster || currentUser.canEdit;
 
@@ -860,14 +855,14 @@ const SlaughterOverview: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
       }
     }
 
-    if (filterProducer) {
+    if (filterSearch.trim()) {
+      const q = filterSearch.toLowerCase().trim();
       logs = logs.filter(log => 
-        log.producer?.toLowerCase().includes(filterProducer.toLowerCase())
+        (log.producer && log.producer.toLowerCase().includes(q)) ||
+        (log.slaughterBatch && log.slaughterBatch.toLowerCase().includes(q)) ||
+        (log.packagingBatch && log.packagingBatch.toLowerCase().includes(q)) ||
+        (log.date && log.date.includes(q))
       );
-    }
-
-    if (selectedBatches.length > 0) {
-      logs = logs.filter(log => selectedBatches.includes(log.slaughterBatch));
     }
 
     return logs.sort((a, b) => {
@@ -875,7 +870,7 @@ const SlaughterOverview: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
       const dateB = new Date(b.date || 0).getTime();
       return sortOrder === 'desc' ? dateB - dateA : dateA - dateB;
     });
-  }, [state.slaughterLogs, filterStartDate, filterEndDate, sortOrder, filterProducer]);
+  }, [state.slaughterLogs, filterStartDate, filterEndDate, sortOrder, filterSearch]);
 
   const months = [
     "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
@@ -937,10 +932,26 @@ const SlaughterOverview: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
             {editingId && <button onClick={resetForm} className="p-2 bg-slate-100 rounded-full hover:bg-slate-200"><X className="w-5 h-5 text-slate-400" /></button>}
           </h3>
 
+          <datalist id="producer-list">
+            {uniqueProducers.map(p => <option key={p} value={p} />)}
+          </datalist>
+
+          <datalist id="batch-list">
+            {allBatches.map(b => <option key={b} value={b} />)}
+          </datalist>
+
           <form onSubmit={handleSave} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6 gap-6 items-end">
             <div className="space-y-1 group md:col-span-2">
               <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-widest">Produtor *</label>
-              <input type="text" required placeholder="Nome do produtor" className="w-full px-5 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none focus:ring-2 focus:ring-slate-900/10 transition-all text-xs" value={formData.producer} onChange={e => setFormData({...formData, producer: e.target.value})} />
+              <input 
+                type="text" 
+                required 
+                list="producer-list"
+                placeholder="Nome do produtor" 
+                className="w-full px-5 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none focus:ring-2 focus:ring-slate-900/10 transition-all text-xs" 
+                value={formData.producer} 
+                onChange={e => setFormData({...formData, producer: e.target.value})} 
+              />
             </div>
 
             <div className="space-y-1">
@@ -978,7 +989,8 @@ const SlaughterOverview: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
               <input 
                 type="text" 
                 required 
-                placeholder="Lote" 
+                list="batch-list"
+                placeholder="Ex: 02/2026 - L2" 
                 className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none text-xs" 
                 value={formData.slaughterBatch} 
                 onChange={e => {
@@ -1073,25 +1085,37 @@ const SlaughterOverview: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
       )}
 
       <div className="space-y-6">
-        <div className="flex flex-col lg:flex-row justify-between items-center gap-4 bg-white p-6 rounded-[2rem] border border-slate-200 shadow-sm">
-          <div className="flex flex-wrap items-center gap-4 w-full lg:w-auto">
+        <div className="flex flex-col lg:flex-row justify-between items-stretch lg:items-center gap-4 bg-white p-6 rounded-[2rem] border border-slate-200 shadow-sm">
+          <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto">
              <div className="p-3 bg-slate-100 rounded-xl"><Search className="w-5 h-5 text-slate-400" /></div>
              <input 
                type="text" 
-               placeholder="Filtrar por produtor..." 
-               className="text-xs font-black bg-slate-50 border-none rounded-lg p-2 outline-none w-full md:w-48" 
-               value={filterProducer} 
-               onChange={e => setFilterProducer(e.target.value)} 
+               placeholder="Buscar por lote, produtor, emb..." 
+               className="text-xs font-black bg-slate-50 border-none rounded-xl px-4 py-2.5 outline-none w-full md:w-56 focus:ring-2 focus:ring-emerald-500/20" 
+               value={filterSearch} 
+               onChange={e => setFilterSearch(e.target.value)} 
              />
+
              <div className="flex gap-2 items-center">
-               <input type="date" className="text-xs font-black bg-slate-50 border-none rounded-lg p-2 outline-none" value={filterStartDate} onChange={e => setFilterStartDate(e.target.value)} />
-               <span className="text-slate-300 self-center">até</span>
-               <input type="date" className="text-xs font-black bg-slate-50 border-none rounded-lg p-2 outline-none" value={filterEndDate} onChange={e => setFilterEndDate(e.target.value)} />
+               <input type="date" className="text-xs font-black bg-slate-50 border-none rounded-xl px-3 py-2.5 outline-none" value={filterStartDate} onChange={e => setFilterStartDate(e.target.value)} />
+               <span className="text-slate-300 self-center text-xs font-black">até</span>
+               <input type="date" className="text-xs font-black bg-slate-50 border-none rounded-xl px-3 py-2.5 outline-none" value={filterEndDate} onChange={e => setFilterEndDate(e.target.value)} />
              </div>
-             {(filterStartDate || filterEndDate || filterProducer) && (
-               <button onClick={() => {setFilterStartDate(''); setFilterEndDate(''); setFilterProducer('');}} className="p-2 text-red-500 hover:bg-red-50 rounded-lg flex items-center gap-2 text-[10px] font-black uppercase"><X className="w-4 h-4" /> Limpar</button>
+
+             {(filterStartDate || filterEndDate || filterSearch) && (
+               <button 
+                 onClick={() => {
+                   setFilterStartDate(''); 
+                   setFilterEndDate(''); 
+                   setFilterSearch('');
+                 }} 
+                 className="px-3 py-2 text-red-500 hover:bg-red-50 rounded-xl flex items-center gap-1 text-[10px] font-black uppercase transition-colors"
+               >
+                 <X className="w-4 h-4" /> Limpar
+               </button>
              )}
           </div>
+
           <button onClick={() => setSortOrder(prev => prev === 'desc' ? 'asc' : 'desc')} className="w-full lg:w-auto flex items-center justify-center gap-2 text-[10px] font-black uppercase text-slate-500 bg-slate-50 px-4 py-3 rounded-xl hover:bg-slate-100 transition-colors">
             <ArrowUpDown className="w-3 h-3" /> {sortOrder === 'desc' ? 'Mais Recentes' : 'Mais Antigos'}
           </button>
