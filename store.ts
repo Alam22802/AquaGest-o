@@ -172,7 +172,6 @@ function mergeArraysById<T extends { id: string, name?: string, batchId?: string
     } else {
       const itemTime = getTime(item);
       const existingTime = getTime(existing);
-      const modified = isObjectModified(existing, item);
       
       if (itemTime > existingTime) {
         // Remote is strictly newer
@@ -181,16 +180,8 @@ function mergeArraysById<T extends { id: string, name?: string, batchId?: string
         // Local is strictly newer
         map.set(item.id, existing);
       } else {
-        // Equal timestamps: resolve according to modification and priority
-        if (modified) {
-          if (priority === 'remote') {
-            map.set(item.id, item);
-          } else {
-            map.set(item.id, existing);
-          }
-        } else {
-          map.set(item.id, priority === 'remote' ? item : existing);
-        }
+        // Equal timestamps: resolve according to priority
+        map.set(item.id, priority === 'remote' ? item : existing);
       }
     }
   }
@@ -603,18 +594,7 @@ export const ensureStateIntegrity = (state: any, mergeWith?: AppState, priority:
       }
     }
 
-    // Unlink cage if it has been harvested for this batch
-    if (batchId) {
-      const isHarvestedInBatch = harvestLogs.some(h =>
-        h.cageId === cage.id &&
-        (h.batchId === batchId || isBatchMatch(h.batchId, { id: batchId, name: batchId }))
-      );
-      if (isHarvestedInBatch) {
-        batchId = undefined;
-      }
-    }
-
-    // Unlink cage if it is explicitly in maintenance/evaluation/scrap without batch intent
+    // Unlink cage only if it is explicitly in scrap/maintenance/evaluation without fish count
     if (cage.status && ['Sucata', 'Manutenção', 'Avaliação'].includes(cage.status) && (!batchId || !cage.initialFishCount)) {
       batchId = undefined;
     }
@@ -649,9 +629,7 @@ export const ensureStateIntegrity = (state: any, mergeWith?: AppState, priority:
         status = 'Limpeza';
       }
     } else {
-      if (!status || status === 'Limpeza' || status === 'Disponível') {
-        status = 'Ocupada';
-      }
+      status = 'Ocupada';
       const batch = batches.find(b => b.id === batchId || isBatchMatch(b.id, { id: batchId, name: batchId }));
       if (batch && !settlementDate) {
         settlementDate = batch.settlementDate;

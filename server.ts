@@ -206,8 +206,8 @@ async function scheduleSafeFarmStatePersist(stateToSave: any) {
         const isModified = isServerObjectModified(existing, item);
 
         // When client sends modified data or equal/newer timestamp, client edits must take precedence
-        if (t2 > t1 || isModified || t2 >= t1) {
-          const finalTime = Math.max(t1, t2, Date.now());
+        if (t2 >= t1 || isModified) {
+          const finalTime = Date.now();
           map.set(item.id, { ...existing, ...item, updatedAt: finalTime });
         } else {
           map.set(item.id, existing);
@@ -385,6 +385,21 @@ async function scheduleSafeFarmStatePersist(stateToSave: any) {
       const preserve = frigorificoAndMaintenanceKeys.has(key);
       merged[key] = mergeObjectsById(s1[key], s2[key], deletedSet, preserve);
     });
+
+    if (Array.isArray(merged.cages)) {
+      const activeBatches = new Set((merged.batches || []).filter((b: any) => !b.isClosed && !deletedSet.has(b.id)).map((b: any) => b.id));
+      merged.cages = merged.cages.map((cage: any) => {
+        if (!cage || typeof cage !== 'object') return cage;
+        let batchId = cage.batchId;
+        let status = cage.status;
+        if (batchId && activeBatches.has(batchId)) {
+          status = 'Ocupada';
+        } else if (!batchId && status === 'Ocupada') {
+          status = 'Limpeza';
+        }
+        return { ...cage, status, batchId: status === 'Ocupada' ? batchId : undefined };
+      });
+    }
 
     return merged;
   }

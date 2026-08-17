@@ -41,7 +41,7 @@ const CageManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
   const hasPermission = currentUser.isMaster || currentUser.canEdit;
 
   const availableCages = useMemo(() => {
-    return (state.cages || []).filter(c => c.status === 'Disponível' || (editingId && c.id === editingId));
+    return (state.cages || []).filter(c => (c.status === 'Disponível' && !c.batchId) || (editingId && c.id === editingId));
   }, [state.cages, editingId]);
 
   const selectedCageDef = useMemo(() => {
@@ -199,23 +199,9 @@ const CageManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     setSelectedCages([]);
   };
 
-  const harvestedCageMap = useMemo(() => {
-    const set = new Set<string>();
-    (state.harvestLogs || []).forEach(h => {
-      set.add(`${h.batchId}_${h.cageId}`);
-      set.add(h.cageId);
-    });
-    return set;
-  }, [state.harvestLogs]);
-
   const occupiedCages = useMemo(() => {
-    return (state.cages || []).filter(c => {
-      if (c.status !== 'Ocupada' && !c.batchId) return false;
-      if (c.batchId && harvestedCageMap.has(`${c.batchId}_${c.id}`)) return false;
-      if (harvestedCageMap.has(c.id) && c.status !== 'Ocupada') return false;
-      return true;
-    });
-  }, [state.cages, harvestedCageMap]);
+    return (state.cages || []).filter(c => Boolean(c.batchId) || c.status === 'Ocupada');
+  }, [state.cages]);
 
   const filteredCages = useMemo(() => {
     if (filterBatchId === 'all') return occupiedCages;
@@ -244,7 +230,7 @@ const CageManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
 
     // Calculate batch settlement balance (Saldo Povoamento) exactly like BatchManagement
     const allCagesForBatch = (state.cages || []).filter(c => c.batchId === filterBatchId);
-    const activeCagesInBatch = allCagesForBatch.filter(c => c.status === 'Ocupada');
+    const activeCagesInBatch = allCagesForBatch.filter(c => c.status === 'Ocupada' || c.batchId === filterBatchId);
     const usedFish = activeCagesInBatch.reduce((acc, curr) => acc + (curr.initialFishCount || 0), 0);
     
     let settledAndHarvested = 0;

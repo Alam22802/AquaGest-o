@@ -145,42 +145,54 @@ const CageInventory: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
 
     // Lógica padrão (Edição ou Cadastro Único)
     if (editingId) {
+      const newL = formData.length ? Number(formData.length) : 4;
+      const newW = formData.width ? Number(formData.width) : 4;
+      const newD = formData.depth ? Number(formData.depth) : 4;
+      const newDensity = formData.stockingDensity ? Number(formData.stockingDensity) : 0;
+      const newCap = calculatedCapacity || Math.floor(newL * newW * newD * newDensity);
+
       const updatedCages = (state.cages || []).map(c => 
         c.id === editingId ? {
           ...c,
-          name: formData.name,
-          model: getInferredModel(Number(formData.length), Number(formData.width), Number(formData.depth), formData.name),
+          name: formData.name.trim(),
+          model: getInferredModel(newL, newW, newD, formData.name.trim()),
           dimensions: {
-            length: Number(formData.length),
-            width: Number(formData.width),
-            depth: Number(formData.depth)
+            length: newL,
+            width: newW,
+            depth: newD
           },
-          stockingDensity: Number(formData.stockingDensity),
-          stockingCapacity: calculatedCapacity,
+          stockingDensity: newDensity,
+          stockingCapacity: newCap,
           updatedAt: Date.now()
         } : c
       );
       onUpdate({ ...state, cages: updatedCages });
       setEditingId(null);
+      resetForm();
     } else {
+      const newL = Number(formData.length) || 4;
+      const newW = Number(formData.width) || 4;
+      const newD = Number(formData.depth) || 4;
+      const newDensity = Number(formData.stockingDensity) || 0;
+      const newCap = calculatedCapacity || Math.floor(newL * newW * newD * newDensity);
+
       const newCage: Cage = {
         id: generateId(),
-        name: formData.name,
-        model: getInferredModel(Number(formData.length), Number(formData.width), Number(formData.depth), formData.name),
+        name: formData.name.trim(),
+        model: getInferredModel(newL, newW, newD, formData.name.trim()),
         dimensions: {
-          length: Number(formData.length),
-          width: Number(formData.width),
-          depth: Number(formData.depth)
+          length: newL,
+          width: newW,
+          depth: newD
         },
-        stockingDensity: Number(formData.stockingDensity),
-        stockingCapacity: calculatedCapacity,
+        stockingDensity: newDensity,
+        stockingCapacity: newCap,
         status: 'Disponível',
         updatedAt: Date.now()
       };
       onUpdate({ ...state, cages: [...(state.cages || []), newCage] });
+      resetForm();
     }
-
-    resetForm();
   };
 
   const resetForm = () => {
@@ -195,14 +207,15 @@ const CageInventory: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
   const startEdit = (cage: Cage) => {
     if (!hasPermission) return;
     setEditingId(cage.id);
+    setSelectedIds([]);
     setFormData({
-      name: cage.name,
+      name: cage.name || '',
       model: cage.model || '4x4x4',
-      length: cage.dimensions.length.toString(),
-      width: cage.dimensions.width.toString(),
-      depth: cage.dimensions.depth.toString(),
-      stockingDensity: (cage.stockingDensity || '').toString(),
-      stockingCapacity: cage.stockingCapacity.toString()
+      length: (cage.dimensions?.length ?? 4).toString(),
+      width: (cage.dimensions?.width ?? 4).toString(),
+      depth: (cage.dimensions?.depth ?? 4).toString(),
+      stockingDensity: (cage.stockingDensity ?? '').toString(),
+      stockingCapacity: (cage.stockingCapacity ?? '').toString()
     });
   };
 
