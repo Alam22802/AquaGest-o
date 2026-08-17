@@ -494,12 +494,23 @@ const App: React.FC = () => {
 
       const newState = { ...prev };
       let actuallyChanged = false;
+      const newlyDeletedIds: string[] = [];
 
       changedKeys.forEach(key => {
         const newVal = update[key];
         const oldVal = (prev as any)[key];
 
         if (Array.isArray(newVal) && Array.isArray(oldVal)) {
+          // Detect deleted items by ID to create tombstones
+          if (oldVal.length > 0 && typeof oldVal[0] === 'object' && oldVal[0] !== null && oldVal[0].id) {
+            const newIdSet = new Set((newVal || []).filter(item => item && typeof item === 'object' && item.id).map(item => item.id));
+            oldVal.forEach(item => {
+              if (item && typeof item === 'object' && item.id && !newIdSet.has(item.id)) {
+                newlyDeletedIds.push(item.id);
+              }
+            });
+          }
+
           const processedList = ensureTimestamps(newVal, oldVal);
           if (processedList !== oldVal) {
             (newState as any)[key] = processedList;
@@ -511,11 +522,12 @@ const App: React.FC = () => {
         }
       });
 
-      if (!actuallyChanged) return prev;
+      if (!actuallyChanged && newlyDeletedIds.length === 0) return prev;
 
       const combinedDeletedIds = Array.from(new Set([
         ...(prev.deletedIds || []),
-        ...(newState.deletedIds || [])
+        ...(newState.deletedIds || []),
+        ...newlyDeletedIds
       ]));
       newState.deletedIds = combinedDeletedIds;
 
