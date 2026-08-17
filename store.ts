@@ -614,8 +614,8 @@ export const ensureStateIntegrity = (state: any, mergeWith?: AppState, priority:
       }
     }
 
-    // Unlink cage if its status is non-occupied (Limpeza, Disponível, Manutenção, Avaliação, Sucata)
-    if (cage.status && ['Limpeza', 'Disponível', 'Manutenção', 'Avaliação', 'Sucata'].includes(cage.status)) {
+    // Unlink cage if it is explicitly in maintenance/evaluation/scrap without batch intent
+    if (cage.status && ['Sucata', 'Manutenção', 'Avaliação'].includes(cage.status) && (!batchId || !cage.initialFishCount)) {
       batchId = undefined;
     }
 
