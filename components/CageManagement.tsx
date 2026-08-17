@@ -50,13 +50,31 @@ const CageManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
 
   const selectedBatch = (state.batches || []).find(b => b.id === formData.batchId);
   
-  const batchUsedFish = (state.cages || [])
-    .filter(c => c.batchId === formData.batchId && c.id !== (formData.cageId || editingId))
-    .reduce((a, b) => a + (b.initialFishCount || 0), 0);
+  // Calculate fish used by other cages in this batch (excluding the current cage being settled or edited)
+  const otherCagesInBatch = (state.cages || [])
+    .filter(c => c.batchId === formData.batchId && c.id !== (editingId || formData.cageId));
     
-  const rawBatchBalance = selectedBatch ? selectedBatch.initialQuantity - batchUsedFish : 0;
-  const batchBalance = Math.max(0, rawBatchBalance);
-  const isOverBatchBalance = Number(formData.initialFishCount) > batchBalance;
+  const batchUsedFishByOthers = otherCagesInBatch.reduce((a, b) => a + (b.initialFishCount || 0), 0);
+  
+  let settledAndHarvestedOther = 0;
+  (state.harvestLogs || []).forEach(h => {
+    if (h.batchId === formData.batchId && h.cageId !== (editingId || formData.cageId)) {
+      settledAndHarvestedOther += (h.initialFishCount || 0);
+    }
+  });
+
+  let nurseryMortality = 0;
+  (state.mortalityLogs || []).forEach(m => {
+    if (m.batchId === formData.batchId && !m.cageId) {
+      nurseryMortality += m.count;
+    }
+  });
+    
+  const maxAvailableForThisCage = selectedBatch 
+    ? Math.max(0, selectedBatch.initialQuantity - batchUsedFishByOthers - settledAndHarvestedOther - nurseryMortality)
+    : 0;
+
+  const isOverBatchBalance = Number(formData.initialFishCount) > maxAvailableForThisCage;
   
   const isOverCageCapacity = selectedCageDef && Number(formData.initialFishCount) > selectedCageDef.stockingCapacity;
 
@@ -68,9 +86,9 @@ const CageManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     const count = Number(formData.initialFishCount);
     let updatedBatches = state.batches;
 
-    if (count > batchBalance) {
-      if (confirm(`A quantidade (${count.toLocaleString('pt-BR')}) excede o saldo disponível do lote (${batchBalance.toLocaleString('pt-BR')}). Deseja ajustar o saldo inicial do lote para acomodar esta gaiola?`)) {
-        const newTotalForBatch = batchUsedFish + count;
+    if (count > maxAvailableForThisCage) {
+      if (confirm(`A quantidade (${count.toLocaleString('pt-BR')}) excede o saldo disponível do lote (${maxAvailableForThisCage.toLocaleString('pt-BR')}). Deseja ajustar o saldo inicial do lote para acomodar esta gaiola?`)) {
+        const newTotalForBatch = batchUsedFishByOthers + settledAndHarvestedOther + nurseryMortality + count;
         updatedBatches = (state.batches || []).map(b => b.id === formData.batchId ? { ...b, initialQuantity: newTotalForBatch, updatedAt: Date.now() } : b);
       } else {
         return;
@@ -345,8 +363,17 @@ const CageManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
               <select required className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 font-bold" value={formData.batchId} onChange={(e) => setFormData({...formData, batchId: e.target.value})}>
                 <option value="">Selecione o lote...</option>
                 {(state.batches || []).sort((a, b) => a.name.localeCompare(b.name)).map(b => {
-                  const used = (state.cages || []).filter(c => c.batchId === b.id && c.id !== (formData.cageId || editingId)).reduce((x, y) => x + (y.initialFishCount || 0), 0);
-                  const rem = Math.max(0, b.initialQuantity - used);
+                  const otherCages = (state.cages || []).filter(c => c.batchId === b.id && c.id !== (editingId || formData.cageId));
+                  const used = otherCages.reduce((x, y) => x + (y.initialFishCount || 0), 0);
+                  let harvests = 0;
+                  (state.harvestLogs || []).forEach(h => {
+                    if (h.batchId === b.id && h.cageId !== (editingId || formData.cageId)) harvests += (h.initialFishCount || 0);
+                  });
+                  let mort = 0;
+                  (state.mortalityLogs || []).forEach(m => {
+                    if (m.batchId === b.id && !m.cageId) mort += m.count;
+                  });
+                  const rem = Math.max(0, b.initialQuantity - used - harvests - mort);
                   return <option key={b.id} value={b.id}>{b.name} (Saldo: {rem.toLocaleString('pt-BR')})</option>;
                 })}
               </select>
