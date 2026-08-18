@@ -27,6 +27,7 @@ const FeedingLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedBatchId, setSelectedBatchId] = useState('');
   const [selectedFilterCageId, setSelectedFilterCageId] = useState('');
+  const [selectedFilterFeedTypeId, setSelectedFilterFeedTypeId] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [selectedLogIds, setSelectedLogIds] = useState<Set<string>>(new Set());
@@ -130,15 +131,21 @@ const FeedingLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
   }, [state.cages, state.feedingLogs, selectedBatchId]);
 
+  const availableFilterFeedTypes = useMemo(() => {
+    const allFeeds = state.feedTypes || [];
+    return [...allFeeds].sort((a, b) => a.name.localeCompare(b.name));
+  }, [state.feedTypes]);
+
   const sortedLogs = useMemo(() => {
     const logs = Array.isArray(state.feedingLogs) ? state.feedingLogs : [];
     let filtered = logs;
     
-    if (selectedBatchId || selectedFilterCageId || startDate || endDate) {
+    if (selectedBatchId || selectedFilterCageId || selectedFilterFeedTypeId || startDate || endDate) {
       const sortedHarvestLogs = [...(state.harvestLogs || [])].sort((a, b) => a.date.localeCompare(b.date));
       
       filtered = logs.filter(log => {
         if (selectedFilterCageId && log.cageId !== selectedFilterCageId) return false;
+        if (selectedFilterFeedTypeId && log.feedTypeId !== selectedFilterFeedTypeId) return false;
         if (selectedBatchId) {
           let bId = log.batchId;
 
@@ -166,7 +173,11 @@ const FeedingLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
         ? b.timestamp.localeCompare(a.timestamp) 
         : a.timestamp.localeCompare(b.timestamp);
     });
-  }, [state.feedingLogs, sortOrder, selectedBatchId, selectedFilterCageId, startDate, endDate, cageMap, state.harvestLogs]);
+  }, [state.feedingLogs, sortOrder, selectedBatchId, selectedFilterCageId, selectedFilterFeedTypeId, startDate, endDate, cageMap, state.harvestLogs]);
+
+  const filteredTotalGrams = useMemo(() => {
+    return sortedLogs.reduce((sum, log) => sum + (Number(log.amount) || 0), 0);
+  }, [sortedLogs]);
 
   const paginatedLogs = useMemo(() => {
     const startIndex = (currentPage - 1) * itemsPerPage;
@@ -525,6 +536,22 @@ const FeedingLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                 </option>
               ))}
             </select>
+            <select 
+              className="text-[10px] font-black uppercase text-slate-500 bg-slate-100 px-3 py-1.5 rounded-lg outline-none border-none"
+              value={selectedFilterFeedTypeId}
+              onChange={e => {
+                setSelectedFilterFeedTypeId(e.target.value);
+                setCurrentPage(1);
+                setSelectedLogIds(new Set());
+              }}
+            >
+              <option value="">Todas as Rações</option>
+              {availableFilterFeedTypes.map(ft => (
+                <option key={ft.id} value={ft.id}>
+                  {ft.name}
+                </option>
+              ))}
+            </select>
             <div className="flex items-center gap-1 bg-slate-100 px-2 py-1 rounded-lg">
               <input 
                 type="date"
@@ -553,6 +580,35 @@ const FeedingLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
             </button>
           </div>
         </div>
+
+        {(selectedBatchId || selectedFilterCageId || selectedFilterFeedTypeId || startDate || endDate) && (
+          <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5 bg-blue-50/70 border border-blue-100 rounded-2xl text-[11px] font-bold text-blue-900">
+            <div className="flex items-center gap-3">
+              <span>
+                Filtro ativo: <strong className="font-black text-blue-700">{sortedLogs.length}</strong> registro(s) encontrado(s)
+              </span>
+              <span className="text-blue-300">|</span>
+              <span>
+                Consumo total filtrado: <strong className="font-black text-blue-700">{formatNumber(filteredTotalGrams / 1000, 2)} kg</strong> ({formatNumber(filteredTotalGrams)} g)
+              </span>
+            </div>
+            <button
+              onClick={() => {
+                setSelectedBatchId('');
+                setSelectedFilterCageId('');
+                setSelectedFilterFeedTypeId('');
+                setStartDate('');
+                setEndDate('');
+                setCurrentPage(1);
+                setSelectedLogIds(new Set());
+              }}
+              className="text-[10px] font-black uppercase text-blue-600 hover:text-blue-800 underline transition-colors"
+            >
+              Limpar Filtros
+            </button>
+          </div>
+        )}
+
         <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm overflow-x-auto">
           <table className="w-full text-left min-w-[600px]">
             <thead className="bg-slate-50 text-[10px] font-black text-slate-400 uppercase tracking-widest">
