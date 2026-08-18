@@ -1,8 +1,8 @@
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { User, AppState } from '../types';
 import { Lock, User as UserIcon, LogIn, ArrowLeft, Clock, Eye, EyeOff, ShieldCheck, Cloud, RefreshCw, AlertTriangle, Link as LinkIcon, CheckCircle2 } from 'lucide-react';
-import { loadState, applyConfigFromLink, matchUserCredentials, matchUserPassword, normalizeLoginString } from '../store';
+import { loadState, applyConfigFromLink, getSupabaseConfig, matchUserCredentials, matchUserPassword, normalizeLoginString } from '../store';
 
 import Logo from './Logo';
 
@@ -35,7 +35,9 @@ const Login: React.FC<Props> = ({ state, onLogin, onRegister, onUpdateState, onS
   const [tempUser, setTempUser] = useState<User | null>(null);
   const [blockedUserForRequest, setBlockedUserForRequest] = useState<User | null>(null);
 
-  const isCloudActive = !!state.supabaseConfig?.url;
+  const isCloudActive = useMemo(() => {
+    return Boolean(state?.supabaseConfig?.url || getSupabaseConfig()?.url);
+  }, [state?.supabaseConfig]);
 
   const [regData, setRegData] = useState({
     name: '',
