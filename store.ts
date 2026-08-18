@@ -172,6 +172,7 @@ function mergeArraysById<T extends { id: string, name?: string, batchId?: string
     } else {
       const itemTime = getTime(item);
       const existingTime = getTime(existing);
+      const isModified = isObjectModified(existing, item);
       
       if (itemTime > existingTime) {
         // Remote is strictly newer
@@ -180,8 +181,12 @@ function mergeArraysById<T extends { id: string, name?: string, batchId?: string
         // Local is strictly newer
         map.set(item.id, existing);
       } else {
-        // Equal timestamps: resolve according to priority
-        map.set(item.id, priority === 'remote' ? item : existing);
+        // Equal timestamps: if modified and local priority, keep local
+        if (priority === 'local') {
+          map.set(item.id, existing);
+        } else {
+          map.set(item.id, isModified ? item : existing);
+        }
       }
     }
   }
@@ -588,7 +593,7 @@ export const ensureStateIntegrity = (state: any, mergeWith?: AppState, priority:
   const cagesWithResolvedBatch = rawCages.map(cage => {
     let batchId = cage.batchId;
     if (batchId) {
-      const existingBatch = batches.find(b => b.id === batchId || isBatchMatch(b.id, { id: batchId, name: batchId }));
+      const existingBatch = batches.find(b => b.id === batchId || isBatchMatch(batchId, b));
       if (!existingBatch || existingBatch.isClosed || deletedSet.has(existingBatch.id)) {
         batchId = undefined;
       }
@@ -630,7 +635,7 @@ export const ensureStateIntegrity = (state: any, mergeWith?: AppState, priority:
       }
     } else {
       status = 'Ocupada';
-      const batch = batches.find(b => b.id === batchId || isBatchMatch(b.id, { id: batchId, name: batchId }));
+      const batch = batches.find(b => b.id === batchId || isBatchMatch(batchId, b));
       if (batch && !settlementDate) {
         settlementDate = batch.settlementDate;
       }

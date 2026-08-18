@@ -387,17 +387,24 @@ async function scheduleSafeFarmStatePersist(stateToSave: any) {
     });
 
     if (Array.isArray(merged.cages)) {
-      const activeBatches = new Set((merged.batches || []).filter((b: any) => !b.isClosed && !deletedSet.has(b.id)).map((b: any) => b.id));
+      const activeBatches = (merged.batches || []).filter((b: any) => !b.isClosed && !deletedSet.has(b.id));
       merged.cages = merged.cages.map((cage: any) => {
         if (!cage || typeof cage !== 'object') return cage;
         let batchId = cage.batchId;
         let status = cage.status;
-        if (batchId && activeBatches.has(batchId)) {
-          status = 'Ocupada';
-        } else if (!batchId && status === 'Ocupada') {
+        if (batchId) {
+          const match = activeBatches.find((b: any) => b.id === batchId || (b.name && b.name.trim().toLowerCase() === String(batchId).trim().toLowerCase()));
+          if (match) {
+            status = 'Ocupada';
+            batchId = match.id;
+          } else {
+            batchId = undefined;
+            if (status === 'Ocupada') status = 'Limpeza';
+          }
+        } else if (status === 'Ocupada') {
           status = 'Limpeza';
         }
-        return { ...cage, status, batchId: status === 'Ocupada' ? batchId : undefined };
+        return { ...cage, status, batchId };
       });
     }
 

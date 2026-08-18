@@ -178,8 +178,9 @@ const App: React.FC = () => {
         const initialConfig = data.supabaseConfig || getSupabaseConfig();
         const remote = await fetchRemoteState(initialConfig);
         if (remote) {
-          const merged = ensureStateIntegrity(data, remote, 'remote');
-          data = merged;
+          // Quando o usuário abre o sistema (especialmente após dias sem logar), 
+          // o estado remoto/servidor é a fonte da verdade canônica.
+          data = remote;
           if (remote.supabaseConfig) {
             saveSupabaseConfig(remote.supabaseConfig);
           }
@@ -206,16 +207,9 @@ const App: React.FC = () => {
 
         if (updatedUser && (updatedUser.isApproved || updatedUser.isMaster) && !isBlockedInactive) {
           const nowIso = new Date().toISOString();
-          const activeUser = { ...updatedUser, lastSync: nowIso, updatedAt: Date.now() };
+          const activeUser = { ...updatedUser, lastSync: nowIso };
           setCurrentUser(activeUser);
           saveSession(activeUser);
-          data = {
-            ...data,
-            lastSync: nowIso,
-            users: data.users.map(u => u.id === activeUser.id ? activeUser : u)
-          };
-          const configToUse = data.supabaseConfig || getSupabaseConfig();
-          saveState(data, configToUse).catch(() => {});
         } else {
           if (isBlockedInactive && updatedUser) {
             data = {
@@ -546,12 +540,9 @@ const App: React.FC = () => {
       const configToUse = user.supabaseConfig || state?.supabaseConfig || getSupabaseConfig();
       const remote = await fetchRemoteState(configToUse);
       if (remote) {
-        setState(prev => {
-          if (!prev) return remote;
-          const merged = ensureStateIntegrity(prev, remote, 'remote');
-          lastSavedStateRef.current = merged;
-          return merged;
-        });
+        // Ao logar, prioriza o estado canônico do servidor para não injetar dados locais antigos
+        setState(remote);
+        lastSavedStateRef.current = remote;
       }
     } catch (err) {
       console.warn('Erro ao sincronizar após login:', err);
@@ -571,11 +562,9 @@ const App: React.FC = () => {
       const configToUse = state?.supabaseConfig || getSupabaseConfig();
       const remote = await fetchRemoteState(configToUse);
       if (remote) {
-        const localState = state || await loadState();
-        const mergedState = ensureStateIntegrity(localState, remote, 'remote');
-        setState(mergedState);
-        lastSavedStateRef.current = mergedState;
-        return mergedState;
+        setState(remote);
+        lastSavedStateRef.current = remote;
+        return remote;
       }
     } catch (err) {
       console.warn('Erro ao sincronizar login:', err);
