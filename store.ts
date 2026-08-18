@@ -592,10 +592,29 @@ export const ensureStateIntegrity = (state: any, mergeWith?: AppState, priority:
   // Step 1: Resolve batchId for each cage first
   const cagesWithResolvedBatch = rawCages.map(cage => {
     let batchId = cage.batchId;
+    let status = cage.status;
+    let maintenanceStartDate = cage.maintenanceStartDate;
+
     if (batchId) {
       const existingBatch = batches.find(b => b.id === batchId || isBatchMatch(batchId, b));
       if (!existingBatch || existingBatch.isClosed || deletedSet.has(existingBatch.id)) {
         batchId = undefined;
+      } else {
+        // Se a gaiola já possui registro de despesca finalizado para este lote e não foi repovoada posteriormente
+        const batchHarvest = harvestLogs.find(h => h.cageId === cage.id && (h.batchId === existingBatch.id || isBatchMatch(h.batchId, existingBatch)));
+        if (batchHarvest) {
+          const harvestDate = batchHarvest.date ? batchHarvest.date.split('T')[0] : '';
+          const cageSettlement = cage.settlementDate ? cage.settlementDate.split('T')[0] : '';
+          if (!cageSettlement || (harvestDate && cageSettlement <= harvestDate)) {
+            batchId = undefined;
+            if (!status || status === 'Ocupada') {
+              status = 'Limpeza';
+            }
+            if (!maintenanceStartDate) {
+              maintenanceStartDate = harvestDate || new Date().toISOString().split('T')[0];
+            }
+          }
+        }
       }
     }
 
@@ -604,7 +623,7 @@ export const ensureStateIntegrity = (state: any, mergeWith?: AppState, priority:
       batchId = undefined;
     }
 
-    return { ...cage, batchId };
+    return { ...cage, batchId, status, maintenanceStartDate };
   });
 
   // Step 2: Build batch map using resolved batch IDs

@@ -388,23 +388,53 @@ async function scheduleSafeFarmStatePersist(stateToSave: any) {
 
     if (Array.isArray(merged.cages)) {
       const activeBatches = (merged.batches || []).filter((b: any) => !b.isClosed && !deletedSet.has(b.id));
+      const harvestLogs = Array.isArray(merged.harvestLogs) ? merged.harvestLogs : [];
       merged.cages = merged.cages.map((cage: any) => {
         if (!cage || typeof cage !== 'object') return cage;
         let batchId = cage.batchId;
         let status = cage.status;
+        let initialFishCount = cage.initialFishCount;
+        let settlementDate = cage.settlementDate;
+        let harvestDate = cage.harvestDate;
+        let maintenanceStartDate = cage.maintenanceStartDate;
+
         if (batchId) {
           const match = activeBatches.find((b: any) => b.id === batchId || (b.name && b.name.trim().toLowerCase() === String(batchId).trim().toLowerCase()));
           if (match) {
-            status = 'Ocupada';
-            batchId = match.id;
+            // Verificar se a gaiola já foi despescada para este lote
+            const harvest = harvestLogs.find((h: any) => h && h.cageId === cage.id && (h.batchId === match.id || (match.name && String(h.batchId).trim().toLowerCase() === match.name.trim().toLowerCase())));
+            if (harvest) {
+              const hDate = harvest.date ? String(harvest.date).split('T')[0] : '';
+              const sDate = settlementDate ? String(settlementDate).split('T')[0] : '';
+              if (!sDate || (hDate && sDate <= hDate)) {
+                batchId = undefined;
+                initialFishCount = undefined;
+                settlementDate = undefined;
+                harvestDate = undefined;
+                if (!status || status === 'Ocupada') status = 'Limpeza';
+                if (!maintenanceStartDate) maintenanceStartDate = hDate || new Date().toISOString().split('T')[0];
+              } else {
+                status = 'Ocupada';
+                batchId = match.id;
+              }
+            } else {
+              status = 'Ocupada';
+              batchId = match.id;
+            }
           } else {
             batchId = undefined;
+            initialFishCount = undefined;
+            settlementDate = undefined;
+            harvestDate = undefined;
             if (status === 'Ocupada') status = 'Limpeza';
           }
-        } else if (status === 'Ocupada') {
-          status = 'Limpeza';
+        } else {
+          initialFishCount = undefined;
+          settlementDate = undefined;
+          harvestDate = undefined;
+          if (status === 'Ocupada') status = 'Limpeza';
         }
-        return { ...cage, status, batchId };
+        return { ...cage, status, batchId, initialFishCount, settlementDate, harvestDate, maintenanceStartDate };
       });
     }
 
