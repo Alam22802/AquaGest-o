@@ -1,14 +1,19 @@
 
-import React, { useMemo, useState, useEffect } from 'react';
-import { AppState } from '../types';
+import React, { useMemo, useState, useEffect, useCallback } from 'react';
+import { AppState, User } from '../types';
 import { 
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   BarChart, Bar, Cell, AreaChart, Area
 } from 'recharts';
 import { formatNumber } from '../utils/formatters';
-import { Fish, Utensils, Scale, TrendingUp, FishOff, Calendar, Layers, Download, Info, AlertTriangle, PackageSearch, CloudSun, Droplets, Wind, CloudRain, Thermometer, Umbrella, Cloud, RefreshCw, ChevronDown, ClipboardCheck } from 'lucide-react';
+import { 
+  Fish, Utensils, Scale, TrendingUp, FishOff, Calendar, Layers, Download, Info, 
+  AlertTriangle, PackageSearch, CloudSun, Droplets, Wind, CloudRain, Thermometer, 
+  Umbrella, Cloud, RefreshCw, ChevronDown, ClipboardCheck, FileSpreadsheet, 
+  CheckSquare, Square, X, Check, Filter, CheckCircle2
+} from 'lucide-react';
 import * as XLSX from 'xlsx';
-import { format, isWithinInterval, parseISO, startOfDay, endOfDay, subDays, differenceInDays, addDays } from 'date-fns';
+import { format, isWithinInterval, parseISO, startOfDay, endOfDay, subDays, differenceInDays, addDays, startOfMonth, startOfYear } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { getTilapiaPriceMG, MarketPrice } from '../src/services/marketPriceService';
 
@@ -48,8 +53,157 @@ const getInterpolatedStandardCurvePoints = (standardCurves: any[], avgInitial: n
   }).filter(p => p.weight > 0);
 };
 
+export interface ExportTabDefinition {
+  id: string;
+  sheetName: string;
+  label: string;
+  category: string;
+  requiredTabId: string;
+  description: string;
+}
+
+export const EXPORT_TAB_DEFINITIONS: ExportTabDefinition[] = [
+  {
+    id: 'summary',
+    sheetName: 'Resumo Geral',
+    label: 'Resumo Geral da Produção',
+    category: 'Geral',
+    requiredTabId: 'dashboard',
+    description: 'Consolidado de estoques, biomassa, FCA e peso médio por lote'
+  },
+  {
+    id: 'batches',
+    sheetName: 'Lotes',
+    label: 'Lotes de Produção',
+    category: 'Aquicultura',
+    requiredTabId: 'batches',
+    description: 'Dados cadastrais, povoamentos e status dos lotes'
+  },
+  {
+    id: 'inventory',
+    sheetName: 'Inventário Gaiolas',
+    label: 'Inventário de Gaiolas',
+    category: 'Aquicultura',
+    requiredTabId: 'inventory',
+    description: 'Estruturas, capacidades, dimensões, status e ocupação'
+  },
+  {
+    id: 'lines',
+    sheetName: 'Linhas e Setores',
+    label: 'Linhas / Setores',
+    category: 'Aquicultura',
+    requiredTabId: 'lines',
+    description: 'Linhas instaladas no parque e quantidade de gaiolas'
+  },
+  {
+    id: 'protocols',
+    sheetName: 'Modelos Produção',
+    label: 'Modelos de Produção',
+    category: 'Aquicultura',
+    requiredTabId: 'protocols',
+    description: 'Protocolos de crescimento, FCA teórico e metas de peso'
+  },
+  {
+    id: 'feeding',
+    sheetName: 'Tratos Alimentares',
+    label: 'Tratos (Alimentação)',
+    category: 'Manejo',
+    requiredTabId: 'feeding',
+    description: 'Registros diários de alimentação por gaiola e tipo de ração'
+  },
+  {
+    id: 'feedStock',
+    sheetName: 'Estoque Ração',
+    label: 'Estoque de Ração',
+    category: 'Manejo',
+    requiredTabId: 'feed',
+    description: 'Posição atual dos silos, capacidades e níveis de estoque'
+  },
+  {
+    id: 'mortality',
+    sheetName: 'Mortalidade',
+    label: 'Mortalidade e Perdas',
+    category: 'Manejo',
+    requiredTabId: 'mortality',
+    description: 'Perdas diárias de peixes registradas por gaiola e lote'
+  },
+  {
+    id: 'biometry',
+    sheetName: 'Biometria',
+    label: 'Biometria e Pesagens',
+    category: 'Manejo',
+    requiredTabId: 'biometry',
+    description: 'Acompanhamento do peso médio e evolução dos peixes'
+  },
+  {
+    id: 'harvest',
+    sheetName: 'Despescas',
+    label: 'Despescas Realizadas',
+    category: 'Despesca',
+    requiredTabId: 'cages',
+    description: 'Histórico de despescas, peixes retirados e biomassa'
+  },
+  {
+    id: 'schedules',
+    sheetName: 'Agendamento Despesca',
+    label: 'Agendamento de Despescas',
+    category: 'Despesca',
+    requiredTabId: 'cages',
+    description: 'Programações de jejum e datas previstas de despesca'
+  },
+  {
+    id: 'maintenance',
+    sheetName: 'Manutenção',
+    label: 'Manutenção de Gaiolas',
+    category: 'Infraestrutura',
+    requiredTabId: 'maintenance',
+    description: 'Registros de manutenção e status das gaiolas'
+  },
+  {
+    id: 'slaughter',
+    sheetName: 'Frigorífico',
+    label: 'Frigorífico (Processamento)',
+    category: 'Frigorífico',
+    requiredTabId: 'slaughter',
+    description: 'Abates diários, peso de recepção, embalados e rendimento'
+  },
+  {
+    id: 'slaughterFinance',
+    sheetName: 'Finanças Frigorífico',
+    label: 'Finanças do Frigorífico',
+    category: 'Frigorífico',
+    requiredTabId: 'slaughter',
+    description: 'Custos operacionais e despesas do frigorífico'
+  },
+  {
+    id: 'slaughterHR',
+    sheetName: 'RH Frigorífico',
+    label: 'RH e Pessoal do Frigorífico',
+    category: 'Frigorífico',
+    requiredTabId: 'slaughter',
+    description: 'Frequência, faltas, folgas e apontamentos da equipe'
+  },
+  {
+    id: 'utilities',
+    sheetName: 'Utilidades e Frio',
+    label: 'Câmaras Frias e Utilidades',
+    category: 'Frigorífico',
+    requiredTabId: 'slaughter',
+    description: 'Leituras térmicas de câmaras frias, consumo de água e energia'
+  },
+  {
+    id: 'capex',
+    sheetName: 'CAPEX (Investimentos)',
+    label: 'Investimentos CAPEX',
+    category: 'Financeiro',
+    requiredTabId: 'capex',
+    description: 'Notas fiscais de investimentos, projetos e aportes de capital'
+  }
+];
+
 interface Props {
   state: AppState;
+  currentUser?: User | null;
 }
 
 const MiniStat = ({ label, value, icon, color, subtext }: any) => (
@@ -410,7 +564,7 @@ const TilapiaPriceWidget = () => {
   );
 };
 
-const Dashboard: React.FC<Props> = ({ state }) => {
+const Dashboard: React.FC<Props> = ({ state, currentUser }) => {
   const [selectedBatchIds, setSelectedBatchIds] = useState<string[]>([]);
   const [showBatchSelector, setShowBatchSelector] = useState(false);
   const [reportStartDate, setReportStartDate] = useState<string>(format(subDays(new Date(), 30), 'yyyy-MM-dd'));
@@ -418,6 +572,59 @@ const Dashboard: React.FC<Props> = ({ state }) => {
   const [showSupplierCurve, setShowSupplierCurve] = useState<boolean>(false);
   const [showStandardCurve, setShowStandardCurve] = useState<boolean>(false);
   const [showContinueCurve, setShowContinueCurve] = useState<boolean>(false);
+  const [showReportModal, setShowReportModal] = useState<boolean>(false);
+  const [selectedReportTabs, setSelectedReportTabs] = useState<string[]>([]);
+
+  const isTabAuthorized = useCallback((tabRequiredId: string) => {
+    if (!currentUser) return true;
+    if (currentUser.isMaster) return true;
+    if (tabRequiredId === 'dashboard') return true;
+    if (!currentUser.allowedTabs || currentUser.allowedTabs.length === 0) return false;
+    return currentUser.allowedTabs.includes(tabRequiredId);
+  }, [currentUser]);
+
+  const availableExportTabs = useMemo(() => {
+    return EXPORT_TAB_DEFINITIONS.filter(t => isTabAuthorized(t.requiredTabId));
+  }, [isTabAuthorized]);
+
+  useEffect(() => {
+    setSelectedReportTabs(availableExportTabs.map(t => t.id));
+  }, [availableExportTabs]);
+
+  const toggleExportTab = (tabId: string) => {
+    setSelectedReportTabs(prev => 
+      prev.includes(tabId) ? prev.filter(id => id !== tabId) : [...prev, tabId]
+    );
+  };
+
+  const selectAllExportTabs = () => {
+    setSelectedReportTabs(availableExportTabs.map(t => t.id));
+  };
+
+  const deselectAllExportTabs = () => {
+    setSelectedReportTabs([]);
+  };
+
+  const setQuickDateRange = (type: '7days' | '30days' | 'thisMonth' | 'thisYear' | 'all') => {
+    const today = new Date();
+    const todayStr = format(today, 'yyyy-MM-dd');
+    if (type === '7days') {
+      setReportStartDate(format(subDays(today, 7), 'yyyy-MM-dd'));
+      setReportEndDate(todayStr);
+    } else if (type === '30days') {
+      setReportStartDate(format(subDays(today, 30), 'yyyy-MM-dd'));
+      setReportEndDate(todayStr);
+    } else if (type === 'thisMonth') {
+      setReportStartDate(format(startOfMonth(today), 'yyyy-MM-dd'));
+      setReportEndDate(todayStr);
+    } else if (type === 'thisYear') {
+      setReportStartDate(format(startOfYear(today), 'yyyy-MM-dd'));
+      setReportEndDate(todayStr);
+    } else if (type === 'all') {
+      setReportStartDate('2020-01-01');
+      setReportEndDate(format(addDays(today, 365), 'yyyy-MM-dd'));
+    }
+  };
 
   const lowStockFeeds = useMemo(() => {
     return (state.feedTypes || []).filter(feed => {
@@ -1502,8 +1709,13 @@ const Dashboard: React.FC<Props> = ({ state }) => {
     return mortalityEvolutionData.reduce((acc, curr) => acc + curr.count, 0);
   }, [mortalityEvolutionData]);
 
-  // FUNÇÃO DE EXPORTAÇÃO COMPLETA COM FILTRO DE DATA
+  // FUNÇÃO DE EXPORTAÇÃO COMPLETA COM FILTRO DE DATA E SELEÇÃO DE ABAS
   const handleDownloadReport = () => {
+    if (selectedReportTabs.length === 0) {
+      alert("Por favor, selecione ao menos uma aba para gerar o relatório.");
+      return;
+    }
+
     // Definir intervalo de filtro
     const start = startOfDay(parseISO(reportStartDate));
     const end = endOfDay(parseISO(reportEndDate));
@@ -1532,260 +1744,332 @@ const Dashboard: React.FC<Props> = ({ state }) => {
     const wb = XLSX.utils.book_new();
 
     // 2. ABA: RESUMO GERAL
-    const summaryHeader = [
-      ["RELATÓRIO GERAL DE PRODUÇÃO - AQUAGESTÃO"],
-      ["Período Selecionado:", `${format(start, 'dd/MM/yyyy')} até ${format(end, 'dd/MM/yyyy')}`],
-      ["Data de Exportação:", format(new Date(), 'dd/MM/yyyy HH:mm')],
-      [""],
-      ["ESTATÍSTICAS CONSOLIDADAS POR LOTE (DADOS ATUAIS)"]
-    ];
-    const summaryData = batchStats.map(bs => [
-      bs.name,
-      `Estoque: ${formatNumber(bs.stock)} un`,
-      `Biomassa: ${formatNumber(bs.biomass, 2)} kg`,
-      `Consumo Total: ${formatNumber(bs.feed, 2)} kg`,
-      `FCA: ${bs.fca}`,
-      `Peso Médio: ${formatNumber(bs.avgWeight, 1)} g`
-    ]);
-    const wsSummary = XLSX.utils.aoa_to_sheet([...summaryHeader, ...summaryData]);
-    XLSX.utils.book_append_sheet(wb, wsSummary, "Resumo Geral");
+    if (selectedReportTabs.includes('summary')) {
+      const summaryHeader = [
+        ["RELATÓRIO GERAL DE PRODUÇÃO - AQUAGESTÃO"],
+        ["Período Selecionado:", `${format(start, 'dd/MM/yyyy')} até ${format(end, 'dd/MM/yyyy')}`],
+        ["Data de Exportação:", format(new Date(), 'dd/MM/yyyy HH:mm')],
+        [""],
+        ["ESTATÍSTICAS CONSOLIDADAS POR LOTE (DADOS ATUAIS)"]
+      ];
+      const summaryData = batchStats.map(bs => [
+        bs.name,
+        `Estoque: ${formatNumber(bs.stock)} un`,
+        `Biomassa: ${formatNumber(bs.biomass, 2)} kg`,
+        `Consumo Total: ${formatNumber(bs.feed, 2)} kg`,
+        `FCA: ${bs.fca}`,
+        `Peso Médio: ${formatNumber(bs.avgWeight, 1)} g`
+      ]);
+      const wsSummary = XLSX.utils.aoa_to_sheet([...summaryHeader, ...summaryData]);
+      XLSX.utils.book_append_sheet(wb, wsSummary, "Resumo Geral");
+    }
 
     // 3. ABA: LOTES
-    const wsBatches = XLSX.utils.json_to_sheet(state.batches.map(b => ({
-      "Nome do Lote": b.name,
-      "Data Povoamento": b.settlementDate,
-      "Qtd Inicial": b.initialQuantity,
-      "Peso Inicial (g)": b.initialUnitWeight,
-      "Modelo Produção": protocolMap.get(b.protocolId || '') || "Nenhum"
-    })));
-    XLSX.utils.book_append_sheet(wb, wsBatches, "Lotes");
+    if (selectedReportTabs.includes('batches')) {
+      const wsBatches = XLSX.utils.json_to_sheet(state.batches.map(b => ({
+        "Nome do Lote": b.name,
+        "Data Povoamento": b.settlementDate,
+        "Qtd Inicial": b.initialQuantity,
+        "Peso Inicial (g)": b.initialUnitWeight,
+        "Modelo Produção": protocolMap.get(b.protocolId || '') || "Nenhum",
+        "Status": b.isClosed ? "Fechado" : "Ativo"
+      })));
+      XLSX.utils.book_append_sheet(wb, wsBatches, "Lotes");
+    }
 
     // 4. ABA: GAIOLAS (INVENTÁRIO)
-    const wsCages = XLSX.utils.json_to_sheet(state.cages.map(c => ({
-      "Gaiola": c.name,
-      "Linha/Setor": lineMap.get(c.lineId || '') || "N/A",
-      "Capacidade": c.stockingCapacity,
-      "Status": c.status,
-      "Lote Atual": batchMap.get(c.batchId || '') || "Vazia",
-      "Peixes Alojados": c.initialFishCount || 0,
-      "Povoamento": c.settlementDate || "",
-      "Prev. Despesca": c.harvestDate || ""
-    })));
-    XLSX.utils.book_append_sheet(wb, wsCages, "Inventário Gaiolas");
+    if (selectedReportTabs.includes('inventory')) {
+      const wsCages = XLSX.utils.json_to_sheet(state.cages.map(c => ({
+        "Gaiola": c.name,
+        "Linha/Setor": lineMap.get(c.lineId || '') || "N/A",
+        "Capacidade": c.stockingCapacity,
+        "Status": c.status,
+        "Lote Atual": batchMap.get(c.batchId || '') || "Vazia",
+        "Peixes Alojados": c.initialFishCount || 0,
+        "Povoamento": c.settlementDate || "",
+        "Prev. Despesca": c.harvestDate || ""
+      })));
+      XLSX.utils.book_append_sheet(wb, wsCages, "Inventário Gaiolas");
+    }
+
+    // ABA: LINHAS E SETORES
+    if (selectedReportTabs.includes('lines')) {
+      const wsLines = XLSX.utils.json_to_sheet((state.lines || []).map(l => ({
+        "Linha / Setor": l.name,
+        "Gaiolas Vinculadas": (state.cages || []).filter(c => c.lineId === l.id).length,
+        "Capacidade Total": (state.cages || []).filter(c => c.lineId === l.id).reduce((sum, c) => sum + (c.stockingCapacity || 0), 0)
+      })));
+      XLSX.utils.book_append_sheet(wb, wsLines, "Linhas e Setores");
+    }
+
+    // ABA: MODELOS DE PRODUÇÃO
+    if (selectedReportTabs.includes('protocols')) {
+      const wsProtocols = XLSX.utils.json_to_sheet((state.protocols || []).map(p => ({
+        "Modelo / Protocolo": p.name,
+        "Espécie": p.species,
+        "Peso Alvo (g)": p.targetWeight,
+        "FCA Esperado": p.expectedFca,
+        "Dias Estimados": p.estimatedDays
+      })));
+      XLSX.utils.book_append_sheet(wb, wsProtocols, "Modelos Produção");
+    }
 
     // 5. ABA: TRATOS (ALIMENTAÇÃO) - FILTRADO
-    const filteredFeedingLogs = (state.feedingLogs || []).filter(f => filterByDate(f.timestamp));
-    const wsFeeding = XLSX.utils.json_to_sheet(filteredFeedingLogs.map(f => {
-      let bId = f.batchId;
-      if (!bId && f.cageId) {
-        const fDate = (f.timestamp || '').split('T')[0];
-        const harvest = sortedHarvestLogs.find(h => h.cageId === f.cageId && h.date >= fDate);
-        if (harvest) {
-          bId = harvest.batchId;
-        } else {
-          const cage = (state.cages || []).find(c => c.id === f.cageId);
-          if (cage?.batchId) {
-            const batch = (state.batches || []).find(b => b.id === cage.batchId);
-            if (batch && fDate >= batch.settlementDate) {
-              bId = cage.batchId;
+    if (selectedReportTabs.includes('feeding')) {
+      const filteredFeedingLogs = (state.feedingLogs || []).filter(f => filterByDate(f.timestamp));
+      const wsFeeding = XLSX.utils.json_to_sheet(filteredFeedingLogs.map(f => {
+        let bId = f.batchId;
+        if (!bId && f.cageId) {
+          const fDate = (f.timestamp || '').split('T')[0];
+          const harvest = sortedHarvestLogs.find(h => h.cageId === f.cageId && h.date >= fDate);
+          if (harvest) {
+            bId = harvest.batchId;
+          } else {
+            const cage = (state.cages || []).find(c => c.id === f.cageId);
+            if (cage?.batchId) {
+              const batch = (state.batches || []).find(b => b.id === cage.batchId);
+              if (batch && fDate >= batch.settlementDate) {
+                bId = cage.batchId;
+              }
             }
           }
         }
-      }
 
-      return {
-        "Data/Hora": f.timestamp,
-        "Lote": batchMap.get(bId || '') || "N/A",
-        "Gaiola": cageMap.get(f.cageId) || f.cageId,
-        "Ração": feedMap.get(f.feedTypeId) || f.feedTypeId,
-        "Quantidade (g)": f.amount,
-        "Lançado por": userMap.get(f.userId) || f.userId
-      };
-    }));
-    XLSX.utils.book_append_sheet(wb, wsFeeding, "Tratos Alimentares");
+        return {
+          "Data/Hora": f.timestamp,
+          "Lote": batchMap.get(bId || '') || "N/A",
+          "Gaiola": cageMap.get(f.cageId) || f.cageId,
+          "Ração": feedMap.get(f.feedTypeId) || f.feedTypeId,
+          "Quantidade (g)": f.amount,
+          "Lançado por": userMap.get(f.userId) || f.userId
+        };
+      }));
+      XLSX.utils.book_append_sheet(wb, wsFeeding, "Tratos Alimentares");
+    }
 
     // 6. ABA: MORTALIDADE - FILTRADO
-    const filteredMortalityLogs = (state.mortalityLogs || []).filter(m => filterByDate(m.date));
-    const wsMortality = XLSX.utils.json_to_sheet(filteredMortalityLogs.map(m => {
-      let bId = m.batchId;
-      if (!bId && m.cageId) {
-        const mDate = m.date;
-        const harvest = sortedHarvestLogs.find(h => h.cageId === m.cageId && h.date >= mDate);
-        if (harvest) {
-          bId = harvest.batchId;
-        } else {
-          const cage = (state.cages || []).find(c => c.id === m.cageId);
-          if (cage?.batchId) {
-            const batch = (state.batches || []).find(b => b.id === cage.batchId);
-            if (batch && mDate >= batch.settlementDate) {
-              bId = cage.batchId;
+    if (selectedReportTabs.includes('mortality')) {
+      const filteredMortalityLogs = (state.mortalityLogs || []).filter(m => filterByDate(m.date));
+      const wsMortality = XLSX.utils.json_to_sheet(filteredMortalityLogs.map(m => {
+        let bId = m.batchId;
+        if (!bId && m.cageId) {
+          const mDate = m.date;
+          const harvest = sortedHarvestLogs.find(h => h.cageId === m.cageId && h.date >= mDate);
+          if (harvest) {
+            bId = harvest.batchId;
+          } else {
+            const cage = (state.cages || []).find(c => c.id === m.cageId);
+            if (cage?.batchId) {
+              const batch = (state.batches || []).find(b => b.id === cage.batchId);
+              if (batch && mDate >= batch.settlementDate) {
+                bId = cage.batchId;
+              }
             }
           }
         }
-      }
 
-      return {
-        "Data": m.date,
-        "Lote": batchMap.get(bId || '') || "N/A",
-        "Gaiola": cageMap.get(m.cageId) || m.cageId,
-        "Quantidade": m.count,
-        "Lançado por": userMap.get(m.userId) || m.userId
-      };
-    }));
-    XLSX.utils.book_append_sheet(wb, wsMortality, "Mortalidade");
+        return {
+          "Data": m.date,
+          "Lote": batchMap.get(bId || '') || "N/A",
+          "Gaiola": cageMap.get(m.cageId) || m.cageId,
+          "Quantidade": m.count,
+          "Lançado por": userMap.get(m.userId) || m.userId
+        };
+      }));
+      XLSX.utils.book_append_sheet(wb, wsMortality, "Mortalidade");
+    }
 
     // 7. ABA: BIOMETRIA - FILTRADO
-    const filteredBiometryLogs = (state.biometryLogs || []).filter(b => filterByDate(b.date));
-    const wsBiometry = XLSX.utils.json_to_sheet(filteredBiometryLogs.map(b => {
-      let bId = b.batchId;
-      if (!bId && b.cageId) {
-        const bDate = b.date;
-        const harvest = sortedHarvestLogs.find(h => h.cageId === b.cageId && h.date >= bDate);
-        if (harvest) {
-          bId = harvest.batchId;
-        } else {
-          const cage = (state.cages || []).find(c => c.id === b.cageId);
-          if (cage?.batchId) {
-            const batch = (state.batches || []).find(b => b.id === cage.batchId);
-            if (batch && bDate >= batch.settlementDate) {
-              bId = cage.batchId;
+    if (selectedReportTabs.includes('biometry')) {
+      const filteredBiometryLogs = (state.biometryLogs || []).filter(b => filterByDate(b.date));
+      const wsBiometry = XLSX.utils.json_to_sheet(filteredBiometryLogs.map(b => {
+        let bId = b.batchId;
+        if (!bId && b.cageId) {
+          const bDate = b.date;
+          const harvest = sortedHarvestLogs.find(h => h.cageId === b.cageId && h.date >= bDate);
+          if (harvest) {
+            bId = harvest.batchId;
+          } else {
+            const cage = (state.cages || []).find(c => c.id === b.cageId);
+            if (cage?.batchId) {
+              const batch = (state.batches || []).find(b => b.id === cage.batchId);
+              if (batch && bDate >= batch.settlementDate) {
+                bId = cage.batchId;
+              }
             }
           }
         }
-      }
 
-      return {
-        "Data": b.date,
-        "Lote": batchMap.get(bId || '') || "N/A",
-        "Gaiola": cageMap.get(b.cageId) || b.cageId,
-        "Peso Médio (g)": b.averageWeight,
-        "Lançado por": userMap.get(b.userId) || b.userId
-      };
-    }));
-    XLSX.utils.book_append_sheet(wb, wsBiometry, "Biometria");
+        return {
+          "Data": b.date,
+          "Lote": batchMap.get(bId || '') || "N/A",
+          "Gaiola": cageMap.get(b.cageId) || b.cageId,
+          "Peso Médio (g)": b.averageWeight,
+          "Lançado por": userMap.get(b.userId) || b.userId
+        };
+      }));
+      XLSX.utils.book_append_sheet(wb, wsBiometry, "Biometria");
+    }
 
     // 8. ABA: ESTOQUE RAÇÃO
-    const wsFeedStock = XLSX.utils.json_to_sheet((state.feedTypes || []).map(f => ({
-      "Ração": f.name,
-      "Estoque Atual (kg)": f.totalStock / 1000,
-      "Capacidade Silo (kg)": f.maxCapacity,
-      "Alerta Mínimo (%)": f.minStockPercentage
-    })));
-    XLSX.utils.book_append_sheet(wb, wsFeedStock, "Estoque Ração");
+    if (selectedReportTabs.includes('feedStock')) {
+      const wsFeedStock = XLSX.utils.json_to_sheet((state.feedTypes || []).map(f => ({
+        "Ração": f.name,
+        "Estoque Atual (kg)": f.totalStock / 1000,
+        "Capacidade Silo (kg)": f.maxCapacity,
+        "Alerta Mínimo (%)": f.minStockPercentage
+      })));
+      XLSX.utils.book_append_sheet(wb, wsFeedStock, "Estoque Ração");
+    }
 
     // 10. ABA: FRIGORÍFICO - FILTRADO
-    const filteredSlaughterLogs = (state.slaughterLogs || []).filter(s => filterByDate(s.date));
-    const wsSlaughter = XLSX.utils.json_to_sheet(filteredSlaughterLogs.map(s => ({
-      "Data": s.date,
-      "Lote Abate": s.slaughterBatch,
-      "Produtor": s.producer,
-      "Peso Filé Congelado (kg)": s.gtaWeight,
-      "Recepção (kg)": s.receptionWeight,
-      "Embalado (kg)": s.packedQuantity,
-      "Rendimento (%)": s.receptionWeight > 0 ? formatNumber((s.packedQuantity / s.receptionWeight) * 100, 1) : 0,
-      "Lote Embalagem": s.packagingBatch,
-      "Lançado por": userMap.get(s.userId) || s.userId
-    })));
-    XLSX.utils.book_append_sheet(wb, wsSlaughter, "Frigorífico");
+    if (selectedReportTabs.includes('slaughter')) {
+      const filteredSlaughterLogs = (state.slaughterLogs || []).filter(s => filterByDate(s.date));
+      const wsSlaughter = XLSX.utils.json_to_sheet(filteredSlaughterLogs.map(s => ({
+        "Data": s.date,
+        "Lote Abate": s.slaughterBatch,
+        "Produtor": s.producer,
+        "Peso Filé Congelado (kg)": s.gtaWeight,
+        "Recepção (kg)": s.receptionWeight,
+        "Embalado (kg)": s.packedQuantity,
+        "Rendimento (%)": s.receptionWeight > 0 ? formatNumber((s.packedQuantity / s.receptionWeight) * 100, 1) : 0,
+        "Lote Embalagem": s.packagingBatch,
+        "Lançado por": userMap.get(s.userId) || s.userId
+      })));
+      XLSX.utils.book_append_sheet(wb, wsSlaughter, "Frigorífico");
+    }
 
     // 11. ABA: DESPESCAS - FILTRADO
-    const filteredHarvestLogs = (state.harvestLogs || []).filter(h => filterByDate(h.date));
-    const wsHarvest = XLSX.utils.json_to_sheet(filteredHarvestLogs.map(h => ({
-      "Data": h.date,
-      "Lote": batchMap.get(h.batchId) || h.batchId,
-      "Gaiola": cageMap.get(h.cageId) || h.cageId,
-      "Peixes Retirados": h.fishCount,
-      "Peso Total (kg)": h.totalWeight,
-      "Peso Médio (g)": h.averageWeight || (h.fishCount > 0 ? formatNumber(h.totalWeight * 1000 / h.fishCount, 1) : 0),
-      "Lançado por": userMap.get(h.userId) || h.userId
-    })));
-    XLSX.utils.book_append_sheet(wb, wsHarvest, "Despescas");
+    if (selectedReportTabs.includes('harvest')) {
+      const filteredHarvestLogs = (state.harvestLogs || []).filter(h => filterByDate(h.date));
+      const wsHarvest = XLSX.utils.json_to_sheet(filteredHarvestLogs.map(h => ({
+        "Data": h.date,
+        "Lote": batchMap.get(h.batchId) || h.batchId,
+        "Gaiola": cageMap.get(h.cageId) || h.cageId,
+        "Peixes Retirados": h.fishCount,
+        "Peso Total (kg)": h.totalWeight,
+        "Peso Médio (g)": h.averageWeight || (h.fishCount > 0 ? formatNumber(h.totalWeight * 1000 / h.fishCount, 1) : 0),
+        "Lançado por": userMap.get(h.userId) || h.userId
+      })));
+      XLSX.utils.book_append_sheet(wb, wsHarvest, "Despescas");
+    }
 
     // 12. ABA: FINANCEIRO FRIGORÍFICO - FILTRADO
-    const filteredSlaughterExpenses = (state.slaughterExpenses || []).filter(e => filterByDate(e.date));
-    const wsSlaughterFinance = XLSX.utils.json_to_sheet(filteredSlaughterExpenses.map(e => ({
-      "Data": e.date,
-      "Descrição": e.description,
-      "Categoria": e.category,
-      "Valor (R$)": e.value,
-      "Quantidade": e.quantity || 1,
-      "Valor Unitário": e.unitValue || e.value,
-      "Lançado por": userMap.get(e.userId) || e.userId
-    })));
-    XLSX.utils.book_append_sheet(wb, wsSlaughterFinance, "Finanças Frigorífico");
+    if (selectedReportTabs.includes('slaughterFinance')) {
+      const filteredSlaughterExpenses = (state.slaughterExpenses || []).filter(e => filterByDate(e.date));
+      const wsSlaughterFinance = XLSX.utils.json_to_sheet(filteredSlaughterExpenses.map(e => ({
+        "Data": e.date,
+        "Descrição": e.description,
+        "Categoria": e.category,
+        "Valor (R$)": e.value,
+        "Quantidade": e.quantity || 1,
+        "Valor Unitário": e.unitValue || e.value,
+        "Lançado por": userMap.get(e.userId) || e.userId
+      })));
+      XLSX.utils.book_append_sheet(wb, wsSlaughterFinance, "Finanças Frigorífico");
+    }
 
     // 13. ABA: RH FRIGORÍFICO
-    const employeeMap = new Map((state.slaughterEmployees || []).map(e => [e.id, e.name]));
-    const filteredHREntries = (state.slaughterHREntries || []).filter(e => filterByDate(e.date));
-    const wsSlaughterHR = XLSX.utils.json_to_sheet(filteredHREntries.map(e => ({
-      "Data": e.date,
-      "Funcionários": e.employeeIds.map(id => employeeMap.get(id) || id).join(', '),
-      "Tipo": e.type,
-      "Dias": e.days || 1,
-      "Descrição": e.description || "",
-      "Lançado por": userMap.get(e.userId) || e.userId
-    })));
-    XLSX.utils.book_append_sheet(wb, wsSlaughterHR, "RH Frigorífico");
+    if (selectedReportTabs.includes('slaughterHR')) {
+      const employeeMap = new Map((state.slaughterEmployees || []).map(e => [e.id, e.name]));
+      const filteredHREntries = (state.slaughterHREntries || []).filter(e => filterByDate(e.date));
+      const wsSlaughterHR = XLSX.utils.json_to_sheet(filteredHREntries.map(e => ({
+        "Data": e.date,
+        "Funcionários": e.employeeIds.map(id => employeeMap.get(id) || id).join(', '),
+        "Tipo": e.type,
+        "Dias": e.days || 1,
+        "Descrição": e.description || "",
+        "Lançado por": userMap.get(e.userId) || e.userId
+      })));
+      XLSX.utils.book_append_sheet(wb, wsSlaughterHR, "RH Frigorífico");
+    }
 
     // 15. ABA: CAPEX - FILTRADO
-    const portfolioMap_capex = new Map(state.portfolios.map(p => [p.id, p.name]));
-    const projectMap = new Map(state.capexProjects.map(p => [p.id, p.name]));
-    const filteredCapexInvoices = (state.capexInvoices || []).filter(i => filterByDate(i.date));
-    const wsCapex = XLSX.utils.json_to_sheet(filteredCapexInvoices.map(i => ({
-      "Data": i.date,
-      "Portfólio": portfolioMap_capex.get(i.portfolioId) || i.portfolioId,
-      "Projeto": projectMap.get(i.projectId) || i.projectId,
-      "NF": i.invoiceNumber,
-      "Fornecedor": i.supplier,
-      "Tipo": i.type,
-      "Valor (R$)": i.value,
-      "Descrição": i.description,
-      "Lançado por": userMap.get(i.userId) || i.userId
-    })));
-    XLSX.utils.book_append_sheet(wb, wsCapex, "CAPEX (Investimentos)");
+    if (selectedReportTabs.includes('capex')) {
+      const portfolioMap_capex = new Map(state.portfolios.map(p => [p.id, p.name]));
+      const projectMap = new Map(state.capexProjects.map(p => [p.id, p.name]));
+      const filteredCapexInvoices = (state.capexInvoices || []).filter(i => filterByDate(i.date));
+      const wsCapex = XLSX.utils.json_to_sheet(filteredCapexInvoices.map(i => ({
+        "Data": i.date,
+        "Portfólio": portfolioMap_capex.get(i.portfolioId) || i.portfolioId,
+        "Projeto": projectMap.get(i.projectId) || i.projectId,
+        "NF": i.invoiceNumber,
+        "Fornecedor": i.supplier,
+        "Tipo": i.type,
+        "Valor (R$)": i.value,
+        "Descrição": i.description,
+        "Lançado por": userMap.get(i.userId) || i.userId
+      })));
+      XLSX.utils.book_append_sheet(wb, wsCapex, "CAPEX (Investimentos)");
+    }
 
     // 16. ABA: UTILIDADES E FRIO - FILTRADO
-    const filteredColdStorage = (state.coldStorageLogs || []).filter(l => filterByDate(l.date));
-    const filteredUtilities = (state.utilityLogs || []).filter(l => filterByDate(l.date));
-    
-    const utilityData = [
-      ...filteredColdStorage.map(l => {
-        const chamber = (state.coldChambers || []).find(c => c.id === l.chamberId);
-        return {
+    if (selectedReportTabs.includes('utilities')) {
+      const filteredColdStorage = (state.coldStorageLogs || []).filter(l => filterByDate(l.date));
+      const filteredUtilities = (state.utilityLogs || []).filter(l => filterByDate(l.date));
+      
+      const utilityData = [
+        ...filteredColdStorage.map(l => {
+          const chamber = (state.coldChambers || []).find(c => c.id === l.chamberId);
+          return {
+            "Data": l.date,
+            "Hora": l.time,
+            "Tipo": "Câmara Fria",
+            "Local/Medição": chamber?.name || (l.chamberId?.startsWith('chamber-') ? l.chamberId.replace('chamber-', '').toUpperCase() : '---'),
+            "Valor/Temp": !isNaN(Number(l.temperature)) ? `${l.temperature}°C` : l.temperature,
+            "Lançado por": userMap.get(l.userId) || l.userId
+          };
+        }),
+        ...filteredUtilities.map(l => ({
           "Data": l.date,
-          "Hora": l.time,
-          "Tipo": "Câmara Fria",
-          "Local/Medição": chamber?.name || (l.chamberId?.startsWith('chamber-') ? l.chamberId.replace('chamber-', '').toUpperCase() : '---'),
-          "Valor/Temp": !isNaN(Number(l.temperature)) ? `${l.temperature}°C` : l.temperature,
+          "Hora": "---",
+          "Tipo": l.type === 'water' ? 'Água' : 'Energia',
+          "Local/Medição": "Leitura Geral",
+          "Valor/Temp": l.reading,
           "Lançado por": userMap.get(l.userId) || l.userId
-        };
-      }),
-      ...filteredUtilities.map(l => ({
-        "Data": l.date,
-        "Hora": "---",
-        "Tipo": l.type === 'water' ? 'Água' : 'Energia',
-        "Local/Medição": "Leitura Geral",
-        "Valor/Temp": l.reading,
-        "Lançado por": userMap.get(l.userId) || l.userId
-      }))
-    ].sort((a, b) => b.Data.localeCompare(a.Data) || b.Hora.localeCompare(a.Hora));
+        }))
+      ].sort((a, b) => b.Data.localeCompare(a.Data) || b.Hora.localeCompare(a.Hora));
 
-    const wsUtilities = XLSX.utils.json_to_sheet(utilityData);
-    XLSX.utils.book_append_sheet(wb, wsUtilities, "Utilidades e Frio");
+      const wsUtilities = XLSX.utils.json_to_sheet(utilityData);
+      XLSX.utils.book_append_sheet(wb, wsUtilities, "Utilidades e Frio");
+    }
 
     // 18. ABA: AGENDAMENTO DESPESCA
-    const filteredSchedules = (state.harvestSchedules || []).filter(s => filterByDate(s.date));
-    const wsSchedules = XLSX.utils.json_to_sheet(filteredSchedules.map(s => ({
-      "Data": s.date,
-      "Lote": batchMap.get(s.batchId) || s.batchId,
-      "Gaiolas": s.cageIds.map(id => cageMap.get(id) || id).join(', '),
-      "Último Trato": s.lastFeedingDate || "N/A",
-      "Observações": s.notes || ""
-    })));
-    XLSX.utils.book_append_sheet(wb, wsSchedules, "Agendamento Despesca");
+    if (selectedReportTabs.includes('schedules')) {
+      const filteredSchedules = (state.harvestSchedules || []).filter(s => filterByDate(s.date));
+      const wsSchedules = XLSX.utils.json_to_sheet(filteredSchedules.map(s => ({
+        "Data": s.date,
+        "Lote": batchMap.get(s.batchId) || s.batchId,
+        "Gaiolas": s.cageIds.map(id => cageMap.get(id) || id).join(', '),
+        "Último Trato": s.lastFeedingDate || "N/A",
+        "Observações": s.notes || ""
+      })));
+      XLSX.utils.book_append_sheet(wb, wsSchedules, "Agendamento Despesca");
+    }
+
+    // ABA: MANUTENÇÃO
+    if (selectedReportTabs.includes('maintenance')) {
+      const maintenanceCages = (state.cages || []).filter(c => c.status === 'Manutenção' || c.status === 'Limpeza' || c.status === 'Avaliação' || c.maintenanceStartDate);
+      const wsMaintenance = XLSX.utils.json_to_sheet(maintenanceCages.map(c => ({
+        "Gaiola": c.name,
+        "Linha / Setor": lineMap.get(c.lineId || '') || "N/A",
+        "Status": c.status,
+        "Início Manutenção": c.maintenanceStartDate || "N/A",
+        "Previsão Conclusão": c.maintenanceEndDate || "N/A",
+        "Capacidade": c.stockingCapacity
+      })));
+      XLSX.utils.book_append_sheet(wb, wsMaintenance, "Manutenção");
+    }
+
+    // VERIFICAR SE AO MENOS UMA ABA FOI GERADA
+    if (wb.SheetNames.length === 0) {
+      alert("Nenhuma aba pôde ser gerada com a seleção atual.");
+      return;
+    }
 
     // FINALIZAR DOWNLOAD
     XLSX.writeFile(wb, `Relatorio_AquaGestao_${reportStartDate}_a_${reportEndDate}.xlsx`);
+    setShowReportModal(false);
   };
 
   return (
@@ -1899,20 +2183,36 @@ const Dashboard: React.FC<Props> = ({ state }) => {
           </div>
         </div>
 
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col xl:flex-row-reverse items-center gap-4">
-          <button onClick={handleDownloadReport} className="w-full xl:w-auto px-6 py-3 bg-emerald-600 text-white rounded-xl font-black text-xs uppercase tracking-widest flex items-center justify-center gap-2 shadow-lg hover:bg-emerald-700 transition-all active:scale-95 whitespace-nowrap">
-            <Download className="w-4 h-4" /> RELATÓRIO (EXCEL)
+        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col xl:flex-row-reverse items-center justify-between gap-4">
+          <button 
+            onClick={() => setShowReportModal(true)} 
+            className="w-full xl:w-auto px-6 py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/20 transition-all active:scale-95 whitespace-nowrap group"
+          >
+            <FileSpreadsheet className="w-4 h-4 text-emerald-200 group-hover:scale-110 transition-transform" />
+            <span>EXPORTAR EXCEL ({selectedReportTabs.length} ABAS)</span>
           </button>
           <div className="flex flex-col sm:flex-row items-center gap-3 flex-1 w-full">
-            <div className="p-3 bg-emerald-50 text-emerald-600 rounded-xl shadow-sm hidden sm:block"><Calendar className="w-6 h-6" /></div>
+            <div className="p-3 bg-emerald-50 text-emerald-600 rounded-xl shadow-sm hidden sm:block">
+              <Calendar className="w-6 h-6" />
+            </div>
             <div className="flex-1 grid grid-cols-2 gap-3 w-full">
               <div>
                 <label className="text-[10px] font-black text-slate-400 uppercase block mb-1">Início Relatório</label>
-                <input type="date" value={reportStartDate} onChange={e => setReportStartDate(e.target.value)} className="w-full text-xs font-bold text-slate-700 bg-slate-50 border border-slate-100 rounded-lg p-2 outline-none" />
+                <input 
+                  type="date" 
+                  value={reportStartDate} 
+                  onChange={e => setReportStartDate(e.target.value)} 
+                  className="w-full text-xs font-bold text-slate-700 bg-slate-50 border border-slate-100 rounded-lg p-2 outline-none focus:ring-2 focus:ring-emerald-500/20" 
+                />
               </div>
               <div>
                 <label className="text-[10px] font-black text-slate-400 uppercase block mb-1">Fim Relatório</label>
-                <input type="date" value={reportEndDate} onChange={e => setReportEndDate(e.target.value)} className="w-full text-xs font-bold text-slate-700 bg-slate-50 border border-slate-100 rounded-lg p-2 outline-none" />
+                <input 
+                  type="date" 
+                  value={reportEndDate} 
+                  onChange={e => setReportEndDate(e.target.value)} 
+                  className="w-full text-xs font-bold text-slate-700 bg-slate-50 border border-slate-100 rounded-lg p-2 outline-none focus:ring-2 focus:ring-emerald-500/20" 
+                />
               </div>
             </div>
           </div>
@@ -2200,6 +2500,228 @@ const Dashboard: React.FC<Props> = ({ state }) => {
           </div>
         )}
       </div>
+
+      {/* MODAL DE EXPORTAÇÃO EXCEL COM SELEÇÃO DE ABAS AUTORIZADAS */}
+      {showReportModal && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[150] flex items-center justify-center p-4 overflow-y-auto animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl shadow-2xl border border-slate-100 max-w-3xl w-full max-h-[90vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
+            {/* Header */}
+            <div className="px-6 py-5 bg-gradient-to-r from-emerald-600 to-teal-700 text-white flex items-center justify-between shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-white/10 rounded-2xl backdrop-blur-md">
+                  <FileSpreadsheet className="w-6 h-6 text-emerald-200" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black uppercase tracking-wider text-white">
+                    Exportar Relatório em Excel (.xlsx)
+                  </h3>
+                  <p className="text-xs text-emerald-100 font-medium">
+                    Personalize o período e selecione as abas autorizadas para a planilha
+                  </p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setShowReportModal(false)}
+                className="p-2 text-white/80 hover:text-white hover:bg-white/10 rounded-xl transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Content Body */}
+            <div className="p-6 overflow-y-auto space-y-6 flex-1">
+              {/* 1. Intervalo de Datas */}
+              <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200/80 space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Calendar className="w-4 h-4 text-emerald-600" />
+                    <span className="text-xs font-black text-slate-700 uppercase tracking-wider">
+                      1. Período de Apuração
+                    </span>
+                  </div>
+                  <span className="text-[10px] font-bold text-slate-400 uppercase">
+                    Filtra lançamentos de manejo e finanças
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-[11px] font-bold text-slate-500 uppercase block mb-1">
+                      Data Inicial
+                    </label>
+                    <input 
+                      type="date" 
+                      value={reportStartDate} 
+                      onChange={e => setReportStartDate(e.target.value)} 
+                      className="w-full text-xs font-bold text-slate-700 bg-white border border-slate-200 rounded-xl p-2.5 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 shadow-sm" 
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[11px] font-bold text-slate-500 uppercase block mb-1">
+                      Data Final
+                    </label>
+                    <input 
+                      type="date" 
+                      value={reportEndDate} 
+                      onChange={e => setReportEndDate(e.target.value)} 
+                      className="w-full text-xs font-bold text-slate-700 bg-white border border-slate-200 rounded-xl p-2.5 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 shadow-sm" 
+                    />
+                  </div>
+                </div>
+
+                {/* Quick Date Presets */}
+                <div className="flex flex-wrap gap-2 pt-1">
+                  <button 
+                    type="button" 
+                    onClick={() => setQuickDateRange('7days')}
+                    className="px-2.5 py-1 text-[10px] font-black uppercase rounded-lg bg-white border border-slate-200 text-slate-600 hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-200 transition-colors"
+                  >
+                    Últimos 7 dias
+                  </button>
+                  <button 
+                    type="button" 
+                    onClick={() => setQuickDateRange('30days')}
+                    className="px-2.5 py-1 text-[10px] font-black uppercase rounded-lg bg-white border border-slate-200 text-slate-600 hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-200 transition-colors"
+                  >
+                    Últimos 30 dias
+                  </button>
+                  <button 
+                    type="button" 
+                    onClick={() => setQuickDateRange('thisMonth')}
+                    className="px-2.5 py-1 text-[10px] font-black uppercase rounded-lg bg-white border border-slate-200 text-slate-600 hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-200 transition-colors"
+                  >
+                    Mês Atual
+                  </button>
+                  <button 
+                    type="button" 
+                    onClick={() => setQuickDateRange('thisYear')}
+                    className="px-2.5 py-1 text-[10px] font-black uppercase rounded-lg bg-white border border-slate-200 text-slate-600 hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-200 transition-colors"
+                  >
+                    Ano Atual
+                  </button>
+                  <button 
+                    type="button" 
+                    onClick={() => setQuickDateRange('all')}
+                    className="px-2.5 py-1 text-[10px] font-black uppercase rounded-lg bg-white border border-slate-200 text-slate-600 hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-200 transition-colors"
+                  >
+                    Todo o Período
+                  </button>
+                </div>
+              </div>
+
+              {/* 2. Seleção de Abas */}
+              <div className="space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-1 border-b border-slate-100">
+                  <div className="flex items-center gap-2">
+                    <Filter className="w-4 h-4 text-emerald-600" />
+                    <span className="text-xs font-black text-slate-700 uppercase tracking-wider">
+                      2. Abas do Arquivo Excel (Planilhas Separadas)
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <button 
+                      type="button"
+                      onClick={selectAllExportTabs}
+                      className="text-[10px] font-black uppercase text-emerald-600 hover:text-emerald-700 transition-colors"
+                    >
+                      Selecionar Todas
+                    </button>
+                    <span className="text-slate-300">|</span>
+                    <button 
+                      type="button"
+                      onClick={deselectAllExportTabs}
+                      className="text-[10px] font-black uppercase text-red-500 hover:text-red-600 transition-colors"
+                    >
+                      Desmarcar Todas
+                    </button>
+                  </div>
+                </div>
+
+                <p className="text-xs text-slate-500">
+                  Exibindo somente as seções autorizadas para seu usuário. Cada opção marcada será inserida como uma aba separada no arquivo <code className="text-[11px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded">.xlsx</code>.
+                </p>
+
+                {/* Cards Grid */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5 pt-1">
+                  {availableExportTabs.map(tab => {
+                    const isSelected = selectedReportTabs.includes(tab.id);
+                    return (
+                      <div
+                        key={tab.id}
+                        onClick={() => toggleExportTab(tab.id)}
+                        className={`p-3.5 rounded-2xl border transition-all cursor-pointer flex items-start gap-3 select-none ${
+                          isSelected 
+                            ? 'bg-emerald-50/70 border-emerald-300 shadow-sm' 
+                            : 'bg-white border-slate-200 hover:border-slate-300 opacity-70 hover:opacity-100'
+                        }`}
+                      >
+                        <div className="pt-0.5 shrink-0">
+                          {isSelected ? (
+                            <CheckSquare className="w-5 h-5 text-emerald-600" />
+                          ) : (
+                            <Square className="w-5 h-5 text-slate-300" />
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className={`text-xs font-black uppercase truncate ${isSelected ? 'text-emerald-950' : 'text-slate-700'}`}>
+                              {tab.label}
+                            </span>
+                            <span className="text-[9px] font-black uppercase px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 shrink-0">
+                              {tab.category}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-1.5 mt-0.5">
+                            <span className="text-[10px] font-bold text-emerald-600">Aba:</span>
+                            <span className="text-[10px] font-bold text-slate-600 italic">"{tab.sheetName}"</span>
+                          </div>
+                          <p className="text-[10px] text-slate-500 mt-1 leading-snug">
+                            {tab.description}
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {availableExportTabs.length === 0 && (
+                  <div className="text-center py-8 bg-slate-50 rounded-2xl border border-slate-200 text-slate-400 font-bold text-xs uppercase">
+                    Nenhuma aba autorizada encontrada para o seu perfil.
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shrink-0">
+              <div className="flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                <span className="text-xs font-bold text-slate-600">
+                  <strong>{selectedReportTabs.length}</strong> de <strong>{availableExportTabs.length}</strong> abas selecionadas
+                </span>
+              </div>
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => setShowReportModal(false)}
+                  className="px-4 py-2.5 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-100 font-bold text-xs uppercase tracking-wider transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={handleDownloadReport}
+                  disabled={selectedReportTabs.length === 0}
+                  className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-xl font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/20 transition-all active:scale-95 cursor-pointer disabled:cursor-not-allowed"
+                >
+                  <Download className="w-4 h-4" />
+                  <span>Baixar Planilha (.xlsx)</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

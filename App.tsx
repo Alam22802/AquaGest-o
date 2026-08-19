@@ -650,7 +650,7 @@ const App: React.FC = () => {
   const renderContent = () => {
     if (!state || !currentUser) return null;
     switch (activeTab) {
-      case 'dashboard': return <Dashboard state={state} />;
+      case 'dashboard': return <Dashboard state={state} currentUser={currentUser} />;
       case 'capex': return <CapexManagement state={state} onUpdate={handleStateUpdate} currentUser={currentUser} />;
       case 'inventory': return <CageInventory state={state} onUpdate={handleStateUpdate} currentUser={currentUser} />;
       case 'maintenance': return <Maintenance state={state} onUpdate={handleStateUpdate} currentUser={currentUser} />;
@@ -666,7 +666,7 @@ const App: React.FC = () => {
       case 'pcm': return <PCMManagement state={state} onUpdate={handleStateUpdate} currentUser={currentUser} />;
       case 'users': return <UserManagement state={state} onUpdate={handleStateUpdate} currentUser={currentUser} />;
       case 'cloud': return <CloudSettings state={state} onUpdate={handleStateUpdate} currentUser={currentUser} onSync={backgroundSync} isSyncing={isSyncingBackground} />;
-      default: return <Dashboard state={state} />;
+      default: return <Dashboard state={state} currentUser={currentUser} />;
     }
   };
 
