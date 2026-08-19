@@ -188,6 +188,8 @@ async function scheduleSafeFarmStatePersist(stateToSave: any) {
   function mergeObjectsById(localArr: any[], remoteArr: any[], deletedSet: Set<string>, preserveOnBatchDeletion: boolean = false): any[] {
     const map = new Map<string, any>();
     
+    const now = Date.now();
+    
     (localArr || []).forEach(item => {
       if (!isServerItemDeleted(item, deletedSet, preserveOnBatchDeletion)) {
         map.set(item.id, item);
@@ -199,18 +201,33 @@ async function scheduleSafeFarmStatePersist(stateToSave: any) {
       
       const existing = map.get(item.id);
       if (!existing) {
+        // If the item only exists in the incoming client state:
+        // Do not resurrect stale ghost items from inactive devices
+        const itemTime = Number(item.updatedAt || 0);
+        if (itemTime > 0 && (now - itemTime > 30 * 24 * 60 * 60 * 1000)) {
+          // Stale item from more than 30 days ago that was absent from server - ignore
+          return;
+        }
         map.set(item.id, item);
       } else {
-        const t1 = Number(existing.updatedAt || 0);
-        const t2 = Number(item.updatedAt || 0);
-        const isModified = isServerObjectModified(existing, item);
+        const t1 = Number(existing.updatedAt || 0); // Server timestamp
+        const t2 = Number(item.updatedAt || 0);     // Client timestamp
 
-        // When client sends modified data or equal/newer timestamp, client edits must take precedence
-        if (t2 >= t1 || isModified) {
-          const finalTime = Date.now();
-          map.set(item.id, { ...existing, ...item, updatedAt: finalTime });
-        } else {
+        // Strictly enforce timestamp-based conflict resolution:
+        // If server is strictly newer, server ALWAYS wins (stale client cannot overwrite)
+        if (t1 > t2) {
           map.set(item.id, existing);
+        } else if (t2 > t1) {
+          // Client is strictly newer: accept client update
+          map.set(item.id, { ...existing, ...item, updatedAt: Math.min(t2, now) });
+        } else {
+          // Equal timestamps: keep server existing unless client explicitly has a recent edit
+          const isModified = isServerObjectModified(existing, item);
+          if (isModified && (now - t2 < 10 * 60 * 1000)) {
+            map.set(item.id, { ...existing, ...item, updatedAt: now });
+          } else {
+            map.set(item.id, existing);
+          }
         }
       }
     });

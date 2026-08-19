@@ -19,7 +19,7 @@ import PCMManagement from './components/PCMManagement.tsx';
 import SlaughterHouse from './components/SlaughterHouse.tsx';
 import Login from './components/Login.tsx';
 import ErrorBoundary from './components/ErrorBoundary.tsx';
-import { loadState, saveState, getSession, saveSession, ensureStateIntegrity, fetchRemoteState, subscribeToRemoteChanges, repairArray, getSupabaseConfig } from './store.ts';
+import { loadState, saveState, getSession, saveSession, ensureStateIntegrity, fetchRemoteState, subscribeToRemoteChanges, repairArray, getSupabaseConfig, saveSupabaseConfig } from './store.ts';
 import { AppState, User } from './types.ts';
 import { Loader2, RefreshCw, AlertTriangle, X, Cloud, CheckCircle2 } from 'lucide-react';
 

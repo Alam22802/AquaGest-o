@@ -162,6 +162,17 @@ function mergeArraysById<T extends { id: string, name?: string, batchId?: string
   for (let i = 0; i < safeLocal.length; i++) {
     const item = safeLocal[i];
     if (isItemDeleted(item)) continue;
+
+    // If remote priority is active and remote collection is populated:
+    // Do not resurrect stale local items that are absent from remote if they are older than 14 days
+    if (priority === 'remote' && safeRemote.length > 0) {
+      const itemTime = getTime(item);
+      const isPresentInRemote = safeRemote.some(r => r && r.id === item.id);
+      if (!isPresentInRemote && (itemTime === 0 || now - itemTime > 14 * 24 * 60 * 60 * 1000)) {
+        continue;
+      }
+    }
+
     map.set(item.id, item);
   }
 
@@ -174,22 +185,27 @@ function mergeArraysById<T extends { id: string, name?: string, batchId?: string
     if (!existing) {
       map.set(item.id, item);
     } else {
-      const itemTime = getTime(item);
-      const existingTime = getTime(existing);
+      const remoteTime = getTime(item);
+      const localTime = getTime(existing);
       const isModified = isObjectModified(existing, item);
       
-      if (itemTime > existingTime) {
-        // Remote is strictly newer
+      if (remoteTime > localTime) {
+        // Remote is strictly newer: remote wins
         map.set(item.id, item);
-      } else if (existingTime > itemTime) {
-        // Local is strictly newer
-        map.set(item.id, existing);
-      } else {
-        // Equal timestamps: if modified and local priority, keep local
-        if (priority === 'local') {
-          map.set(item.id, existing);
+      } else if (localTime > remoteTime) {
+        // Local is strictly newer: local wins only if priority is local or local was edited recently
+        if (priority === 'remote' && (now - localTime > 7 * 24 * 60 * 60 * 1000)) {
+          // Inactive local device with old timestamp should NOT override remote
+          map.set(item.id, item);
         } else {
-          map.set(item.id, isModified ? item : existing);
+          map.set(item.id, existing);
+        }
+      } else {
+        // Equal timestamps:
+        if (priority === 'remote') {
+          map.set(item.id, item);
+        } else {
+          map.set(item.id, isModified ? existing : item);
         }
       }
     }
@@ -1023,6 +1039,16 @@ export const getSupabaseConfig = () => {
   return saved ? JSON.parse(saved) : null;
 };
 
+export const saveSupabaseConfig = (config: { url: string; key: string } | null) => {
+  if (config && config.url && config.key) {
+    try {
+      localStorage.setItem(SUPABASE_CONFIG_KEY, JSON.stringify(config));
+    } catch (e) {
+      console.warn('Falha ao salvar config Supabase no localStorage');
+    }
+  }
+};
+
 export interface ApplyLinkResult {
   success: boolean;
   message: string;
@@ -1258,7 +1284,7 @@ export const saveState = async (state: AppState, userConfig?: {url: string, key:
       const remoteState = data?.state as AppState | undefined;
       
       mergedStateToSave = remoteState 
-        ? ensureStateIntegrity(mergedStateToSave, remoteState, 'local') 
+        ? ensureStateIntegrity(mergedStateToSave, remoteState, 'remote') 
         : mergedStateToSave;
 
       await supabase.from('farm_data').upsert({ id: 'singleton', state: mergedStateToSave, last_sync: new Date().toISOString() });
