@@ -438,6 +438,27 @@ async function scheduleSafeFarmStatePersist(stateToSave: any) {
       });
     }
 
+    if (Array.isArray(merged.batches)) {
+      merged.batches = merged.batches.filter((b: any) => {
+        if (!b || !b.id || deletedSet.has(b.id) || b.name === '01/2026 - L2') return false;
+        return true;
+      }).map((b: any) => {
+        if (b.name === '03/2026 - L3') {
+          return { ...b, isClosed: true, cageIds: [] };
+        }
+        return b;
+      });
+    }
+
+    if (Array.isArray(merged.harvestSchedules)) {
+      const closedBatchIds = new Set((merged.batches || []).filter((b: any) => b.isClosed || b.name === '03/2026 - L3').map((b: any) => b.id));
+      merged.harvestSchedules = merged.harvestSchedules.filter((hs: any) => {
+        if (!hs || !hs.id || deletedSet.has(hs.id)) return false;
+        if (hs.batchId && (deletedSet.has(hs.batchId) || closedBatchIds.has(hs.batchId))) return false;
+        return true;
+      });
+    }
+
     return merged;
   }
 

@@ -99,7 +99,11 @@ const initialState: AppState = {
   pcmPlannedImprovements: [],
   farmTargetCapacity: 0,
   notificationSettings: defaultNotificationSettings,
-  deletedIds: []
+  deletedIds: [
+    '9ce0396e-06cf-416d-b795-ae69fc473fae',
+    '01/2026 - L2',
+    '972c8350-2c1c-42e4-b325-43a8d83802ee'
+  ]
 };
 
 function isObjectModified(a: any, b: any): boolean {
@@ -884,7 +888,15 @@ export const ensureStateIntegrity = (state: any, mergeWith?: AppState, priority:
   }
 
   if (finalResult.harvestSchedules && finalResult.harvestSchedules.length > 0) {
-    finalResult.harvestSchedules = finalResult.harvestSchedules.filter(hs => !deletedSet.has(hs.id) && (!hs.batchId || !deletedSet.has(hs.batchId)));
+    finalResult.harvestSchedules = finalResult.harvestSchedules.filter(hs => {
+      if (!hs || !hs.id || deletedSet.has(hs.id)) return false;
+      if (hs.batchId) {
+        if (deletedSet.has(hs.batchId)) return false;
+        const b = batchMap.get(hs.batchId);
+        if (b && (b.isClosed || b.name === '03/2026 - L3' || b.name === '01/2026 - L2')) return false;
+      }
+      return true;
+    });
   }
 
   if (finalResult.batchExpenses && finalResult.batchExpenses.length > 0) {

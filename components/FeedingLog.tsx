@@ -133,8 +133,38 @@ const FeedingLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
 
   const availableFilterFeedTypes = useMemo(() => {
     const allFeeds = state.feedTypes || [];
-    return [...allFeeds].sort((a, b) => a.name.localeCompare(b.name));
-  }, [state.feedTypes]);
+    const logs = Array.isArray(state.feedingLogs) ? state.feedingLogs : [];
+    
+    // Calculate consumption per feed type for the selected batch or overall
+    const feedConsumptionMap = new Map<string, number>();
+    logs.forEach(log => {
+      if (!log.feedTypeId) return;
+      if (selectedBatchId) {
+        let bId = log.batchId;
+        if (!bId && log.cageId) {
+          const cage = cageMap.get(log.cageId);
+          bId = cage?.batchId;
+        }
+        if (bId !== selectedBatchId) return;
+      }
+      feedConsumptionMap.set(log.feedTypeId, (feedConsumptionMap.get(log.feedTypeId) || 0) + (Number(log.amount) || 0));
+    });
+
+    return [...allFeeds].map(ft => {
+      const consumedGrams = feedConsumptionMap.get(ft.id) || 0;
+      const consumedKg = consumedGrams / 1000;
+      return {
+        ...ft,
+        consumedKg,
+        hasConsumption: consumedGrams > 0
+      };
+    }).sort((a, b) => {
+      if (a.hasConsumption && !b.hasConsumption) return -1;
+      if (!a.hasConsumption && b.hasConsumption) return 1;
+      if (a.hasConsumption && b.hasConsumption) return b.consumedKg - a.consumedKg;
+      return a.name.localeCompare(b.name);
+    });
+  }, [state.feedTypes, state.feedingLogs, selectedBatchId, cageMap]);
 
   const sortedLogs = useMemo(() => {
     const logs = Array.isArray(state.feedingLogs) ? state.feedingLogs : [];
@@ -537,7 +567,7 @@ const FeedingLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
               ))}
             </select>
             <select 
-              className="text-[10px] font-black uppercase text-slate-500 bg-slate-100 px-3 py-1.5 rounded-lg outline-none border-none"
+              className="text-[10px] font-black uppercase text-slate-500 bg-slate-100 px-3 py-1.5 rounded-lg outline-none border-none max-w-[200px]"
               value={selectedFilterFeedTypeId}
               onChange={e => {
                 setSelectedFilterFeedTypeId(e.target.value);
@@ -545,10 +575,10 @@ const FeedingLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                 setSelectedLogIds(new Set());
               }}
             >
-              <option value="">Todas as Rações</option>
+              <option value="">Todas as Rações (Modelos)</option>
               {availableFilterFeedTypes.map(ft => (
                 <option key={ft.id} value={ft.id}>
-                  {ft.name}
+                  {ft.name} {ft.hasConsumption ? `(${formatNumber(ft.consumedKg, 1)} kg)` : ''}
                 </option>
               ))}
             </select>
@@ -580,6 +610,47 @@ const FeedingLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
             </button>
           </div>
         </div>
+
+        {/* Quick Filter Chips for Feed Models consumed in the selected batch */}
+        {availableFilterFeedTypes.some(ft => ft.hasConsumption) && (
+          <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-hide">
+            <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest shrink-0">Modelos consumidos:</span>
+            <button
+              onClick={() => {
+                setSelectedFilterFeedTypeId('');
+                setCurrentPage(1);
+                setSelectedLogIds(new Set());
+              }}
+              className={`px-3 py-1 rounded-full text-[10px] font-black uppercase transition-all shrink-0 ${
+                !selectedFilterFeedTypeId 
+                  ? 'bg-blue-600 text-white shadow-md shadow-blue-600/20' 
+                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+              }`}
+            >
+              Todos ({formatNumber(filteredTotalGrams / 1000, 1)} kg)
+            </button>
+            {availableFilterFeedTypes.filter(ft => ft.hasConsumption).map(ft => (
+              <button
+                key={ft.id}
+                onClick={() => {
+                  setSelectedFilterFeedTypeId(selectedFilterFeedTypeId === ft.id ? '' : ft.id);
+                  setCurrentPage(1);
+                  setSelectedLogIds(new Set());
+                }}
+                className={`px-3 py-1 rounded-full text-[10px] font-black uppercase transition-all shrink-0 flex items-center gap-1.5 ${
+                  selectedFilterFeedTypeId === ft.id
+                    ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/20'
+                    : 'bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-200/50'
+                }`}
+              >
+                <span>{ft.name}</span>
+                <span className={`text-[9px] px-1.5 py-0.5 rounded-full ${selectedFilterFeedTypeId === ft.id ? 'bg-emerald-700/50 text-white' : 'bg-slate-200 text-slate-600'}`}>
+                  {formatNumber(ft.consumedKg, 1)} kg
+                </span>
+              </button>
+            ))}
+          </div>
+        )}
 
         {(selectedBatchId || selectedFilterCageId || selectedFilterFeedTypeId || startDate || endDate) && (
           <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5 bg-blue-50/70 border border-blue-100 rounded-2xl text-[11px] font-bold text-blue-900">
