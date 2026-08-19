@@ -99,25 +99,36 @@ const HarvestManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
       return;
     }
 
-    const updatedCages = state.cages.map(c => 
-      c.id === selectedCageId ? { 
-        ...c, 
-        batchId: undefined, 
-        initialFishCount: undefined, 
-        settlementDate: undefined,
-        harvestDate: undefined,
-        status: 'Limpeza' as const,
-        maintenanceStartDate: date || new Date().toISOString().split('T')[0],
-        maintenanceEndDate: undefined,
-        updatedAt: Date.now()
-      } : c
+    // Check if this was the last unharvested cage for the batch
+    const harvestedCageIdsForBatch = new Set(
+      (state.harvestLogs || []).filter(h => h.batchId === selectedBatchId).map(h => h.cageId)
+    );
+    harvestedCageIdsForBatch.add(selectedCageId);
+
+    const remainingUnharvested = state.cages.filter(c => 
+      c.batchId === selectedBatchId && 
+      c.id !== selectedCageId &&
+      c.status === 'Ocupada' && 
+      !harvestedCageIdsForBatch.has(c.id)
     );
 
-    const cageMortality = (state.mortalityLogs || [])
-      .filter(m => m.cageId === selectedCageId && (m.batchId ? m.batchId === selectedBatchId : true))
-      .reduce((acc, curr) => acc + curr.count, 0);
-
-    const initialFishCountToSave = selectedCage?.initialFishCount || (Number(fishCount) + cageMortality);
+    // If no remaining unharvested cages exist for this batch, ensure all cages assigned to it are freed
+    const finalUpdatedCages = state.cages.map(c => {
+      if (c.id === selectedCageId || (remainingUnharvested.length === 0 && c.batchId === selectedBatchId)) {
+        return {
+          ...c,
+          batchId: undefined,
+          initialFishCount: undefined,
+          settlementDate: undefined,
+          harvestDate: undefined,
+          status: 'Limpeza' as const,
+          maintenanceStartDate: date || new Date().toISOString().split('T')[0],
+          maintenanceEndDate: undefined,
+          updatedAt: Date.now()
+        };
+      }
+      return c;
+    });
 
     if (editingId) {
       const updatedLogs = (state.harvestLogs || []).map(l => 
@@ -137,7 +148,7 @@ const HarvestManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
 
       onUpdate({
         ...state,
-        cages: updatedCages,
+        cages: finalUpdatedCages,
         harvestLogs: updatedLogs
       });
       setEditingId(null);
@@ -159,10 +170,16 @@ const HarvestManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
 
       const updatedHarvestLogs = [newLog, ...(state.harvestLogs || [])];
 
+      // If batch is completely harvested, also clean up remaining harvest schedules for this batch
+      const updatedSchedules = remainingUnharvested.length === 0
+        ? (state.harvestSchedules || []).filter(hs => hs.batchId !== selectedBatchId)
+        : (state.harvestSchedules || []);
+
       onUpdate({
         ...state,
-        cages: updatedCages,
-        harvestLogs: updatedHarvestLogs
+        cages: finalUpdatedCages,
+        harvestLogs: updatedHarvestLogs,
+        harvestSchedules: updatedSchedules
       });
     }
 

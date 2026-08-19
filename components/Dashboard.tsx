@@ -748,8 +748,20 @@ const Dashboard: React.FC<Props> = ({ state }) => {
   }, [state.batches, state.cages, state.mortalityLogs, state.biometryLogs, state.feedingLogs, state.feedTypes, state.harvestLogs, state.slaughterLogs, state.batchRevenues]);
 
   const filteredBatchStats = useMemo(() => {
-    return batchStats.filter(b => !b.isClosed && b.settlementBalance === 0);
-  }, [batchStats]);
+    return batchStats.filter(b => {
+      if (b.isClosed) return false;
+      // Batches that completed all cage harvests (0 active occupied cages in water and harvested > 0)
+      // are removed from Visão Geral and displayed solely in Fechamento
+      const activeCages = (state.cages || []).filter(c => 
+        (c.batchId === b.id || (b.name && c.batchId === b.name)) && 
+        c.status === 'Ocupada'
+      );
+      if (b.harvested > 0 && activeCages.length === 0) {
+        return false;
+      }
+      return b.settlementBalance === 0;
+    });
+  }, [batchStats, state.cages]);
 
   const selectedBatchData = useMemo(() => {
     const batchesToProcess = selectedBatchIds.length > 0 

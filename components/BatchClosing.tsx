@@ -8,6 +8,7 @@ import {
   TrendingUp, 
   Scale, 
   Fish, 
+  FishOff,
   Utensils, 
   Calendar, 
   DollarSign, 
@@ -24,8 +25,22 @@ import {
   Percent,
   Printer,
   Lock,
-  Unlock
+  Unlock,
+  Activity
 } from 'lucide-react';
+import {
+  ResponsiveContainer,
+  LineChart,
+  Line,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  Cell
+} from 'recharts';
 
 interface Props {
   state: AppState;
@@ -553,6 +568,103 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       });
     });
 
+    // 1. Compute Biometry Evolution Data for Charts
+    const biometryDateMap = new Map<string, { weights: number[]; count: number }>();
+    batchBiometries.forEach(b => {
+      if (b.date && b.averageWeight && b.averageWeight > 0) {
+        const d = b.date.split('T')[0];
+        const existing = biometryDateMap.get(d) || { weights: [], count: 0 };
+        existing.weights.push(b.averageWeight);
+        existing.count += (b.sampleCount || 1);
+        biometryDateMap.set(d, existing);
+      }
+    });
+
+    const startDateStr = batch.settlementDate ? batch.settlementDate.split('T')[0] : '';
+    const biometryEvolutionTimeline: {
+      date: string;
+      fullDate: string;
+      weight?: number;
+      standardWeight?: number;
+      isHarvestDate?: boolean;
+      days: number;
+    }[] = [];
+
+    // Initial settlement point
+    if (startDateStr) {
+      biometryEvolutionTimeline.push({
+        date: safeDateFormat(startDateStr, 'dd/MM'),
+        fullDate: startDateStr,
+        weight: batch.initialUnitWeight || 0,
+        standardWeight: batch.initialUnitWeight || 0,
+        days: 0
+      });
+    }
+
+    // Biometry points
+    const sortedBiometryDates = Array.from(biometryDateMap.keys()).sort();
+    sortedBiometryDates.forEach(d => {
+      if (d === startDateStr) return;
+      const bInfo = biometryDateMap.get(d)!;
+      const avgW = bInfo.weights.reduce((sum, w) => sum + w, 0) / bInfo.weights.length;
+      const daysPassed = startDateStr ? Math.max(0, differenceInDays(parseISO(d), parseISO(startDateStr))) : 0;
+
+      let stdW: number | undefined = undefined;
+      if (protocol && startDateStr) {
+        const activePhase = (protocol.phases || []).find(p => daysPassed >= p.startDay && daysPassed <= p.endDay);
+        if (activePhase) {
+          const phaseDuration = Math.max(1, activePhase.endDay - activePhase.startDay);
+          const progress = Math.min(1, Math.max(0, (daysPassed - activePhase.startDay) / phaseDuration));
+          stdW = Math.round(activePhase.startWeight + progress * (activePhase.endWeight - activePhase.startWeight));
+        }
+      }
+
+      biometryEvolutionTimeline.push({
+        date: safeDateFormat(d, 'dd/MM'),
+        fullDate: d,
+        weight: Math.round(avgW * 10) / 10,
+        standardWeight: stdW,
+        days: daysPassed
+      });
+    });
+
+    // If batch has harvest, add harvest date and real harvest weight
+    if (firstHarvestDate && harvestBiometricsAvgWeight > 0 && !biometryDateMap.has(firstHarvestDate)) {
+      const daysPassed = startDateStr ? Math.max(0, differenceInDays(parseISO(firstHarvestDate), parseISO(startDateStr))) : 0;
+      biometryEvolutionTimeline.push({
+        date: safeDateFormat(firstHarvestDate, 'dd/MM'),
+        fullDate: firstHarvestDate,
+        weight: Math.round(harvestBiometricsAvgWeight * 10) / 10,
+        isHarvestDate: true,
+        days: daysPassed
+      });
+    }
+
+    biometryEvolutionTimeline.sort((a, b) => a.fullDate.localeCompare(b.fullDate));
+
+    // 2. Compute Mortality Evolution Data for Charts
+    const mortalityByDateMap = new Map<string, number>();
+    mortalityLogs.forEach(m => {
+      if (m.date && m.count > 0) {
+        const d = m.date.split('T')[0];
+        mortalityByDateMap.set(d, (mortalityByDateMap.get(d) || 0) + m.count);
+      }
+    });
+
+    const sortedMortalityDates = Array.from(mortalityByDateMap.keys()).sort();
+    let cumulativeMort = 0;
+    const mortalityEvolutionData = sortedMortalityDates.map(d => {
+      const count = mortalityByDateMap.get(d) || 0;
+      cumulativeMort += count;
+      return {
+        date: safeDateFormat(d, 'dd/MM'),
+        fullDate: d,
+        count,
+        cumulative: cumulativeMort,
+        cumulativeRate: batch.initialQuantity > 0 ? Number(((cumulativeMort / batch.initialQuantity) * 100).toFixed(2)) : 0
+      };
+    });
+
     return {
       batch,
       mortality,
@@ -589,7 +701,9 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       categories,
       items,
       filteredEntries,
-      totalReceptionWeight
+      totalReceptionWeight,
+      biometryEvolutionData: biometryEvolutionTimeline,
+      mortalityEvolutionData
     };
   }, [selectedBatchId, state.batches, state.mortalityLogs, state.feedingLogs, state.harvestLogs, state.slaughterLogs, state.batchExpenses, state.batchRevenues, state.protocols, state.biometryLogs, state.cages, state.feedTypes, state.feedStockLogs, filterCategory, filterItem]);
 
@@ -1647,6 +1761,273 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                   )}
                 </div>
               )}
+            </div>
+          </div>
+
+          {/* Gráficos de Evolução do Lote (Peso e Mortalidade) */}
+          <div className="space-y-6 print-container print-no-break">
+            <div className="flex items-center gap-3 px-4 print:px-0">
+              <div className="p-3 bg-blue-50 rounded-2xl print:bg-slate-100">
+                <Activity className="w-6 h-6 text-blue-600 print:text-blue-700" />
+              </div>
+              <div>
+                <h3 className="text-xl font-black text-black uppercase tracking-tighter italic print-text-xl">Evolução do Lote (Gráficos)</h3>
+                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest print-text-xs">Trajetória biométrica de peso e histórico de mortalidade</p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 print-grid-2">
+              {/* Gráfico 1: Evolução de Peso */}
+              <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-200 space-y-6 print-card print-no-break">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-4">
+                  <div className="flex items-center gap-2">
+                    <TrendingUp className="w-5 h-5 text-blue-600" />
+                    <h4 className="text-sm font-black text-slate-800 uppercase tracking-widest italic print-text-base">
+                      Evolução de Peso (g)
+                    </h4>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-black text-blue-600 bg-blue-50 px-2.5 py-1 rounded-xl border border-blue-100 print:bg-slate-100 print-text-xs">
+                      GPD: {formatNumber(batchData.gpd, 2)} g/dia
+                    </span>
+                    <span className="text-[10px] font-black text-slate-600 bg-slate-100 px-2.5 py-1 rounded-xl print-text-xs">
+                      {batchData.biometryEvolutionData.length} registros
+                    </span>
+                  </div>
+                </div>
+
+                <div className="h-[300px] w-full print:h-[260px]">
+                  {batchData.biometryEvolutionData.length > 0 ? (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={batchData.biometryEvolutionData} margin={{ top: 10, right: 20, left: -10, bottom: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                        <XAxis 
+                          dataKey="date" 
+                          axisLine={false} 
+                          tickLine={false} 
+                          tick={{ fontSize: 10, fontWeight: 700, fill: '#64748b' }} 
+                        />
+                        <YAxis 
+                          axisLine={false} 
+                          tickLine={false} 
+                          tick={{ fontSize: 10, fontWeight: 700, fill: '#64748b' }} 
+                          unit="g" 
+                        />
+                        <Tooltip 
+                          contentStyle={{ borderRadius: '1rem', border: '1px solid #e2e8f0', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
+                          formatter={(value: any, name: string) => {
+                            if (name === 'weight') return [`${value} g`, 'PESO REAL'];
+                            if (name === 'standardWeight') return [`${value} g`, 'CURVA PADRÃO'];
+                            return [value, name];
+                          }}
+                        />
+                        <Legend 
+                          verticalAlign="top" 
+                          height={36} 
+                          iconType="circle"
+                          formatter={(val) => <span className="text-[10px] font-black uppercase tracking-wider text-slate-600">{val === 'weight' ? 'Peso Real (g)' : 'Curva Padrão (g)'}</span>}
+                        />
+                        <Line 
+                          type="monotone" 
+                          dataKey="weight" 
+                          stroke="#2563eb" 
+                          strokeWidth={3.5} 
+                          dot={{ r: 4, fill: '#2563eb', strokeWidth: 2, stroke: '#ffffff' }} 
+                          activeDot={{ r: 6, strokeWidth: 0 }} 
+                          connectNulls 
+                        />
+                        {batchData.protocol && (
+                          <Line 
+                            type="monotone" 
+                            dataKey="standardWeight" 
+                            stroke="#8b5cf6" 
+                            strokeWidth={2} 
+                            strokeDasharray="4 4" 
+                            dot={false} 
+                            connectNulls 
+                          />
+                        )}
+                      </LineChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <div className="h-full flex flex-col items-center justify-center text-slate-300">
+                      <Scale className="w-10 h-10 mb-2 opacity-40" />
+                      <p className="text-[11px] font-bold uppercase tracking-widest">Sem biometrias registradas para o lote</p>
+                    </div>
+                  )}
+                </div>
+
+                <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-xs print:pt-2">
+                  <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Inicial: {formatNumber(batchData.batch.initialUnitWeight, 1)}g</span>
+                  <span className="text-[10px] font-black text-blue-600 uppercase tracking-widest">
+                    {batchData.harvestedFish > 0 
+                      ? `Final Despesca: ${formatNumber((batchData.harvestedWeight * 1000) / Math.max(1, batchData.harvestedFish), 1)}g` 
+                      : `Peso Atual Estimado: ${formatNumber(batchData.batch.initialUnitWeight + (batchData.gpd * batchData.totalDays), 1)}g`}
+                  </span>
+                </div>
+              </div>
+
+              {/* Gráfico 2: Evolução de Mortalidade */}
+              <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-200 space-y-6 print-card print-no-break">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-4">
+                  <div className="flex items-center gap-2">
+                    <FishOff className="w-5 h-5 text-red-500" />
+                    <h4 className="text-sm font-black text-slate-800 uppercase tracking-widest italic print-text-base">
+                      Mortalidade Registrada (un)
+                    </h4>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-black text-red-600 bg-red-50 px-2.5 py-1 rounded-xl border border-red-100 print:bg-slate-100 print-text-xs">
+                      Perdas Totais: {formatNumber(batchData.mortality)} un
+                    </span>
+                    <span className="text-[10px] font-black text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-xl border border-emerald-100 print:bg-slate-100 print-text-xs">
+                      Sobrevivência: {formatNumber(batchData.survivalRateReal, 1)}%
+                    </span>
+                  </div>
+                </div>
+
+                <div className="h-[300px] w-full print:h-[260px]">
+                  {batchData.mortalityEvolutionData.length > 0 ? (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={batchData.mortalityEvolutionData} margin={{ top: 10, right: 20, left: -10, bottom: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                        <XAxis 
+                          dataKey="date" 
+                          axisLine={false} 
+                          tickLine={false} 
+                          tick={{ fontSize: 10, fontWeight: 700, fill: '#64748b' }} 
+                        />
+                        <YAxis 
+                          axisLine={false} 
+                          tickLine={false} 
+                          tick={{ fontSize: 10, fontWeight: 700, fill: '#64748b' }} 
+                          unit=" un" 
+                        />
+                        <Tooltip 
+                          contentStyle={{ borderRadius: '1rem', border: '1px solid #e2e8f0', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
+                          formatter={(value: any, name: string) => {
+                            if (name === 'count') return [`${value} un`, 'MORTALIDADE DO DIA'];
+                            if (name === 'cumulative') return [`${value} un`, 'ACUMULADO'];
+                            return [value, name];
+                          }}
+                        />
+                        <Legend 
+                          verticalAlign="top" 
+                          height={36} 
+                          formatter={(val) => <span className="text-[10px] font-black uppercase tracking-wider text-slate-600">{val === 'count' ? 'Mortalidade Diária (un)' : 'Acumulado'}</span>}
+                        />
+                        <Bar dataKey="count" fill="#ef4444" radius={[6, 6, 0, 0]}>
+                          {batchData.mortalityEvolutionData.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={entry.count > 50 ? '#dc2626' : '#ef4444'} />
+                          ))}
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <div className="h-full flex flex-col items-center justify-center text-slate-300">
+                      <FishOff className="w-10 h-10 mb-2 opacity-40" />
+                      <p className="text-[11px] font-bold uppercase tracking-widest">Nenhuma mortalidade registrada para o lote</p>
+                    </div>
+                  )}
+                </div>
+
+                <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-xs print:pt-2">
+                  <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">
+                    Taxa Acumulada: {batchData.batch.initialQuantity > 0 ? formatNumber((batchData.mortality / batchData.batch.initialQuantity) * 100, 1) : 0}%
+                  </span>
+                  <span className="text-[10px] font-black text-emerald-600 uppercase tracking-widest">
+                    Saldo Vivo Final: {formatNumber(Math.max(0, batchData.liveFish))} un
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Quadro de Evolução de Peso do Lote (Datas e Pesos) */}
+            <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-200 print-card print-no-break space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-4">
+                <div className="flex items-center gap-2">
+                  <Scale className="w-5 h-5 text-blue-600" />
+                  <h4 className="text-sm font-black text-slate-800 uppercase tracking-widest italic print-text-base">
+                    Quadro de Evolução de Peso do Lote (Histórico de Pesagens)
+                  </h4>
+                </div>
+                <div className="text-[10px] font-black text-slate-500 uppercase tracking-widest print-text-xs">
+                  {batchData.biometryEvolutionData.length} registros cronológicos
+                </div>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="border-b-2 border-slate-200 bg-slate-50/80">
+                      <th className="py-3.5 px-4 text-[10px] font-black text-slate-700 uppercase tracking-widest print-text-xs">Data</th>
+                      <th className="py-3.5 px-4 text-[10px] font-black text-slate-700 uppercase tracking-widest print-text-xs">Dia de Cultivo</th>
+                      <th className="py-3.5 px-4 text-[10px] font-black text-slate-700 uppercase tracking-widest print-text-xs">Evento / Registro</th>
+                      <th className="py-3.5 px-4 text-right text-[10px] font-black text-slate-700 uppercase tracking-widest print-text-xs">Peso Médio Real (g)</th>
+                      {batchData.protocol && (
+                        <th className="py-3.5 px-4 text-right text-[10px] font-black text-slate-700 uppercase tracking-widest print-text-xs">Peso Padrão (g)</th>
+                      )}
+                      <th className="py-3.5 px-4 text-right text-[10px] font-black text-slate-700 uppercase tracking-widest print-text-xs">Ganho Acumulado (g)</th>
+                      <th className="py-3.5 px-4 text-right text-[10px] font-black text-slate-700 uppercase tracking-widest print-text-xs">GPD Médio (g/dia)</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {batchData.biometryEvolutionData.map((row, idx) => {
+                      const initialW = batchData.batch.initialUnitWeight || 0;
+                      const weightGain = row.weight !== undefined ? row.weight - initialW : 0;
+                      const periodGpd = row.days > 0 && row.weight !== undefined ? (row.weight - initialW) / row.days : 0;
+                      const eventLabel = row.days === 0 
+                        ? 'Povoamento Inicial' 
+                        : row.isHarvestDate 
+                          ? 'Despesca Final' 
+                          : `Biometria`;
+
+                      return (
+                        <tr key={`${row.fullDate}-${idx}`} className="hover:bg-slate-50/70 transition-colors">
+                          <td className="py-3.5 px-4 text-xs font-black text-slate-900 print-text-sm">
+                            {safeDateFormat(row.fullDate, 'dd/MM/yyyy')}
+                          </td>
+                          <td className="py-3.5 px-4 text-xs font-bold text-slate-600 print-text-sm">
+                            {row.days === 0 ? 'Dia 0 (Povoamento)' : `Dia ${row.days}`}
+                          </td>
+                          <td className="py-3.5 px-4 text-xs print-text-sm">
+                            <span className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase inline-block ${
+                              row.days === 0 
+                                ? 'bg-indigo-50 text-indigo-700 border border-indigo-100' 
+                                : row.isHarvestDate 
+                                  ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' 
+                                  : 'bg-blue-50 text-blue-700 border border-blue-100'
+                            }`}>
+                              {eventLabel}
+                            </span>
+                          </td>
+                          <td className="py-3.5 px-4 text-right text-xs font-black text-blue-700 italic print-text-sm">
+                            {row.weight !== undefined ? `${formatNumber(row.weight, 1)} g` : '-'}
+                          </td>
+                          {batchData.protocol && (
+                            <td className="py-3.5 px-4 text-right text-xs font-black text-purple-700 italic print-text-sm">
+                              {row.standardWeight !== undefined ? `${formatNumber(row.standardWeight, 1)} g` : '-'}
+                            </td>
+                          )}
+                          <td className={`py-3.5 px-4 text-right text-xs font-black italic print-text-sm ${weightGain >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                            {row.weight !== undefined ? `${weightGain >= 0 ? '+' : ''}${formatNumber(weightGain, 1)} g` : '-'}
+                          </td>
+                          <td className="py-3.5 px-4 text-right text-xs font-black text-slate-800 italic print-text-sm">
+                            {row.days > 0 && periodGpd > 0 ? `${formatNumber(periodGpd, 2)} g/d` : '-'}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                    {batchData.biometryEvolutionData.length === 0 && (
+                      <tr>
+                        <td colSpan={batchData.protocol ? 7 : 6} className="py-8 text-center text-slate-400 font-bold uppercase text-xs">
+                          Nenhum registro de peso encontrado para este lote.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
 
