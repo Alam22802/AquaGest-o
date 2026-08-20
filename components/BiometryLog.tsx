@@ -25,6 +25,14 @@ const BiometryLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
   
+  // Table Filters & Pagination
+  const [selectedBatchId, setSelectedBatchId] = useState('');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [selectedLogIds, setSelectedLogIds] = useState<Set<string>>(new Set());
+  const itemsPerPage = 50;
+
   const hasPermission = currentUser.isMaster || currentUser.canEdit;
 
   const [formData, setFormData] = useState({
@@ -43,6 +51,14 @@ const BiometryLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
   useEffect(() => {
     if (!editingId) setFormData(prev => ({ ...prev, cageId: '' }));
   }, [selectedLineId]);
+
+  const { cageMap, userMap, lineMap, batchMap } = useMemo(() => {
+    const cages = new Map((state.cages || []).map(c => [c.id, c]));
+    const users = new Map((state.users || []).map(u => [u.id, u]));
+    const lines = new Map((state.lines || []).map(l => [l.id, l]));
+    const batches = new Map((state.batches || []).map(b => [b.id, b]));
+    return { cageMap: cages, userMap: users, lineMap: lines, batchMap: batches };
+  }, [state.cages, state.users, state.lines, state.batches]);
 
   const filteredLines = useMemo(() => {
     if (!formBatchId) return [];
@@ -75,12 +91,88 @@ const BiometryLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
 
   const sortedLogs = useMemo(() => {
     const logs = Array.isArray(state.biometryLogs) ? state.biometryLogs : [];
-    return [...logs].sort((a, b) => {
+    let filtered = logs;
+
+    if (selectedBatchId || startDate || endDate) {
+      const sortedHarvestLogs = [...(state.harvestLogs || [])].sort((a, b) => a.date.localeCompare(b.date));
+
+      filtered = logs.filter(log => {
+        if (selectedBatchId) {
+          let bId = log.batchId;
+          const logDate = log.date;
+
+          if (!bId && log.cageId) {
+            const cage = cageMap.get(log.cageId);
+            if (cage?.batchId) {
+              bId = cage.batchId;
+            } else {
+              const harvest = sortedHarvestLogs.find(h => h.cageId === log.cageId && h.date >= logDate);
+              if (harvest) {
+                bId = harvest.batchId;
+              }
+            }
+          }
+          if (bId !== selectedBatchId) return false;
+        }
+
+        if (startDate && log.date < startDate) return false;
+        if (endDate && log.date > endDate) return false;
+        return true;
+      });
+    }
+
+    return [...filtered].sort((a, b) => {
       return sortOrder === 'desc' 
         ? b.date.localeCompare(a.date) 
         : a.date.localeCompare(b.date);
     });
-  }, [state.biometryLogs, sortOrder]);
+  }, [state.biometryLogs, sortOrder, selectedBatchId, startDate, endDate, cageMap, state.harvestLogs]);
+
+  const filteredStats = useMemo(() => {
+    if (sortedLogs.length === 0) return { count: 0, avgWeight: 0 };
+    const totalWeight = sortedLogs.reduce((acc, log) => acc + (Number(log.averageWeight) || 0), 0);
+    return {
+      count: sortedLogs.length,
+      avgWeight: totalWeight / sortedLogs.length
+    };
+  }, [sortedLogs]);
+
+  const paginatedLogs = useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    return sortedLogs.slice(startIndex, startIndex + itemsPerPage);
+  }, [sortedLogs, currentPage]);
+
+  const totalPages = Math.ceil(sortedLogs.length / itemsPerPage);
+
+  const toggleSelectAll = () => {
+    if (selectedLogIds.size === paginatedLogs.length && paginatedLogs.length > 0) {
+      setSelectedLogIds(new Set());
+    } else {
+      setSelectedLogIds(new Set(paginatedLogs.map(l => l.id)));
+    }
+  };
+
+  const toggleSelectLog = (id: string) => {
+    const newSelected = new Set(selectedLogIds);
+    if (newSelected.has(id)) {
+      newSelected.delete(id);
+    } else {
+      newSelected.add(id);
+    }
+    setSelectedLogIds(newSelected);
+  };
+
+  const removeSelectedLogs = () => {
+    if (!hasPermission || selectedLogIds.size === 0) return;
+    if (!confirm(`Deseja excluir ${selectedLogIds.size} pesagens selecionadas?`)) return;
+
+    onUpdate({
+      ...state,
+      biometryLogs: (state.biometryLogs || []).filter(l => !selectedLogIds.has(l.id)),
+      deletedIds: [...(state.deletedIds || []), ...Array.from(selectedLogIds)]
+    });
+    setSelectedLogIds(new Set());
+  };
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
@@ -126,13 +218,17 @@ const BiometryLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
 
   const startEdit = (log: IBiometryLog) => {
     if (!hasPermission) return;
-    const cage = (state.cages || []).find(c => c.id === log.cageId);
-    if (cage) {
-      setFormBatchId(cage.batchId || '');
-      setSelectedLineId(cage.lineId || '');
+    const cage = cageMap.get(log.cageId);
+    let bId = log.batchId;
+    if (!bId && cage) {
+      bId = cage.batchId;
     }
+    if (bId) setFormBatchId(bId);
+    if (cage?.lineId) setSelectedLineId(cage.lineId);
+
     setEditingId(log.id);
     setFormData({ cageId: log.cageId, averageWeight: log.averageWeight.toString(), date: log.date });
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const removeLog = (id: string) => {
@@ -143,6 +239,19 @@ const BiometryLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       biometryLogs: (state.biometryLogs || []).filter(b => b.id !== id),
       deletedIds: [...(state.deletedIds || []), id]
     });
+    setSelectedLogIds(prev => {
+      const next = new Set(prev);
+      next.delete(id);
+      return next;
+    });
+  };
+
+  const clearFilters = () => {
+    setSelectedBatchId('');
+    setStartDate('');
+    setEndDate('');
+    setCurrentPage(1);
+    setSelectedLogIds(new Set());
   };
 
   return (
@@ -187,30 +296,160 @@ const BiometryLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       </div>
 
       <div className="lg:col-span-2 space-y-4">
-        <div className="flex justify-between items-center">
-          <h3 className="text-sm font-black text-slate-400 uppercase tracking-widest italic">Histórico de Biometria</h3>
-          <button onClick={() => setSortOrder(prev => prev === 'desc' ? 'asc' : 'desc')} className="flex items-center gap-2 text-[10px] font-black uppercase text-slate-500 bg-slate-100 px-3 py-1.5 rounded-lg hover:bg-slate-200 transition-colors">
-            <ArrowUpDown className="w-3 h-3" /> {sortOrder === 'desc' ? 'Mais Recentes' : 'Mais Antigos'}
-          </button>
+        <div className="flex flex-wrap justify-between items-center gap-3">
+          <div>
+            <h3 className="text-sm font-black text-slate-400 uppercase tracking-widest italic">Histórico de Biometria</h3>
+            <p className="text-[10px] font-bold text-slate-400 uppercase">
+              Total: <span className="text-blue-600 font-black">{filteredStats.count}</span> pesagens {filteredStats.count > 0 && <span>| Média: <span className="text-blue-600 font-black">{formatNumber(filteredStats.avgWeight, 1)}g</span></span>}
+            </p>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            {selectedLogIds.size > 0 && (
+              <button 
+                onClick={removeSelectedLogs}
+                className="flex items-center gap-2 text-[10px] font-black uppercase text-white bg-red-500 px-3 py-1.5 rounded-lg hover:bg-red-600 transition-colors shadow-lg shadow-red-500/20"
+              >
+                <Trash2 className="w-3 h-3" /> Excluir ({selectedLogIds.size})
+              </button>
+            )}
+
+            {/* Filtro de Lote */}
+            <select 
+              className="text-[10px] font-black uppercase text-slate-500 bg-slate-100 px-3 py-1.5 rounded-lg outline-none border-none cursor-pointer"
+              value={selectedBatchId}
+              onChange={e => {
+                setSelectedBatchId(e.target.value);
+                setCurrentPage(1);
+                setSelectedLogIds(new Set());
+              }}
+            >
+              <option value="">Todos os Lotes</option>
+              {(state.batches || []).sort((a, b) => a.name.localeCompare(b.name)).map(b => (
+                <option key={b.id} value={b.id}>{b.name}</option>
+              ))}
+            </select>
+
+            {/* Filtro de Período com Data Início e Fim */}
+            <div className="flex items-center gap-1 bg-slate-100 px-2 py-1 rounded-lg">
+              <input 
+                type="date"
+                title="Data Início"
+                aria-label="Data Início"
+                className="text-[11px] font-black uppercase text-slate-500 bg-transparent outline-none border-none cursor-pointer"
+                value={startDate}
+                onChange={e => {
+                  setStartDate(e.target.value);
+                  setCurrentPage(1);
+                  setSelectedLogIds(new Set());
+                }}
+              />
+              <span className="text-[9px] font-black text-slate-300">ATÉ</span>
+              <input 
+                type="date"
+                title="Data Fim"
+                aria-label="Data Fim"
+                className="text-[11px] font-black uppercase text-slate-500 bg-transparent outline-none border-none cursor-pointer"
+                value={endDate}
+                onChange={e => {
+                  setEndDate(e.target.value);
+                  setCurrentPage(1);
+                  setSelectedLogIds(new Set());
+                }}
+              />
+            </div>
+
+            {/* Ordenação */}
+            <button 
+              onClick={() => setSortOrder(prev => prev === 'desc' ? 'asc' : 'desc')} 
+              className="flex items-center gap-2 text-[10px] font-black uppercase text-slate-500 bg-slate-100 px-3 py-1.5 rounded-lg hover:bg-slate-200 transition-colors cursor-pointer"
+            >
+              <ArrowUpDown className="w-3 h-3" /> {sortOrder === 'desc' ? 'Mais Recentes' : 'Mais Antigos'}
+            </button>
+          </div>
         </div>
-        <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm">
-          <table className="w-full text-left">
+
+        {/* Banner de Filtros Ativos */}
+        {(selectedBatchId || startDate || endDate) && (
+          <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-2 bg-blue-50/70 border border-blue-100 rounded-2xl text-[11px] font-bold text-blue-900 animate-in fade-in duration-200">
+            <div className="flex flex-wrap items-center gap-3">
+              <span>
+                Filtro ativo: <strong className="font-black text-blue-700">{filteredStats.count}</strong> pesagem(ns)
+              </span>
+              {selectedBatchId && (
+                <>
+                  <span className="text-blue-300">|</span>
+                  <span>Lote: <strong className="font-black text-blue-700">{batchMap.get(selectedBatchId)?.name || 'Lote Selecionado'}</strong></span>
+                </>
+              )}
+              {(startDate || endDate) && (
+                <>
+                  <span className="text-blue-300">|</span>
+                  <span>Período: <strong className="font-black text-blue-700">{startDate ? format(new Date(startDate + 'T12:00:00'), 'dd/MM/yyyy') : 'Início'} até {endDate ? format(new Date(endDate + 'T12:00:00'), 'dd/MM/yyyy') : 'Hoje'}</strong></span>
+                </>
+              )}
+              {filteredStats.count > 0 && (
+                <>
+                  <span className="text-blue-300">|</span>
+                  <span>Média filtrada: <strong className="font-black text-blue-700">{formatNumber(filteredStats.avgWeight, 1)}g</strong></span>
+                </>
+              )}
+            </div>
+            <button
+              onClick={clearFilters}
+              className="text-[10px] font-black uppercase text-blue-600 hover:text-blue-800 underline transition-colors cursor-pointer"
+            >
+              Limpar Filtros
+            </button>
+          </div>
+        )}
+
+        <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm overflow-x-auto">
+          <table className="w-full text-left min-w-[550px]">
             <thead className="bg-slate-50 text-[10px] font-black text-slate-400 uppercase tracking-widest">
               <tr>
-                <th className="px-6 py-4">Gaiola</th>
+                {hasPermission && (
+                  <th className="px-6 py-4 w-10">
+                    <input 
+                      type="checkbox" 
+                      className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                      checked={selectedLogIds.size === paginatedLogs.length && paginatedLogs.length > 0}
+                      onChange={toggleSelectAll}
+                    />
+                  </th>
+                )}
+                <th className="px-6 py-4">Gaiola / Lote</th>
                 <th className="px-6 py-4">Data</th>
-                <th className="px-6 py-4">Peso (g)</th>
+                <th className="px-6 py-4">Peso Médio (g)</th>
                 <th className="px-6 py-4">Lançado por</th>
                 {hasPermission && <th className="px-6 py-4 text-center">Ações</th>}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {sortedLogs.map(log => {
-                const cage = (state.cages || []).find(c => c.id === log.cageId);
-                const user = (state.users || []).find(u => u.id === log.userId);
+              {paginatedLogs.map(log => {
+                const cage = cageMap.get(log.cageId);
+                const line = cage?.lineId ? lineMap.get(cage.lineId) : null;
+                const batch = log.batchId ? batchMap.get(log.batchId) : (cage?.batchId ? batchMap.get(cage.batchId) : null);
+                const user = userMap.get(log.userId);
+                const isSelected = selectedLogIds.has(log.id);
                 return (
-                  <tr key={log.id} className="hover:bg-slate-50 transition-colors">
-                    <td className="px-6 py-4 font-black text-slate-800 uppercase">{cage?.name}</td>
+                  <tr key={log.id} className={`hover:bg-slate-50 transition-colors ${isSelected ? 'bg-blue-50/40' : ''}`}>
+                    {hasPermission && (
+                      <td className="px-6 py-4">
+                        <input 
+                          type="checkbox" 
+                          className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                          checked={isSelected}
+                          onChange={() => toggleSelectLog(log.id)}
+                        />
+                      </td>
+                    )}
+                    <td className="px-6 py-4">
+                      <div className="font-black text-slate-800 uppercase">{cage?.name || 'Gaiola Excluída'}</div>
+                      <div className="text-[10px] font-bold text-slate-400 uppercase">
+                        {batch ? batch.name : 'Sem lote'} {line ? `• ${line.name}` : ''}
+                      </div>
+                    </td>
                     <td className="px-6 py-4 text-xs font-bold text-slate-600">
                       <div className="flex items-center gap-1"><Calendar className="w-3 h-3 opacity-30" /> {format(new Date(log.date + 'T12:00:00'), 'dd/MM/yyyy')}</div>
                     </td>
@@ -219,17 +458,46 @@ const BiometryLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                     {hasPermission && (
                       <td className="px-6 py-4 text-center">
                         <div className="flex justify-center gap-2">
-                          <button onClick={() => startEdit(log)} className="p-2 text-slate-300 hover:text-amber-500 transition-colors"><Edit3 className="w-4 h-4" /></button>
-                          <button onClick={() => removeLog(log.id)} className="p-2 text-slate-300 hover:text-red-500 transition-colors"><Trash2 className="w-4 h-4" /></button>
+                          <button onClick={() => startEdit(log)} className="p-2 text-slate-300 hover:text-amber-500 transition-colors cursor-pointer" title="Editar"><Edit3 className="w-4 h-4" /></button>
+                          <button onClick={() => removeLog(log.id)} className="p-2 text-slate-300 hover:text-red-500 transition-colors cursor-pointer" title="Excluir"><Trash2 className="w-4 h-4" /></button>
                         </div>
                       </td>
                     )}
                   </tr>
                 );
               })}
+              {paginatedLogs.length === 0 && (
+                <tr>
+                  <td colSpan={hasPermission ? 6 : 5} className="px-6 py-10 text-center text-slate-400 font-bold uppercase text-[10px] tracking-widest italic">
+                    Nenhum registro de biometria encontrado.
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
+
+        {totalPages > 1 && (
+          <div className="flex justify-center items-center gap-4 py-4">
+            <button 
+              disabled={currentPage === 1}
+              onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+              className="px-4 py-2 bg-slate-100 rounded-xl text-[10px] font-black uppercase tracking-widest disabled:opacity-30 hover:bg-slate-200 transition-colors cursor-pointer"
+            >
+              Anterior
+            </button>
+            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+              Página {currentPage} de {totalPages}
+            </span>
+            <button 
+              disabled={currentPage === totalPages}
+              onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+              className="px-4 py-2 bg-slate-100 rounded-xl text-[10px] font-black uppercase tracking-widest disabled:opacity-30 hover:bg-slate-200 transition-colors cursor-pointer"
+            >
+              Próxima
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
