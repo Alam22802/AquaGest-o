@@ -114,10 +114,10 @@ export const EXPORT_TAB_DEFINITIONS: ExportTabDefinition[] = [
   {
     id: 'feedStock',
     sheetName: 'Estoque Ração',
-    label: 'Estoque de Ração',
+    label: 'Estoque e Entradas de Ração',
     category: 'Manejo',
     requiredTabId: 'feed',
-    description: 'Posição atual dos silos, capacidades e níveis de estoque'
+    description: 'Posição dos silos, níveis de estoque e histórico de entradas com NFs e fornecedores'
   },
   {
     id: 'mortality',
@@ -1911,14 +1911,97 @@ const Dashboard: React.FC<Props> = ({ state, currentUser }) => {
       XLSX.utils.book_append_sheet(wb, wsBiometry, "Biometria");
     }
 
-    // 8. ABA: ESTOQUE RAÇÃO
+    // 8. ABA: ESTOQUE E ENTRADAS DE RAÇÃO
     if (selectedReportTabs.includes('feedStock')) {
-      const wsFeedStock = XLSX.utils.json_to_sheet((state.feedTypes || []).map(f => ({
-        "Ração": f.name,
-        "Estoque Atual (kg)": f.totalStock / 1000,
-        "Capacidade Silo (kg)": f.maxCapacity,
-        "Alerta Mínimo (%)": f.minStockPercentage
-      })));
+      const feedTypeMap = new Map((state.feedTypes || []).map(f => [f.id, f]));
+      const filteredFeedStockLogs = (state.feedStockLogs || []).filter(l => {
+        const d = l.timestamp ? l.timestamp.split('T')[0] : '';
+        return filterByDate(d);
+      }).sort((a, b) => (b.timestamp || '').localeCompare(a.timestamp || ''));
+
+      const aoaFeedStock: any[][] = [];
+
+      // SEÇÃO 1: POSIÇÃO ATUAL DO ESTOQUE / SILOS
+      aoaFeedStock.push(["--- POSIÇÃO ATUAL DOS SILOS E ESTOQUE DE RAÇÃO ---"]);
+      aoaFeedStock.push([
+        "Tipo de Ração",
+        "Estoque Atual (kg)",
+        "Capacidade Silo (kg)",
+        "Ocupação Atual (%)",
+        "Alerta Mínimo (%)",
+        "Estoque Mínimo (kg)",
+        "Status do Estoque"
+      ]);
+
+      (state.feedTypes || []).forEach(f => {
+        const stockKg = f.totalStock / 1000;
+        const ocupacao = f.maxCapacity > 0 ? (stockKg / f.maxCapacity) * 100 : 0;
+        const minKg = f.maxCapacity * (f.minStockPercentage / 100);
+        const status = stockKg <= minKg ? 'CRÍTICO / BAIXO' : 'NORMAL';
+
+        aoaFeedStock.push([
+          f.name,
+          stockKg,
+          f.maxCapacity,
+          Number(ocupacao.toFixed(1)),
+          f.minStockPercentage,
+          minKg,
+          status
+        ]);
+      });
+
+      if ((state.feedTypes || []).length === 0) {
+        aoaFeedStock.push(["Nenhum modelo de ração cadastrado", "", "", "", "", "", ""]);
+      }
+
+      // Linhas em branco para espaçamento entre seções
+      aoaFeedStock.push([]);
+      aoaFeedStock.push([]);
+
+      // SEÇÃO 2: LANÇAMENTOS DE ENTRADAS E AJUSTES DE RAÇÃO
+      aoaFeedStock.push([`--- LANÇAMENTOS DE ENTRADAS DE RAÇÃO (PERÍODO: ${reportStartDate} A ${reportEndDate}) ---`]);
+      aoaFeedStock.push([
+        "Data",
+        "Hora",
+        "Tipo de Movimentação",
+        "Tipo de Ração",
+        "Quantidade (kg)",
+        "Preço Unitário (R$/kg)",
+        "Valor Total (R$)",
+        "Nº Nota Fiscal",
+        "Fornecedor",
+        "CNPJ Fornecedor",
+        "Lançado por"
+      ]);
+
+      filteredFeedStockLogs.forEach(l => {
+        const dateStr = l.timestamp ? l.timestamp.split('T')[0] : 'N/A';
+        const timeStr = l.timestamp && l.timestamp.includes('T') ? l.timestamp.split('T')[1].substring(0, 5) : '---';
+        const feedName = feedTypeMap.get(l.feedTypeId)?.name || 'Ração Desconhecida';
+        const qtyKg = l.amount / 1000;
+        const unitPrice = typeof l.unitPrice === 'number' && !isNaN(l.unitPrice) ? l.unitPrice : null;
+        const totalValue = unitPrice !== null ? qtyKg * unitPrice : null;
+
+        aoaFeedStock.push([
+          dateStr,
+          timeStr,
+          l.type || 'Entrada',
+          feedName,
+          qtyKg,
+          unitPrice !== null ? unitPrice : '---',
+          totalValue !== null ? Number(totalValue.toFixed(2)) : '---',
+          l.invoiceNumber || '---',
+          l.supplierName || '---',
+          l.supplierCnpj || '---',
+          userMap.get(l.userId) || l.userId || 'Sistema'
+        ]);
+      });
+
+      if (filteredFeedStockLogs.length === 0) {
+        aoaFeedStock.push(["Nenhum lançamento de entrada ou ajuste de ração encontrado no período selecionado.", "", "", "", "", "", "", "", "", "", ""]);
+      }
+
+      const wsFeedStock = XLSX.utils.aoa_to_sheet(aoaFeedStock);
       XLSX.utils.book_append_sheet(wb, wsFeedStock, "Estoque Ração");
     }
 
