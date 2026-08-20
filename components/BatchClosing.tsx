@@ -26,8 +26,12 @@ import {
   Printer,
   Lock,
   Unlock,
-  Activity
+  Activity,
+  History,
+  Archive
 } from 'lucide-react';
+import { ClosedBatchHistory } from './ClosedBatchHistory';
+import { buildBatchSnapshot } from '../utils/batchSnapshot';
 import {
   ResponsiveContainer,
   LineChart,
@@ -131,6 +135,7 @@ const checkIsFeedingLogForBatch = (f: any, batch: any, harvestLogs: any[] = [], 
 };
 
 const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
+  const [subTab, setSubTab] = useState<'closing' | 'history'>('closing');
   const [selectedBatchId, setSelectedBatchId] = useState<string>('');
   const [expenseForm, setExpenseForm] = useState({
     category: '',
@@ -963,6 +968,15 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     if (!selectedBatchId || !currentUser.isMaster) return;
     if (!confirm('Deseja realmente FECHAR este lote? Esta ação é definitiva para fins de auditoria.')) return;
 
+    const targetBatch = (state.batches || []).find(b => b.id === selectedBatchId);
+    let updatedClosedHistory = [...(state.closedBatchHistory || [])];
+    if (targetBatch) {
+      const closedBatchObj = { ...targetBatch, isClosed: true, closedAt: new Date().toISOString(), updatedAt: Date.now() };
+      const snapshot = buildBatchSnapshot(closedBatchObj, state);
+      updatedClosedHistory = updatedClosedHistory.filter(r => r.id !== targetBatch.id && r.batchId !== targetBatch.id);
+      updatedClosedHistory.unshift(snapshot);
+    }
+
     const updatedBatches = (state.batches || []).map(b => 
       b.id === selectedBatchId ? { ...b, isClosed: true, closedAt: new Date().toISOString(), updatedAt: Date.now() } : b
     );
@@ -984,7 +998,8 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     onUpdate({
       ...state,
       batches: updatedBatches,
-      cages: updatedCages
+      cages: updatedCages,
+      closedBatchHistory: updatedClosedHistory
     });
   };
 
@@ -1008,6 +1023,14 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
 
     const targetBatch = (state.batches || []).find(b => b.id === selectedBatchId || isBatchMatch(b.id, { id: selectedBatchId, name: selectedBatchId }));
 
+    let updatedClosedHistory = [...(state.closedBatchHistory || [])];
+    if (targetBatch) {
+      const snapshot = buildBatchSnapshot({ ...targetBatch, isClosed: true, closedAt: targetBatch.closedAt || new Date().toISOString() }, state);
+      snapshot.isDeletedFromSystem = true;
+      updatedClosedHistory = updatedClosedHistory.filter(r => r.id !== targetBatch.id && r.batchId !== targetBatch.id);
+      updatedClosedHistory.unshift(snapshot);
+    }
+
     const isMatch = (itemBatchId?: string) => {
       if (!itemBatchId) return false;
       if (itemBatchId === selectedBatchId) return true;
@@ -1015,9 +1038,35 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       return false;
     };
 
-    const feedingLogsToRemove = (state.feedingLogs || []).filter((f) => isMatch(f.batchId) || (targetBatch && checkIsFeedingLogForBatch(f, targetBatch, state.harvestLogs, state.cages, state.batches))).map(f => f.id);
-    const mortalityLogsToRemove = (state.mortalityLogs || []).filter((m) => isMatch(m.batchId)).map(m => m.id);
-    const biometryLogsToRemove = (state.biometryLogs || []).filter((b) => isMatch(b.batchId)).map(b => b.id);
+    const harvestCages = new Set((state.harvestLogs || []).filter(h => isMatch(h.batchId)).map(h => h.cageId));
+    const targetCageIds = new Set([
+      ...(targetBatch?.cageIds || []),
+      ...(state.cages || []).filter(c => isMatch(c.batchId) || (targetBatch && c.batchId === targetBatch.id)).map(c => c.id),
+      ...Array.from(harvestCages)
+    ]);
+
+    const feedingLogsToRemove = (state.feedingLogs || []).filter((f) => 
+      isMatch(f.batchId) || (targetBatch && checkIsFeedingLogForBatch(f, targetBatch, state.harvestLogs, state.cages, state.batches))
+    ).map(f => f.id);
+
+    const mortalityLogsToRemove = (state.mortalityLogs || []).filter((m) => {
+      if (isMatch(m.batchId)) return true;
+      if (m.cageId && targetCageIds.has(m.cageId)) {
+        if (targetBatch?.settlementDate && m.date >= targetBatch.settlementDate) return true;
+        if (!m.batchId) return true;
+      }
+      return false;
+    }).map(m => m.id);
+
+    const biometryLogsToRemove = (state.biometryLogs || []).filter((b) => {
+      if (isMatch(b.batchId)) return true;
+      if (b.cageId && targetCageIds.has(b.cageId)) {
+        if (targetBatch?.settlementDate && b.date >= targetBatch.settlementDate) return true;
+        if (!b.batchId) return true;
+      }
+      return false;
+    }).map(b => b.id);
+
     const harvestLogsToRemove = (state.harvestLogs || []).filter((h) => isMatch(h.batchId)).map(h => h.id);
     const batchExpensesToRemove = (state.batchExpenses || []).filter((e) => isMatch(e.batchId)).map(e => e.id);
     const batchRevenuesToRemove = (state.batchRevenues || []).filter((r) => isMatch(r.batchId)).map(r => r.id);
@@ -1095,6 +1144,7 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       slaughterLogs: preservedSlaughterLogs,
       harvestSchedules: (state.harvestSchedules || []).filter(hs => !scheduleRemoveSet.has(hs.id)),
       cages: (state.cages || []).map(c => (isMatch(c.batchId) || (targetBatch && c.batchId === targetBatch.id)) ? { ...c, batchId: undefined, initialFishCount: undefined, settlementDate: undefined, harvestDate: undefined, status: 'Limpeza' as const, maintenanceStartDate: new Date().toISOString().split('T')[0], maintenanceEndDate: undefined, updatedAt: Date.now() } : c),
+      closedBatchHistory: updatedClosedHistory,
       deletedIds: Array.from(new Set([...(state.deletedIds || []), ...allRemovedIds])),
     });
 
@@ -1204,60 +1254,92 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
           }
         }
       `}} />
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 print:hidden">
-        <div>
-          <h2 className="text-2xl font-black text-black uppercase tracking-tighter italic flex items-center gap-3">
-            <FileText className="w-8 h-8 text-blue-600" />
-            Fechamento de Lote
-          </h2>
-          <p className="text-xs font-bold text-slate-600 uppercase tracking-widest">Resumo financeiro e produtivo do lote finalizado</p>
-        </div>
-
-        <div className="flex items-center gap-3">
-          {batchData?.batch.isClosed && (
-            <div className="flex items-center gap-3">
-              <div className="flex items-center gap-2 bg-slate-100 p-1.5 rounded-2xl border border-slate-200">
-                <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-2">Impressão:</span>
-                <div className="flex items-center gap-1">
-                  <button
-                    onClick={() => setPrintOrientation('portrait')}
-                    className={`px-3 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${printOrientation === 'portrait' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
-                    title="Orientação Retrato"
-                  >
-                    Vertical
-                  </button>
-                  <button
-                    onClick={() => setPrintOrientation('landscape')}
-                    className={`px-3 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${printOrientation === 'landscape' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
-                    title="Orientação Paisagem"
-                  >
-                    Horizontal
-                  </button>
-                </div>
-              </div>
-              
-              <button 
-                onClick={handlePrint}
-                className="px-6 py-3 bg-white border border-slate-200 rounded-2xl font-black text-xs outline-none hover:bg-slate-50 uppercase tracking-widest shadow-sm flex items-center gap-2"
-              >
-                <Printer className="w-4 h-4" />
-                Imprimir
-              </button>
-            </div>
-          )}
-          
-          <select 
-            className="px-6 py-3 bg-white border border-slate-200 rounded-2xl font-black text-sm outline-none focus:ring-2 focus:ring-blue-500/10 uppercase tracking-widest shadow-sm"
-            value={selectedBatchId}
-            onChange={(e) => setSelectedBatchId(e.target.value)}
+      {/* Subpage Navigation Tabs */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 pb-4 print:hidden">
+        <div className="flex items-center gap-2 bg-slate-100 p-1.5 rounded-2xl w-fit border border-slate-200">
+          <button
+            onClick={() => setSubTab('closing')}
+            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-black text-xs uppercase tracking-wider transition-all ${
+              subTab === 'closing'
+                ? 'bg-white text-blue-600 shadow-sm'
+                : 'text-slate-500 hover:text-slate-800'
+            }`}
           >
-            <option value="">Selecionar Lote para Fechamento</option>
-            {batches.map(b => (
-              <option key={b.id} value={b.id}>{b.name} - {safeDateFormat(b.settlementDate, 'dd/MM/yyyy')}</option>
-            ))}
-          </select>
+            <FileText className="w-4 h-4" />
+            Fechamento de Lote
+          </button>
+          <button
+            onClick={() => setSubTab('history')}
+            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-black text-xs uppercase tracking-wider transition-all ${
+              subTab === 'history'
+                ? 'bg-white text-indigo-600 shadow-sm'
+                : 'text-slate-500 hover:text-slate-800'
+            }`}
+          >
+            <History className="w-4 h-4" />
+            Histórico de Lotes
+          </button>
         </div>
       </div>
+
+      {subTab === 'history' ? (
+        <ClosedBatchHistory state={state} currentUser={currentUser} onUpdate={onUpdate} />
+      ) : (
+        <>
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 print:hidden">
+            <div>
+              <h2 className="text-2xl font-black text-black uppercase tracking-tighter italic flex items-center gap-3">
+                <FileText className="w-8 h-8 text-blue-600" />
+                Fechamento de Lote
+              </h2>
+              <p className="text-xs font-bold text-slate-600 uppercase tracking-widest">Resumo financeiro e produtivo do lote finalizado</p>
+            </div>
+
+            <div className="flex items-center gap-3">
+              {batchData?.batch.isClosed && (
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2 bg-slate-100 p-1.5 rounded-2xl border border-slate-200">
+                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-2">Impressão:</span>
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => setPrintOrientation('portrait')}
+                        className={`px-3 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${printOrientation === 'portrait' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+                        title="Orientação Retrato"
+                      >
+                        Vertical
+                      </button>
+                      <button
+                        onClick={() => setPrintOrientation('landscape')}
+                        className={`px-3 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${printOrientation === 'landscape' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+                        title="Orientação Paisagem"
+                      >
+                        Horizontal
+                      </button>
+                    </div>
+                  </div>
+                  
+                  <button 
+                    onClick={handlePrint}
+                    className="px-6 py-3 bg-white border border-slate-200 rounded-2xl font-black text-xs outline-none hover:bg-slate-50 uppercase tracking-widest shadow-sm flex items-center gap-2"
+                  >
+                    <Printer className="w-4 h-4" />
+                    Imprimir
+                  </button>
+                </div>
+              )}
+              
+              <select 
+                className="px-6 py-3 bg-white border border-slate-200 rounded-2xl font-black text-sm outline-none focus:ring-2 focus:ring-blue-500/10 uppercase tracking-widest shadow-sm"
+                value={selectedBatchId}
+                onChange={(e) => setSelectedBatchId(e.target.value)}
+              >
+                <option value="">Selecionar Lote para Fechamento</option>
+                {batches.map(b => (
+                  <option key={b.id} value={b.id}>{b.name} - {safeDateFormat(b.settlementDate, 'dd/MM/yyyy')}</option>
+                ))}
+              </select>
+            </div>
+          </div>
 
       {batchData ? (
         <div className="space-y-8">
@@ -2244,6 +2326,8 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
             <p className="text-xs font-bold text-slate-600 uppercase tracking-widest mt-2">Selecione um lote acima para visualizar o fechamento</p>
           </div>
         </div>
+      )}
+        </>
       )}
 
       {showAdjustFeedModal && (

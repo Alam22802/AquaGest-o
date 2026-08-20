@@ -28,6 +28,7 @@ import { ptBR } from "date-fns/locale";
 import { formatNumber } from "../utils/formatters";
 import HarvestManagement from "./HarvestManagement";
 import BatchClosing from "./BatchClosing";
+import { buildBatchSnapshot, isBatchMatch, checkIsFeedingLogForBatch } from "../utils/batchSnapshot";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
@@ -216,18 +217,52 @@ const BatchManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     )
       return;
 
-    const targetBatch = (state.batches || []).find((b) => b.id === id || (b.name && b.name.toLowerCase() === id.toLowerCase()));
+    const targetBatch = (state.batches || []).find((b) => b.id === id || (b.name && b.name.toLowerCase() === id.toLowerCase()) || isBatchMatch(b.id, { id, name: id }));
+
+    let updatedClosedHistory = [...(state.closedBatchHistory || [])];
+    if (targetBatch) {
+      const snapshot = buildBatchSnapshot({ ...targetBatch, isClosed: true, closedAt: targetBatch.closedAt || new Date().toISOString() }, state);
+      snapshot.isDeletedFromSystem = true;
+      updatedClosedHistory = updatedClosedHistory.filter(r => r.id !== targetBatch.id && r.batchId !== targetBatch.id);
+      updatedClosedHistory.unshift(snapshot);
+    }
 
     const isMatch = (itemBatchId?: string) => {
       if (!itemBatchId) return false;
       if (itemBatchId === id) return true;
-      if (targetBatch && (itemBatchId === targetBatch.id || itemBatchId === targetBatch.name)) return true;
+      if (targetBatch && (itemBatchId === targetBatch.id || itemBatchId === targetBatch.name || isBatchMatch(itemBatchId, targetBatch))) return true;
       return false;
     };
 
-    const feedingLogsToRemove = (state.feedingLogs || []).filter((f) => isMatch(f.batchId)).map(f => f.id);
-    const mortalityLogsToRemove = (state.mortalityLogs || []).filter((m) => isMatch(m.batchId)).map(m => m.id);
-    const biometryLogsToRemove = (state.biometryLogs || []).filter((b) => isMatch(b.batchId)).map(b => b.id);
+    const harvestCages = new Set((state.harvestLogs || []).filter(h => isMatch(h.batchId)).map(h => h.cageId));
+    const targetCageIds = new Set([
+      ...(targetBatch?.cageIds || []),
+      ...(state.cages || []).filter(c => isMatch(c.batchId) || (targetBatch && c.batchId === targetBatch.id)).map(c => c.id),
+      ...Array.from(harvestCages)
+    ]);
+
+    const feedingLogsToRemove = (state.feedingLogs || []).filter((f) => 
+      isMatch(f.batchId) || (targetBatch && checkIsFeedingLogForBatch(f, targetBatch, state.harvestLogs, state.cages, state.batches))
+    ).map(f => f.id);
+
+    const mortalityLogsToRemove = (state.mortalityLogs || []).filter((m) => {
+      if (isMatch(m.batchId)) return true;
+      if (m.cageId && targetCageIds.has(m.cageId)) {
+        if (targetBatch?.settlementDate && m.date >= targetBatch.settlementDate) return true;
+        if (!m.batchId) return true;
+      }
+      return false;
+    }).map(m => m.id);
+
+    const biometryLogsToRemove = (state.biometryLogs || []).filter((b) => {
+      if (isMatch(b.batchId)) return true;
+      if (b.cageId && targetCageIds.has(b.cageId)) {
+        if (targetBatch?.settlementDate && b.date >= targetBatch.settlementDate) return true;
+        if (!b.batchId) return true;
+      }
+      return false;
+    }).map(b => b.id);
+
     const harvestLogsToRemove = (state.harvestLogs || []).filter((h) => isMatch(h.batchId)).map(h => h.id);
     const batchExpensesToRemove = (state.batchExpenses || []).filter((e) => isMatch(e.batchId)).map(e => e.id);
     const batchRevenuesToRemove = (state.batchRevenues || []).filter((r) => isMatch(r.batchId)).map(r => r.id);
@@ -319,6 +354,7 @@ const BatchManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
             }
           : c,
       ),
+      closedBatchHistory: updatedClosedHistory,
       deletedIds: Array.from(new Set([...(state.deletedIds || []), ...allRemovedIds])),
     });
   };

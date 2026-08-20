@@ -553,6 +553,83 @@ export interface PCPSlaughterSchedule {
   updatedAt?: number;
 }
 
+export interface ClosedBatchRecord {
+  id: string;
+  batchId: string;
+  batchName: string;
+  settlementDate: string;
+  closedAt?: string;
+  initialQuantity: number;
+  initialUnitWeight: number;
+  protocolName?: string;
+  expectedHarvestDate?: string;
+  
+  // Indicadores Zootécnicos e Produtivos
+  totalDays: number;
+  expectedFish: number;
+  harvestedFish: number;
+  mortality: number;
+  survivalRate: number;
+  survivalRateReal: number;
+  
+  biomassBeforeHarvest: number;
+  harvestedWeight: number;
+  totalReceptionWeight: number;
+  accuracy: number;
+  
+  initialAvgWeight: number;
+  currentAvgWeight: number;
+  gpd: number;
+  
+  totalFeedKg: number;
+  fcaTheoretical: number;
+  fcaReal: number;
+  
+  // Indicadores Financeiros
+  totalExpenses: number;
+  totalRevenue: number;
+  totalProfit: number;
+  costPerKg: number;
+  profitMarginPercent?: number;
+
+  feedBreakdown?: { name: string; amountKg: number; cost: number }[];
+  
+  // Gráficos e Histórico de Pesagens
+  biometryTimeline: {
+    date: string;
+    fullDate: string;
+    weight: number;
+    standardWeight?: number;
+    days: number;
+    dailyGain?: number;
+    isHarvestDate?: boolean;
+  }[];
+  mortalityTimeline: {
+    date: string;
+    fullDate: string;
+    count: number;
+    cumulative: number;
+    cumulativeRate: number;
+  }[];
+
+  // Quadro de Lançamentos
+  entries: {
+    id: string;
+    type: 'expense' | 'revenue';
+    date: string;
+    category: string;
+    description: string;
+    receptionWeight?: number;
+    unitPrice?: number;
+    value: number;
+  }[];
+
+  isDeletedFromSystem?: boolean;
+  archivedAt?: string;
+  userId?: string;
+  updatedAt?: number;
+}
+
 export interface AppState {
   users: User[];
   lines: Line[];
@@ -590,6 +667,7 @@ export interface AppState {
   harvestSchedules?: HarvestSchedule[];
   batchExpenses?: BatchExpense[];
   batchRevenues?: BatchRevenue[];
+  closedBatchHistory?: ClosedBatchRecord[];
   coldStorageLogs?: ColdStorageLog[];
   utilityLogs?: UtilityLog[];
   coldChambers?: ColdChamber[];
