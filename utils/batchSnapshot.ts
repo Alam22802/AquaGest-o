@@ -76,6 +76,25 @@ export const checkIsFeedingLogForBatch = (f: FeedingLog, batch: Batch, harvestLo
   return false;
 };
 
+export const isCostDeductionRevenue = (r: any): boolean => {
+  if (r?.isCostDeduction === true) return true;
+  if (r?.isCostDeduction === false) return false;
+  const cat = (r?.category || '').toLowerCase();
+  const desc = (r?.description || '').toLowerCase();
+  return (
+    cat.includes('bonifica') ||
+    cat.includes('crédito') ||
+    cat.includes('credito') ||
+    cat.includes('desconto') ||
+    cat.includes('ressarcimento') ||
+    desc.includes('bonifica') ||
+    desc.includes('crédito') ||
+    desc.includes('credito') ||
+    desc.includes('desconto') ||
+    desc.includes('ressarcimento')
+  );
+};
+
 export function buildBatchSnapshot(batch: Batch, state: AppState): ClosedBatchRecord {
   const harvestsByBatch: HarvestLog[] = (state.harvestLogs || []).filter((h: HarvestLog) => h.batchId === batch.id || isBatchMatch(h.batchId, batch));
   const harvestCages = new Set(harvestsByBatch.map((h: HarvestLog) => h.cageId));
@@ -219,7 +238,14 @@ export function buildBatchSnapshot(batch: Batch, state: AppState): ClosedBatchRe
     });
   });
 
-  const totalExpenses = expenses.reduce((acc: number, curr: BatchExpense) => acc + curr.value, 0) + supplierInvoiceVal + totalFeedCost;
+  const grossExpenses = expenses.reduce((acc: number, curr: BatchExpense) => acc + curr.value, 0) + supplierInvoiceVal + totalFeedCost;
+  
+  const bonusDeductions = revenues.filter(r => isCostDeductionRevenue(r)).reduce((acc: number, curr: BatchRevenue) => {
+    const val = curr.value !== undefined ? curr.value : ((curr.receptionWeight || 0) * (curr.unitPrice || 0));
+    return acc + val;
+  }, 0);
+
+  const totalExpenses = Math.max(0, grossExpenses - bonusDeductions);
   
   const totalRevenueReceptionWeight = revenues.reduce((acc: number, curr: BatchRevenue) => acc + (curr.receptionWeight || 0), 0);
   const totalReceptionWeight = slaughteredReceptionWeight > 0 
@@ -240,11 +266,17 @@ export function buildBatchSnapshot(batch: Batch, state: AppState): ClosedBatchRe
     return acc;
   }, 0);
 
-  const totalRevenue = (revenues.length > 0 || slaughteredTotalRevenue > 0) 
-    ? (revenues.reduce((acc: number, curr: BatchRevenue) => acc + (curr.receptionWeight * curr.unitPrice), 0) + slaughteredTotalRevenue)
+  const standardRevenues = revenues.filter(r => !isCostDeductionRevenue(r));
+  const standardRevenueVal = standardRevenues.reduce((acc: number, curr: BatchRevenue) => {
+    const val = curr.value !== undefined ? curr.value : ((curr.receptionWeight || 0) * (curr.unitPrice || 0));
+    return acc + val;
+  }, 0);
+
+  const totalRevenue = (standardRevenues.length > 0 || slaughteredTotalRevenue > 0) 
+    ? (standardRevenueVal + slaughteredTotalRevenue)
     : harvestsByBatch.reduce((acc: number, curr: HarvestLog) => acc + (curr.totalWeight * (curr.unitPrice || 0)), 0);
 
-  const totalProfit = totalRevenue - totalExpenses;
+  const totalProfit = (totalRevenue + bonusDeductions) - grossExpenses;
 
   // Timeline
   const startDate = parseISO(batch.settlementDate);
@@ -406,16 +438,22 @@ export function buildBatchSnapshot(batch: Batch, state: AppState): ClosedBatchRe
     value: e.value
   }));
 
-  const revenueEntries = revenues.map((r: BatchRevenue) => ({
-    id: r.id,
-    type: 'revenue' as const,
-    date: r.date,
-    category: 'Receita',
-    description: `Peso Recepção Frigorífico: ${formatNumber(r.receptionWeight, 1)}kg`,
-    receptionWeight: r.receptionWeight,
-    unitPrice: r.unitPrice,
-    value: (r.receptionWeight * r.unitPrice) || 0
-  }));
+  const revenueEntries = revenues.map((r: BatchRevenue) => {
+    const isBonus = isCostDeductionRevenue(r);
+    const val = r.value !== undefined ? r.value : ((r.receptionWeight || 0) * (r.unitPrice || 0));
+    const desc = r.description || (r.receptionWeight ? `Peso Recepção Frigorífico: ${formatNumber(r.receptionWeight, 1)}kg` : (r.category || 'Receita'));
+    return {
+      id: r.id,
+      type: 'revenue' as const,
+      date: r.date,
+      category: r.category || (isBonus ? 'Bonificação de juvenis' : 'Receita'),
+      description: desc,
+      receptionWeight: r.receptionWeight,
+      unitPrice: r.unitPrice,
+      value: val,
+      isCostDeduction: isBonus
+    };
+  });
 
   const slaughterEntries = slaughters.map((s: SlaughterLog, idx: number) => {
     const unitP = harvestsByBatch[0]?.unitPrice || (s.invoiceValue && s.packedQuantity ? s.invoiceValue / s.packedQuantity : 0);

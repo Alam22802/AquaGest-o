@@ -443,8 +443,12 @@ export interface BatchExpense {
 export interface BatchRevenue {
   id: string;
   batchId: string;
-  receptionWeight: number;
-  unitPrice: number;
+  category?: string;
+  description?: string;
+  value?: number;
+  receptionWeight?: number;
+  unitPrice?: number;
+  isCostDeduction?: boolean;
   date: string;
   userId: string;
   updatedAt?: number;
@@ -622,6 +626,7 @@ export interface ClosedBatchRecord {
     receptionWeight?: number;
     unitPrice?: number;
     value: number;
+    isCostDeduction?: boolean;
   }[];
 
   isDeletedFromSystem?: boolean;
@@ -667,6 +672,10 @@ export interface AppState {
   harvestSchedules?: HarvestSchedule[];
   batchExpenses?: BatchExpense[];
   batchRevenues?: BatchRevenue[];
+  batchExpenseCategories?: string[];
+  batchRevenueCategories?: string[];
+  batchExpenseItems?: string[];
+  batchRevenueItems?: string[];
   closedBatchHistory?: ClosedBatchRecord[];
   coldStorageLogs?: ColdStorageLog[];
   utilityLogs?: UtilityLog[];
