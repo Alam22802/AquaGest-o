@@ -1,8 +1,11 @@
 
 import React, { useState, useMemo } from 'react';
-import { Cage, AppState, User } from '../types';
-import { Trash2, Box, Edit, X, Ruler, Users, Tag, Calendar, LayoutDashboard, Info, Layers, Eye, Filter, CheckSquare, Square, Save, LogOut } from 'lucide-react';
-import { format, parseISO } from 'date-fns';
+import { Cage, AppState, User, Batch } from '../types';
+import { Trash2, Box, Edit, X, Ruler, Users, Tag, Calendar, LayoutDashboard, Info, Layers, Eye, Filter, CheckSquare, Square, Save, LogOut, FileText, Printer, Download } from 'lucide-react';
+import { format, parseISO, differenceInDays, startOfDay } from 'date-fns';
+import { formatNumber, formatCurrency } from '../utils/formatters';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 const generateId = () => {
   try {
@@ -293,6 +296,418 @@ const CageManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     }
   };
 
+  const safeDateFormat = (dateStr?: string, pattern: string = 'dd/MM/yyyy') => {
+    if (!dateStr) return '---';
+    try {
+      const raw = dateStr.split('T')[0];
+      const parsed = parseISO(raw);
+      if (isNaN(parsed.getTime())) return '---';
+      return format(parsed, pattern);
+    } catch (e) {
+      return '---';
+    }
+  };
+
+  const getBatchSettlementBalance = (batch: Batch) => {
+    const allCagesForBatch = (state.cages || []).filter(c => c.batchId === batch.id);
+    const activeCagesInBatch = allCagesForBatch.filter(c => c.status === 'Ocupada' || c.batchId === batch.id);
+    const usedFish = activeCagesInBatch.reduce((acc, curr) => acc + (curr.initialFishCount || 0), 0);
+    
+    let settledAndHarvested = 0;
+    (state.harvestLogs || []).forEach(h => {
+      if (h.batchId === batch.id) {
+        settledAndHarvested += (h.initialFishCount || 0);
+      }
+    });
+
+    const nurseryMortality = (state.mortalityLogs || []).filter(m => m.batchId === batch.id && !m.cageId).reduce((acc, curr) => acc + curr.count, 0);
+
+    return batch.isSettlementComplete 
+      ? 0 
+      : Math.max(0, batch.initialQuantity - usedFish - settledAndHarvested - nurseryMortality);
+  };
+
+  const handleExportPDF = () => {
+    const isSingleBatch = filterBatchId !== 'all';
+    const targetBatch = isSingleBatch ? (state.batches || []).find(b => b.id === filterBatchId) : null;
+    const cagesToExport = filteredCages;
+
+    if (cagesToExport.length === 0 && !targetBatch) {
+      alert("Nenhum dado de povoamento encontrado para gerar o PDF.");
+      return;
+    }
+
+    const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+    const now = new Date();
+    const emissionDateStr = format(now, "dd/MM/yyyy 'às' HH:mm");
+
+    // Header Background
+    doc.setFillColor(52, 68, 52); // #344434 AquaGestão Dark Green
+    doc.rect(0, 0, 210, 26, "F");
+
+    // Accent Line
+    doc.setFillColor(16, 185, 129); // Emerald 500
+    doc.rect(0, 26, 210, 1.5, "F");
+
+    // Header Text
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(13);
+    doc.setFont("helvetica", "bold");
+    doc.text("AQUAGESTÃO • CONTROLE DE POVOAMENTO", 14, 11);
+
+    doc.setFontSize(8.5);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(228, 228, 212); // #e4e4d4
+    const subTitle = isSingleBatch && targetBatch
+      ? `RELATÓRIO DETALHADO DO LOTE: ${targetBatch.name.toUpperCase()}`
+      : "RELATÓRIO GERAL DE POVOAMENTO DE GAIOLAS (TODOS OS LOTES ATIVOS)";
+    doc.text(subTitle, 14, 17);
+
+    doc.setFontSize(7.5);
+    doc.text(`Emissão: ${emissionDateStr} | Usuário: ${currentUser.name} | CostaFoods Brasil`, 14, 22);
+
+    let startY = 32;
+
+    if (isSingleBatch && targetBatch) {
+      const protocol = (state.protocols || []).find(p => p.id === targetBatch.protocolId);
+      
+      const totalInitial = targetBatch.initialQuantity || 0;
+      const totalInCages = cagesToExport.reduce((acc, c) => acc + (c.initialFishCount || 0), 0);
+      const nurseryMort = (state.mortalityLogs || []).filter(m => m.batchId === targetBatch.id && !m.cageId).reduce((a, b) => a + b.count, 0);
+      
+      let cagesMort = 0;
+      let livingFishInCages = 0;
+
+      cagesToExport.forEach(c => {
+        const cMort = (state.mortalityLogs || []).filter(m => {
+          if (m.cageId !== c.id) return false;
+          if (m.batchId && m.batchId !== targetBatch.id) return false;
+          const cageSettlement = c.settlementDate || targetBatch.settlementDate;
+          if (cageSettlement && m.date < cageSettlement) return false;
+          if (c.harvestDate && m.date > c.harvestDate) return false;
+          return true;
+        }).reduce((a, b) => a + b.count, 0);
+        cagesMort += cMort;
+        livingFishInCages += Math.max(0, (c.initialFishCount || 0) - cMort);
+      });
+
+      const totalBatchMort = nurseryMort + cagesMort;
+      const totalLivingBatch = Math.max(0, totalInitial - totalBatchMort);
+      const survivalRate = totalInitial > 0 ? ((totalLivingBatch / totalInitial) * 100) : 0;
+      const settlementBal = getBatchSettlementBalance(targetBatch);
+
+      // Model stratification string
+      const modelCounts: { [key: string]: { count: number; fish: number } } = {};
+      cagesToExport.forEach(c => {
+        const m = c.model || 'Padrão';
+        if (!modelCounts[m]) modelCounts[m] = { count: 0, fish: 0 };
+        modelCounts[m].count += 1;
+        modelCounts[m].fish += (c.initialFishCount || 0);
+      });
+      const stratText = Object.entries(modelCounts)
+        .map(([m, data]) => `Mod. ${m}: ${data.count} gaiola(s) (${formatNumber(data.fish)} un)`)
+        .join(' | ');
+
+      const supplierText = targetBatch.supplierName || 'Não informado';
+      const nfsText = targetBatch.invoices && targetBatch.invoices.length > 0
+        ? targetBatch.invoices.map(i => i.invoiceNumber).filter(Boolean).join(', ')
+        : (targetBatch.invoiceValue ? formatCurrency(targetBatch.invoiceValue) : 'Não informada');
+
+      // Batch Summary Box
+      doc.setFillColor(248, 250, 252);
+      doc.setDrawColor(203, 213, 225);
+      doc.setLineWidth(0.3);
+      doc.roundedRect(14, startY, 182, 38, 2, 2, "FD");
+
+      // Batch Title inside Box
+      doc.setFontSize(10);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(30, 41, 59);
+      doc.text(`LOTE: ${targetBatch.name}`, 18, startY + 6);
+
+      doc.setFontSize(8);
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(71, 85, 105);
+
+      // Line 1: Dates & Initial Stats
+      doc.text(`Data Povoamento: ${safeDateFormat(targetBatch.settlementDate)}`, 18, startY + 12);
+      doc.text(`Prev. Despesca: ${safeDateFormat(targetBatch.expectedHarvestDate)}`, 78, startY + 12);
+      doc.text(`Peso Médio Inicial: ${targetBatch.initialUnitWeight ? `${formatNumber(targetBatch.initialUnitWeight, 1)} g` : '---'}`, 135, startY + 12);
+
+      // Line 2: Totals & Balance
+      doc.text(`Povoamento Total Lote: ${formatNumber(totalInitial)} un`, 18, startY + 17);
+      doc.text(`Alocado em Gaiolas: ${formatNumber(totalInCages)} un`, 78, startY + 17);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(37, 99, 235); // Blue
+      doc.text(`Saldo Povoamento: ${formatNumber(settlementBal)} un`, 135, startY + 17);
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(71, 85, 105);
+
+      // Line 3: Living stock & Mortality
+      doc.text(`Gaiolas Ativas: ${cagesToExport.length} un`, 18, startY + 22);
+      doc.text(`Mortalidade Acum.: ${formatNumber(totalBatchMort)} un (${totalInitial > 0 ? formatNumber((totalBatchMort / totalInitial) * 100, 1) : 0}%)`, 78, startY + 22);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(16, 185, 129); // Green
+      doc.text(`Estoque Vivo Atual: ${formatNumber(totalLivingBatch)} un (${formatNumber(survivalRate, 1)}% Sobrev.)`, 135, startY + 22);
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(71, 85, 105);
+
+      // Line 4: Supplier, Invoices & Protocol
+      doc.setFontSize(7.5);
+      doc.text(`Fornecedor: ${supplierText} | NF(s): ${nfsText} | Protocolo: ${protocol?.name || 'Padrão'}`, 18, startY + 28);
+      
+      // Line 5: Stratification
+      if (stratText) {
+        doc.text(`Estratificação Gaiolas: ${stratText}`, 18, startY + 33);
+      }
+
+      startY += 42;
+    } else {
+      // General Summary Card for All Batches
+      const totalActiveCages = cagesToExport.length;
+      const totalInitialAll = cagesToExport.reduce((acc, c) => acc + (c.initialFishCount || 0), 0);
+      let totalMortAll = 0;
+      let totalLivingAll = 0;
+
+      cagesToExport.forEach(c => {
+        const cMort = (state.mortalityLogs || []).filter(m => {
+          if (m.cageId !== c.id) return false;
+          if (c.batchId && m.batchId && m.batchId !== c.batchId) return false;
+          if (c.settlementDate && m.date < c.settlementDate) return false;
+          if (c.harvestDate && m.date > c.harvestDate) return false;
+          return true;
+        }).reduce((a, b) => a + b.count, 0);
+        totalMortAll += cMort;
+        totalLivingAll += Math.max(0, (c.initialFishCount || 0) - cMort);
+      });
+
+      doc.setFillColor(248, 250, 252);
+      doc.setDrawColor(203, 213, 225);
+      doc.setLineWidth(0.3);
+      doc.roundedRect(14, startY, 182, 18, 2, 2, "FD");
+
+      doc.setFontSize(9);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(30, 41, 59);
+      doc.text(`Total de Gaiolas Ocupadas: ${totalActiveCages} un`, 18, startY + 7);
+      doc.text(`Povoamento Inicial Total: ${formatNumber(totalInitialAll)} un`, 80, startY + 7);
+      doc.text(`Estoque Vivo em Cultivo: ${formatNumber(totalLivingAll)} un`, 140, startY + 7);
+
+      doc.setFontSize(8);
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(100, 116, 139);
+      doc.text(`Mortalidade Acumulada em Gaiolas: ${formatNumber(totalMortAll)} un | Sobrevivência Geral: ${totalInitialAll > 0 ? formatNumber((totalLivingAll / totalInitialAll) * 100, 1) : 0}%`, 18, startY + 13);
+
+      startY += 23;
+    }
+
+    // Build Table Rows
+    const tableHead = isSingleBatch
+      ? [["#", "Gaiola", "Setor / Linha", "Modelo", "Data Povoam.", "Dias", "Prev. Despesca", "Qtd Inicial", "Mort. Acum.", "Estoque Vivo", "Sobrev."]]
+      : [["#", "Gaiola", "Lote", "Setor / Linha", "Modelo", "Data Povoam.", "Dias", "Qtd Inicial", "Mort. Acum.", "Estoque Vivo", "Sobrev."]];
+
+    let sumInitial = 0;
+    let sumMort = 0;
+    let sumLiving = 0;
+
+    const tableBody = cagesToExport.map((cage, index) => {
+      const batch = (state.batches || []).find(b => b.id === cage.batchId);
+      const line = (state.lines || []).find(l => l.id === cage.lineId);
+      
+      const cMort = (state.mortalityLogs || []).filter(m => {
+        if (m.cageId !== cage.id) return false;
+        if (cage.batchId && m.batchId && m.batchId !== cage.batchId) return false;
+        const cageSettlement = cage.settlementDate || batch?.settlementDate;
+        if (cageSettlement && m.date < cageSettlement) return false;
+        if (cage.harvestDate && m.date > cage.harvestDate) return false;
+        return true;
+      }).reduce((a, b) => a + b.count, 0);
+
+      const initCount = cage.initialFishCount || 0;
+      const currentCount = Math.max(0, initCount - cMort);
+      const survPct = initCount > 0 ? (currentCount / initCount) * 100 : 0;
+
+      sumInitial += initCount;
+      sumMort += cMort;
+      sumLiving += currentCount;
+
+      let cycleDaysStr = '---';
+      const sDate = cage.settlementDate || batch?.settlementDate;
+      if (sDate) {
+        try {
+          const days = differenceInDays(startOfDay(now), startOfDay(parseISO(sDate.split('T')[0])));
+          cycleDaysStr = `${Math.max(0, days)}d`;
+        } catch(e) {}
+      }
+
+      const rawModel = cage.model 
+        ? cage.model 
+        : cage.dimensions 
+          ? `${cage.dimensions.length}x${cage.dimensions.width}x${cage.dimensions.depth}`
+          : '---';
+
+      if (isSingleBatch) {
+        return [
+          (index + 1).toString(),
+          cage.name,
+          line?.name || '---',
+          rawModel,
+          safeDateFormat(cage.settlementDate || batch?.settlementDate),
+          cycleDaysStr,
+          safeDateFormat(cage.harvestDate || batch?.expectedHarvestDate),
+          formatNumber(initCount),
+          formatNumber(cMort),
+          formatNumber(currentCount),
+          `${formatNumber(survPct, 1)}%`
+        ];
+      } else {
+        return [
+          (index + 1).toString(),
+          cage.name,
+          batch?.name || '---',
+          line?.name || '---',
+          rawModel,
+          safeDateFormat(cage.settlementDate || batch?.settlementDate),
+          cycleDaysStr,
+          formatNumber(initCount),
+          formatNumber(cMort),
+          formatNumber(currentCount),
+          `${formatNumber(survPct, 1)}%`
+        ];
+      }
+    });
+
+    const totalSurvAvg = sumInitial > 0 ? (sumLiving / sumInitial) * 100 : 0;
+
+    const tableFoot = isSingleBatch
+      ? [[
+          "TOTAIS",
+          `${cagesToExport.length} gaiolas`,
+          "",
+          "",
+          "",
+          "",
+          "",
+          `${formatNumber(sumInitial)} un`,
+          `${formatNumber(sumMort)} un`,
+          `${formatNumber(sumLiving)} un`,
+          `${formatNumber(totalSurvAvg, 1)}%`
+        ]]
+      : [[
+          "TOTAIS",
+          `${cagesToExport.length} gaiolas`,
+          "",
+          "",
+          "",
+          "",
+          "",
+          `${formatNumber(sumInitial)} un`,
+          `${formatNumber(sumMort)} un`,
+          `${formatNumber(sumLiving)} un`,
+          `${formatNumber(totalSurvAvg, 1)}%`
+        ]];
+
+    autoTable(doc, {
+      startY: startY,
+      head: tableHead,
+      body: tableBody,
+      foot: tableFoot,
+      theme: "striped",
+      headStyles: {
+        fillColor: [52, 68, 52],
+        textColor: [255, 255, 255],
+        fontSize: 7.5,
+        fontStyle: "bold",
+        halign: "center",
+        valign: "middle"
+      },
+      styles: {
+        fontSize: 7.5,
+        cellPadding: 2.2,
+        valign: "middle"
+      },
+      columnStyles: isSingleBatch ? {
+        0: { cellWidth: 8, halign: "center" },
+        1: { cellWidth: 26, fontStyle: "bold" },
+        2: { cellWidth: 24 },
+        3: { cellWidth: 18, halign: "center" },
+        4: { cellWidth: 18, halign: "center" },
+        5: { cellWidth: 12, halign: "center" },
+        6: { cellWidth: 18, halign: "center" },
+        7: { cellWidth: 17, halign: "right" },
+        8: { cellWidth: 15, halign: "right", textColor: [185, 28, 28] },
+        9: { cellWidth: 16, halign: "right", fontStyle: "bold", textColor: [21, 128, 61] },
+        10: { cellWidth: 14, halign: "right" }
+      } : {
+        0: { cellWidth: 8, halign: "center" },
+        1: { cellWidth: 24, fontStyle: "bold" },
+        2: { cellWidth: 22 },
+        3: { cellWidth: 20 },
+        4: { cellWidth: 16, halign: "center" },
+        5: { cellWidth: 17, halign: "center" },
+        6: { cellWidth: 12, halign: "center" },
+        7: { cellWidth: 17, halign: "right" },
+        8: { cellWidth: 15, halign: "right", textColor: [185, 28, 28] },
+        9: { cellWidth: 17, halign: "right", fontStyle: "bold", textColor: [21, 128, 61] },
+        10: { cellWidth: 14, halign: "right" }
+      },
+      footStyles: {
+        fillColor: [241, 245, 249],
+        textColor: [15, 23, 42],
+        fontSize: 7.5,
+        fontStyle: "bold",
+        valign: "middle"
+      },
+      margin: { left: 14, right: 14 }
+    });
+
+    const finalY = (doc as any).lastAutoTable?.finalY || 180;
+    const signY = Math.min(Math.max(finalY + 20, 235), 270);
+
+    // If signY would exceed page, add page
+    if (finalY > 235) {
+      doc.addPage();
+      const newSignY = 60;
+      doc.setDrawColor(148, 163, 184);
+      doc.setLineWidth(0.4);
+      doc.line(20, newSignY, 90, newSignY);
+      doc.setFontSize(8);
+      doc.setTextColor(71, 85, 105);
+      doc.setFont("helvetica", "bold");
+      doc.text("Responsável Técnico / Biólogo", 55, newSignY + 5, { align: "center" });
+
+      doc.line(120, newSignY, 190, newSignY);
+      doc.text("Gerência de Produção / Piscicultura", 155, newSignY + 5, { align: "center" });
+    } else {
+      doc.setDrawColor(148, 163, 184);
+      doc.setLineWidth(0.4);
+      doc.line(20, signY, 90, signY);
+      doc.setFontSize(8);
+      doc.setTextColor(71, 85, 105);
+      doc.setFont("helvetica", "bold");
+      doc.text("Responsável Técnico / Biólogo", 55, signY + 5, { align: "center" });
+
+      doc.line(120, signY, 190, signY);
+      doc.text("Gerência de Produção / Piscicultura", 155, signY + 5, { align: "center" });
+    }
+
+    // Page count footer
+    const pageCount = (doc as any).internal.getNumberOfPages();
+    for (let i = 1; i <= pageCount; i++) {
+      doc.setPage(i);
+      doc.setFontSize(7.5);
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(148, 163, 184);
+      doc.text(`AquaGestão Piscicultura • CostaFoods Brasil — Página ${i} de ${pageCount}`, 105, 290, { align: "center" });
+    }
+
+    const fileName = isSingleBatch && targetBatch
+      ? `relatorio-povoamento-${targetBatch.name.toLowerCase().replace(/\s+/g, '-')}-${format(now, 'yyyyMMdd-HHmm')}.pdf`
+      : `relatorio-geral-povoamento-${format(now, 'yyyyMMdd-HHmm')}.pdf`;
+
+    doc.save(fileName);
+  };
+
   const handleBulkUpdate = () => {
     if (!hasPermission || selectedCages.length === 0) return;
     if (!bulkData.settlementDate && !bulkData.harvestDate && !bulkData.lineId && !bulkData.initialFishCount) return;
@@ -458,41 +873,52 @@ const CageManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
           </div>
         </div>
 
-        {hasPermission && filteredCages.length > 0 && (
-          <div className="flex items-center gap-2 w-full md:w-auto">
-            <button 
-              onClick={toggleSelectAll}
-              className="flex-1 md:flex-none px-4 py-2 bg-slate-50 hover:bg-slate-100 text-slate-600 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2"
-            >
-              {selectedCages.length === filteredCages.length ? <CheckSquare className="w-4 h-4" /> : <Square className="w-4 h-4" />}
-              {selectedCages.length === filteredCages.length ? 'Desmarcar Todos' : 'Selecionar Todos'}
-            </button>
-            {selectedCages.length > 0 && (
-              <React.Fragment>
-                <button 
-                  onClick={() => setShowBulkEdit(true)}
-                  className="flex-1 md:flex-none px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 shadow-lg shadow-blue-600/20"
-                >
-                  <Edit className="w-4 h-4" /> Edição em Massa ({selectedCages.length})
-                </button>
-                <button 
-                  onClick={handleBulkRelease}
-                  title="Desvincular gaiolas do lote mantendo-as no inventário"
-                  className="flex-1 md:flex-none px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 shadow-lg shadow-amber-500/20"
-                >
-                  <LogOut className="w-4 h-4" /> Desvincular ({selectedCages.length})
-                </button>
-                <button 
-                  onClick={handleBulkDelete}
-                  title="Excluir gaiolas definitivamente do sistema"
-                  className="flex-1 md:flex-none px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 shadow-lg shadow-red-600/20"
-                >
-                  <Trash2 className="w-4 h-4" /> Excluir ({selectedCages.length})
-                </button>
-              </React.Fragment>
-            )}
-          </div>
-        )}
+        <div className="flex items-center gap-2 w-full md:w-auto flex-wrap justify-end">
+          <button
+            onClick={handleExportPDF}
+            title="Gerar PDF com as gaiolas e informações do lote filtrado"
+            className="px-4 py-2.5 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 shadow-md shadow-slate-900/10 active:scale-95"
+          >
+            <FileText className="w-4 h-4 text-emerald-400" />
+            <span>{filterBatchId !== 'all' ? 'Gerar PDF do Lote' : 'Gerar PDF Geral'}</span>
+          </button>
+
+          {hasPermission && filteredCages.length > 0 && (
+            <React.Fragment>
+              <button 
+                onClick={toggleSelectAll}
+                className="px-4 py-2 bg-slate-50 hover:bg-slate-100 text-slate-600 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2"
+              >
+                {selectedCages.length === filteredCages.length ? <CheckSquare className="w-4 h-4" /> : <Square className="w-4 h-4" />}
+                {selectedCages.length === filteredCages.length ? 'Desmarcar' : 'Marcar Todos'}
+              </button>
+              {selectedCages.length > 0 && (
+                <React.Fragment>
+                  <button 
+                    onClick={() => setShowBulkEdit(true)}
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 shadow-lg shadow-blue-600/20"
+                  >
+                    <Edit className="w-4 h-4" /> Edição em Massa ({selectedCages.length})
+                  </button>
+                  <button 
+                    onClick={handleBulkRelease}
+                    title="Desvincular gaiolas do lote mantendo-as no inventário"
+                    className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 shadow-lg shadow-amber-500/20"
+                  >
+                    <LogOut className="w-4 h-4" /> Desvincular ({selectedCages.length})
+                  </button>
+                  <button 
+                    onClick={handleBulkDelete}
+                    title="Excluir gaiolas definitivamente do sistema"
+                    className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 shadow-lg shadow-red-600/20"
+                  >
+                    <Trash2 className="w-4 h-4" /> Excluir ({selectedCages.length})
+                  </button>
+                </React.Fragment>
+              )}
+            </React.Fragment>
+          )}
+        </div>
       </div>
 
       {showBulkEdit && (
@@ -582,7 +1008,17 @@ const CageManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       {batchStratification && (
         <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-6 rounded-[2rem] border border-blue-100 shadow-sm flex flex-col md:flex-row justify-between items-stretch gap-6 animate-in fade-in duration-300">
           <div className="flex flex-col justify-center min-w-[280px]">
-            <span className="text-[10px] font-black text-blue-600 uppercase tracking-widest block mb-1">Resumo do Lote Selecionado</span>
+            <div className="flex items-center justify-between gap-2 mb-1">
+              <span className="text-[10px] font-black text-blue-600 uppercase tracking-widest block">Resumo do Lote Selecionado</span>
+              <button
+                onClick={handleExportPDF}
+                className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-[9px] font-black uppercase tracking-widest flex items-center gap-1.5 shadow-md shadow-blue-600/20 transition-all active:scale-95 cursor-pointer"
+                title="Exportar PDF deste lote com gaiolas e detalhes"
+              >
+                <FileText className="w-3.5 h-3.5" />
+                <span>PDF do Lote</span>
+              </button>
+            </div>
             <h4 className="text-2xl font-black text-slate-800 uppercase tracking-tight italic">
               {batchStratification.batchName}
             </h4>
@@ -609,7 +1045,16 @@ const CageManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
           </div>
 
           <div className="flex-1 flex flex-col justify-center">
-            <span className="text-xs font-black text-slate-700 uppercase tracking-widest block mb-2.5">Modelos de Gaiola no Lote</span>
+            <div className="flex items-center justify-between mb-2.5">
+              <span className="text-xs font-black text-slate-700 uppercase tracking-widest block">Modelos de Gaiola no Lote</span>
+              <button
+                onClick={handleExportPDF}
+                className="hidden md:flex px-3.5 py-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-xl text-[10px] font-black uppercase tracking-widest items-center gap-2 shadow-xs transition-all active:scale-95 cursor-pointer"
+              >
+                <Download className="w-3.5 h-3.5 text-blue-600" />
+                <span>Exportar Relatório PDF</span>
+              </button>
+            </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
               {batchStratification.models.map(({ model, count }) => (
                 <div key={model} className="bg-white p-3.5 rounded-2xl border border-blue-100 shadow-sm flex items-center gap-3">
