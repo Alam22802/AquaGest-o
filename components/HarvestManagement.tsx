@@ -93,11 +93,19 @@ const HarvestManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!hasPermission) return;
+    if (!hasPermission) {
+      alert('Você não possui permissão para lançar despescas.');
+      return;
+    }
     if (!selectedBatchId || !selectedCageId || !totalWeight || !fishCount) {
       alert('Por favor, preencha todos os campos obrigatórios.');
       return;
     }
+
+    const initialFishCountToSave = selectedCage?.initialFishCount 
+      || (editingId ? (state.harvestLogs || []).find(l => l.id === editingId)?.initialFishCount : undefined) 
+      || Number(fishCount) 
+      || 0;
 
     // Check if this was the last unharvested cage for the batch
     const harvestedCageIdsForBatch = new Set(
