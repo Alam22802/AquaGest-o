@@ -60,13 +60,18 @@ export const ClosedBatchHistory: React.FC<Props> = ({ state, currentUser, onUpda
     if (!currentUser.isMaster || !onUpdate) return;
     if (!confirm('Deseja excluir este registro histórico visual permanentemente?')) return;
 
-    const updatedHistory = (state.closedBatchHistory || []).filter(r => r.id !== recordId && r.batchId !== recordId);
+    const histId = recordId.startsWith('hist-') ? recordId : (`hist-${recordId}`);
+    const rawBatchId = recordId.replace(/^hist-/, '');
+
+    const updatedHistory = (state.closedBatchHistory || []).filter(r => 
+      r.id !== recordId && r.id !== histId && r.batchId !== recordId && r.batchId !== rawBatchId
+    );
     onUpdate({
       ...state,
       closedBatchHistory: updatedHistory,
-      deletedIds: Array.from(new Set([...(state.deletedIds || []), recordId]))
+      deletedIds: Array.from(new Set([...(state.deletedIds || []), recordId, histId]))
     });
-    if (selectedRecordId === recordId) {
+    if (selectedRecordId === recordId || selectedRecordId === histId || selectedRecordId === rawBatchId) {
       setSelectedRecordId('');
     }
   };
@@ -77,16 +82,23 @@ export const ClosedBatchHistory: React.FC<Props> = ({ state, currentUser, onUpda
 
     // 1. From saved closedBatchHistory (includes deleted batches archived in history)
     (state.closedBatchHistory || []).forEach(record => {
-      recordsMap.set(record.batchId || record.id, record);
+      const cleanKey = (record.batchId || record.id).replace(/^hist-/, '');
+      recordsMap.set(cleanKey, {
+        ...record,
+        id: record.id?.startsWith('hist-') ? record.id : (`hist-${cleanKey}`),
+        batchId: cleanKey
+      });
     });
 
     // 2. From active batches that have isClosed === true
     (state.batches || [])
       .filter(b => b.isClosed)
       .forEach(batch => {
-        // If not already in recordsMap or to keep it up to date
-        const snapshot = buildBatchSnapshot(batch, state);
-        recordsMap.set(batch.id, snapshot);
+        const cleanKey = batch.id.replace(/^hist-/, '');
+        if (!recordsMap.has(cleanKey)) {
+          const snapshot = buildBatchSnapshot(batch, state);
+          recordsMap.set(cleanKey, snapshot);
+        }
       });
 
     return Array.from(recordsMap.values()).sort((a, b) => {
@@ -98,7 +110,8 @@ export const ClosedBatchHistory: React.FC<Props> = ({ state, currentUser, onUpda
 
   const selectedRecord = useMemo(() => {
     if (!selectedRecordId) return null;
-    return historicalRecords.find(r => r.id === selectedRecordId || r.batchId === selectedRecordId) || null;
+    const cleanId = selectedRecordId.replace(/^hist-/, '');
+    return historicalRecords.find(r => r.id === selectedRecordId || r.batchId === selectedRecordId || r.batchId === cleanId || r.id === `hist-${cleanId}`) || null;
   }, [selectedRecordId, historicalRecords]);
 
   const filteredEntries = useMemo(() => {

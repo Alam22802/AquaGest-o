@@ -222,8 +222,13 @@ const BatchManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     let updatedClosedHistory = [...(state.closedBatchHistory || [])];
     if (targetBatch) {
       const snapshot = buildBatchSnapshot({ ...targetBatch, isClosed: true, closedAt: targetBatch.closedAt || new Date().toISOString() }, state);
+      const histId = snapshot.id?.startsWith('hist-') ? snapshot.id : (`hist-${targetBatch.id}`);
+      snapshot.id = histId;
+      snapshot.batchId = targetBatch.id;
+      snapshot.batchName = targetBatch.name;
       snapshot.isDeletedFromSystem = true;
-      updatedClosedHistory = updatedClosedHistory.filter(r => r.id !== targetBatch.id && r.batchId !== targetBatch.id);
+      snapshot.archivedAt = new Date().toISOString();
+      updatedClosedHistory = updatedClosedHistory.filter(r => r.id !== histId && r.id !== targetBatch.id && r.batchId !== targetBatch.id);
       updatedClosedHistory.unshift(snapshot);
     }
 

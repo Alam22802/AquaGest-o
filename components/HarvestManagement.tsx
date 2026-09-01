@@ -30,24 +30,15 @@ const HarvestManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
   const [editingId, setEditingId] = useState<string | null>(null);
   const [selectedLogIds, setSelectedLogIds] = useState<Set<string>>(new Set());
 
-  const hasPermission = currentUser.isMaster || currentUser.canEdit;
+  const [formError, setFormError] = useState<string | null>(null);
+
+  const hasPermission = currentUser.isMaster || currentUser.canEdit !== false || (currentUser.allowedTabs && currentUser.allowedTabs.includes('batches'));
 
   const batches = useMemo(() => {
     return [...(state.batches || [])]
-      .filter(b => {
-        if (b.id === selectedBatchId) return true;
-        if (b.isClosed) return false;
-
-        const harvestedCageIdsForBatch = new Set(
-          (state.harvestLogs || []).filter(h => h.batchId === b.id).map(h => h.cageId)
-        );
-        const availableCages = (state.cages || []).filter(
-          c => c.batchId === b.id && c.status === 'Ocupada' && !harvestedCageIdsForBatch.has(c.id)
-        );
-        return availableCages.length > 0;
-      })
+      .filter(b => !b.isClosed || b.id === selectedBatchId)
       .sort((a, b) => a.name.localeCompare(b.name));
-  }, [state.batches, state.cages, state.harvestLogs, selectedBatchId]);
+  }, [state.batches, selectedBatchId]);
   
   const selectedBatch = useMemo(() => 
     batches.find(b => b.id === selectedBatchId),
@@ -63,13 +54,17 @@ const HarvestManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
     );
   }, [state.harvestLogs, selectedBatchId, editingId]);
 
-  const cagesInBatch = useMemo(() => 
-    state.cages.filter(c => 
+  const cagesInBatch = useMemo(() => {
+    if (!selectedBatchId) return [];
+    const targetB = (state.batches || []).find(b => b.id === selectedBatchId);
+    const linkedCages = state.cages.filter(c => 
       c.id === selectedCageId || 
-      (c.batchId === selectedBatchId && c.status === 'Ocupada' && !harvestedCageIds.has(c.id))
-    ),
-    [state.cages, selectedBatchId, selectedCageId, harvestedCageIds]
-  );
+      c.batchId === selectedBatchId ||
+      (targetB?.cageIds || []).includes(c.id)
+    );
+    if (linkedCages.length > 0) return linkedCages;
+    return state.cages;
+  }, [state.cages, state.batches, selectedBatchId, selectedCageId]);
 
   const selectedCage = useMemo(() => 
     state.cages.find(c => c.id === selectedCageId),
@@ -84,8 +79,10 @@ const HarvestManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
         .filter(m => m.cageId === selectedCage.id)
         .reduce((acc, curr) => acc + curr.count, 0);
       
-      const currentCount = (selectedCage.initialFishCount || 0) - cageMortality;
-      setFishCount(currentCount.toString());
+      const currentCount = Math.max(0, (selectedCage.initialFishCount || 0) - cageMortality);
+      if (currentCount > 0) {
+        setFishCount(currentCount.toString());
+      }
     } else if (!selectedCage && !editingId) {
       setFishCount('');
     }
@@ -93,12 +90,14 @@ const HarvestManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
+    setFormError(null);
+
     if (!hasPermission) {
-      alert('Você não possui permissão para lançar despescas.');
+      setFormError('Você não possui permissão para lançar despescas.');
       return;
     }
     if (!selectedBatchId || !selectedCageId || !totalWeight || !fishCount) {
-      alert('Por favor, preencha todos os campos obrigatórios.');
+      setFormError('Por favor, selecione o Lote, a Gaiola, e preencha Peso Total e Qtd de Peixes.');
       return;
     }
 
@@ -116,7 +115,6 @@ const HarvestManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
     const remainingUnharvested = state.cages.filter(c => 
       c.batchId === selectedBatchId && 
       c.id !== selectedCageId &&
-      c.status === 'Ocupada' && 
       !harvestedCageIdsForBatch.has(c.id)
     );
 
@@ -205,7 +203,6 @@ const HarvestManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
       harvestedCageIdsForBatch.add(selectedCageId);
       const remainingCages = state.cages.filter(c => 
         c.batchId === selectedBatchId && 
-        c.status === 'Ocupada' && 
         !harvestedCageIdsForBatch.has(c.id)
       );
       if (remainingCages.length === 0) {
@@ -469,7 +466,7 @@ const HarvestManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
                 <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-widest">Peso Médio (g) *</label>
                 <input 
                   type="number" 
-                  step="0.1"
+                  step="any"
                   required
                   placeholder="0.0"
                   className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none focus:ring-2 focus:ring-blue-500/10 text-xs"
@@ -481,7 +478,7 @@ const HarvestManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
                 <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-widest">Peso Total Gaiola (kg) *</label>
                 <input 
                   type="number" 
-                  step="0.01"
+                  step="any"
                   required
                   placeholder="0.00"
                   className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none focus:ring-2 focus:ring-blue-500/10 text-xs"
@@ -495,6 +492,7 @@ const HarvestManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
               <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-widest">Qtd Peixes *</label>
               <input 
                 type="number" 
+                step="any"
                 required
                 placeholder="0"
                 className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none focus:ring-2 focus:ring-blue-500/10 text-xs"
@@ -507,7 +505,7 @@ const HarvestManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
               <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-widest">Preço por kg (R$)</label>
               <input 
                 type="number" 
-                step="0.01"
+                step="any"
                 placeholder="0.00"
                 className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none focus:ring-2 focus:ring-blue-500/10 text-xs"
                 value={unitPrice}
@@ -528,6 +526,13 @@ const HarvestManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
                 />
               </div>
             </div>
+
+            {formError && (
+              <div className="p-3 bg-red-50 border border-red-200 rounded-2xl flex items-center gap-2 text-xs font-bold text-red-600">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                <span>{formError}</span>
+              </div>
+            )}
 
             <button 
               type="submit"

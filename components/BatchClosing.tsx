@@ -634,7 +634,7 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     const fcaReal = weightGainReal > 0 ? (feeding / 1000) / weightGainReal : 0;
 
     // GPD: (Final Avg Weight - Initial Weight) / Total Days
-    const finalAvgWeight = harvestedFish > 0 ? (harvestedWeight / harvestedFish) * 1000 : currentAvgWeight;
+    const finalAvgWeight = harvestedFish > 0 ? (finalWeight / harvestedFish) * 1000 : currentAvgWeight;
     const gpd = totalDays > 0 ? (finalAvgWeight - batch.initialUnitWeight) / totalDays : 0;
 
     // Cost per kg
@@ -1132,7 +1132,12 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     if (targetBatch) {
       const closedBatchObj = { ...targetBatch, isClosed: true, closedAt: new Date().toISOString(), updatedAt: Date.now() };
       const snapshot = buildBatchSnapshot(closedBatchObj, state);
-      updatedClosedHistory = updatedClosedHistory.filter(r => r.id !== targetBatch.id && r.batchId !== targetBatch.id);
+      const histId = snapshot.id?.startsWith('hist-') ? snapshot.id : (`hist-${targetBatch.id}`);
+      snapshot.id = histId;
+      snapshot.batchId = targetBatch.id;
+      snapshot.batchName = targetBatch.name;
+      snapshot.isDeletedFromSystem = false;
+      updatedClosedHistory = updatedClosedHistory.filter(r => r.id !== histId && r.id !== targetBatch.id && r.batchId !== targetBatch.id);
       updatedClosedHistory.unshift(snapshot);
     }
 
@@ -1185,8 +1190,13 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     let updatedClosedHistory = [...(state.closedBatchHistory || [])];
     if (targetBatch) {
       const snapshot = buildBatchSnapshot({ ...targetBatch, isClosed: true, closedAt: targetBatch.closedAt || new Date().toISOString() }, state);
+      const histId = snapshot.id?.startsWith('hist-') ? snapshot.id : (`hist-${targetBatch.id}`);
+      snapshot.id = histId;
+      snapshot.batchId = targetBatch.id;
+      snapshot.batchName = targetBatch.name;
       snapshot.isDeletedFromSystem = true;
-      updatedClosedHistory = updatedClosedHistory.filter(r => r.id !== targetBatch.id && r.batchId !== targetBatch.id);
+      snapshot.archivedAt = new Date().toISOString();
+      updatedClosedHistory = updatedClosedHistory.filter(r => r.id !== histId && r.id !== targetBatch.id && r.batchId !== targetBatch.id);
       updatedClosedHistory.unshift(snapshot);
     }
 

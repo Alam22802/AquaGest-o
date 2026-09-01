@@ -177,7 +177,12 @@ async function scheduleSafeFarmStatePersist(stateToSave: any) {
 
   function isServerItemDeleted(item: any, deletedSet: Set<string>, preserveOnBatchDeletion: boolean = false): boolean {
     if (!item || !item.id) return true;
-    if (deletedSet.has(item.id)) return true;
+    if (deletedSet.has(item.id)) {
+      if (preserveOnBatchDeletion && (item.batchId || item.batchName || item.entries || item.isDeletedFromSystem || item.id.startsWith('hist-'))) {
+        return false;
+      }
+      return true;
+    }
     if (!preserveOnBatchDeletion) {
       if (item.name && deletedSet.has(item.name)) return true;
       if (item.batchId && deletedSet.has(item.batchId)) return true;
@@ -360,7 +365,7 @@ async function scheduleSafeFarmStatePersist(stateToSave: any) {
       'slaughterHREntries', 'slaughterHRVacancies', 'slaughterSupplyItems',
       'slaughterSuppliers', 'slaughterSupplyRequests', 'slaughterPurchaseOrders',
       'slaughterSupplyInvoices', 'harvestLogs', 'harvestSchedules',
-      'batchExpenses', 'batchRevenues', 'coldStorageLogs', 'utilityLogs',
+      'batchExpenses', 'batchRevenues', 'closedBatchHistory', 'coldStorageLogs', 'utilityLogs',
       'coldChambers', 'protocols', 'standardCurves', 'portfolios',
       'capexProjects', 'capexInvoices', 'capexPurchaseOrders', 'feedingTables', 'costCenters',
       'pcmEquipments', 'pcmStoppageReasons', 'pcmProductionStoppages',
@@ -376,6 +381,7 @@ async function scheduleSafeFarmStatePersist(stateToSave: any) {
     };
 
     const frigorificoAndMaintenanceKeys = new Set([
+      'closedBatchHistory',
       'slaughterLogs',
       'slaughterExpenses',
       'slaughterEmployees',

@@ -525,13 +525,22 @@ const SlaughterOverview: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
   const [chartMonth, setChartMonth] = useState(new Date().getMonth());
   const [chartYear, setChartYear] = useState(new Date().getFullYear());
 
+  const activeBatches = useMemo(() => {
+    return (state.batches || []).filter(b => !b.isClosed).sort((a, b) => a.name.localeCompare(b.name));
+  }, [state.batches]);
+
+  const closedBatches = useMemo(() => {
+    return (state.batches || []).filter(b => b.isClosed).sort((a, b) => b.name.localeCompare(a.name));
+  }, [state.batches]);
+
   const allBatches = useMemo(() => {
     const logs = Array.isArray(state.slaughterLogs) ? state.slaughterLogs : [];
-    const farmBatches = (state.batches || []).map(b => b.name);
+    const farmActive = activeBatches.map(b => b.name);
+    const farmClosed = closedBatches.map(b => b.name);
     const slaughterBatches = logs.map(l => l.slaughterBatch).filter(Boolean);
-    const combined = Array.from(new Set([...farmBatches, ...slaughterBatches]));
-    return combined.sort((a, b) => a.localeCompare(b));
-  }, [state.slaughterLogs, state.batches]);
+    const combined = Array.from(new Set([...farmActive, ...farmClosed, ...slaughterBatches]));
+    return combined;
+  }, [activeBatches, closedBatches, state.slaughterLogs]);
 
   const uniqueProducers = useMemo(() => {
     const logs = Array.isArray(state.slaughterLogs) ? state.slaughterLogs : [];
@@ -797,6 +806,7 @@ const SlaughterOverview: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
       receptionWeight: '',
       startTime: format(new Date(), 'HH:mm'),
       slaughterBatch: '',
+      batchId: '',
       endTime: '',
       packedQuantity: '',
       renderingWeight: '',
@@ -959,10 +969,17 @@ const SlaughterOverview: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
               <input type="date" required className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none text-xs" value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} />
             </div>
 
-            <div className="space-y-1">
-              <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-widest">Lote Produção</label>
+            <div className="space-y-1 md:col-span-2">
+              <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-widest flex items-center justify-between">
+                <span>Vincular Lote da Piscicultura</span>
+                {formData.batchId && (
+                  <span className="text-[9px] font-bold text-emerald-600 lowercase bg-emerald-50 px-2 py-0.5 rounded-md">
+                    vinculado
+                  </span>
+                )}
+              </label>
               <select 
-                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none text-xs" 
+                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none text-xs text-slate-700" 
                 value={formData.batchId} 
                 onChange={e => {
                   const selectedId = e.target.value;
@@ -970,40 +987,51 @@ const SlaughterOverview: React.FC<Props> = ({ state, onUpdate, currentUser }) =>
                   setFormData(prev => ({
                     ...prev,
                     batchId: selectedId,
-                    slaughterBatch: selectedBatch ? selectedBatch.name : prev.slaughterBatch
+                    slaughterBatch: selectedBatch ? selectedBatch.name : prev.slaughterBatch,
+                    producer: (!prev.producer || prev.producer === 'Fazenda Própria (Thiago)') && selectedBatch?.producer 
+                      ? selectedBatch.producer 
+                      : (prev.producer || (selectedBatch ? 'Fazenda Própria (Thiago)' : ''))
                   }));
                 }}
               >
-                <option value="">Nenhum / Externo</option>
+                <option value="">Nenhum / Lote Externo (Sem Vínculo)</option>
                 {formData.batchId && !(state.batches || []).some(b => b.id === formData.batchId) && (
                   <option value={formData.batchId}>{formData.slaughterBatch || 'Lote Histórico'}</option>
                 )}
-                {(state.batches || []).sort((a, b) => b.id.localeCompare(a.id)).map(b => (
-                  <option key={b.id} value={b.id}>{b.name} {b.isClosed ? '(Encerrado)' : ''}</option>
-                ))}
+                {activeBatches.length > 0 && (
+                  <optgroup label="🌱 Lotes Ativos (Em Andamento / Despesca)">
+                    {activeBatches.map(b => (
+                      <option key={b.id} value={b.id}>
+                        {b.name} (Ativo)
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
+                {closedBatches.length > 0 && (
+                  <optgroup label="📁 Lotes Encerrados (Histórico)">
+                    {closedBatches.map(b => (
+                      <option key={b.id} value={b.id}>
+                        {b.name} (Encerrado)
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
               </select>
             </div>
 
-            <div className="space-y-1">
-              <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-widest">Lote Abate *</label>
+            <div className="space-y-1 md:col-span-2">
+              <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-widest">Identificação do Lote de Abate *</label>
               <input 
                 type="text" 
                 required 
                 list="batch-list"
-                placeholder="Ex: 02/2026 - L2" 
-                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none text-xs" 
+                placeholder="Ex: 02/2026 - Lote 2 ou Nome Comercial" 
+                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none text-xs text-slate-800" 
                 value={formData.slaughterBatch} 
                 onChange={e => {
-                  const val = e.target.value;
-                  const matchedBatch = (state.batches || []).find(b => 
-                    b.name.trim().toLowerCase() === val.trim().toLowerCase() ||
-                    b.name.trim().toLowerCase().includes(val.trim().toLowerCase()) ||
-                    val.trim().toLowerCase().includes(b.name.trim().toLowerCase())
-                  );
                   setFormData(prev => ({
                     ...prev,
-                    slaughterBatch: val,
-                    batchId: prev.batchId || (matchedBatch ? matchedBatch.id : prev.batchId)
+                    slaughterBatch: e.target.value
                   }));
                 }} 
               />

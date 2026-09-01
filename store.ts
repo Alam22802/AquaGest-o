@@ -151,7 +151,12 @@ function mergeArraysById<T extends { id: string, name?: string, batchId?: string
 
   const isItemDeleted = (item: any): boolean => {
     if (!item || !item.id) return true;
-    if (deletedSet.has(item.id)) return true;
+    if (deletedSet.has(item.id)) {
+      if (preserveOnBatchDeletion && (item.batchId || item.batchName || item.entries || item.isDeletedFromSystem || item.id.startsWith('hist-'))) {
+        return false;
+      }
+      return true;
+    }
     if (!preserveOnBatchDeletion) {
       if (item.name && deletedSet.has(item.name)) return true;
       if (item.batchId && deletedSet.has(item.batchId)) return true;
@@ -485,7 +490,12 @@ export const ensureStateIntegrity = (state: any, mergeWith?: AppState, priority:
     if (deletedSet.size === 0) return arr;
     return arr.filter(i => {
       if (!i || !i.id) return false;
-      if (deletedSet.has(i.id)) return false;
+      if (deletedSet.has(i.id)) {
+        if (preserveOnBatchDeletion && (i.batchId || i.batchName || i.entries || i.isDeletedFromSystem || i.id.startsWith('hist-'))) {
+          return true;
+        }
+        return false;
+      }
       if (!preserveOnBatchDeletion) {
         if (i.name && deletedSet.has(i.name)) return false;
         if (i.batchId && deletedSet.has(i.batchId)) return false;

@@ -297,7 +297,7 @@ export function buildBatchSnapshot(batch: Batch, state: AppState): ClosedBatchRe
   const weightGainReal = Math.max(0, finalWeight - initialBatchWeightKg);
   const fcaReal = weightGainReal > 0 ? (feeding / 1000) / weightGainReal : 0;
 
-  const finalAvgWeight = harvestedFish > 0 ? (harvestedWeight / harvestedFish) * 1000 : currentAvgWeight;
+  const finalAvgWeight = harvestedFish > 0 ? (finalWeight / harvestedFish) * 1000 : currentAvgWeight;
   const gpd = totalDays > 0 ? (finalAvgWeight - batch.initialUnitWeight) / totalDays : 0;
 
   const costPerKg = totalReceptionWeight > 0 ? totalExpenses / totalReceptionWeight : 0;
@@ -478,9 +478,14 @@ export function buildBatchSnapshot(batch: Batch, state: AppState): ClosedBatchRe
     ...slaughterEntries
   ].sort((a, b) => b.date.localeCompare(a.date));
 
+  const cleanBatchId = (batch.id || '').replace(/^hist-/, '').replace(/^history-/, '');
+  const historyId = (batch.id && (batch.id.startsWith('hist-') || batch.id.startsWith('history-')))
+    ? batch.id
+    : `hist-${cleanBatchId}`;
+
   return {
-    id: batch.id,
-    batchId: batch.id,
+    id: historyId,
+    batchId: cleanBatchId,
     batchName: batch.name,
     settlementDate: batch.settlementDate,
     closedAt: batch.closedAt || new Date().toISOString(),
