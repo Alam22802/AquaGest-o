@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { AppState, ClosedBatchRecord, User } from '../types';
 import { formatNumber, formatCurrency } from '../utils/formatters';
 import { buildBatchSnapshot } from '../utils/batchSnapshot';
@@ -56,26 +56,6 @@ export const ClosedBatchHistory: React.FC<Props> = ({ state, currentUser, onUpda
   const [filterItem, setFilterItem] = useState('');
   const [printOrientation, setPrintOrientation] = useState<'portrait' | 'landscape'>('portrait');
 
-  const handleDeleteHistoryRecord = (recordId: string) => {
-    if (!currentUser.isMaster || !onUpdate) return;
-    if (!confirm('Deseja excluir este registro histórico visual permanentemente?')) return;
-
-    const histId = recordId.startsWith('hist-') ? recordId : (`hist-${recordId}`);
-    const rawBatchId = recordId.replace(/^hist-/, '');
-
-    const updatedHistory = (state.closedBatchHistory || []).filter(r => 
-      r.id !== recordId && r.id !== histId && r.batchId !== recordId && r.batchId !== rawBatchId
-    );
-    onUpdate({
-      ...state,
-      closedBatchHistory: updatedHistory,
-      deletedIds: Array.from(new Set([...(state.deletedIds || []), recordId, histId]))
-    });
-    if (selectedRecordId === recordId || selectedRecordId === histId || selectedRecordId === rawBatchId) {
-      setSelectedRecordId('');
-    }
-  };
-
   // Combine closed batches currently in state.batches and historical records in state.closedBatchHistory
   const historicalRecords = useMemo(() => {
     const recordsMap = new Map<string, ClosedBatchRecord>();
@@ -107,6 +87,12 @@ export const ClosedBatchHistory: React.FC<Props> = ({ state, currentUser, onUpda
       return dateB.localeCompare(dateA);
     });
   }, [state.batches, state.closedBatchHistory, state.harvestLogs, state.feedingLogs, state.mortalityLogs, state.biometryLogs, state.slaughterLogs, state.batchExpenses, state.batchRevenues]);
+
+  useEffect(() => {
+    if (!selectedRecordId && historicalRecords.length > 0) {
+      setSelectedRecordId(historicalRecords[0].id);
+    }
+  }, [historicalRecords, selectedRecordId]);
 
   const selectedRecord = useMemo(() => {
     if (!selectedRecordId) return null;
