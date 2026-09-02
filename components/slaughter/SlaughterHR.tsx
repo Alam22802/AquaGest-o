@@ -1,11 +1,14 @@
 
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { AppState, SlaughterEmployee, SlaughterHRIndicator, SlaughterHREntry, SlaughterHRVacancy, User } from '../../types';
-import { Users, UserPlus, UserMinus, Trash2, Edit3, X, Calendar, Search, TrendingUp, Heart, AlertCircle, Briefcase, BarChart as BarChartIcon, CheckSquare, Square, Plus, Layout } from 'lucide-react';
+import { Users, UserPlus, UserMinus, Trash2, Edit3, X, Calendar, Search, TrendingUp, Heart, AlertCircle, Briefcase, BarChart as BarChartIcon, CheckSquare, Square, Plus, Layout, FileText, Loader2 } from 'lucide-react';
 import { format, parseISO, differenceInDays, addDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { formatNumber } from '../../utils/formatters';
+import { jsPDF } from 'jspdf';
+import autoTable from 'jspdf-autotable';
+import html2canvas from 'html2canvas';
 
 interface Props {
   state: AppState;
@@ -47,6 +50,12 @@ const HeadcountTooltip = ({ active, payload, label }: any) => {
   return null;
 };
 
+export const isDismissalType = (type: string | undefined | null): boolean => {
+  if (!type) return false;
+  const lower = type.toLowerCase().trim();
+  return lower.includes('desligamento') || lower.includes('turnover') || lower.includes('saída') || lower.includes('saida');
+};
+
 interface TurnoverMetricsResult {
   rate: number;
   dismissalsCount: number;
@@ -56,9 +65,9 @@ interface TurnoverMetricsResult {
 }
 
 /**
- * Turnover (%) = (Número de desligamentos ÷ Número médio de colaboradores) × 100
+ * Turnover (%) = (Número de desligamentos / saídas ÷ Número médio de colaboradores) × 100
  * Onde:
- * - Número de desligamentos: total de desligamentos ocorridos no período
+ * - Número de saídas / desligamentos: total de saídas (lançamentos de Desligamento) ocorridas no período
  * - Número médio de colaboradores: (Colaboradores ativos no início + Colaboradores ativos no fim) ÷ 2
  */
 const getMonthTurnoverMetrics = (
@@ -73,11 +82,10 @@ const getMonthTurnoverMetrics = (
   const lastDay = new Date(targetYear, targetMonth, 0).getDate();
   const endDateStr = `${targetYear}-${pad(targetMonth)}-${pad(lastDay)}`;
 
-  // Mapeamento de datas de desligamento dos colaboradores baseado nos lançamentos de Turnover
+  // Mapeamento de datas de desligamento (saída) dos colaboradores baseado nos lançamentos de Desligamento
   const dismissalDates = new Map<string, string>();
   entriesList.forEach(e => {
-    const isTurnover = e.type?.toLowerCase().includes('turnover') || e.type?.toLowerCase().includes('desligamento');
-    if (isTurnover && e.date && Array.isArray(e.employeeIds)) {
+    if (isDismissalType(e.type) && e.date && Array.isArray(e.employeeIds)) {
       e.employeeIds.forEach(id => {
         const prev = dismissalDates.get(id);
         if (!prev || e.date > prev) {
@@ -87,15 +95,14 @@ const getMonthTurnoverMetrics = (
     }
   });
 
-  // Lançamentos de turnover no mês/ano
+  // Lançamentos de desligamento (saídas) no mês/ano
   const monthlyTurnoverEntries = entriesList.filter(e => {
-    const isTurnover = e.type?.toLowerCase().includes('turnover') || e.type?.toLowerCase().includes('desligamento');
-    if (!isTurnover || !e.date) return false;
+    if (!isDismissalType(e.type) || !e.date) return false;
     const [y, m] = e.date.split('-').map(Number);
     return m === targetMonth && y === targetYear;
   });
 
-  // 1. Número de desligamentos no mês
+  // 1. Número de desligamentos / saídas no mês
   let dismissalsCount = 0;
   if (targetEmployeeId === 'all') {
     const dismissedIds = new Set<string>();
@@ -184,6 +191,8 @@ const SlaughterHR: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
   } | null>(null);
 
   const [editingEntryId, setEditingEntryId] = useState<string | null>(null);
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+  const [pdfError, setPdfError] = useState<string | null>(null);
   const [entryForm, setEntryForm] = useState({
     employeeIds: [] as string[],
     type: 'Falta',
@@ -223,21 +232,61 @@ const SlaughterHR: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
   const [peopleStatusFilter, setPeopleStatusFilter] = useState<'all' | 'Ativo' | 'Inativo'>('all');
   const [peopleSearch, setPeopleSearch] = useState('');
 
+  // Sincronização e migração de 'Turnover' para 'Desligamento' nos tipos e lançamentos
+  useEffect(() => {
+    const rawTypes = state.slaughterHREntryTypes || [];
+    const rawEntries = state.slaughterHREntries || [];
+    let typesNeedUpdate = false;
+    let entriesNeedUpdate = false;
+
+    let newTypes = [...rawTypes];
+    if (newTypes.includes('Turnover')) {
+      newTypes = newTypes.map(t => t === 'Turnover' ? 'Desligamento' : t);
+      typesNeedUpdate = true;
+    }
+    if (newTypes.length > 0 && !newTypes.includes('Desligamento')) {
+      newTypes.push('Desligamento');
+      typesNeedUpdate = true;
+    }
+    newTypes = Array.from(new Set(newTypes));
+
+    const newEntries = rawEntries.map(e => {
+      if (e.type === 'Turnover') {
+        entriesNeedUpdate = true;
+        return { ...e, type: 'Desligamento', updatedAt: Date.now() };
+      }
+      return e;
+    });
+
+    if (typesNeedUpdate || entriesNeedUpdate) {
+      onUpdate({
+        ...state,
+        ...(typesNeedUpdate ? { 
+          slaughterHREntryTypes: newTypes, 
+          slaughterHREntryTypesUpdated: Date.now() 
+        } : {}),
+        ...(entriesNeedUpdate ? { 
+          slaughterHREntries: newEntries 
+        } : {})
+      });
+    }
+  }, [state.slaughterHREntryTypes, state.slaughterHREntries, onUpdate, state]);
+
   useEffect(() => {
     const rawEmployees = state.slaughterEmployees || [];
     const rawEntries = state.slaughterHREntries || [];
     
-    const turnoverEmployeeIds = new Set(
+    const dismissalEmployeeIds = new Set(
       rawEntries
-        .filter(entry => entry.type.toLowerCase().includes('turnover'))
+        .filter(entry => isDismissalType(entry.type))
         .flatMap(entry => entry.employeeIds)
     );
     
-    const needsUpdate = rawEmployees.some(emp => turnoverEmployeeIds.has(emp.id) && emp.status !== 'Inativo');
+    const needsUpdate = rawEmployees.some(emp => dismissalEmployeeIds.has(emp.id) && emp.status !== 'Inativo');
     
     if (needsUpdate) {
       const updatedEmployees = rawEmployees.map(emp => {
-        if (turnoverEmployeeIds.has(emp.id) && emp.status !== 'Inativo') {
+        if (dismissalEmployeeIds.has(emp.id) && emp.status !== 'Inativo') {
           return { ...emp, status: 'Inativo' as const, updatedAt: Date.now() };
         }
         return emp;
@@ -253,14 +302,14 @@ const SlaughterHR: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     const rawEmployees = state.slaughterEmployees || [];
     const rawEntries = state.slaughterHREntries || [];
     
-    const turnoverEmployeeIds = new Set(
+    const dismissalEmployeeIds = new Set(
       rawEntries
-        .filter(entry => entry.type.toLowerCase().includes('turnover'))
+        .filter(entry => isDismissalType(entry.type))
         .flatMap(entry => entry.employeeIds)
     );
     
     return rawEmployees.map(emp => {
-      if (turnoverEmployeeIds.has(emp.id) && emp.status !== 'Inativo') {
+      if (dismissalEmployeeIds.has(emp.id) && emp.status !== 'Inativo') {
         return { ...emp, status: 'Inativo' as const };
       }
       return emp;
@@ -283,7 +332,17 @@ const SlaughterHR: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
   const vacancies = useMemo(() => state.slaughterHRVacancies || [], [state.slaughterHRVacancies]);
   const roles = useMemo(() => state.slaughterHRRoles || [], [state.slaughterHRRoles]);
   const departments = useMemo(() => state.slaughterHRDepartments || [], [state.slaughterHRDepartments]);
-  const entryTypes = useMemo(() => state.slaughterHREntryTypes || [], [state.slaughterHREntryTypes]);
+  const entryTypes = useMemo(() => {
+    const defaultTypes = ['Falta', 'Atestado Médico', 'Acidente', 'Desligamento', 'Outros'];
+    const raw = (state.slaughterHREntryTypes && state.slaughterHREntryTypes.length > 0)
+      ? state.slaughterHREntryTypes
+      : defaultTypes;
+    const mapped = raw.map(t => t === 'Turnover' ? 'Desligamento' : t);
+    if (!mapped.includes('Desligamento')) {
+      mapped.push('Desligamento');
+    }
+    return Array.from(new Set(mapped));
+  }, [state.slaughterHREntryTypes]);
 
   const [vacancyForm, setVacancyForm] = useState({
     department: '',
@@ -571,22 +630,22 @@ const SlaughterHR: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       ? entries.map(ent => ent.id === editingEntryId ? newEntry : ent)
       : [...entries, newEntry];
 
-    // Se o tipo do lançamento for Turnover, altera o status do colaborador para 'Inativo'
-    // Se o tipo do lançamento foi alterado DE Turnover para outra coisa, ou se salvamos um novo, sincronizamos o status
+    // Se o tipo do lançamento for Desligamento / Saída, altera o status do colaborador para 'Inativo'
+    // Se o tipo do lançamento foi alterado DE Desligamento para outra coisa, ou se salvamos um novo, sincronizamos o status
     const oldEntry = editingEntryId ? entries.find(e => e.id === editingEntryId) : null;
     let updatedEmployees = employees;
-    if (newEntry.type.toLowerCase().includes('turnover')) {
+    if (isDismissalType(newEntry.type)) {
       updatedEmployees = employees.map(emp => {
         if (newEntry.employeeIds.includes(emp.id)) {
           return { ...emp, status: 'Inativo' as const, updatedAt: Date.now() };
         }
         return emp;
       });
-    } else if (oldEntry && oldEntry.type.toLowerCase().includes('turnover')) {
+    } else if (oldEntry && isDismissalType(oldEntry.type)) {
       updatedEmployees = employees.map(emp => {
         if (oldEntry.employeeIds.includes(emp.id)) {
-          const otherTurnovers = updatedEntries.filter(e => e.id !== newEntry.id && e.employeeIds.includes(emp.id) && e.type.toLowerCase().includes('turnover'));
-          if (otherTurnovers.length === 0) {
+          const otherDismissals = updatedEntries.filter(e => e.id !== newEntry.id && e.employeeIds.includes(emp.id) && isDismissalType(e.type));
+          if (otherDismissals.length === 0) {
             return { ...emp, status: 'Ativo' as const, updatedAt: Date.now() };
           }
         }
@@ -620,11 +679,11 @@ const SlaughterHR: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       onConfirm: () => {
         const entryToDelete = entries.find(e => e.id === id);
         let updatedEmployees = employees;
-        if (entryToDelete && entryToDelete.type.toLowerCase().includes('turnover')) {
+        if (entryToDelete && isDismissalType(entryToDelete.type)) {
           updatedEmployees = employees.map(emp => {
             if (entryToDelete.employeeIds.includes(emp.id)) {
-              const otherTurnovers = entries.filter(e => e.id !== id && e.employeeIds.includes(emp.id) && e.type.toLowerCase().includes('turnover'));
-              if (otherTurnovers.length === 0) {
+              const otherDismissals = entries.filter(e => e.id !== id && e.employeeIds.includes(emp.id) && isDismissalType(e.type));
+              if (otherDismissals.length === 0) {
                 return { ...emp, status: 'Ativo' as const, updatedAt: Date.now() };
               }
             }
@@ -885,6 +944,399 @@ const SlaughterHR: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
         setConfirmDelete(null);
       }
     });
+  };
+
+  const generatePDF = async () => {
+    setIsGeneratingPdf(true);
+    setPdfError(null);
+
+    try {
+      const doc = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: 'a4'
+      });
+
+      const monthDate = new Date(filterYear, filterMonth - 1, 1);
+      const rawMonthName = format(monthDate, 'MMMM', { locale: ptBR });
+      const monthName = rawMonthName.charAt(0).toUpperCase() + rawMonthName.slice(1);
+      const emissionDate = format(new Date(), "dd/MM/yyyy 'às' HH:mm:ss");
+
+      // Draw standard top header banner
+      const drawPageHeader = (pageTitle: string, pageSub: string) => {
+        doc.setFillColor(52, 68, 52); // #344434
+        doc.rect(0, 0, 210, 30, 'F');
+
+        doc.setFillColor(228, 228, 212); // #e4e4d4 accent stripe
+        doc.rect(0, 30, 210, 1.2, 'F');
+
+        doc.setTextColor(255, 255, 255);
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(14);
+        doc.text('AQUAGESTÃO PISCICULTURA • FRIGORÍFICO', 15, 12);
+
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(8.5);
+        doc.setTextColor(228, 228, 212);
+        doc.text(pageTitle, 15, 19);
+
+        doc.setFontSize(7);
+        doc.setTextColor(200, 215, 200);
+        doc.text(`Período de Referência: ${monthName} de ${filterYear}   |   Emissão: ${emissionDate}   |   Responsável: ${currentUser?.name || 'Sistema'}`, 15, 25);
+      };
+
+      // Helper to capture a DOM element via html2canvas
+      const captureDomElement = async (elementId: string): Promise<{ dataUrl: string; width: number; height: number } | null> => {
+        const el = document.getElementById(elementId);
+        if (!el) return null;
+        try {
+          const canvas = await html2canvas(el, {
+            scale: 2,
+            backgroundColor: '#ffffff',
+            logging: false,
+            useCORS: true,
+            allowTaint: true
+          });
+          return {
+            dataUrl: canvas.toDataURL('image/png'),
+            width: canvas.width,
+            height: canvas.height
+          };
+        } catch (e) {
+          console.warn(`Falha na captura do elemento ${elementId}:`, e);
+          return null;
+        }
+      };
+
+      // ==========================================
+      // PAGE 1: RESUMO DO MÊS, ANIVERSARIANTES E ABSENTEÍSMO
+      // ==========================================
+      drawPageHeader('Relatório Mensal de Indicadores de Recursos Humanos', `${monthName} / ${filterYear}`);
+
+      let currentY = 38;
+
+      // 1. Indicadores Consolidados
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(10);
+      doc.setTextColor(52, 68, 52);
+      doc.text(`1. INDICADORES CONSOLIDADOS DO MÊS (${monthName.toUpperCase()}/${filterYear})`, 15, currentY);
+      currentY += 4;
+
+      const cardWidth = 42;
+      const cardHeight = 22;
+      const cardGap = 4;
+      const startX = 15;
+
+      const kpis = [
+        {
+          title: 'ABSENTEÍSMO',
+          value: `${formatNumber(stats.filteredIndicator.absenteeism, 1)}%`,
+          sub: 'Faltas e atestados do mês'
+        },
+        {
+          title: 'TURNOVER',
+          value: `${formatNumber(stats.filteredIndicator.turnover, 1)}%`,
+          sub: `${stats.filteredIndicator.turnoverDetails.dismissalsCount} ${stats.filteredIndicator.turnoverDetails.dismissalsCount === 1 ? 'saída' : 'saídas'} (méd. ${formatNumber(stats.filteredIndicator.turnoverDetails.avgEmployees, 1)})`
+        },
+        {
+          title: 'ACIDENTES',
+          value: `${formatNumber(stats.filteredIndicator.accidents)}`,
+          sub: 'Ocorrências no mês'
+        },
+        {
+          title: 'QUADRO DE VAGAS',
+          value: `${formatNumber(stats.active)} / ${formatNumber(stats.totalVacanciesCount)}`,
+          sub: `${formatNumber(stats.occupancyRate, 1)}% taxa ocupação`
+        }
+      ];
+
+      kpis.forEach((kpi, idx) => {
+        const x = startX + idx * (cardWidth + cardGap);
+        doc.setFillColor(248, 250, 248);
+        doc.roundedRect(x, currentY, cardWidth, cardHeight, 2, 2, 'F');
+        doc.setDrawColor(226, 232, 240);
+        doc.roundedRect(x, currentY, cardWidth, cardHeight, 2, 2, 'S');
+
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(6.5);
+        doc.setTextColor(100, 116, 139);
+        doc.text(kpi.title, x + 3, currentY + 5.5);
+
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(11);
+        doc.setTextColor(52, 68, 52);
+        doc.text(kpi.value, x + 3, currentY + 12.5);
+
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(5.5);
+        doc.setTextColor(148, 163, 184);
+        doc.text(kpi.sub, x + 3, currentY + 18);
+      });
+
+      currentY += cardHeight + 8;
+
+      // 2. Aniversariantes do Mês
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(10);
+      doc.setTextColor(52, 68, 52);
+      doc.text(`2. ANIVERSARIANTES DE ${monthName.toUpperCase()}`, 15, currentY);
+      currentY += 4;
+
+      if (stats.birthdays.length > 0) {
+        const birthdayRows = stats.birthdays.map(b => [
+          `Dia ${b.day.toString().padStart(2, '0')}`,
+          b.name,
+          b.department || '-'
+        ]);
+
+        autoTable(doc, {
+          startY: currentY,
+          head: [['Dia', 'Colaborador', 'Setor / Departamento']],
+          body: birthdayRows,
+          theme: 'striped',
+          headStyles: { fillColor: [52, 68, 52], fontStyle: 'bold', fontSize: 7.5 },
+          bodyStyles: { fontSize: 7, textColor: [30, 41, 59] },
+          columnStyles: {
+            0: { cellWidth: 25, halign: 'center', fontStyle: 'bold' },
+            1: { fontStyle: 'bold' },
+            2: { cellWidth: 60 }
+          },
+          margin: { left: 15, right: 15 }
+        });
+
+        currentY = (doc as any).lastAutoTable.finalY + 8;
+      } else {
+        doc.setFillColor(248, 250, 252);
+        doc.rect(15, currentY, 180, 9, 'F');
+        doc.setDrawColor(226, 232, 240);
+        doc.rect(15, currentY, 180, 9, 'S');
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(7.5);
+        doc.setTextColor(148, 163, 184);
+        doc.text('Nenhum colaborador aniversariante registrado neste mês.', 20, currentY + 6);
+        currentY += 15;
+      }
+
+      // 3. Gráfico de Absenteísmo
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(10);
+      doc.setTextColor(52, 68, 52);
+      doc.text('3. EVOLUÇÃO DO ABSENTEÍSMO (%) - ÚLTIMOS 6 MESES', 15, currentY);
+      currentY += 4;
+
+      const absenteeismImg = await captureDomElement('hr-report-card-absenteeism');
+      if (absenteeismImg) {
+        const imgW = 180;
+        const imgH = (absenteeismImg.height / absenteeismImg.width) * imgW;
+        const finalH = Math.min(imgH, 65);
+        doc.addImage(absenteeismImg.dataUrl, 'PNG', 15, currentY, imgW, finalH);
+        currentY += finalH + 4;
+      }
+
+      const absHeaders = stats.absenteeismData.map(d => d.name);
+      const absValues = stats.absenteeismData.map(d => `${formatNumber(d.value, 1)}%`);
+      autoTable(doc, {
+        startY: currentY,
+        head: [['Indicador', ...absHeaders]],
+        body: [['Absenteísmo (%)', ...absValues]],
+        theme: 'grid',
+        headStyles: { fillColor: [52, 68, 52], fontStyle: 'bold', fontSize: 7, halign: 'center' },
+        bodyStyles: { fontSize: 7, halign: 'center' },
+        columnStyles: {
+          0: { fontStyle: 'bold', halign: 'left', cellWidth: 30 }
+        },
+        margin: { left: 15, right: 15 }
+      });
+
+      // ==========================================
+      // PAGE 2: TURNOVER E HEADCOUNT
+      // ==========================================
+      doc.addPage();
+      drawPageHeader('Relatório Mensal de Indicadores de RH - Continuação', 'Turnover e Headcount por Setor');
+      currentY = 38;
+
+      // 4. Turnover
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(10);
+      doc.setTextColor(52, 68, 52);
+      doc.text('4. EVOLUÇÃO DO TURNOVER (%) - ÚLTIMOS 6 MESES', 15, currentY);
+      currentY += 4;
+
+      const turnoverImg = await captureDomElement('hr-report-card-turnover');
+      if (turnoverImg) {
+        const imgW = 180;
+        const imgH = (turnoverImg.height / turnoverImg.width) * imgW;
+        const finalH = Math.min(imgH, 62);
+        doc.addImage(turnoverImg.dataUrl, 'PNG', 15, currentY, imgW, finalH);
+        currentY += finalH + 4;
+      }
+
+      const turnHeaders = stats.turnoverData.map(d => d.name);
+      const turnRates = stats.turnoverData.map(d => `${formatNumber(d.value, 1)}%`);
+      const turnDismissals = stats.turnoverData.map(d => `${d.dismissals ?? 0}`);
+      const turnAvgs = stats.turnoverData.map(d => `${formatNumber(d.avgEmployees ?? 0, 1)}`);
+      autoTable(doc, {
+        startY: currentY,
+        head: [['Métrica', ...turnHeaders]],
+        body: [
+          ['Turnover (%)', ...turnRates],
+          ['Desligamentos (Saídas)', ...turnDismissals],
+          ['Média Colaboradores', ...turnAvgs]
+        ],
+        theme: 'grid',
+        headStyles: { fillColor: [52, 68, 52], fontStyle: 'bold', fontSize: 7, halign: 'center' },
+        bodyStyles: { fontSize: 7, halign: 'center' },
+        columnStyles: {
+          0: { fontStyle: 'bold', halign: 'left', cellWidth: 32 }
+        },
+        margin: { left: 15, right: 15 }
+      });
+
+      currentY = (doc as any).lastAutoTable.finalY + 8;
+
+      // 5. Headcount
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(10);
+      doc.setTextColor(52, 68, 52);
+      doc.text('5. HEADCOUNT - VAGAS VS OCUPADAS POR SETOR', 15, currentY);
+      currentY += 4;
+
+      const headcountImg = await captureDomElement('hr-report-card-headcount');
+      if (headcountImg) {
+        const imgW = 180;
+        const imgH = (headcountImg.height / headcountImg.width) * imgW;
+        const finalH = Math.min(imgH, 55);
+        doc.addImage(headcountImg.dataUrl, 'PNG', 15, currentY, imgW, finalH);
+        currentY += finalH + 4;
+      }
+
+      const totalVagasAll = stats.headcountData.reduce((acc, h) => acc + h.vagas, 0);
+      const totalOcupadasAll = stats.headcountData.reduce((acc, h) => acc + h.ocupadas, 0);
+      const totalSaldoAll = Math.max(0, totalVagasAll - totalOcupadasAll);
+      const totalTaxaAll = totalVagasAll > 0 ? (totalOcupadasAll / totalVagasAll) * 100 : 0;
+
+      const headcountRows = stats.headcountData.map(h => {
+        const saldo = Math.max(0, h.vagas - h.ocupadas);
+        const taxa = h.vagas > 0 ? (h.ocupadas / h.vagas) * 100 : 0;
+        return [
+          h.name,
+          h.vagas.toString(),
+          h.ocupadas.toString(),
+          saldo.toString(),
+          `${formatNumber(taxa, 1)}%`
+        ];
+      });
+
+      autoTable(doc, {
+        startY: currentY,
+        head: [['Setor / Departamento', 'Vagas Previstas', 'Vagas Ocupadas', 'Vagas Abertas (Saldo)', 'Taxa de Ocupação']],
+        body: headcountRows,
+        theme: 'striped',
+        headStyles: { fillColor: [52, 68, 52], fontStyle: 'bold', fontSize: 7.5 },
+        bodyStyles: { fontSize: 7, textColor: [30, 41, 59] },
+        columnStyles: {
+          0: { fontStyle: 'bold' },
+          1: { halign: 'center' },
+          2: { halign: 'center', fontStyle: 'bold' },
+          3: { halign: 'center' },
+          4: { halign: 'center', fontStyle: 'bold', textColor: [52, 68, 52] }
+        },
+        foot: [[
+          'TOTAL GERAL',
+          totalVagasAll.toString(),
+          totalOcupadasAll.toString(),
+          totalSaldoAll.toString(),
+          `${formatNumber(totalTaxaAll, 1)}%`
+        ]],
+        footStyles: { fillColor: [241, 245, 249], textColor: [15, 23, 42], fontStyle: 'bold', fontSize: 7.5 },
+        margin: { left: 15, right: 15 }
+      });
+
+      // ==========================================
+      // PAGE 3: OCORRÊNCIAS / LANÇAMENTOS DO MÊS (SE HOUVER)
+      // ==========================================
+      if (stats.filteredEntries.length > 0) {
+        doc.addPage();
+        drawPageHeader('Relatório Mensal de Indicadores de RH - Detalhamento', 'Ocorrências e Lançamentos do Mês');
+        currentY = 38;
+
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(10);
+        doc.setTextColor(52, 68, 52);
+        doc.text(`6. REGISTRO DE OCORRÊNCIAS DO MÊS (${stats.filteredEntries.length} registro(s))`, 15, currentY);
+        currentY += 4;
+
+        const entriesRows = stats.filteredEntries.map(e => {
+          const empNames = (e.employeeIds || []).map(id => {
+            const emp = employees.find(emp => emp.id === id);
+            return emp ? emp.name : 'Colaborador';
+          }).join(', ');
+
+          const dateFormatted = e.date ? format(parseISO(e.date), 'dd/MM/yyyy') : '-';
+          const endDateFormatted = e.endDate && e.endDate !== e.date ? ` até ${format(parseISO(e.endDate), 'dd/MM/yyyy')}` : '';
+
+          return [
+            `${dateFormatted}${endDateFormatted}`,
+            empNames || '-',
+            e.type || '-',
+            e.notes || '-'
+          ];
+        });
+
+        autoTable(doc, {
+          startY: currentY,
+          head: [['Data / Período', 'Colaborador(es)', 'Tipo de Ocorrência', 'Observações / Motivo']],
+          body: entriesRows,
+          theme: 'striped',
+          headStyles: { fillColor: [52, 68, 52], fontStyle: 'bold', fontSize: 7.5 },
+          bodyStyles: { fontSize: 7, textColor: [30, 41, 59] },
+          columnStyles: {
+            0: { cellWidth: 35, halign: 'center', fontStyle: 'bold' },
+            1: { cellWidth: 50, fontStyle: 'bold' },
+            2: { cellWidth: 35 },
+            3: { }
+          },
+          margin: { top: 35, bottom: 15, left: 15, right: 15 }
+        });
+      }
+
+      // ==========================================
+      // FOOTER AND HEADER FOR OVERFLOW PAGES
+      // ==========================================
+      const totalPages = doc.getNumberOfPages();
+      for (let i = 1; i <= totalPages; i++) {
+        doc.setPage(i);
+        if (i > 3) {
+          drawPageHeader('Relatório Mensal de Indicadores de RH - Ocorrências (Cont.)', 'Detalhamento das Ocorrências');
+        }
+
+        doc.setDrawColor(226, 232, 240);
+        doc.line(15, 287, 195, 287);
+
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(7);
+        doc.setTextColor(148, 163, 184);
+        doc.text(
+          `AquaGestão Piscicultura • Frigorífico - Gestão de Recursos Humanos • Referência: ${monthName}/${filterYear}`,
+          15,
+          291
+        );
+        doc.text(
+          `Página ${i} de ${totalPages}`,
+          195,
+          291,
+          { align: 'right' }
+        );
+      }
+
+      const cleanMonth = rawMonthName.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+      doc.save(`Relatorio_RH_${cleanMonth}_${filterYear}.pdf`);
+    } catch (err: any) {
+      console.error('Erro ao gerar relatório PDF de RH:', err);
+      setPdfError(err?.message || 'Erro ao gerar o relatório PDF.');
+    } finally {
+      setIsGeneratingPdf(false);
+    }
   };
 
   return (
@@ -1574,7 +2026,7 @@ const SlaughterHR: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                     </div>
                     <div className="mt-2 max-h-48 overflow-y-auto border border-slate-100 rounded-2xl divide-y divide-slate-50">
                       {employees
-                        .filter(emp => emp.status === 'Ativo' && (
+                        .filter(emp => (emp.status === 'Ativo' || entryForm.employeeIds.includes(emp.id)) && (
                           emp.name.toLowerCase().includes(employeeSearch.toLowerCase()) ||
                           emp.registrationNumber.includes(employeeSearch)
                         ))
@@ -1685,7 +2137,11 @@ const SlaughterHR: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                     </div>
                     <div className="space-y-1">
                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">
-                        {(entryForm.type.toLowerCase().includes('falta') || entryForm.type.toLowerCase().includes('atestado')) ? 'Data Início' : 'Data'}
+                        {(entryForm.type.toLowerCase().includes('falta') || entryForm.type.toLowerCase().includes('atestado')) 
+                          ? 'Data Início' 
+                          : isDismissalType(entryForm.type)
+                            ? 'Data do Desligamento (Saída)'
+                            : 'Data'}
                       </label>
                       <input 
                         type="date" required 
@@ -1745,6 +2201,16 @@ const SlaughterHR: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                         onChange={e => setEntryForm({...entryForm, description: e.target.value})}
                       />
                     </div>
+
+                    {isDismissalType(entryForm.type) && (
+                      <div className="p-4 bg-amber-50/80 border border-amber-200/80 rounded-2xl text-[11px] text-amber-900 leading-relaxed">
+                        <div className="font-black flex items-center gap-1.5 mb-1 text-amber-800 uppercase tracking-wider text-[10px]">
+                          <UserMinus className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                          <span>Registro de Saída (Cálculo do Turnover)</span>
+                        </div>
+                        Este lançamento de <strong>Desligamento</strong> registra a saída do colaborador, define seu status como <strong>Inativo</strong> e computa a saída na apuração da taxa de <strong>Turnover</strong> do período.
+                      </div>
+                    )}
                   </div>
 
                   <div className="flex flex-col justify-end pb-1">
@@ -1794,11 +2260,11 @@ const SlaughterHR: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                         <td className="px-8 py-6">
                           <span className={`text-[9px] font-black uppercase tracking-widest px-3 py-1 rounded-full ${
                             ent.type === 'Acidente' ? 'bg-red-50 text-red-600' :
-                            ent.type === 'Atestado' ? 'bg-amber-50 text-amber-600' :
-                            ent.type === 'Turnover' ? 'bg-slate-100 text-slate-600' :
+                            (ent.type === 'Atestado' || ent.type === 'Atestado Médico') ? 'bg-amber-50 text-amber-600' :
+                            isDismissalType(ent.type) ? 'bg-rose-50 text-rose-700 border border-rose-200/60' :
                             'bg-blue-50 text-blue-600'
                           }`}>
-                            {ent.type} {ent.days ? `(${formatNumber(ent.days)}d)` : ''}
+                            {ent.type === 'Turnover' ? 'Desligamento' : ent.type} {ent.days ? `(${formatNumber(ent.days)}d)` : ''}
                           </span>
                         </td>
                         <td className="px-8 py-6">
@@ -1807,7 +2273,7 @@ const SlaughterHR: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                               setEditingEntryId(ent.id);
                               setEntryForm({
                                 employeeIds: ent.employeeIds,
-                                type: ent.type,
+                                type: ent.type === 'Turnover' ? 'Desligamento' : ent.type,
                                 date: ent.date,
                                 endDate: ent.endDate || ent.date,
                                 days: ent.days?.toString() || '1',
@@ -1841,31 +2307,65 @@ const SlaughterHR: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
               <TrendingUp className="w-6 h-6 text-[#344434]" />
               Indicadores de RH
             </h3>
-            <div className="flex items-center gap-2 bg-white p-2 rounded-2xl border border-slate-200 shadow-sm">
-              <Calendar className="w-4 h-4 text-slate-400 ml-2" />
-              <select 
-                value={filterMonth} 
-                onChange={e => setFilterMonth(Number(e.target.value))}
-                className="bg-transparent border-none text-[10px] font-black uppercase outline-none focus:ring-0 cursor-pointer text-slate-600 px-3"
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="flex items-center gap-2 bg-white p-2 rounded-2xl border border-slate-200 shadow-sm">
+                <Calendar className="w-4 h-4 text-slate-400 ml-2" />
+                <select 
+                  value={filterMonth} 
+                  onChange={e => setFilterMonth(Number(e.target.value))}
+                  className="bg-transparent border-none text-[10px] font-black uppercase outline-none focus:ring-0 cursor-pointer text-slate-600 px-3"
+                >
+                  {Array.from({ length: 12 }, (_, i) => (
+                    <option key={i + 1} value={i + 1}>
+                      {format(new Date(2000, i), 'MMMM', { locale: ptBR })}
+                    </option>
+                  ))}
+                </select>
+                <div className="w-[1px] h-4 bg-slate-200"></div>
+                <select 
+                  value={filterYear} 
+                  onChange={e => setFilterYear(Number(e.target.value))}
+                  className="bg-transparent border-none text-[10px] font-black uppercase outline-none focus:ring-0 cursor-pointer text-slate-600 px-3"
+                >
+                  {[new Date().getFullYear(), new Date().getFullYear() - 1, new Date().getFullYear() - 2].map(y => (
+                    <option key={y} value={y}>{y}</option>
+                  ))}
+                </select>
+              </div>
+
+              <button
+                type="button"
+                onClick={generatePDF}
+                disabled={isGeneratingPdf}
+                title="Exportar indicadores e gráficos do mês selecionado em formato PDF"
+                className="flex items-center gap-2 px-5 py-2.5 bg-[#344434] hover:bg-[#283528] active:scale-95 disabled:opacity-50 text-white rounded-2xl text-[10px] font-black uppercase tracking-wider shadow-sm transition-all cursor-pointer shrink-0"
               >
-                {Array.from({ length: 12 }, (_, i) => (
-                  <option key={i + 1} value={i + 1}>
-                    {format(new Date(2000, i), 'MMMM', { locale: ptBR })}
-                  </option>
-                ))}
-              </select>
-              <div className="w-[1px] h-4 bg-slate-200"></div>
-              <select 
-                value={filterYear} 
-                onChange={e => setFilterYear(Number(e.target.value))}
-                className="bg-transparent border-none text-[10px] font-black uppercase outline-none focus:ring-0 cursor-pointer text-slate-600 px-3"
-              >
-                {[new Date().getFullYear(), new Date().getFullYear() - 1, new Date().getFullYear() - 2].map(y => (
-                  <option key={y} value={y}>{y}</option>
-                ))}
-              </select>
+                {isGeneratingPdf ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin text-[#e4e4d4]" />
+                    <span>Gerando PDF...</span>
+                  </>
+                ) : (
+                  <>
+                    <FileText className="w-4 h-4 text-[#e4e4d4]" />
+                    <span>Gerar PDF do Mês</span>
+                  </>
+                )}
+              </button>
             </div>
           </div>
+
+          {pdfError && (
+            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-2xl text-xs flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 text-red-500 shrink-0" />
+                <span>{pdfError}</span>
+              </div>
+              <button onClick={() => setPdfError(null)} className="text-red-400 hover:text-red-600">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          )}
 
           {/* 1. Resumo de Indicadores (Calculado dos Lançamentos) - Agora em segundo */}
           <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-200">
@@ -1882,6 +2382,9 @@ const SlaughterHR: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
               <div className="bg-[#e4e4d4]/20 p-6 rounded-3xl border border-[#344434]/5">
                 <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Turnover</div>
                 <div className="text-2xl font-black text-[#344434]">{formatNumber(stats.filteredIndicator.turnover, 1)}%</div>
+                <div className="text-[10px] text-slate-400 mt-1">
+                  {stats.filteredIndicator.turnoverDetails.dismissalsCount} {stats.filteredIndicator.turnoverDetails.dismissalsCount === 1 ? 'saída' : 'saídas'} (méd. {formatNumber(stats.filteredIndicator.turnoverDetails.avgEmployees, 1)} colab.)
+                </div>
               </div>
               <div className="bg-[#e4e4d4]/20 p-6 rounded-3xl border border-[#344434]/5">
                 <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Acidentes</div>
@@ -1927,7 +2430,7 @@ const SlaughterHR: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
 
           {/* 3. Gráficos Empilhados Verticalmente */}
           <div className="grid grid-cols-1 gap-8">
-            <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-200">
+            <div id="hr-report-card-absenteeism" className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-200">
               <div className="flex items-center gap-3 mb-8">
                 <div className="p-3 bg-[#e4e4d4] text-[#344434] rounded-2xl shadow-sm">
                   <TrendingUp className="w-6 h-6" />
@@ -1954,14 +2457,14 @@ const SlaughterHR: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
               </div>
             </div>
 
-            <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-200">
+            <div id="hr-report-card-turnover" className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-200">
               <div className="flex items-center gap-3 mb-8">
                 <div className="p-3 bg-[#e4e4d4] text-[#344434] rounded-2xl shadow-sm">
                   <UserMinus className="w-6 h-6" />
                 </div>
                 <div>
                   <h3 className="text-sm font-black text-slate-800 uppercase tracking-tighter italic leading-none">Turnover (%)</h3>
-                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">Histórico dos últimos 6 meses</p>
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">Histórico dos últimos 6 meses • Saídas vs. Efetivo Médio</p>
                 </div>
               </div>
               <div className="h-[250px] w-full">
@@ -1974,7 +2477,7 @@ const SlaughterHR: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                       cursor={{fill: '#f8fafc'}} 
                       contentStyle={{borderRadius: '20px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)'}} 
                       formatter={(value: number, _name: any, item: any) => [
-                        `${formatNumber(value, 1)}% (${item?.payload?.dismissals ?? 0} deslig. / méd. ${formatNumber(item?.payload?.avgEmployees ?? 0, 1)} colab.)`,
+                        `${formatNumber(value, 1)}% (${item?.payload?.dismissals ?? 0} ${item?.payload?.dismissals === 1 ? 'saída' : 'saídas'} / méd. ${formatNumber(item?.payload?.avgEmployees ?? 0, 1)} colab.)`,
                         "Turnover"
                       ]}
                     />
@@ -1984,7 +2487,7 @@ const SlaughterHR: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
               </div>
             </div>
 
-            <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-200">
+            <div id="hr-report-card-headcount" className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-200">
               <div className="flex items-center gap-3 mb-8">
                 <div className="p-3 bg-[#e4e4d4] text-[#344434] rounded-2xl shadow-sm">
                   <Users className="w-6 h-6" />
