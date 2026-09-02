@@ -504,6 +504,16 @@ export const ensureStateIntegrity = (state: any, mergeWith?: AppState, priority:
     });
   };
 
+  const filterStringList = (arr: any[] | undefined, prefix: string) => {
+    if (!Array.isArray(arr)) return [];
+    return arr.filter(item => 
+      typeof item === 'string' && 
+      item.trim() !== '' && 
+      !deletedSet.has(`${prefix}:${item}`) && 
+      !deletedSet.has(item)
+    );
+  };
+
   const result: AppState = {
     ...base,
     users: filterByTombstone(base.users || initialState.users),
@@ -521,16 +531,20 @@ export const ensureStateIntegrity = (state: any, mergeWith?: AppState, priority:
     slaughterHRIndicators: filterByTombstone(base.slaughterHRIndicators || [], true),
     slaughterHREntries: filterByTombstone(base.slaughterHREntries || [], true),
     slaughterHRVacancies: filterByTombstone(base.slaughterHRVacancies || [], true),
-    slaughterExpenseCategories: base.slaughterExpenseCategories || initialState.slaughterExpenseCategories,
-    slaughterHREntryTypes: base.slaughterHREntryTypes || initialState.slaughterHREntryTypes,
-    slaughterHRDepartments: base.slaughterHRDepartments || initialState.slaughterHRDepartments,
-    slaughterHRRoles: base.slaughterHRRoles || initialState.slaughterHRRoles,
+    slaughterExpenseCategories: filterStringList(base.slaughterExpenseCategories || initialState.slaughterExpenseCategories, 'expenseCategory'),
+    slaughterExpenseCategoriesUpdated: base.slaughterExpenseCategoriesUpdated || 0,
+    slaughterHREntryTypes: filterStringList(base.slaughterHREntryTypes || initialState.slaughterHREntryTypes, 'entryType'),
+    slaughterHREntryTypesUpdated: base.slaughterHREntryTypesUpdated || 0,
+    slaughterHRDepartments: filterStringList(base.slaughterHRDepartments || initialState.slaughterHRDepartments, 'dept'),
+    slaughterHRDepartmentsUpdated: base.slaughterHRDepartmentsUpdated || 0,
+    slaughterHRRoles: filterStringList(base.slaughterHRRoles || initialState.slaughterHRRoles, 'role'),
+    slaughterHRRolesUpdated: base.slaughterHRRolesUpdated || 0,
     slaughterSupplyItems: filterByTombstone(base.slaughterSupplyItems || [], true),
     slaughterSuppliers: filterByTombstone(base.slaughterSuppliers || [], true),
     slaughterSupplyRequests: filterByTombstone(base.slaughterSupplyRequests || [], true),
     slaughterPurchaseOrders: filterByTombstone(base.slaughterPurchaseOrders || [], true),
     slaughterSupplyInvoices: filterByTombstone(base.slaughterSupplyInvoices || [], true),
-    slaughterSupplyCategories: base.slaughterSupplyCategories || initialState.slaughterSupplyCategories,
+    slaughterSupplyCategories: filterStringList(base.slaughterSupplyCategories || initialState.slaughterSupplyCategories, 'supplyCategory'),
     slaughterSupplyCategoriesUpdated: base.slaughterSupplyCategoriesUpdated || 0,
     protocols: filterByTombstone(base.protocols || []),
     standardCurves: filterByTombstone(base.standardCurves || []),
@@ -557,6 +571,60 @@ export const ensureStateIntegrity = (state: any, mergeWith?: AppState, priority:
     farmTargetCapacity: base.farmTargetCapacity || 0,
   };
 
+  const mergeStringListByTimestamp = (
+    list1: string[] | undefined,
+    time1: number | undefined,
+    list2: string[] | undefined,
+    time2: number | undefined,
+    prefix: string
+  ): { list: string[]; updated: number } => {
+    const t1 = Number(time1) || 0;
+    const t2 = Number(time2) || 0;
+    let chosen: string[];
+    if (t1 > t2) {
+      chosen = list1 || [];
+    } else if (t2 > t1) {
+      chosen = list2 || [];
+    } else if (t1 > 0 && t1 === t2) {
+      chosen = priority === 'local' ? (list1 || list2 || []) : (list2 || list1 || []);
+    } else {
+      chosen = priority === 'local' ? (list1 || list2 || []) : (list2 || list1 || []);
+    }
+    const filtered = Array.from(new Set((Array.isArray(chosen) ? chosen : []).filter(item => 
+      typeof item === 'string' && 
+      item.trim() !== '' && 
+      !deletedSet.has(`${prefix}:${item}`) && 
+      !deletedSet.has(item)
+    )));
+    return { list: filtered, updated: Math.max(t1, t2) };
+  };
+
+  const mergedSupply = mergeWith ? mergeStringListByTimestamp(
+    result.slaughterSupplyCategories, result.slaughterSupplyCategoriesUpdated,
+    mergeWith.slaughterSupplyCategories, mergeWith.slaughterSupplyCategoriesUpdated,
+    'supplyCategory'
+  ) : null;
+  const mergedExpenses = mergeWith ? mergeStringListByTimestamp(
+    result.slaughterExpenseCategories, result.slaughterExpenseCategoriesUpdated,
+    mergeWith.slaughterExpenseCategories, mergeWith.slaughterExpenseCategoriesUpdated,
+    'expenseCategory'
+  ) : null;
+  const mergedEntryTypes = mergeWith ? mergeStringListByTimestamp(
+    result.slaughterHREntryTypes, result.slaughterHREntryTypesUpdated,
+    mergeWith.slaughterHREntryTypes, mergeWith.slaughterHREntryTypesUpdated,
+    'entryType'
+  ) : null;
+  const mergedDepts = mergeWith ? mergeStringListByTimestamp(
+    result.slaughterHRDepartments, result.slaughterHRDepartmentsUpdated,
+    mergeWith.slaughterHRDepartments, mergeWith.slaughterHRDepartmentsUpdated,
+    'dept'
+  ) : null;
+  const mergedRoles = mergeWith ? mergeStringListByTimestamp(
+    result.slaughterHRRoles, result.slaughterHRRolesUpdated,
+    mergeWith.slaughterHRRoles, mergeWith.slaughterHRRolesUpdated,
+    'role'
+  ) : null;
+
   const finalResult = mergeWith ? {
     ...result,
     users: mergeUsers(result.users, mergeWith.users, combinedDeletedIdsArray, priority),
@@ -579,16 +647,16 @@ export const ensureStateIntegrity = (state: any, mergeWith?: AppState, priority:
     slaughterSupplyRequests: mergeArraysById(result.slaughterSupplyRequests || [], mergeWith.slaughterSupplyRequests || [], combinedDeletedIdsArray, priority, true),
     slaughterPurchaseOrders: mergeArraysById(result.slaughterPurchaseOrders || [], mergeWith.slaughterPurchaseOrders || [], combinedDeletedIdsArray, priority, true),
     slaughterSupplyInvoices: mergeArraysById(result.slaughterSupplyInvoices || [], mergeWith.slaughterSupplyInvoices || [], combinedDeletedIdsArray, priority, true),
-    slaughterSupplyCategories: Array.from(new Set([...(result.slaughterSupplyCategories || []), ...(mergeWith.slaughterSupplyCategories || [])])),
-    slaughterSupplyCategoriesUpdated: Math.max(result.slaughterSupplyCategoriesUpdated || 0, mergeWith.slaughterSupplyCategoriesUpdated || 0),
-    slaughterExpenseCategories: Array.from(new Set([...(result.slaughterExpenseCategories || []), ...(mergeWith.slaughterExpenseCategories || [])])),
-    slaughterExpenseCategoriesUpdated: Math.max(result.slaughterExpenseCategoriesUpdated || 0, mergeWith.slaughterExpenseCategoriesUpdated || 0),
-    slaughterHREntryTypes: Array.from(new Set([...(result.slaughterHREntryTypes || []), ...(mergeWith.slaughterHREntryTypes || [])])),
-    slaughterHREntryTypesUpdated: Math.max(result.slaughterHREntryTypesUpdated || 0, mergeWith.slaughterHREntryTypesUpdated || 0),
-    slaughterHRDepartments: Array.from(new Set([...(result.slaughterHRDepartments || []), ...(mergeWith.slaughterHRDepartments || [])])),
-    slaughterHRDepartmentsUpdated: Math.max(result.slaughterHRDepartmentsUpdated || 0, mergeWith.slaughterHRDepartmentsUpdated || 0),
-    slaughterHRRoles: Array.from(new Set([...(result.slaughterHRRoles || []), ...(mergeWith.slaughterHRRoles || [])])),
-    slaughterHRRolesUpdated: Math.max(result.slaughterHRRolesUpdated || 0, mergeWith.slaughterHRRolesUpdated || 0),
+    slaughterSupplyCategories: mergedSupply?.list ?? result.slaughterSupplyCategories ?? [],
+    slaughterSupplyCategoriesUpdated: mergedSupply?.updated ?? result.slaughterSupplyCategoriesUpdated ?? 0,
+    slaughterExpenseCategories: mergedExpenses?.list ?? result.slaughterExpenseCategories ?? [],
+    slaughterExpenseCategoriesUpdated: mergedExpenses?.updated ?? result.slaughterExpenseCategoriesUpdated ?? 0,
+    slaughterHREntryTypes: mergedEntryTypes?.list ?? result.slaughterHREntryTypes ?? [],
+    slaughterHREntryTypesUpdated: mergedEntryTypes?.updated ?? result.slaughterHREntryTypesUpdated ?? 0,
+    slaughterHRDepartments: mergedDepts?.list ?? result.slaughterHRDepartments ?? [],
+    slaughterHRDepartmentsUpdated: mergedDepts?.updated ?? result.slaughterHRDepartmentsUpdated ?? 0,
+    slaughterHRRoles: mergedRoles?.list ?? result.slaughterHRRoles ?? [],
+    slaughterHRRolesUpdated: mergedRoles?.updated ?? result.slaughterHRRolesUpdated ?? 0,
     protocols: mergeArraysById(result.protocols, mergeWith.protocols, combinedDeletedIdsArray, priority),
     standardCurves: mergeArraysById(result.standardCurves || [], mergeWith.standardCurves || [], combinedDeletedIdsArray, priority),
     portfolios: mergeArraysById(result.portfolios || [], mergeWith.portfolios || [], combinedDeletedIdsArray, priority),

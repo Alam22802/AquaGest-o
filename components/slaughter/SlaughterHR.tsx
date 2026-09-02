@@ -175,6 +175,13 @@ const SlaughterHR: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
   const [showNewEntryTypeInput, setShowNewEntryTypeInput] = useState(false);
   const [newEntryTypeName, setNewEntryTypeName] = useState('');
   const [editingEntryType, setEditingEntryType] = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    actionText?: string;
+    onConfirm: () => void;
+  } | null>(null);
 
   const [editingEntryId, setEditingEntryId] = useState<string | null>(null);
   const [entryForm, setEntryForm] = useState({
@@ -477,11 +484,21 @@ const SlaughterHR: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
   };
 
   const removeVacancy = (id: string) => {
-    if (!confirm('Deseja excluir este quadro de vagas?')) return;
-    onUpdate({ 
-      ...state, 
-      slaughterHRVacancies: (state.slaughterHRVacancies || []).filter(v => v.id !== id),
-      deletedIds: Array.from(new Set([...(state.deletedIds || []), id]))
+    const target = vacancies.find(v => v.id === id);
+    const desc = target ? ` de "${target.department} - ${target.role}"` : '';
+    setConfirmDelete({
+      isOpen: true,
+      title: 'Excluir Quadro de Vagas',
+      message: `Deseja realmente excluir o quadro de vagas${desc}?`,
+      actionText: 'Excluir Vagas',
+      onConfirm: () => {
+        onUpdate({ 
+          ...state, 
+          slaughterHRVacancies: (state.slaughterHRVacancies || []).filter(v => v.id !== id),
+          deletedIds: Array.from(new Set([...(state.deletedIds || []), id]))
+        });
+        setConfirmDelete(null);
+      }
     });
   };
 
@@ -513,11 +530,21 @@ const SlaughterHR: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
   };
 
   const removeEmployee = (id: string) => {
-    if (!confirm('Deseja excluir este colaborador?')) return;
-    onUpdate({ 
-      ...state, 
-      slaughterEmployees: (state.slaughterEmployees || []).filter(e => e.id !== id),
-      deletedIds: Array.from(new Set([...(state.deletedIds || []), id]))
+    const target = employees.find(e => e.id === id);
+    const desc = target ? ` "${target.name}"` : '';
+    setConfirmDelete({
+      isOpen: true,
+      title: 'Excluir Colaborador',
+      message: `Deseja realmente excluir o colaborador${desc}?`,
+      actionText: 'Excluir Colaborador',
+      onConfirm: () => {
+        onUpdate({ 
+          ...state, 
+          slaughterEmployees: (state.slaughterEmployees || []).filter(e => e.id !== id),
+          deletedIds: Array.from(new Set([...(state.deletedIds || []), id]))
+        });
+        setConfirmDelete(null);
+      }
     });
   };
 
@@ -585,27 +612,34 @@ const SlaughterHR: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
   };
 
   const removeEntry = (id: string) => {
-    if (!confirm('Deseja excluir este lançamento?')) return;
-    
-    const entryToDelete = entries.find(e => e.id === id);
-    let updatedEmployees = employees;
-    if (entryToDelete && entryToDelete.type.toLowerCase().includes('turnover')) {
-      updatedEmployees = employees.map(emp => {
-        if (entryToDelete.employeeIds.includes(emp.id)) {
-          const otherTurnovers = entries.filter(e => e.id !== id && e.employeeIds.includes(emp.id) && e.type.toLowerCase().includes('turnover'));
-          if (otherTurnovers.length === 0) {
-            return { ...emp, status: 'Ativo' as const, updatedAt: Date.now() };
-          }
+    setConfirmDelete({
+      isOpen: true,
+      title: 'Excluir Lançamento',
+      message: 'Deseja realmente excluir este lançamento?',
+      actionText: 'Excluir Lançamento',
+      onConfirm: () => {
+        const entryToDelete = entries.find(e => e.id === id);
+        let updatedEmployees = employees;
+        if (entryToDelete && entryToDelete.type.toLowerCase().includes('turnover')) {
+          updatedEmployees = employees.map(emp => {
+            if (entryToDelete.employeeIds.includes(emp.id)) {
+              const otherTurnovers = entries.filter(e => e.id !== id && e.employeeIds.includes(emp.id) && e.type.toLowerCase().includes('turnover'));
+              if (otherTurnovers.length === 0) {
+                return { ...emp, status: 'Ativo' as const, updatedAt: Date.now() };
+              }
+            }
+            return emp;
+          });
         }
-        return emp;
-      });
-    }
 
-    onUpdate({ 
-      ...state, 
-      slaughterHREntries: (state.slaughterHREntries || []).filter(e => e.id !== id),
-      slaughterEmployees: updatedEmployees,
-      deletedIds: Array.from(new Set([...(state.deletedIds || []), id]))
+        onUpdate({ 
+          ...state, 
+          slaughterHREntries: (state.slaughterHREntries || []).filter(e => e.id !== id),
+          slaughterEmployees: updatedEmployees,
+          deletedIds: Array.from(new Set([...(state.deletedIds || []), id]))
+        });
+        setConfirmDelete(null);
+      }
     });
   };
 
@@ -670,70 +704,187 @@ const SlaughterHR: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
   };
 
   const removeIndicator = (id: string) => {
-    if (!confirm('Deseja excluir este indicador?')) return;
-    onUpdate({ 
-      ...state, 
-      slaughterHRIndicators: (state.slaughterHRIndicators || []).filter(i => i.id !== id),
-      deletedIds: Array.from(new Set([...(state.deletedIds || []), id]))
+    setConfirmDelete({
+      isOpen: true,
+      title: 'Excluir Indicador',
+      message: 'Deseja realmente excluir este indicador mensal?',
+      actionText: 'Excluir Indicador',
+      onConfirm: () => {
+        onUpdate({ 
+          ...state, 
+          slaughterHRIndicators: (state.slaughterHRIndicators || []).filter(i => i.id !== id),
+          deletedIds: Array.from(new Set([...(state.deletedIds || []), id]))
+        });
+        setConfirmDelete(null);
+      }
     });
   };
 
   const updateRole = (oldRole: string, newRole: string) => {
-    if (!newRole.trim() || roles.includes(newRole.trim())) return;
-    const updatedRoles = roles.map(r => r === oldRole ? newRole.trim() : r);
-    const updatedEmployees = employees.map(emp => emp.role === oldRole ? { ...emp, role: newRole.trim() } : emp);
-    const updatedVacancies = vacancies.map(v => v.role === oldRole ? { ...v, role: newRole.trim() } : v);
+    const trimmed = newRole.trim();
+    if (!trimmed || roles.includes(trimmed)) return;
+    const updatedRoles = roles.map(r => r === oldRole ? trimmed : r);
+    const updatedEmployees = employees.map(emp => emp.role === oldRole ? { ...emp, role: trimmed, updatedAt: Date.now() } : emp);
+    const updatedVacancies = vacancies.map(v => v.role === oldRole ? { ...v, role: trimmed, updatedAt: Date.now() } : v);
+    const currentDeletedIds = state.deletedIds || [];
+    const updatedDeletedIds = Array.from(new Set([
+      ...currentDeletedIds.filter(id => id !== `role:${trimmed}` && id !== trimmed),
+      `role:${oldRole}`
+    ]));
     onUpdate({ 
       ...state, 
       slaughterHRRoles: updatedRoles, 
+      slaughterHRRolesUpdated: Date.now(),
       slaughterEmployees: updatedEmployees,
-      slaughterHRVacancies: updatedVacancies
+      slaughterHRVacancies: updatedVacancies,
+      deletedIds: updatedDeletedIds
     });
     setEditingRole(null);
     setNewRoleName('');
   };
 
   const deleteRole = (role: string) => {
-    if (!confirm(`Deseja excluir o cargo "${role}"?`)) return;
-    onUpdate({ ...state, slaughterHRRoles: roles.filter(r => r !== role) });
+    const linkedVacancies = vacancies.filter(v => v.role === role);
+    const linkedEmployees = employees.filter(e => e.role === role);
+    const details = [];
+    if (linkedVacancies.length > 0) details.push(`${linkedVacancies.length} quadro(s) de vagas`);
+    if (linkedEmployees.length > 0) details.push(`${linkedEmployees.length} colaborador(es)`);
+    const warn = details.length > 0 ? ` Este cargo possui ${details.join(' e ')} vinculados que serão atualizados.` : '';
+
+    setConfirmDelete({
+      isOpen: true,
+      title: 'Excluir Cargo',
+      message: `Deseja realmente excluir o cargo "${role}"?${warn}`,
+      actionText: 'Excluir Cargo',
+      onConfirm: () => {
+        const remainingVacancies = vacancies.filter(v => v.role !== role);
+        const removedVacancyIds = linkedVacancies.map(v => v.id);
+        const updatedEmployees = employees.map(emp => emp.role === role ? { ...emp, role: '', updatedAt: Date.now() } : emp);
+        const updatedRoles = roles.filter(r => r !== role);
+        const updatedDeletedIds = Array.from(new Set([
+          ...(state.deletedIds || []),
+          `role:${role}`,
+          role,
+          ...removedVacancyIds
+        ]));
+        onUpdate({
+          ...state,
+          slaughterHRRoles: updatedRoles,
+          slaughterHRRolesUpdated: Date.now(),
+          slaughterHRVacancies: remainingVacancies,
+          slaughterEmployees: updatedEmployees,
+          deletedIds: updatedDeletedIds
+        });
+        setConfirmDelete(null);
+      }
+    });
   };
 
   const updateDepartment = (oldDept: string, newDept: string) => {
-    if (!newDept.trim() || departments.includes(newDept.trim())) return;
-    const updatedDepts = departments.map(d => d === oldDept ? newDept.trim() : d);
-    const updatedEmployees = employees.map(emp => emp.department === oldDept ? { ...emp, department: newDept.trim() } : emp);
-    const updatedVacancies = vacancies.map(v => v.department === oldDept ? { ...v, department: newDept.trim() } : v);
+    const trimmed = newDept.trim();
+    if (!trimmed || departments.includes(trimmed)) return;
+    const updatedDepts = departments.map(d => d === oldDept ? trimmed : d);
+    const updatedEmployees = employees.map(emp => emp.department === oldDept ? { ...emp, department: trimmed, updatedAt: Date.now() } : emp);
+    const updatedVacancies = vacancies.map(v => v.department === oldDept ? { ...v, department: trimmed, updatedAt: Date.now() } : v);
+    const currentDeletedIds = state.deletedIds || [];
+    const updatedDeletedIds = Array.from(new Set([
+      ...currentDeletedIds.filter(id => id !== `dept:${trimmed}` && id !== trimmed),
+      `dept:${oldDept}`
+    ]));
     onUpdate({ 
       ...state, 
       slaughterHRDepartments: updatedDepts, 
+      slaughterHRDepartmentsUpdated: Date.now(),
       slaughterEmployees: updatedEmployees,
-      slaughterHRVacancies: updatedVacancies
+      slaughterHRVacancies: updatedVacancies,
+      deletedIds: updatedDeletedIds
     });
     setEditingDept(null);
     setNewDeptName('');
   };
 
   const deleteDepartment = (dept: string) => {
-    if (!confirm(`Deseja excluir o setor "${dept}"?`)) return;
-    onUpdate({ ...state, slaughterHRDepartments: departments.filter(d => d !== dept) });
+    const linkedVacancies = vacancies.filter(v => v.department === dept);
+    const linkedEmployees = employees.filter(e => e.department === dept);
+    const details = [];
+    if (linkedVacancies.length > 0) details.push(`${linkedVacancies.length} quadro(s) de vagas`);
+    if (linkedEmployees.length > 0) details.push(`${linkedEmployees.length} colaborador(es)`);
+    const warn = details.length > 0 ? ` Este setor possui ${details.join(' e ')} vinculados que serão atualizados.` : '';
+
+    setConfirmDelete({
+      isOpen: true,
+      title: 'Excluir Setor',
+      message: `Deseja realmente excluir o setor "${dept}"?${warn}`,
+      actionText: 'Excluir Setor',
+      onConfirm: () => {
+        const remainingVacancies = vacancies.filter(v => v.department !== dept);
+        const removedVacancyIds = linkedVacancies.map(v => v.id);
+        const updatedEmployees = employees.map(emp => emp.department === dept ? { ...emp, department: '', updatedAt: Date.now() } : emp);
+        const updatedDepts = departments.filter(d => d !== dept);
+        const updatedDeletedIds = Array.from(new Set([
+          ...(state.deletedIds || []),
+          `dept:${dept}`,
+          dept,
+          ...removedVacancyIds
+        ]));
+        onUpdate({
+          ...state,
+          slaughterHRDepartments: updatedDepts,
+          slaughterHRDepartmentsUpdated: Date.now(),
+          slaughterHRVacancies: remainingVacancies,
+          slaughterEmployees: updatedEmployees,
+          deletedIds: updatedDeletedIds
+        });
+        setConfirmDelete(null);
+      }
+    });
   };
 
   const updateEntryType = (oldType: string, newType: string) => {
-    if (!newType.trim() || entryTypes.includes(newType.trim())) return;
-    const updatedTypes = entryTypes.map(t => t === oldType ? newType.trim() : t);
-    const updatedEntries = entries.map(ent => ent.type === oldType ? { ...ent, type: newType.trim() } : ent);
+    const trimmed = newType.trim();
+    if (!trimmed || entryTypes.includes(trimmed)) return;
+    const updatedTypes = entryTypes.map(t => t === oldType ? trimmed : t);
+    const updatedEntries = entries.map(ent => ent.type === oldType ? { ...ent, type: trimmed, updatedAt: Date.now() } : ent);
+    const currentDeletedIds = state.deletedIds || [];
+    const updatedDeletedIds = Array.from(new Set([
+      ...currentDeletedIds.filter(id => id !== `entryType:${trimmed}` && id !== trimmed),
+      `entryType:${oldType}`
+    ]));
     onUpdate({ 
       ...state, 
       slaughterHREntryTypes: updatedTypes,
-      slaughterHREntries: updatedEntries
+      slaughterHREntryTypesUpdated: Date.now(),
+      slaughterHREntries: updatedEntries,
+      deletedIds: updatedDeletedIds
     });
     setEditingEntryType(null);
     setNewEntryTypeName('');
   };
 
   const deleteEntryType = (type: string) => {
-    if (!confirm(`Deseja excluir o tipo de lançamento "${type}"?`)) return;
-    onUpdate({ ...state, slaughterHREntryTypes: entryTypes.filter(t => t !== type) });
+    const linkedEntries = entries.filter(e => e.type === type);
+    const warn = linkedEntries.length > 0 ? ` Existem ${linkedEntries.length} lançamento(s) deste tipo.` : '';
+
+    setConfirmDelete({
+      isOpen: true,
+      title: 'Excluir Tipo de Lançamento',
+      message: `Deseja realmente excluir o tipo de lançamento "${type}"?${warn}`,
+      actionText: 'Excluir Tipo',
+      onConfirm: () => {
+        const updatedDeletedIds = Array.from(new Set([
+          ...(state.deletedIds || []),
+          `entryType:${type}`,
+          type
+        ]));
+        onUpdate({
+          ...state,
+          slaughterHREntryTypes: entryTypes.filter(t => t !== type),
+          slaughterHREntryTypesUpdated: Date.now(),
+          deletedIds: updatedDeletedIds
+        });
+        setConfirmDelete(null);
+      }
+    });
   };
 
   return (
@@ -1035,71 +1186,117 @@ const SlaughterHR: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                     className="flex-1 px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none text-xs"
                     value={newDeptName}
                     onChange={e => setNewDeptName(e.target.value)}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        const trimmed = newDeptName.trim();
+                        if (trimmed && !departments.includes(trimmed)) {
+                          const currentDeletedIds = state.deletedIds || [];
+                          const updatedDeletedIds = currentDeletedIds.filter(id => id !== `dept:${trimmed}` && id !== trimmed);
+                          onUpdate({
+                            ...state,
+                            slaughterHRDepartments: [...departments, trimmed],
+                            slaughterHRDepartmentsUpdated: Date.now(),
+                            deletedIds: updatedDeletedIds
+                          });
+                          setNewDeptName('');
+                        }
+                      }
+                    }}
                   />
                   <button 
                     onClick={() => {
-                      if (newDeptName.trim() && !departments.includes(newDeptName.trim())) {
+                      const trimmed = newDeptName.trim();
+                      if (trimmed && !departments.includes(trimmed)) {
+                        const currentDeletedIds = state.deletedIds || [];
+                        const updatedDeletedIds = currentDeletedIds.filter(id => id !== `dept:${trimmed}` && id !== trimmed);
                         onUpdate({
                           ...state,
-                          slaughterHRDepartments: [...departments, newDeptName.trim()]
+                          slaughterHRDepartments: [...departments, trimmed],
+                          slaughterHRDepartmentsUpdated: Date.now(),
+                          deletedIds: updatedDeletedIds
                         });
                         setNewDeptName('');
                       }
                     }}
-                    className="px-6 py-3.5 bg-[#344434] text-white rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-md hover:bg-[#2a382a] transition-all"
+                    className="px-6 py-3.5 bg-[#344434] text-white rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-md hover:bg-[#2a382a] transition-all shrink-0"
                   >
                     Adicionar
                   </button>
                 </div>
                 <div className="space-y-2 max-h-60 overflow-y-auto pr-2 custom-scrollbar">
-                  {departments.map(dept => (
-                    <div key={dept} className="flex items-center justify-between bg-slate-50 p-3 rounded-xl border border-slate-100 group">
-                      {editingDept === dept ? (
-                        <div className="flex gap-2 w-full">
-                          <input 
-                            type="text"
-                            className="flex-1 px-3 py-1 bg-white border border-slate-200 rounded-lg text-xs font-bold outline-none"
-                            value={newDeptName}
-                            onChange={e => setNewDeptName(e.target.value)}
-                            autoFocus
-                          />
-                          <button 
-                            onClick={() => updateDepartment(dept, newDeptName)}
-                            className="px-2 py-1 bg-[#344434] text-white rounded-lg text-[9px] font-black uppercase"
-                          >
-                            OK
-                          </button>
-                          <button 
-                            onClick={() => setEditingDept(null)}
-                            className="px-2 py-1 bg-slate-100 text-slate-400 rounded-lg text-[9px] font-black uppercase"
-                          >
-                            <X className="w-3 h-3" />
-                          </button>
-                        </div>
-                      ) : (
-                        <>
-                          <span className="text-xs font-bold text-slate-700">{dept}</span>
-                          <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <button 
-                              onClick={() => {
-                                setEditingDept(dept);
-                                setNewDeptName(dept);
+                  {departments.map(dept => {
+                    const linkedVacCount = vacancies.filter(v => v.department === dept).length;
+                    const linkedEmpCount = employees.filter(e => e.department === dept && e.status === 'Ativo').length;
+                    return (
+                      <div key={dept} className="flex items-center justify-between bg-slate-50 p-3 rounded-xl border border-slate-100 group">
+                        {editingDept === dept ? (
+                          <div className="flex gap-2 w-full">
+                            <input 
+                              type="text"
+                              className="flex-1 px-3 py-1 bg-white border border-slate-200 rounded-lg text-xs font-bold outline-none"
+                              value={newDeptName}
+                              onChange={e => setNewDeptName(e.target.value)}
+                              onKeyDown={e => {
+                                if (e.key === 'Enter') updateDepartment(dept, newDeptName);
+                                if (e.key === 'Escape') setEditingDept(null);
                               }}
-                              className="p-1.5 text-slate-400 hover:text-amber-500 transition-colors"
+                              autoFocus
+                            />
+                            <button 
+                              onClick={() => updateDepartment(dept, newDeptName)}
+                              className="px-2 py-1 bg-[#344434] text-white rounded-lg text-[9px] font-black uppercase"
                             >
-                              <Edit3 className="w-3.5 h-3.5" />
+                              OK
                             </button>
                             <button 
-                              onClick={() => deleteDepartment(dept)}
-                              className="p-1.5 text-slate-400 hover:text-red-500 transition-colors"
+                              onClick={() => setEditingDept(null)}
+                              className="px-2 py-1 bg-slate-100 text-slate-400 rounded-lg text-[9px] font-black uppercase"
                             >
-                              <Trash2 className="w-3.5 h-3.5" />
+                              <X className="w-3 h-3" />
                             </button>
                           </div>
-                        </>
-                      )}
+                        ) : (
+                          <>
+                            <div className="flex items-center gap-2 min-w-0 pr-2">
+                              <span className="text-xs font-bold text-slate-700 truncate">{dept}</span>
+                              {(linkedEmpCount > 0 || linkedVacCount > 0) && (
+                                <span className="text-[9px] font-bold text-slate-400 bg-slate-200/60 px-2 py-0.5 rounded-full shrink-0">
+                                  {linkedEmpCount > 0 ? `${linkedEmpCount} colab.` : ''}
+                                  {linkedEmpCount > 0 && linkedVacCount > 0 ? ' • ' : ''}
+                                  {linkedVacCount > 0 ? `${linkedVacCount} vagas` : ''}
+                                </span>
+                              )}
+                            </div>
+                            <div className="flex gap-1 opacity-80 group-hover:opacity-100 transition-opacity shrink-0">
+                              <button 
+                                onClick={() => {
+                                  setEditingDept(dept);
+                                  setNewDeptName(dept);
+                                }}
+                                title="Editar setor"
+                                className="p-1.5 text-slate-400 hover:text-amber-500 transition-colors"
+                              >
+                                <Edit3 className="w-3.5 h-3.5" />
+                              </button>
+                              <button 
+                                onClick={() => deleteDepartment(dept)}
+                                title="Excluir setor"
+                                className="p-1.5 text-slate-400 hover:text-red-500 transition-colors"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    );
+                  })}
+                  {departments.length === 0 && (
+                    <div className="p-4 text-center text-slate-400 text-xs font-bold">
+                      Nenhum setor cadastrado.
                     </div>
-                  ))}
+                  )}
                 </div>
               </div>
             </div>
@@ -1118,71 +1315,117 @@ const SlaughterHR: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                     className="flex-1 px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none text-xs"
                     value={newRoleName}
                     onChange={e => setNewRoleName(e.target.value)}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        const trimmed = newRoleName.trim();
+                        if (trimmed && !roles.includes(trimmed)) {
+                          const currentDeletedIds = state.deletedIds || [];
+                          const updatedDeletedIds = currentDeletedIds.filter(id => id !== `role:${trimmed}` && id !== trimmed);
+                          onUpdate({
+                            ...state,
+                            slaughterHRRoles: [...roles, trimmed],
+                            slaughterHRRolesUpdated: Date.now(),
+                            deletedIds: updatedDeletedIds
+                          });
+                          setNewRoleName('');
+                        }
+                      }
+                    }}
                   />
                   <button 
                     onClick={() => {
-                      if (newRoleName.trim() && !roles.includes(newRoleName.trim())) {
+                      const trimmed = newRoleName.trim();
+                      if (trimmed && !roles.includes(trimmed)) {
+                        const currentDeletedIds = state.deletedIds || [];
+                        const updatedDeletedIds = currentDeletedIds.filter(id => id !== `role:${trimmed}` && id !== trimmed);
                         onUpdate({
                           ...state,
-                          slaughterHRRoles: [...roles, newRoleName.trim()]
+                          slaughterHRRoles: [...roles, trimmed],
+                          slaughterHRRolesUpdated: Date.now(),
+                          deletedIds: updatedDeletedIds
                         });
                         setNewRoleName('');
                       }
                     }}
-                    className="px-6 py-3.5 bg-[#344434] text-white rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-md hover:bg-[#2a382a] transition-all"
+                    className="px-6 py-3.5 bg-[#344434] text-white rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-md hover:bg-[#2a382a] transition-all shrink-0"
                   >
                     Adicionar
                   </button>
                 </div>
                 <div className="space-y-2 max-h-60 overflow-y-auto pr-2 custom-scrollbar">
-                  {roles.map(role => (
-                    <div key={role} className="flex items-center justify-between bg-slate-50 p-3 rounded-xl border border-slate-100 group">
-                      {editingRole === role ? (
-                        <div className="flex gap-2 w-full">
-                          <input 
-                            type="text"
-                            className="flex-1 px-3 py-1 bg-white border border-slate-200 rounded-lg text-xs font-bold outline-none"
-                            value={newRoleName}
-                            onChange={e => setNewRoleName(e.target.value)}
-                            autoFocus
-                          />
-                          <button 
-                            onClick={() => updateRole(role, newRoleName)}
-                            className="px-2 py-1 bg-[#344434] text-white rounded-lg text-[9px] font-black uppercase"
-                          >
-                            OK
-                          </button>
-                          <button 
-                            onClick={() => setEditingRole(null)}
-                            className="px-2 py-1 bg-slate-100 text-slate-400 rounded-lg text-[9px] font-black uppercase"
-                          >
-                            <X className="w-3 h-3" />
-                          </button>
-                        </div>
-                      ) : (
-                        <>
-                          <span className="text-xs font-bold text-slate-700">{role}</span>
-                          <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <button 
-                              onClick={() => {
-                                setEditingRole(role);
-                                setNewRoleName(role);
+                  {roles.map(role => {
+                    const linkedVacCount = vacancies.filter(v => v.role === role).length;
+                    const linkedEmpCount = employees.filter(e => e.role === role && e.status === 'Ativo').length;
+                    return (
+                      <div key={role} className="flex items-center justify-between bg-slate-50 p-3 rounded-xl border border-slate-100 group">
+                        {editingRole === role ? (
+                          <div className="flex gap-2 w-full">
+                            <input 
+                              type="text"
+                              className="flex-1 px-3 py-1 bg-white border border-slate-200 rounded-lg text-xs font-bold outline-none"
+                              value={newRoleName}
+                              onChange={e => setNewRoleName(e.target.value)}
+                              onKeyDown={e => {
+                                if (e.key === 'Enter') updateRole(role, newRoleName);
+                                if (e.key === 'Escape') setEditingRole(null);
                               }}
-                              className="p-1.5 text-slate-400 hover:text-amber-500 transition-colors"
+                              autoFocus
+                            />
+                            <button 
+                              onClick={() => updateRole(role, newRoleName)}
+                              className="px-2 py-1 bg-[#344434] text-white rounded-lg text-[9px] font-black uppercase"
                             >
-                              <Edit3 className="w-3.5 h-3.5" />
+                              OK
                             </button>
                             <button 
-                              onClick={() => deleteRole(role)}
-                              className="p-1.5 text-slate-400 hover:text-red-500 transition-colors"
+                              onClick={() => setEditingRole(null)}
+                              className="px-2 py-1 bg-slate-100 text-slate-400 rounded-lg text-[9px] font-black uppercase"
                             >
-                              <Trash2 className="w-3.5 h-3.5" />
+                              <X className="w-3 h-3" />
                             </button>
                           </div>
-                        </>
-                      )}
+                        ) : (
+                          <>
+                            <div className="flex items-center gap-2 min-w-0 pr-2">
+                              <span className="text-xs font-bold text-slate-700 truncate">{role}</span>
+                              {(linkedEmpCount > 0 || linkedVacCount > 0) && (
+                                <span className="text-[9px] font-bold text-slate-400 bg-slate-200/60 px-2 py-0.5 rounded-full shrink-0">
+                                  {linkedEmpCount > 0 ? `${linkedEmpCount} colab.` : ''}
+                                  {linkedEmpCount > 0 && linkedVacCount > 0 ? ' • ' : ''}
+                                  {linkedVacCount > 0 ? `${linkedVacCount} vagas` : ''}
+                                </span>
+                              )}
+                            </div>
+                            <div className="flex gap-1 opacity-80 group-hover:opacity-100 transition-opacity shrink-0">
+                              <button 
+                                onClick={() => {
+                                  setEditingRole(role);
+                                  setNewRoleName(role);
+                                }}
+                                title="Editar cargo"
+                                className="p-1.5 text-slate-400 hover:text-amber-500 transition-colors"
+                              >
+                                <Edit3 className="w-3.5 h-3.5" />
+                              </button>
+                              <button 
+                                onClick={() => deleteRole(role)}
+                                title="Excluir cargo"
+                                className="p-1.5 text-slate-400 hover:text-red-500 transition-colors"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    );
+                  })}
+                  {roles.length === 0 && (
+                    <div className="p-4 text-center text-slate-400 text-xs font-bold">
+                      Nenhum cargo cadastrado.
                     </div>
-                  ))}
+                  )}
                 </div>
               </div>
             </div>
@@ -1395,16 +1638,40 @@ const SlaughterHR: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                             className="flex-1 px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl font-bold outline-none text-xs min-w-0"
                             value={newEntryTypeName}
                             onChange={e => setNewEntryTypeName(e.target.value)}
+                            onKeyDown={e => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault();
+                                const trimmed = newEntryTypeName.trim();
+                                if (trimmed && !entryTypes.includes(trimmed)) {
+                                  const currentDeletedIds = state.deletedIds || [];
+                                  const updatedDeletedIds = currentDeletedIds.filter(id => id !== `entryType:${trimmed}` && id !== trimmed);
+                                  onUpdate({
+                                    ...state,
+                                    slaughterHREntryTypes: [...entryTypes, trimmed],
+                                    slaughterHREntryTypesUpdated: Date.now(),
+                                    deletedIds: updatedDeletedIds
+                                  });
+                                  setEntryForm({ ...entryForm, type: trimmed });
+                                  setNewEntryTypeName('');
+                                  setShowNewEntryTypeInput(false);
+                                }
+                              }
+                            }}
                           />
                           <button 
                             type="button"
                             onClick={() => {
-                              if (newEntryTypeName.trim() && !entryTypes.includes(newEntryTypeName.trim())) {
+                              const trimmed = newEntryTypeName.trim();
+                              if (trimmed && !entryTypes.includes(trimmed)) {
+                                const currentDeletedIds = state.deletedIds || [];
+                                const updatedDeletedIds = currentDeletedIds.filter(id => id !== `entryType:${trimmed}` && id !== trimmed);
                                 onUpdate({
                                   ...state,
-                                  slaughterHREntryTypes: [...entryTypes, newEntryTypeName.trim()]
+                                  slaughterHREntryTypes: [...entryTypes, trimmed],
+                                  slaughterHREntryTypesUpdated: Date.now(),
+                                  deletedIds: updatedDeletedIds
                                 });
-                                setEntryForm({ ...entryForm, type: newEntryTypeName.trim() });
+                                setEntryForm({ ...entryForm, type: trimmed });
                                 setNewEntryTypeName('');
                                 setShowNewEntryTypeInput(false);
                               }
@@ -1739,6 +2006,41 @@ const SlaughterHR: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                   </BarChart>
                 </ResponsiveContainer>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Confirmation Modal */}
+      {confirmDelete && confirmDelete.isOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs animate-in fade-in duration-150">
+          <div className="bg-white w-full max-w-md rounded-3xl p-6 shadow-2xl border border-slate-100 transform transition-all space-y-4">
+            <div className="flex items-center gap-3 text-red-600">
+              <div className="p-3 bg-red-50 rounded-2xl">
+                <Trash2 className="w-6 h-6" />
+              </div>
+              <h3 className="text-lg font-black text-slate-800 tracking-tight">{confirmDelete.title}</h3>
+            </div>
+            
+            <p className="text-xs font-semibold text-slate-600 leading-relaxed">
+              {confirmDelete.message}
+            </p>
+
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setConfirmDelete(null)}
+                className="px-5 py-2.5 rounded-xl border border-slate-200 text-xs font-black uppercase tracking-wider text-slate-600 hover:bg-slate-50 transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={confirmDelete.onConfirm}
+                className="px-5 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-black uppercase tracking-wider shadow-md hover:shadow-lg transition-all"
+              >
+                {confirmDelete.actionText || 'Excluir'}
+              </button>
             </div>
           </div>
         </div>

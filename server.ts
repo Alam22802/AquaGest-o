@@ -419,6 +419,25 @@ async function scheduleSafeFarmStatePersist(stateToSave: any) {
       merged[key] = mergeObjectsById(s1[key], s2[key], deletedSet, preserve);
     });
 
+    const mergeServerStringList = (key: string, updatedKey: string, prefix: string) => {
+      const t1 = Number(s1[updatedKey]) || 0;
+      const t2 = Number(s2[updatedKey]) || 0;
+      const chosen = (t2 >= t1 ? (s2[key] || s1[key] || []) : (s1[key] || s2[key] || [])) as string[];
+      merged[key] = Array.from(new Set((Array.isArray(chosen) ? chosen : []).filter((item: any) => 
+        typeof item === 'string' && 
+        item.trim() !== '' && 
+        !deletedSet.has(`${prefix}:${item}`) && 
+        !deletedSet.has(item)
+      )));
+      merged[updatedKey] = Math.max(t1, t2);
+    };
+
+    mergeServerStringList('slaughterHRDepartments', 'slaughterHRDepartmentsUpdated', 'dept');
+    mergeServerStringList('slaughterHRRoles', 'slaughterHRRolesUpdated', 'role');
+    mergeServerStringList('slaughterHREntryTypes', 'slaughterHREntryTypesUpdated', 'entryType');
+    mergeServerStringList('slaughterExpenseCategories', 'slaughterExpenseCategoriesUpdated', 'expenseCategory');
+    mergeServerStringList('slaughterSupplyCategories', 'slaughterSupplyCategoriesUpdated', 'supplyCategory');
+
     if (Array.isArray(merged.cages)) {
       const activeBatches = (merged.batches || []).filter((b: any) => !b.isClosed && !deletedSet.has(b.id));
       const harvestLogs = Array.isArray(merged.harvestLogs) ? merged.harvestLogs : [];
