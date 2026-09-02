@@ -1615,12 +1615,6 @@ const SlaughterHR: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
               <div className="bg-[#e4e4d4]/20 p-6 rounded-3xl border border-[#344434]/5">
                 <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Turnover</div>
                 <div className="text-2xl font-black text-[#344434]">{formatNumber(stats.filteredIndicator.turnover, 1)}%</div>
-                <div className="text-[10px] text-slate-400 mt-1">(Desligamentos ÷ Nº Médio) × 100</div>
-                {stats.filteredIndicator.turnoverDetails && (
-                  <div className="text-[9px] font-medium text-slate-500 mt-1">
-                    {stats.filteredIndicator.turnoverDetails.dismissalsCount} deslig. • Média: {formatNumber(stats.filteredIndicator.turnoverDetails.avgEmployees, 1)} colab.
-                  </div>
-                )}
               </div>
               <div className="bg-[#e4e4d4]/20 p-6 rounded-3xl border border-[#344434]/5">
                 <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Acidentes</div>
