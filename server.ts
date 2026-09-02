@@ -9,6 +9,11 @@ export const app = express();
 app.use(compression());
 app.use(express.json({ limit: "50mb" }));
 
+// Health check route
+app.get("/api/health", (req, res) => {
+  res.json({ status: "ok" });
+});
+
 // Serve service worker with no-cache headers
 app.get("/sw.js", (req, res) => {
   const swPath = path.join(process.cwd(), "public", "sw.js");
@@ -81,9 +86,14 @@ function loadInitialFarmState(): any {
       const parsed = tryParseOrRepairJson(content);
       if (parsed) {
         console.log("Loaded Farm State from persistent storage file.");
-        // Keep backup file synchronized on healthy read
+        // Keep backup file synchronized on healthy read (compact serialization for fast I/O)
         try {
-          fs.writeFileSync(FARM_STATE_BAK_FILE, JSON.stringify(parsed, null, 2), "utf-8");
+          const serialized = JSON.stringify(parsed);
+          fs.writeFileSync(FARM_STATE_BAK_FILE, serialized, "utf-8");
+          // If original file was repaired or differed in length, persist the clean version
+          if (content.length !== serialized.length) {
+            fs.writeFileSync(FARM_STATE_FILE, serialized, "utf-8");
+          }
         } catch (_) {}
         return parsed;
       }

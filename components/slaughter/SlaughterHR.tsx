@@ -47,6 +47,111 @@ const HeadcountTooltip = ({ active, payload, label }: any) => {
   return null;
 };
 
+interface TurnoverMetricsResult {
+  rate: number;
+  dismissalsCount: number;
+  avgEmployees: number;
+  activeAtStart: number;
+  activeAtEnd: number;
+}
+
+/**
+ * Turnover (%) = (Número de desligamentos ÷ Número médio de colaboradores) × 100
+ * Onde:
+ * - Número de desligamentos: total de desligamentos ocorridos no período
+ * - Número médio de colaboradores: (Colaboradores ativos no início + Colaboradores ativos no fim) ÷ 2
+ */
+const getMonthTurnoverMetrics = (
+  targetMonth: number,
+  targetYear: number,
+  targetEmployeeId: string,
+  employeesList: SlaughterEmployee[],
+  entriesList: SlaughterHREntry[]
+): TurnoverMetricsResult => {
+  const pad = (n: number) => n.toString().padStart(2, '0');
+  const startDateStr = `${targetYear}-${pad(targetMonth)}-01`;
+  const lastDay = new Date(targetYear, targetMonth, 0).getDate();
+  const endDateStr = `${targetYear}-${pad(targetMonth)}-${pad(lastDay)}`;
+
+  // Mapeamento de datas de desligamento dos colaboradores baseado nos lançamentos de Turnover
+  const dismissalDates = new Map<string, string>();
+  entriesList.forEach(e => {
+    const isTurnover = e.type?.toLowerCase().includes('turnover') || e.type?.toLowerCase().includes('desligamento');
+    if (isTurnover && e.date && Array.isArray(e.employeeIds)) {
+      e.employeeIds.forEach(id => {
+        const prev = dismissalDates.get(id);
+        if (!prev || e.date > prev) {
+          dismissalDates.set(id, e.date);
+        }
+      });
+    }
+  });
+
+  // Lançamentos de turnover no mês/ano
+  const monthlyTurnoverEntries = entriesList.filter(e => {
+    const isTurnover = e.type?.toLowerCase().includes('turnover') || e.type?.toLowerCase().includes('desligamento');
+    if (!isTurnover || !e.date) return false;
+    const [y, m] = e.date.split('-').map(Number);
+    return m === targetMonth && y === targetYear;
+  });
+
+  // 1. Número de desligamentos no mês
+  let dismissalsCount = 0;
+  if (targetEmployeeId === 'all') {
+    const dismissedIds = new Set<string>();
+    monthlyTurnoverEntries.forEach(e => {
+      e.employeeIds?.forEach(id => dismissedIds.add(id));
+    });
+    dismissalsCount = dismissedIds.size;
+  } else {
+    const wasDismissed = monthlyTurnoverEntries.some(e => e.employeeIds?.includes(targetEmployeeId));
+    dismissalsCount = wasDismissed ? 1 : 0;
+  }
+
+  // Filtragem dos colaboradores a considerar
+  const targetEmployees = targetEmployeeId === 'all'
+    ? employeesList
+    : employeesList.filter(e => e.id === targetEmployeeId);
+
+  // Colaboradores ativos no início do mês (1º dia)
+  const activeAtStart = targetEmployees.filter(e => {
+    const adm = e.admissionDate || '2000-01-01';
+    if (adm > startDateStr) return false;
+
+    const dismissal = dismissalDates.get(e.id);
+    if (dismissal) {
+      return dismissal >= startDateStr;
+    }
+    return e.status === 'Ativo';
+  }).length;
+
+  // Colaboradores ativos no final do mês (último dia)
+  const activeAtEnd = targetEmployees.filter(e => {
+    const adm = e.admissionDate || '2000-01-01';
+    if (adm > endDateStr) return false;
+
+    const dismissal = dismissalDates.get(e.id);
+    if (dismissal) {
+      return dismissal > endDateStr;
+    }
+    return e.status === 'Ativo';
+  }).length;
+
+  // 2. Número médio de colaboradores: (Início + Fim) / 2
+  const avgEmployees = (activeAtStart + activeAtEnd) / 2;
+
+  // 3. Turnover (%) = (Número de desligamentos ÷ Número médio de colaboradores) × 100
+  const rate = avgEmployees > 0 ? (dismissalsCount / avgEmployees) * 100 : 0;
+
+  return {
+    rate,
+    dismissalsCount,
+    avgEmployees,
+    activeAtStart,
+    activeAtEnd
+  };
+};
+
 const SlaughterHR: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
   const [activeSubTab, setActiveSubTab] = useState<'employees' | 'sectors' | 'entries' | 'indicators'>('employees');
   const [filterMonth, setFilterMonth] = useState(new Date().getMonth() + 1);
@@ -224,20 +329,22 @@ const SlaughterHR: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       })
       .reduce((acc, e) => acc + e.employeeIds.length, 0);
 
-    const turnoverCount = entries
-      .filter(e => {
-        const [y, m] = e.date.split('-').map(Number);
-        return m === filterMonth && y === filterYear && e.type.toLowerCase().includes('turnover');
-      })
-      .reduce((acc, e) => acc + e.employeeIds.length, 0);
+    // Turnover calculation: Turnover (%) = (Número de desligamentos ÷ Número médio de colaboradores) × 100
+    const currentTurnover = getMonthTurnoverMetrics(
+      filterMonth,
+      filterYear,
+      filterEmployeeId,
+      employees,
+      entries
+    );
+    const turnoverCount = currentTurnover.dismissalsCount;
+    const turnoverRate = currentTurnover.rate;
     
     // Headcount for the specific filtered month (estimate)
     const monthActiveCount = employees.filter(e => {
       const admission = parseISO(e.admissionDate);
       return admission <= monthEnd && e.status === 'Ativo';
     }).length;
-
-    const turnoverRate = monthActiveCount > 0 ? (turnoverCount / monthActiveCount) * 100 : 0;
 
     const filteredAbsentDays = filteredEntries
       .filter(e => e.type.toLowerCase().includes('atestado') || e.type.toLowerCase().includes('falta'))
@@ -292,32 +399,18 @@ const SlaughterHR: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     });
 
     const turnoverData = last6Months.map(m => {
-      const mStart = new Date(m.year, m.month - 1, 1);
-      const mEnd = new Date(m.year, m.month, 0);
-
-      const mEntries = entries.filter(e => {
-        const d = parseISO(e.date);
-        const mVal = d.getMonth() + 1;
-        const yVal = d.getFullYear();
-        const matchesDate = (mVal === m.month && yVal === m.year);
-        const matchesEmployee = filterEmployeeId === 'all' || e.employeeIds.includes(filterEmployeeId);
-        return matchesDate && matchesEmployee && e.type.toLowerCase().includes('turnover');
-      });
-
-      const mTurnoverCount = mEntries.reduce((acc, e) => acc + (filterEmployeeId === 'all' ? e.employeeIds.length : 1), 0);
-
-      const mActiveCount = filterEmployeeId === 'all' 
-        ? employees.filter(e => {
-            const admission = parseISO(e.admissionDate);
-            const monthEnd = new Date(m.year, m.month, 0);
-            return admission <= monthEnd && e.status === 'Ativo';
-          }).length
-        : 1;
-
-      const mRate = mActiveCount > 0 ? (mTurnoverCount / mActiveCount) * 100 : 0;
+      const mMetrics = getMonthTurnoverMetrics(
+        m.month,
+        m.year,
+        filterEmployeeId,
+        employees,
+        entries
+      );
       return {
         name: `${format(new Date(2000, m.month - 1), 'MMM', { locale: ptBR })}/${m.year}`,
-        value: mRate
+        value: mMetrics.rate,
+        dismissals: mMetrics.dismissalsCount,
+        avgEmployees: mMetrics.avgEmployees
       };
     });
 
@@ -349,6 +442,7 @@ const SlaughterHR: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       occupancyRate, 
       filteredIndicator: {
         turnover: turnoverRate,
+        turnoverDetails: currentTurnover,
         accidents: accidentsCount,
         absenteeism: absenteeismRate
       }, 
@@ -358,7 +452,7 @@ const SlaughterHR: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       headcountData,
       birthdays
     };
-  }, [employees, entries, vacancies, filterMonth, filterYear, departments]);
+  }, [employees, entries, vacancies, filterMonth, filterYear, departments, filterEmployeeId]);
 
   const handleSaveVacancy = (e: React.FormEvent) => {
     e.preventDefault();
@@ -1521,7 +1615,12 @@ const SlaughterHR: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
               <div className="bg-[#e4e4d4]/20 p-6 rounded-3xl border border-[#344434]/5">
                 <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Turnover</div>
                 <div className="text-2xl font-black text-[#344434]">{formatNumber(stats.filteredIndicator.turnover, 1)}%</div>
-                <div className="text-[10px] text-slate-400 mt-1">Baseado em desligamentos do mês</div>
+                <div className="text-[10px] text-slate-400 mt-1">(Desligamentos ÷ Nº Médio) × 100</div>
+                {stats.filteredIndicator.turnoverDetails && (
+                  <div className="text-[9px] font-medium text-slate-500 mt-1">
+                    {stats.filteredIndicator.turnoverDetails.dismissalsCount} deslig. • Média: {formatNumber(stats.filteredIndicator.turnoverDetails.avgEmployees, 1)} colab.
+                  </div>
+                )}
               </div>
               <div className="bg-[#e4e4d4]/20 p-6 rounded-3xl border border-[#344434]/5">
                 <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Acidentes</div>
@@ -1613,7 +1712,10 @@ const SlaughterHR: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                     <Tooltip 
                       cursor={{fill: '#f8fafc'}} 
                       contentStyle={{borderRadius: '20px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)'}} 
-                      formatter={(value: number) => [formatNumber(value, 1) + '%', "Turnover"]}
+                      formatter={(value: number, _name: any, item: any) => [
+                        `${formatNumber(value, 1)}% (${item?.payload?.dismissals ?? 0} deslig. / méd. ${formatNumber(item?.payload?.avgEmployees ?? 0, 1)} colab.)`,
+                        "Turnover"
+                      ]}
                     />
                     <Bar dataKey="value" name="Turnover" fill="#344434" radius={[6, 6, 0, 0]} />
                   </BarChart>
