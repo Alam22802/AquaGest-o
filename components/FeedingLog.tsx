@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { AppState, FeedingLog as IFeedingLog, User } from '../types';
-import { Utensils, Trash2, Edit3, X, ArrowUpDown, Clock, Calendar, AlertTriangle, Eye } from 'lucide-react';
+import { Utensils, Trash2, Edit3, X, ArrowUpDown, Clock, Calendar, AlertTriangle, Eye, CheckCircle2, ArrowRightLeft } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { formatNumber } from '../utils/formatters';
 
@@ -216,6 +216,49 @@ const FeedingLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
 
   const totalPages = Math.ceil(sortedLogs.length / itemsPerPage);
 
+  const originalLog = useMemo(() => {
+    if (!editingId) return null;
+    return (state.feedingLogs || []).find(l => l.id === editingId) || null;
+  }, [editingId, state.feedingLogs]);
+
+  const editStockDifference = useMemo(() => {
+    if (!editingId || !originalLog) return null;
+    const newAmount = Number(formData.amount);
+    if (isNaN(newAmount) || newAmount <= 0) return null;
+    const oldAmount = Number(originalLog.amount) || 0;
+    const oldFeed = feedMap.get(originalLog.feedTypeId);
+    const newFeed = feedMap.get(formData.feedTypeId);
+
+    if (originalLog.feedTypeId === formData.feedTypeId) {
+      const diff = newAmount - oldAmount;
+      if (diff < 0) {
+        const returnedKg = Math.abs(diff) / 1000;
+        return {
+          type: 'return' as const,
+          text: `Quantidade reduzida em ${formatNumber(returnedKg, 2)} kg. Esse saldo retornará para o estoque de ${newFeed?.name || 'ração'}.`
+        };
+      } else if (diff > 0) {
+        const addedKg = diff / 1000;
+        return {
+          type: 'deduct' as const,
+          text: `Quantidade aumentada em ${formatNumber(addedKg, 2)} kg. Esse saldo adicional será debitado do estoque de ${newFeed?.name || 'ração'}.`
+        };
+      } else {
+        return {
+          type: 'neutral' as const,
+          text: 'Mesma quantidade anterior. Nenhuma alteração no saldo de estoque.'
+        };
+      }
+    } else {
+      const oldKg = oldAmount / 1000;
+      const newKg = newAmount / 1000;
+      return {
+        type: 'change_feed' as const,
+        text: `Troca de ração: ${formatNumber(oldKg, 2)} kg retornarão ao estoque de ${oldFeed?.name || 'ração anterior'} e ${formatNumber(newKg, 2)} kg serão debitados de ${newFeed?.name || 'nova ração'}.`
+      };
+    }
+  }, [editingId, originalLog, formData.amount, formData.feedTypeId, feedMap]);
+
   const toggleSelectAll = () => {
     if (selectedLogIds.size === paginatedLogs.length && paginatedLogs.length > 0) {
       setSelectedLogIds(new Set());
@@ -236,7 +279,7 @@ const FeedingLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
 
   const removeSelectedLogs = () => {
     if (!hasPermission || selectedLogIds.size === 0) return;
-    if (!confirm(`Deseja excluir ${selectedLogIds.size} trato(s) selecionado(s) do histórico do lote?`)) return;
+    if (!confirm(`Deseja excluir ${selectedLogIds.size} trato(s) selecionado(s) do histórico do lote? Atenção: o saldo de ração NÃO será estornado para o estoque central.`)) return;
 
     onUpdate({
       ...state,
@@ -281,6 +324,8 @@ const FeedingLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     if (!selectedFeed) return;
 
     if (editingId) {
+      const targetOriginalLog = originalLog || (state.feedingLogs || []).find(l => l.id === editingId);
+
       const updatedLogs = (state.feedingLogs || []).map(l => 
         l.id === editingId ? {
           ...l,
@@ -293,8 +338,44 @@ const FeedingLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
         } : l
       );
 
-      // Ajustes de trato atualizam o lote/histórico, mas NÃO afetam o saldo real do estoque de ração
-      onUpdate({ ...state, feedingLogs: updatedLogs });
+      // Na edição do lançamento de trato:
+      // Se a quantidade diminuir: a diferença retorna ao estoque (+).
+      // Se a quantidade aumentar: o saldo adicional é debitado do estoque (-).
+      // Se o tipo de ração mudar: estorna o valor da ração anterior e debita o valor da nova ração.
+      let updatedFeeds = state.feedTypes || [];
+      if (targetOriginalLog) {
+        const oldFeedId = targetOriginalLog.feedTypeId;
+        const newFeedId = formData.feedTypeId;
+        const oldAmount = Number(targetOriginalLog.amount) || 0;
+        const newAmount = amountNum;
+
+        updatedFeeds = updatedFeeds.map(f => {
+          let stock = f.totalStock;
+          let changed = false;
+
+          if (oldFeedId === newFeedId && f.id === newFeedId) {
+            stock = stock + oldAmount - newAmount;
+            changed = true;
+          } else {
+            if (f.id === oldFeedId) {
+              stock = stock + oldAmount;
+              changed = true;
+            }
+            if (f.id === newFeedId) {
+              stock = stock - newAmount;
+              changed = true;
+            }
+          }
+
+          return changed ? { ...f, totalStock: stock, updatedAt: Date.now() } : f;
+        });
+      }
+
+      onUpdate({ 
+        ...state, 
+        feedingLogs: updatedLogs,
+        feedTypes: updatedFeeds 
+      });
       setEditingId(null);
     } else {
       const cagesToProcess = isBulkMode ? Array.from(selectedCageIds) : [formData.cageId];
@@ -367,7 +448,7 @@ const FeedingLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
 
   const removeLog = (logId: string) => {
     if (!hasPermission) return;
-    if (!confirm('Deseja excluir este trato do histórico do lote?')) return;
+    if (!confirm('Deseja excluir este trato do histórico do lote? Atenção: o saldo de ração NÃO será estornado para o estoque central.')) return;
     const log = (state.feedingLogs || []).find(l => l.id === logId);
     if (!log) return;
     
@@ -502,6 +583,28 @@ const FeedingLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                 <input type="date" required className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none" value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} />
                 <input type="time" required className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none" value={formData.time} onChange={e => setFormData({...formData, time: e.target.value})} />
               </div>
+
+              {editingId && editStockDifference && (
+                <div className={`p-3.5 rounded-2xl border text-[11px] leading-relaxed transition-all ${
+                  editStockDifference.type === 'return'
+                    ? 'bg-emerald-50/90 border-emerald-200/90 text-emerald-900'
+                    : editStockDifference.type === 'deduct'
+                      ? 'bg-amber-50/90 border-amber-200/90 text-amber-900'
+                      : editStockDifference.type === 'change_feed'
+                        ? 'bg-indigo-50/90 border-indigo-200/90 text-indigo-900'
+                        : 'bg-slate-50 border-slate-200 text-slate-700'
+                }`}>
+                  <div className="font-black flex items-center gap-1.5 mb-1 uppercase tracking-wider text-[10px]">
+                    {editStockDifference.type === 'return' && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />}
+                    {editStockDifference.type === 'deduct' && <AlertTriangle className="w-3.5 h-3.5 text-amber-600 shrink-0" />}
+                    {editStockDifference.type === 'change_feed' && <ArrowRightLeft className="w-3.5 h-3.5 text-indigo-600 shrink-0" />}
+                    {editStockDifference.type === 'neutral' && <Clock className="w-3.5 h-3.5 text-slate-400 shrink-0" />}
+                    <span>Ajuste de Estoque na Edição</span>
+                  </div>
+                  <p className="font-medium">{editStockDifference.text}</p>
+                </div>
+              )}
+
               <button type="submit" className={`w-full py-4 rounded-2xl font-black uppercase tracking-widest text-xs text-white shadow-xl transition-all active:scale-95 ${editingId ? 'bg-amber-600 shadow-amber-600/20' : 'bg-blue-600 shadow-blue-600/20'}`}>
                 {editingId ? 'Salvar Alteração' : 'Registrar Trato'}
               </button>
@@ -516,10 +619,15 @@ const FeedingLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
         )}
 
         <div className="mt-4 p-4 bg-blue-50 border border-blue-100 rounded-2xl flex items-start gap-3">
-          <AlertTriangle className="w-5 h-5 text-blue-400 shrink-0" />
-          <p className="text-[10px] font-bold text-blue-700 leading-relaxed uppercase">
-            A cada trato registrado, o sistema subtrai automaticamente a quantidade do estoque central de rações.
-          </p>
+          <AlertTriangle className="w-5 h-5 text-blue-500 shrink-0 mt-0.5" />
+          <div className="text-[10px] text-blue-900 leading-relaxed">
+            <div className="uppercase tracking-wider font-black mb-1.5 text-blue-800">Regras de Estoque no Trato Diário:</div>
+            <ul className="space-y-1 font-medium list-disc pl-3.5 text-blue-900/90">
+              <li><strong>Novo lançamento:</strong> O saldo lançado é debitado automaticamente do estoque de ração.</li>
+              <li><strong>Edição de lançamento:</strong> O estoque é recalculado com a diferença (se diminuir, o saldo retorna ao estoque; se aumentar, a diferença é debitada).</li>
+              <li><strong>Exclusão de lançamento:</strong> O saldo lançado não é estornado para o estoque central.</li>
+            </ul>
+          </div>
         </div>
       </div>
 
