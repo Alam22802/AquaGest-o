@@ -634,20 +634,20 @@ async function scheduleSafeFarmStatePersist(stateToSave: any) {
   // Helper to construct fallback data dynamically matching the current date
   const getDynamicFallback = () => {
     const now = new Date();
-    const sourceRange = "CEPEA (24 - 28/08/2026)";
+    const sourceRange = "CEPEA (31 - 04/09/2026)";
 
     return {
-      price: 9.51,
+      price: 9.47,
       source: sourceRange,
       lastUpdate: now.toISOString(),
-      variation: -0.58,
-      weeklyVariation: -0.58,
+      variation: -0.38,
+      weeklyVariation: -0.38,
       regions: [
-        { name: "Triâng.Mineiro/Alto Paranaíba", price: 9.51, variation: -0.58, weeklyVariation: -0.58 },
-        { name: "Grandes Lagos", price: 9.48, variation: -0.18, weeklyVariation: -0.18 },
-        { name: "Norte do Paraná", price: 10.14, variation: -0.23, weeklyVariation: -0.23 },
-        { name: "Morada Nova de Minas", price: 9.29, variation: -0.14, weeklyVariation: -0.14 },
-        { name: "Oeste do Paraná", price: 8.67, variation: 0.00, weeklyVariation: 0.00 }
+        { name: "Triâng.Mineiro/Alto Paranaíba", price: 9.47, variation: -0.38, weeklyVariation: -0.38 },
+        { name: "Grandes Lagos", price: 9.49, variation: 0.16, weeklyVariation: 0.16 },
+        { name: "Norte do Paraná", price: 10.13, variation: -0.10, weeklyVariation: -0.10 },
+        { name: "Morada Nova de Minas", price: 9.28, variation: -0.07, weeklyVariation: -0.07 },
+        { name: "Oeste do Paraná", price: 8.69, variation: 0.17, weeklyVariation: 0.17 }
       ]
     };
   };
@@ -917,7 +917,10 @@ async function scheduleSafeFarmStatePersist(stateToSave: any) {
       if (process.env.NODE_ENV !== "production") {
         const { createServer: createViteServer } = await import("vite");
         const vite = await createViteServer({
-          server: { middlewareMode: true },
+          server: {
+            middlewareMode: true,
+            hmr: process.env.DISABLE_HMR === "true" ? false : undefined,
+          },
           appType: "spa",
         });
         app.use(vite.middlewares);
@@ -930,11 +933,16 @@ async function scheduleSafeFarmStatePersist(stateToSave: any) {
       }
 
       app.listen(PORT, "0.0.0.0", () => {
+        console.log(`Server running on port ${PORT}`);
+        console.log(`Server running on http://localhost:${PORT}`);
         console.log(`Server running on http://0.0.0.0:${PORT} in ${process.env.NODE_ENV || 'development'} mode`);
       });
     }
   }
 
-  initServer();
+  initServer().catch((err) => {
+    console.error("Failed to initialize server:", err);
+    process.exit(1);
+  });
 
 export default app;

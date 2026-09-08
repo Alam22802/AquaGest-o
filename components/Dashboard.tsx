@@ -536,7 +536,7 @@ const TilapiaPriceWidget = () => {
                  region.name.includes('Morada') ? 'Morada N.' :
                  region.name.includes('Norte') ? 'Norte PR' :
                  region.name.includes('Oeste') ? 'Oeste PR' :
-                 region.name.includes('Triângulo') ? 'Triângulo' : region.name}
+                 region.name.includes('Triâng') ? 'Triângulo' : region.name}
               </span>
               <div className="flex items-center gap-1 mb-1">
                 <span className="text-xs font-black">R$ {Math.floor(region.price)}</span>
