@@ -1054,60 +1054,6 @@ export const ClosedBatchHistory: React.FC<Props> = ({ state, currentUser, onUpda
               </div>
             </div>
           </div>
-
-          {/* 5. Histórico por Gaiola Arquivado */}
-          {selectedRecord.cageDetails && selectedRecord.cageDetails.length > 0 && (
-            <div className="space-y-6 print-container print-no-break">
-              <div className="flex items-center gap-3 px-2 print:px-0">
-                <div className="p-2.5 bg-blue-50 rounded-xl print:bg-slate-100">
-                  <Fish className="w-5 h-5 text-blue-600 print:text-blue-700" />
-                </div>
-                <div>
-                  <h3 className="text-lg font-black text-slate-900 uppercase tracking-tight italic">
-                    Histórico por Gaiola (Manejos Arquivados)
-                  </h3>
-                  <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
-                    Detalhamento de tratos, mortalidade e biometria por gaiola registrado durante o cultivo
-                  </p>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {selectedRecord.cageDetails.map(cage => (
-                  <div key={cage.cageId} className="bg-white rounded-[2rem] p-6 shadow-sm border border-slate-200 space-y-4 print-card">
-                    <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                      <div className="flex items-center gap-2">
-                        <Fish className="w-4 h-4 text-blue-600" />
-                        <h4 className="text-sm font-black text-slate-800 uppercase italic">{cage.cageName}</h4>
-                      </div>
-                      <span className="text-[9px] font-black text-slate-500 uppercase bg-slate-50 px-2 py-0.5 rounded-lg">
-                        {cage.biometries?.length || 0} biometrias
-                      </span>
-                    </div>
-
-                    <div className="grid grid-cols-3 gap-2 text-center">
-                      <div className="bg-slate-50 p-2 rounded-xl">
-                        <span className="text-[8px] font-black text-slate-500 uppercase block">Tratos</span>
-                        <span className="text-xs font-black text-slate-800">{cage.feedingCount || 0} ({formatNumber(cage.feedingKg || 0, 1)}kg)</span>
-                      </div>
-                      <div className="bg-red-50/60 p-2 rounded-xl border border-red-100/50">
-                        <span className="text-[8px] font-black text-red-500 uppercase block">Mortes</span>
-                        <span className="text-xs font-black text-red-700">{cage.mortalityCount || 0} un</span>
-                      </div>
-                      <div className="bg-emerald-50/60 p-2 rounded-xl border border-emerald-100/50">
-                        <span className="text-[8px] font-black text-emerald-600 uppercase block">Último Peso</span>
-                        <span className="text-xs font-black text-emerald-700">
-                          {cage.biometries && cage.biometries.length > 0 
-                            ? `${formatNumber(cage.biometries[cage.biometries.length - 1].weight, 1)}g` 
-                            : '-'}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
         </div>
       ) : (
         <div className="bg-white rounded-[2.5rem] p-16 text-center border border-slate-200 shadow-sm space-y-4">
