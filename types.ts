@@ -598,6 +598,21 @@ export interface ClosedBatchRecord {
 
   feedBreakdown?: { name: string; amountKg: number; cost: number }[];
   
+  // Detalhamento de Custos e Gaiolas
+  grossExpenses?: number;
+  supplierInvoiceVal?: number;
+  totalFeedCost?: number;
+  otherExpensesVal?: number;
+  bonusDeductionsVal?: number;
+  cageDetails?: {
+    cageId: string;
+    cageName: string;
+    feedingCount: number;
+    feedingKg: number;
+    mortalityCount: number;
+    biometries: { date: string; weight: number }[];
+  }[];
+
   // Gráficos e Histórico de Pesagens
   biometryTimeline: {
     date: string;

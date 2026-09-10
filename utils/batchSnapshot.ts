@@ -96,6 +96,14 @@ export const isCostDeductionRevenue = (r: any): boolean => {
 };
 
 export function buildBatchSnapshot(batch: Batch, state: AppState): ClosedBatchRecord {
+  const cleanBatchId = (batch.id || '').replace(/^hist-/, '').replace(/^history-/, '');
+  const existingHist = (state.closedBatchHistory || []).find(h => 
+    (h.batchId && (h.batchId === cleanBatchId || h.batchId === batch.id)) || 
+    h.id === batch.id || 
+    h.id === `hist-${cleanBatchId}` || 
+    (batch.name && h.batchName === batch.name)
+  );
+
   const harvestsByBatch: HarvestLog[] = (state.harvestLogs || []).filter((h: HarvestLog) => h.batchId === batch.id || isBatchMatch(h.batchId, batch));
   const harvestCages = new Set(harvestsByBatch.map((h: HarvestLog) => h.cageId));
   const cageMap = new Map<string, Cage>((state.cages || []).map((c: Cage) => [c.id, c]));
@@ -113,12 +121,37 @@ export function buildBatchSnapshot(batch: Batch, state: AppState): ClosedBatchRe
     }
     return false;
   });
-  const mortality = mortalityLogs.reduce((acc: number, curr: MortalityLog) => acc + curr.count, 0);
 
   // Feeding
   const feedingLogs: FeedingLog[] = (state.feedingLogs || []).filter((f: FeedingLog) => 
     checkIsFeedingLogForBatch(f, batch, state.harvestLogs, state.cages, state.batches)
   );
+
+  const batchBiometries: BiometryLog[] = (state.biometryLogs || []).filter((b: BiometryLog) => {
+    if (b.batchId === batch.id || isBatchMatch(b.batchId, batch)) return true;
+    if (b.cageId) {
+      if (harvestCages.has(b.cageId)) return true;
+      const cage = cageMap.get(b.cageId);
+      return cage?.batchId === batch.id;
+    }
+    return false;
+  });
+
+  const hasRawLogs = harvestsByBatch.length > 0 || mortalityLogs.length > 0 || feedingLogs.length > 0 || batchBiometries.length > 0;
+
+  // If raw logs were deleted but we already have an existing historical snapshot with complete data, preserve it!
+  if (!hasRawLogs && existingHist && (existingHist.harvestedFish > 0 || existingHist.totalExpenses > 0 || (existingHist.biometryTimeline && existingHist.biometryTimeline.length > 0))) {
+    return {
+      ...existingHist,
+      id: existingHist.id?.startsWith('hist-') ? existingHist.id : `hist-${cleanBatchId}`,
+      batchId: cleanBatchId,
+      batchName: batch.name || existingHist.batchName,
+      closedAt: batch.closedAt || existingHist.closedAt || new Date().toISOString(),
+      updatedAt: Date.now()
+    };
+  }
+
+  const mortality = mortalityLogs.reduce((acc: number, curr: MortalityLog) => acc + curr.count, 0);
   const feeding = feedingLogs.reduce((acc: number, curr: FeedingLog) => acc + curr.amount, 0);
 
   const feedingByType: Record<string, number> = {};
@@ -137,16 +170,6 @@ export function buildBatchSnapshot(batch: Batch, state: AppState): ClosedBatchRe
 
   let avgWeightBeforeHarvest = batch.initialUnitWeight;
   let expectedFish = batch.initialQuantity - mortality;
-
-  const batchBiometries: BiometryLog[] = (state.biometryLogs || []).filter((b: BiometryLog) => {
-    if (b.batchId === batch.id || isBatchMatch(b.batchId, batch)) return true;
-    if (b.cageId) {
-      if (harvestCages.has(b.cageId)) return true;
-      const cage = cageMap.get(b.cageId);
-      return cage?.batchId === batch.id;
-    }
-    return false;
-  });
 
   if (firstHarvestDate) {
     const mortalityBeforeHarvest = mortalityLogs
@@ -478,10 +501,34 @@ export function buildBatchSnapshot(batch: Batch, state: AppState): ClosedBatchRe
     ...slaughterEntries
   ].sort((a, b) => b.date.localeCompare(a.date));
 
-  const cleanBatchId = (batch.id || '').replace(/^hist-/, '').replace(/^history-/, '');
   const historyId = (batch.id && (batch.id.startsWith('hist-') || batch.id.startsWith('history-')))
     ? batch.id
     : `hist-${cleanBatchId}`;
+
+  const otherExpensesVal = expenses.reduce((acc: number, curr: BatchExpense) => acc + curr.value, 0);
+
+  // Cage Details
+  const allBatchCageIds = new Set<string>([
+    ...(batch.cageIds || []),
+    ...Array.from(harvestCages),
+    ...feedingLogs.map((f: FeedingLog) => f.cageId),
+    ...mortalityLogs.map((m: MortalityLog) => m.cageId).filter(Boolean) as string[]
+  ]);
+
+  const cageDetails = Array.from(allBatchCageIds).map((cId: string) => {
+    const c = cageMap.get(cId);
+    const cFeed = feedingLogs.filter((f: FeedingLog) => f.cageId === cId);
+    const cMort = mortalityLogs.filter((m: MortalityLog) => m.cageId === cId);
+    const cBio = batchBiometries.filter((b: BiometryLog) => b.cageId === cId);
+    return {
+      cageId: cId,
+      cageName: c?.name || `Gaiola ${cId.slice(0, 4)}`,
+      feedingCount: cFeed.length,
+      feedingKg: cFeed.reduce((acc: number, f: FeedingLog) => acc + f.amount, 0) / 1000,
+      mortalityCount: cMort.reduce((acc: number, m: MortalityLog) => acc + m.count, 0),
+      biometries: cBio.map((b: BiometryLog) => ({ date: b.date, weight: b.averageWeight }))
+    };
+  }).filter(c => c.feedingCount > 0 || c.mortalityCount > 0 || c.biometries.length > 0);
 
   return {
     id: historyId,
@@ -510,6 +557,12 @@ export function buildBatchSnapshot(batch: Batch, state: AppState): ClosedBatchRe
     fcaTheoretical,
     fcaReal,
     totalExpenses,
+    grossExpenses,
+    supplierInvoiceVal,
+    totalFeedCost,
+    otherExpensesVal,
+    bonusDeductionsVal: bonusDeductions,
+    cageDetails: cageDetails.length > 0 ? cageDetails : existingHist?.cageDetails,
     totalRevenue,
     totalProfit,
     costPerKg,

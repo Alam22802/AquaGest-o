@@ -940,6 +940,14 @@ async function scheduleSafeFarmStatePersist(stateToSave: any) {
     }
   }
 
+  process.on("unhandledRejection", (reason, promise) => {
+    console.error("Unhandled Rejection at:", promise, "reason:", reason);
+  });
+
+  process.on("uncaughtException", (error) => {
+    console.error("Uncaught Exception:", error);
+  });
+
   initServer().catch((err) => {
     console.error("Failed to initialize server:", err);
     process.exit(1);

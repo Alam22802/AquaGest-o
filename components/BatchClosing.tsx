@@ -172,11 +172,40 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       harvestsByBatch.set(h.batchId, (harvestsByBatch.get(h.batchId) || 0) + h.fishCount);
     });
 
-    // Only show batches that have harvests (or are closed) and have no remaining active unharvested cages
-    return (state.batches || [])
+    const list: (Batch & { isArchived?: boolean })[] = [...(state.batches || [])];
+
+    // Also include batches from closedBatchHistory so they can be viewed, analyzed, or reopened
+    (state.closedBatchHistory || []).forEach(hist => {
+      const cleanId = (hist.batchId || hist.id).replace(/^hist-/, '');
+      if (!list.some(b => b.id === cleanId || b.id === hist.id || b.name === hist.batchName)) {
+        list.push({
+          id: cleanId,
+          name: hist.batchName,
+          cageIds: [],
+          initialQuantity: hist.initialQuantity,
+          initialUnitWeight: hist.initialUnitWeight,
+          settlementDate: hist.settlementDate,
+          expectedHarvestDate: hist.expectedHarvestDate,
+          isClosed: true,
+          closedAt: hist.closedAt,
+          updatedAt: hist.updatedAt || Date.now(),
+          isArchived: hist.isDeletedFromSystem
+        } as any);
+      }
+    });
+
+    // Only show batches that have harvests (or are closed/archived) and have no remaining active unharvested cages
+    return list
       .filter(batch => {
         const harvestedFish = harvestsByBatch.get(batch.id) || 0;
-        if (harvestedFish === 0 && !batch.isClosed) return false;
+        if (harvestedFish === 0 && !batch.isClosed) {
+          const inHist = (state.closedBatchHistory || []).some(h => 
+            (h.batchId && (h.batchId === batch.id || h.batchId === batch.id.replace(/^hist-/, ''))) ||
+            h.id === batch.id ||
+            h.batchName === batch.name
+          );
+          if (!inHist) return false;
+        }
 
         const harvestedCageIds = new Set(
           (state.harvestLogs || []).filter(h => h.batchId === batch.id).map(h => h.cageId)
@@ -190,12 +219,21 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
         return activeUncoveredCages.length === 0 || batch.isClosed;
       })
       .sort((a, b) => a.name.localeCompare(b.name));
-  }, [state.batches, state.cages, state.harvestLogs]);
+  }, [state.batches, state.cages, state.harvestLogs, state.closedBatchHistory]);
 
   const batchData = useMemo(() => {
     if (!selectedBatchId) return null;
-    const batch = (state.batches || []).find(b => b.id === selectedBatchId);
+    const batch = (state.batches || []).find(b => b.id === selectedBatchId) ||
+      batches.find(b => b.id === selectedBatchId);
     if (!batch) return null;
+
+    const cleanBatchId = (batch.id || '').replace(/^hist-/, '').replace(/^history-/, '');
+    const histRecord = (state.closedBatchHistory || []).find(h => 
+      (h.batchId && (h.batchId === cleanBatchId || h.batchId === batch.id)) ||
+      h.id === batch.id ||
+      h.id === `hist-${cleanBatchId}` ||
+      (batch.name && h.batchName === batch.name)
+    );
 
     // Create lookups for better performance
     const harvestsByBatch = (state.harvestLogs || []).filter(h => h.batchId === batch.id);
@@ -259,6 +297,139 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       }
       return false;
     });
+
+    const hasRawLogs = harvestsByBatch.length > 0 || mortalityLogs.length > 0 || feedingLogs.length > 0 || batchBiometries.length > 0;
+
+    // Fallback if raw logs were archived/deleted: recover complete metrics from histRecord
+    if (!hasRawLogs && histRecord) {
+      const histEntries = histRecord.entries || [];
+      const histJuvenileCost = histRecord.supplierInvoiceVal ?? histEntries.filter(e => e.type === 'expense' && (e.category?.toLowerCase().includes('alevino') || e.category?.toLowerCase().includes('povoamento') || e.description?.toLowerCase().includes('aquisição de juvenis'))).reduce((acc, curr) => acc + curr.value, 0);
+      const histFeedCost = histRecord.totalFeedCost ?? ((histRecord.feedBreakdown || []).reduce((acc, f) => acc + f.cost, 0) || histEntries.filter(e => e.type === 'expense' && e.category?.toLowerCase().includes('ração')).reduce((acc, curr) => acc + curr.value, 0));
+      const histOtherExpenses = histRecord.otherExpensesVal ?? histEntries.filter(e => e.type === 'expense' && !e.category?.toLowerCase().includes('alevino') && !e.category?.toLowerCase().includes('povoamento') && !e.category?.toLowerCase().includes('ração') && !e.description?.toLowerCase().includes('aquisição de juvenis')).reduce((acc, curr) => acc + curr.value, 0);
+      const histBonus = histRecord.bonusDeductionsVal ?? histEntries.filter(e => e.type === 'revenue' && e.category?.toLowerCase().includes('bonifica')).reduce((acc, curr) => acc + curr.value, 0);
+
+      const totalExpenses = histRecord.totalExpenses || 0;
+      const grossExpenses = histRecord.grossExpenses || (histJuvenileCost + histFeedCost + histOtherExpenses) || totalExpenses;
+      const totalRevenue = histRecord.totalRevenue || 0;
+      const totalProfit = histRecord.totalProfit ?? (totalRevenue + histBonus - grossExpenses);
+      const hWeight = histRecord.harvestedWeight || 0;
+      const totalReceptionWeight = histRecord.totalReceptionWeight || hWeight;
+      const hFish = histRecord.harvestedFish || 0;
+      const hMortality = histRecord.mortality || 0;
+      const hFeeding = (histRecord.totalFeedKg || 0) * 1000;
+      const costPerKg = histRecord.costPerKg || (totalReceptionWeight > 0 ? totalExpenses / totalReceptionWeight : 0);
+
+      const feedDetailsByType = (histRecord.feedBreakdown || []).map((fe, idx) => ({
+        feedTypeId: `feed-${idx}`,
+        typeName: fe.name,
+        amountGrams: fe.amountKg * 1000,
+        amountKg: fe.amountKg,
+        pricePerKg: fe.amountKg > 0 ? fe.cost / fe.amountKg : 0,
+        cost: fe.cost
+      }));
+
+      const biometryEvolutionTimeline = (histRecord.biometryTimeline || []).map(b => ({
+        date: b.date,
+        fullDate: b.fullDate,
+        weight: b.weight,
+        standardWeight: b.standardWeight,
+        days: b.days,
+        isHarvestDate: b.fullDate === histRecord.closedAt?.split('T')[0]
+      }));
+
+      const mortalityEvolutionData = (histRecord.mortalityTimeline || []);
+
+      const allEntries = histEntries.map((e, idx) => ({
+        id: e.id || `hist-entry-${idx}`,
+        batchId: batch.id,
+        description: e.description,
+        category: e.category,
+        value: e.value,
+        date: e.date,
+        userId: (batch as any).userId || 'system',
+        type: e.type,
+        isVirtual: false,
+        receptionWeight: (e as any).receptionWeight,
+        unitPrice: (e as any).unitPrice,
+        isCostDeduction: (e as any).category?.toLowerCase().includes('bonifica')
+      }));
+
+      const filteredEntries = allEntries.filter(e => {
+        const matchCategory = !filterCategory || e.category === filterCategory;
+        const matchItem = !filterItem || e.description.toLowerCase().includes(filterItem.toLowerCase());
+        return matchCategory && matchItem;
+      }).sort((a, b) => b.date.localeCompare(a.date));
+
+      const logsByCage = new Map<string, any>();
+      if (histRecord.cageDetails && histRecord.cageDetails.length > 0) {
+        histRecord.cageDetails.forEach(cd => {
+          logsByCage.set(cd.cageId, {
+            cageName: cd.cageName,
+            feeding: [{ amount: cd.feedingKg * 1000, timestamp: batch.settlementDate, feedTypeName: 'Ração' }],
+            mortality: [{ count: cd.mortalityCount, date: batch.settlementDate }],
+            biometry: (cd.biometries || []).map(b => ({ averageWeight: b.weight, date: b.date }))
+          });
+        });
+      }
+
+      const categories = Array.from(new Set(allEntries.map(e => e.category))).filter(Boolean).sort();
+      const items = Array.from(new Set(allEntries.map(e => e.description))).filter(Boolean).sort();
+
+      return {
+        batch: {
+          ...batch,
+          isClosed: true,
+          closedAt: histRecord.closedAt || batch.closedAt
+        },
+        mortality: hMortality,
+        feeding: hFeeding,
+        feedingByType: Object.fromEntries(feedDetailsByType.map(f => [f.typeName, f.amountGrams])),
+        feedingByTypeId: Object.fromEntries(feedDetailsByType.map(f => [f.feedTypeId, f.amountGrams])),
+        harvestedFish: hFish,
+        harvestedWeight: hWeight,
+        totalRevenue,
+        totalProfit,
+        slaughteredWeight: totalReceptionWeight,
+        slaughteredCount: hFish,
+        slaughteredReceptionWeight: totalReceptionWeight,
+        expenses: histEntries.filter(e => e.type === 'expense'),
+        revenues: histEntries.filter(e => e.type === 'revenue'),
+        otherExpensesVal: histOtherExpenses,
+        grossExpenses,
+        bonusDeductionsVal: histBonus,
+        netExpenses: totalExpenses,
+        supplierInvoiceVal: histJuvenileCost,
+        totalFeedCost: histFeedCost,
+        feedDetailsByType,
+        totalExpenses,
+        protocol: (state.protocols || []).find(p => p.name === histRecord.protocolName || p.id === batch.protocolId),
+        totalDays: histRecord.totalDays || 0,
+        survivalRate: histRecord.survivalRate || 0,
+        fcaTheoretical: histRecord.fcaTheoretical || 0,
+        fcaReal: histRecord.fcaReal || 0,
+        gpd: histRecord.gpd || 0,
+        costPerKg,
+        accuracy: histRecord.accuracy || 0,
+        survivalRateReal: histRecord.survivalRateReal || 0,
+        expectedFish: histRecord.expectedFish || (batch.initialQuantity - hMortality),
+        expectedWeight: histRecord.biomassBeforeHarvest || (hWeight),
+        liveFish: Math.max(0, batch.initialQuantity - hMortality - hFish),
+        currentBiomassKg: (Math.max(0, batch.initialQuantity - hMortality - hFish) * (histRecord.currentAvgWeight || batch.initialUnitWeight)) / 1000,
+        biomassBeforeHarvest: histRecord.biomassBeforeHarvest || 0,
+        logsByCage,
+        categories,
+        items,
+        expenseCategories: categories,
+        expenseItems: items,
+        revenueCategories: categories,
+        revenueItems: items,
+        allEntries,
+        filteredEntries,
+        totalReceptionWeight,
+        biometryEvolutionData: biometryEvolutionTimeline,
+        mortalityEvolutionData
+      };
+    }
 
     if (firstHarvestDate) {
       const mortalityBeforeHarvest = mortalityLogs
@@ -1171,13 +1342,45 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     if (!selectedBatchId || !currentUser.isMaster) return;
     if (!confirm('Deseja realmente REABRIR este lote? Ao reabrir, o lote voltará ao status em aberto e permitirá edições, lançamentos e ajustes.')) return;
 
-    const updatedBatches = (state.batches || []).map(b => 
-      b.id === selectedBatchId ? { ...b, isClosed: false, closedAt: undefined, updatedAt: Date.now() } : b
-    );
+    const targetBatch = (state.batches || []).find(b => b.id === selectedBatchId);
+    let updatedBatches = [...(state.batches || [])];
+    
+    if (targetBatch) {
+      updatedBatches = updatedBatches.map(b => 
+        b.id === selectedBatchId ? { ...b, isClosed: false, closedAt: undefined, updatedAt: Date.now() } : b
+      );
+    } else {
+      // If batch was archived / deleted from state.batches but exists in closedBatchHistory
+      const cleanId = selectedBatchId.replace(/^hist-/, '');
+      const hist = (state.closedBatchHistory || []).find(h => h.batchId === cleanId || h.id === selectedBatchId || h.id === `hist-${cleanId}` || h.batchName === selectedBatchId);
+      if (hist) {
+        updatedBatches.push({
+          id: hist.batchId || cleanId,
+          name: hist.batchName,
+          cageIds: [],
+          initialQuantity: hist.initialQuantity,
+          initialUnitWeight: hist.initialUnitWeight,
+          settlementDate: hist.settlementDate,
+          expectedHarvestDate: hist.expectedHarvestDate,
+          isClosed: false,
+          closedAt: undefined,
+          updatedAt: Date.now()
+        } as Batch);
+      }
+    }
+
+    const updatedClosedHistory = (state.closedBatchHistory || []).map(h => {
+      const cleanId = selectedBatchId.replace(/^hist-/, '');
+      if (h.batchId === cleanId || h.id === selectedBatchId || h.id === `hist-${cleanId}` || h.batchName === selectedBatchId) {
+        return { ...h, isDeletedFromSystem: false, updatedAt: Date.now() };
+      }
+      return h;
+    });
 
     onUpdate({
       ...state,
-      batches: updatedBatches
+      batches: updatedBatches,
+      closedBatchHistory: updatedClosedHistory
     });
   };
 
@@ -1317,7 +1520,8 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       deletedIds: Array.from(new Set([...(state.deletedIds || []), ...allRemovedIds])),
     });
 
-    setSelectedBatchId('');
+    // Immediately direct to history page for analysis as requested!
+    setSubTab('history');
   };
 
   const handlePrint = () => {
@@ -1452,7 +1656,7 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       </div>
 
       {subTab === 'history' ? (
-        <ClosedBatchHistory state={state} currentUser={currentUser} onUpdate={onUpdate} />
+        <ClosedBatchHistory state={state} currentUser={currentUser} onUpdate={onUpdate} initialBatchId={selectedBatchId} />
       ) : (
         <>
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 print:hidden">
@@ -1465,7 +1669,7 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
             </div>
 
             <div className="flex items-center gap-3">
-              {batchData?.batch.isClosed && (
+              {batchData && (
                 <div className="flex items-center gap-3">
                   <div className="flex items-center gap-2 bg-slate-100 p-1.5 rounded-2xl border border-slate-200">
                     <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-2">Impressão:</span>

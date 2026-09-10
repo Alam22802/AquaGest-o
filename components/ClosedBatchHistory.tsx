@@ -16,7 +16,8 @@ import {
   Search,
   Layers,
   History,
-  Trash2
+  Trash2,
+  Unlock
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -37,6 +38,7 @@ interface Props {
   state: AppState;
   currentUser: User;
   onUpdate?: (newState: AppState) => void;
+  initialBatchId?: string;
 }
 
 const safeDateFormat = (dateStr: string | undefined, formatStr: string) => {
@@ -50,7 +52,7 @@ const safeDateFormat = (dateStr: string | undefined, formatStr: string) => {
   }
 };
 
-export const ClosedBatchHistory: React.FC<Props> = ({ state, currentUser, onUpdate }) => {
+export const ClosedBatchHistory: React.FC<Props> = ({ state, currentUser, onUpdate, initialBatchId }) => {
   const [selectedRecordId, setSelectedRecordId] = useState<string>('');
   const [filterCategory, setFilterCategory] = useState('');
   const [filterItem, setFilterItem] = useState('');
@@ -89,16 +91,110 @@ export const ClosedBatchHistory: React.FC<Props> = ({ state, currentUser, onUpda
   }, [state.batches, state.closedBatchHistory, state.harvestLogs, state.feedingLogs, state.mortalityLogs, state.biometryLogs, state.slaughterLogs, state.batchExpenses, state.batchRevenues]);
 
   useEffect(() => {
+    if (initialBatchId) {
+      const cleanId = initialBatchId.replace(/^hist-/, '');
+      const match = historicalRecords.find(r => r.id === initialBatchId || r.batchId === initialBatchId || r.batchId === cleanId || r.id === `hist-${cleanId}` || r.batchName === initialBatchId);
+      if (match) {
+        setSelectedRecordId(match.id);
+        return;
+      }
+    }
     if (!selectedRecordId && historicalRecords.length > 0) {
       setSelectedRecordId(historicalRecords[0].id);
     }
-  }, [historicalRecords, selectedRecordId]);
+  }, [historicalRecords, selectedRecordId, initialBatchId]);
 
   const selectedRecord = useMemo(() => {
     if (!selectedRecordId) return null;
     const cleanId = selectedRecordId.replace(/^hist-/, '');
-    return historicalRecords.find(r => r.id === selectedRecordId || r.batchId === selectedRecordId || r.batchId === cleanId || r.id === `hist-${cleanId}`) || null;
+    return historicalRecords.find(r => r.id === selectedRecordId || r.batchId === selectedRecordId || r.batchId === cleanId || r.id === `hist-${cleanId}` || r.batchName === selectedRecordId) || null;
   }, [selectedRecordId, historicalRecords]);
+
+  const costBreakdown = useMemo(() => {
+    if (!selectedRecord) return { juvenileCost: 0, feedCost: 0, otherExpenses: 0, bonusDeductions: 0, grossExpenses: 0, netExpenses: 0, costPerKg: 0, totalRevenue: 0, totalProfit: 0, margin: 0 };
+    
+    const entries = selectedRecord.entries || [];
+    
+    const juvenileCost = selectedRecord.supplierInvoiceVal ?? entries
+      .filter(e => e.type === 'expense' && (e.category?.toLowerCase().includes('alevino') || e.category?.toLowerCase().includes('povoamento') || e.description?.toLowerCase().includes('aquisição de juvenis')))
+      .reduce((acc, curr) => acc + curr.value, 0);
+
+    const feedCost = selectedRecord.totalFeedCost ?? ((selectedRecord.feedBreakdown || []).reduce((acc, f) => acc + f.cost, 0) || entries
+      .filter(e => e.type === 'expense' && e.category?.toLowerCase().includes('ração'))
+      .reduce((acc, curr) => acc + curr.value, 0));
+
+    const otherExpenses = selectedRecord.otherExpensesVal ?? entries
+      .filter(e => e.type === 'expense' && !e.category?.toLowerCase().includes('alevino') && !e.category?.toLowerCase().includes('povoamento') && !e.category?.toLowerCase().includes('ração') && !e.description?.toLowerCase().includes('aquisição de juvenis'))
+      .reduce((acc, curr) => acc + curr.value, 0);
+
+    const bonusDeductions = selectedRecord.bonusDeductionsVal ?? entries
+      .filter(e => e.type === 'revenue' && e.category?.toLowerCase().includes('bonifica'))
+      .reduce((acc, curr) => acc + curr.value, 0);
+
+    const netExpenses = selectedRecord.totalExpenses || 0;
+    const grossExpenses = selectedRecord.grossExpenses || (juvenileCost + feedCost + otherExpenses) || netExpenses;
+    const totalRevenue = selectedRecord.totalRevenue || 0;
+    const totalProfit = selectedRecord.totalProfit ?? (totalRevenue + bonusDeductions - grossExpenses);
+    const totalReceptionWeight = selectedRecord.totalReceptionWeight || selectedRecord.harvestedWeight || 0;
+    const costPerKg = selectedRecord.costPerKg || (totalReceptionWeight > 0 ? netExpenses / totalReceptionWeight : 0);
+    const margin = selectedRecord.profitMarginPercent ?? (totalRevenue > 0 ? (totalProfit / totalRevenue) * 100 : 0);
+
+    return {
+      juvenileCost,
+      feedCost,
+      otherExpenses,
+      bonusDeductions,
+      grossExpenses,
+      netExpenses,
+      costPerKg,
+      totalRevenue,
+      totalProfit,
+      margin
+    };
+  }, [selectedRecord]);
+
+  const handleReopenBatch = () => {
+    if (!selectedRecord || !currentUser.isMaster || !onUpdate) return;
+    if (!confirm(`Deseja realmente REABRIR o lote ${selectedRecord.batchName}? Ao reabrir, o lote retornará para a lista de lotes ativos e permitirá lançamentos, edições e fechamento.`)) return;
+
+    const cleanId = (selectedRecord.batchId || selectedRecord.id).replace(/^hist-/, '');
+    const existing = (state.batches || []).find(b => b.id === cleanId || b.id === selectedRecord.id || b.name === selectedRecord.batchName);
+    
+    let updatedBatches = [...(state.batches || [])];
+    if (existing) {
+      updatedBatches = updatedBatches.map(b => 
+        (b.id === existing.id) ? { ...b, isClosed: false, closedAt: undefined, updatedAt: Date.now() } : b
+      );
+    } else {
+      updatedBatches.push({
+        id: cleanId,
+        name: selectedRecord.batchName,
+        cageIds: [],
+        initialQuantity: selectedRecord.initialQuantity,
+        initialUnitWeight: selectedRecord.initialAvgWeight || selectedRecord.initialUnitWeight || 0,
+        settlementDate: selectedRecord.settlementDate,
+        expectedHarvestDate: selectedRecord.expectedHarvestDate,
+        isClosed: false,
+        closedAt: undefined,
+        updatedAt: Date.now()
+      } as any);
+    }
+
+    const updatedClosedHistory = (state.closedBatchHistory || []).map(h => {
+      if (h.id === selectedRecord.id || h.batchId === cleanId || h.batchName === selectedRecord.batchName) {
+        return { ...h, isDeletedFromSystem: false, updatedAt: Date.now() };
+      }
+      return h;
+    });
+
+    onUpdate({
+      ...state,
+      batches: updatedBatches,
+      closedBatchHistory: updatedClosedHistory
+    });
+
+    alert(`O lote ${selectedRecord.batchName} foi reaberto com sucesso!`);
+  };
 
   const filteredEntries = useMemo(() => {
     if (!selectedRecord || !selectedRecord.entries) return [];
@@ -485,47 +581,84 @@ export const ClosedBatchHistory: React.FC<Props> = ({ state, currentUser, onUpda
                     </div>
 
                     <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 space-y-2">
-                      <span className="text-[10px] font-black text-slate-600 uppercase tracking-widest block">Detalhamento dos Custos</span>
+                      <span className="text-[10px] font-black text-slate-600 uppercase tracking-widest block mb-1">Detalhamento dos Custos</span>
+                      
+                      <div className="flex justify-between items-center text-xs">
+                        <span className="font-bold text-slate-500">Juvenis / Povoamento:</span>
+                        <span className="font-black text-slate-800">
+                          {formatCurrency(costBreakdown.juvenileCost)}
+                        </span>
+                      </div>
+
                       <div className="flex justify-between items-center text-xs">
                         <span className="font-bold text-slate-500">Consumo Ração:</span>
                         <span className="font-black text-amber-700">
-                          {formatCurrency((selectedRecord.feedBreakdown || []).reduce((acc, f) => acc + f.cost, 0))}
+                          {formatCurrency(costBreakdown.feedCost)}
                         </span>
                       </div>
+
                       <div className="flex justify-between items-center text-xs">
-                        <span className="font-bold text-slate-500">Total Despesas:</span>
-                        <span className="font-black text-slate-700">{formatCurrency(selectedRecord.totalExpenses)}</span>
+                        <span className="font-bold text-slate-500">Outras Despesas:</span>
+                        <span className="font-black text-slate-800">
+                          {formatCurrency(costBreakdown.otherExpenses)}
+                        </span>
                       </div>
-                      <div className="flex justify-between items-center text-xs">
-                        <span className="font-bold text-slate-500">Receita Total:</span>
-                        <span className="font-black text-blue-700">{formatCurrency(selectedRecord.totalRevenue)}</span>
+
+                      {costBreakdown.bonusDeductions > 0 && (
+                        <div className="flex justify-between items-center text-xs text-emerald-600 font-black">
+                          <span>Bonificação Frigorífico (Dedução):</span>
+                          <span>-{formatCurrency(costBreakdown.bonusDeductions)}</span>
+                        </div>
+                      )}
+
+                      <div className="flex justify-between items-center text-xs pt-2 border-t border-slate-200">
+                        <span className="font-bold text-slate-600">Receita Frigorífico:</span>
+                        <span className="font-black text-blue-700">{formatCurrency(costBreakdown.totalRevenue)}</span>
                       </div>
+
                       <div className="flex justify-between items-center text-xs pt-1 border-t border-slate-200">
                         <span className="font-bold text-slate-600">Resultado Líquido:</span>
-                        <span className={`font-black ${selectedRecord.totalProfit >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-                          {formatCurrency(selectedRecord.totalProfit)}
+                        <span className={`font-black ${costBreakdown.totalProfit >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                          {formatCurrency(costBreakdown.totalProfit)} ({formatNumber(costBreakdown.margin, 1)}%)
                         </span>
                       </div>
                     </div>
 
                     <div className="p-4 bg-blue-50/70 rounded-2xl border border-blue-100">
-                      <span className="text-[10px] font-black text-blue-900 uppercase tracking-widest block mb-1">Custo Total Acumulado</span>
-                      <span className="text-2xl font-black text-blue-950 italic">{formatCurrency(selectedRecord.totalExpenses)}</span>
+                      <span className="text-[10px] font-black text-blue-900 uppercase tracking-widest block mb-1">Custo Total (Líquido)</span>
+                      <span className="text-2xl font-black text-blue-950 italic">{formatCurrency(costBreakdown.netExpenses)}</span>
+                      {costBreakdown.bonusDeductions > 0 && (
+                        <span className="text-[9px] font-bold text-blue-600 block mt-0.5">
+                          * Abatida a bonificação de {formatCurrency(costBreakdown.bonusDeductions)}
+                        </span>
+                      )}
                     </div>
 
                     <div className="p-4 bg-emerald-50 rounded-2xl border border-emerald-100">
                       <span className="text-[10px] font-black text-emerald-700 uppercase tracking-widest block mb-1">Custo por KG</span>
-                      <span className="text-2xl font-black text-emerald-700 italic">{formatCurrency(selectedRecord.costPerKg)}</span>
+                      <span className="text-2xl font-black text-emerald-700 italic">{formatCurrency(costBreakdown.costPerKg)}</span>
                     </div>
                   </div>
 
-                  <div className="p-4 bg-slate-100 rounded-2xl border border-slate-200 text-center">
-                    <p className="text-[10px] font-black text-slate-600 uppercase tracking-widest">
-                      {selectedRecord.isDeletedFromSystem ? 'Registro Histórico Arquivado' : 'Lote Finalizado no Sistema'}
-                    </p>
-                    <p className="text-[9px] font-bold text-slate-500 uppercase mt-1">
-                      Visualização exclusiva para consulta e auditoria
-                    </p>
+                  <div className="space-y-3">
+                    <div className="p-4 bg-slate-100 rounded-2xl border border-slate-200 text-center">
+                      <p className="text-[10px] font-black text-slate-600 uppercase tracking-widest">
+                        {selectedRecord.isDeletedFromSystem ? 'Registro Histórico Arquivado' : 'Lote Finalizado no Sistema'}
+                      </p>
+                      <p className="text-[9px] font-bold text-slate-500 uppercase mt-1">
+                        Visualização exclusiva para consulta e auditoria
+                      </p>
+                    </div>
+
+                    {currentUser.isMaster && onUpdate && (
+                      <button 
+                        onClick={handleReopenBatch}
+                        className="w-full py-3.5 bg-amber-500 text-white rounded-2xl font-black uppercase tracking-widest text-xs shadow-md shadow-amber-200 hover:bg-amber-600 transition-all active:scale-95 flex items-center justify-center gap-2 print:hidden"
+                      >
+                        <Unlock className="w-4 h-4" />
+                        Reabrir Lote no Sistema
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
