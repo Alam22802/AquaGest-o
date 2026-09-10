@@ -1074,11 +1074,11 @@ export const ClosedBatchHistory: React.FC<Props> = ({ state, currentUser, onUpda
                     <div className="grid grid-cols-3 gap-2 text-center">
                       <div className="bg-slate-50 p-2 rounded-xl">
                         <span className="text-[8px] font-black text-slate-500 uppercase block">Tratos</span>
-                        <span className="text-xs font-black text-slate-800">{cage.feedingCount} ({formatNumber(cage.feedingKg, 1)}kg)</span>
+                        <span className="text-xs font-black text-slate-800">{cage.feedingCount || 0} ({formatNumber(cage.feedingKg || 0, 1)}kg)</span>
                       </div>
                       <div className="bg-red-50/60 p-2 rounded-xl border border-red-100/50">
                         <span className="text-[8px] font-black text-red-500 uppercase block">Mortes</span>
-                        <span className="text-xs font-black text-red-700">{cage.mortalityCount} un</span>
+                        <span className="text-xs font-black text-red-700">{cage.mortalityCount || 0} un</span>
                       </div>
                       <div className="bg-emerald-50/60 p-2 rounded-xl border border-emerald-100/50">
                         <span className="text-[8px] font-black text-emerald-600 uppercase block">Último Peso</span>

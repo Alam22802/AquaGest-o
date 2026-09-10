@@ -358,16 +358,17 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
         const matchCategory = !filterCategory || e.category === filterCategory;
         const matchItem = !filterItem || e.description.toLowerCase().includes(filterItem.toLowerCase());
         return matchCategory && matchItem;
-      }).sort((a, b) => b.date.localeCompare(a.date));
+      }).sort((a, b) => (b.date || '').localeCompare(a.date || ''));
 
       const logsByCage = new Map<string, any>();
       if (histRecord.cageDetails && histRecord.cageDetails.length > 0) {
         histRecord.cageDetails.forEach(cd => {
+          if (!cd?.cageId) return;
           logsByCage.set(cd.cageId, {
-            cageName: cd.cageName,
-            feeding: [{ amount: cd.feedingKg * 1000, timestamp: batch.settlementDate, feedTypeName: 'Ração' }],
-            mortality: [{ count: cd.mortalityCount, date: batch.settlementDate }],
-            biometry: (cd.biometries || []).map(b => ({ averageWeight: b.weight, date: b.date }))
+            cageName: cd.cageName || `Gaiola ${cd.cageId}`,
+            feeding: [{ amount: (cd.feedingKg || 0) * 1000, timestamp: batch.settlementDate || '', feedTypeName: 'Ração' }],
+            mortality: [{ count: cd.mortalityCount || 0, date: batch.settlementDate || '' }],
+            biometry: (cd.biometries || []).map(b => ({ averageWeight: b.weight || 0, date: b.date || '' }))
           });
         });
       }
@@ -836,21 +837,23 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       ...batchBiometries.map(b => b.cageId).filter(Boolean)
     ]);
 
-    if (existingHist?.cageDetails && existingHist.cageDetails.length > 0) {
-      existingHist.cageDetails.forEach((cd: any) => allCageIds.add(cd.cageId));
+    if (histRecord?.cageDetails && histRecord.cageDetails.length > 0) {
+      histRecord.cageDetails.forEach((cd: any) => {
+        if (cd?.cageId) allCageIds.add(cd.cageId);
+      });
     }
     
     allCageIds.forEach(cId => {
       if (!cId) return;
       const cage = cageMap.get(cId);
       const cFeed = feedingLogs.filter(f => f.cageId === cId).sort((a, b) => (b.timestamp || b.date || '').localeCompare(a.timestamp || a.date || ''));
-      const cMort = mortalityLogs.filter(m => m.cageId === cId).sort((a, b) => b.date.localeCompare(a.date));
-      const cBio = batchBiometries.filter(b => b.cageId === cId).sort((a, b) => b.date.localeCompare(a.date));
+      const cMort = mortalityLogs.filter(m => m.cageId === cId).sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+      const cBio = batchBiometries.filter(b => b.cageId === cId).sort((a, b) => (b.date || '').localeCompare(a.date || ''));
 
-      const histCage = existingHist?.cageDetails?.find((cd: any) => cd.cageId === cId);
-      const finalFeed = cFeed.length > 0 ? cFeed : (histCage?.feedingLogs || []).map((f: any) => ({ timestamp: f.date, amount: f.amountKg * 1000 }));
-      const finalMort = cMort.length > 0 ? cMort : (histCage?.mortalityLogs || []).map((m: any) => ({ date: m.date, count: m.count }));
-      const finalBio = cBio.length > 0 ? cBio : (histCage?.biometries || []).map((b: any) => ({ date: b.date, averageWeight: b.weight }));
+      const histCage = histRecord?.cageDetails?.find((cd: any) => cd?.cageId === cId);
+      const finalFeed = cFeed.length > 0 ? cFeed : ((histCage as any)?.feedingLogs || []).map((f: any) => ({ timestamp: f.date || f.timestamp || '', amount: (f.amountKg || 0) * 1000 }));
+      const finalMort = cMort.length > 0 ? cMort : ((histCage as any)?.mortalityLogs || []).map((m: any) => ({ date: m.date || '', count: m.count || 0 }));
+      const finalBio = cBio.length > 0 ? cBio : (histCage?.biometries || []).map((b: any) => ({ date: b.date || '', averageWeight: b.weight || 0 }));
 
       if (finalFeed.length > 0 || finalMort.length > 0 || finalBio.length > 0 || (batch.cageIds || []).includes(cId)) {
         logsByCage.set(cId, {
@@ -934,7 +937,18 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       });
     }
 
-    biometryEvolutionTimeline.sort((a, b) => a.fullDate.localeCompare(b.fullDate));
+    biometryEvolutionTimeline.sort((a, b) => (a.fullDate || '').localeCompare(b.fullDate || ''));
+
+    const finalBiometryEvolutionTimeline = (biometryEvolutionTimeline.length > 1 || !histRecord?.biometryTimeline || histRecord.biometryTimeline.length === 0)
+      ? biometryEvolutionTimeline
+      : histRecord.biometryTimeline.map(b => ({
+          date: b.date,
+          fullDate: b.fullDate,
+          weight: b.weight,
+          standardWeight: b.standardWeight,
+          days: b.days,
+          isHarvestDate: b.isHarvestDate
+        }));
 
     // 2. Compute Mortality Evolution Data for Charts
     const mortalityByDateMap = new Map<string, number>();
@@ -958,6 +972,10 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
         cumulativeRate: batch.initialQuantity > 0 ? Number(((cumulativeMort / batch.initialQuantity) * 100).toFixed(2)) : 0
       };
     });
+
+    const finalMortalityEvolutionData = (mortalityEvolutionData.length > 0 || !histRecord?.mortalityTimeline || histRecord.mortalityTimeline.length === 0)
+      ? mortalityEvolutionData
+      : histRecord.mortalityTimeline;
 
     return {
       batch,
@@ -1006,8 +1024,8 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       allEntries,
       filteredEntries,
       totalReceptionWeight,
-      biometryEvolutionData: biometryEvolutionTimeline,
-      mortalityEvolutionData
+      biometryEvolutionData: finalBiometryEvolutionTimeline,
+      mortalityEvolutionData: finalMortalityEvolutionData
     };
   }, [selectedBatchId, state.batches, state.mortalityLogs, state.feedingLogs, state.harvestLogs, state.slaughterLogs, state.batchExpenses, state.batchRevenues, state.protocols, state.biometryLogs, state.cages, state.feedTypes, state.feedStockLogs, filterCategory, filterItem]);
 
@@ -2934,7 +2952,7 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                           </div>
                           <div className="text-right">
                             <span className="text-[8px] font-black text-slate-600 uppercase block print-text-xs">Biometrias</span>
-                            <span className="text-xs font-black text-emerald-600 print-text-sm">{logs.biometry.length} {lastBiometry ? `(${formatNumber(lastBiometry.averageWeight, 1)}g)` : ''}</span>
+                            <span className="text-xs font-black text-emerald-600 print-text-sm">{logs.biometry.length} {lastBiometry ? `(${formatNumber(lastBiometry.averageWeight ?? lastBiometry.weight ?? 0, 1)}g)` : ''}</span>
                           </div>
                         </div>
                       </div>
@@ -2984,7 +3002,7 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                             {logs.biometry.map((b, idx) => (
                               <div key={idx} className="flex items-center justify-between p-3 bg-emerald-50/50 rounded-xl border border-emerald-100 print:bg-emerald-50">
                                 <span className="text-[10px] font-bold text-emerald-500">{safeDateFormat(b.date, 'dd/MM/yyyy')}</span>
-                                <span className="text-xs font-black text-emerald-700 italic">{formatNumber(b.averageWeight, 1)}g</span>
+                                <span className="text-xs font-black text-emerald-700 italic">{formatNumber(b.averageWeight ?? b.weight ?? 0, 1)}g</span>
                               </div>
                             ))}
                             {logs.biometry.length === 0 && <p className="text-[10px] font-bold text-slate-300 uppercase italic">Sem registros</p>}
