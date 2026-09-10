@@ -827,17 +827,39 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       biometry: any[];
     }>();
 
-    // Get all cage IDs involved in this batch (from harvests)
-    const cageIds = Array.from(new Set(harvestsByBatch.map(h => h.cageId)));
+    // Get all cage IDs involved in this batch
+    const allCageIds = new Set<string>([
+      ...(batch.cageIds || []),
+      ...harvestsByBatch.map(h => h.cageId),
+      ...feedingLogs.map(f => f.cageId),
+      ...mortalityLogs.map(m => m.cageId).filter(Boolean),
+      ...batchBiometries.map(b => b.cageId).filter(Boolean)
+    ]);
+
+    if (existingHist?.cageDetails && existingHist.cageDetails.length > 0) {
+      existingHist.cageDetails.forEach((cd: any) => allCageIds.add(cd.cageId));
+    }
     
-    cageIds.forEach(cId => {
+    allCageIds.forEach(cId => {
+      if (!cId) return;
       const cage = cageMap.get(cId);
-      logsByCage.set(cId, {
-        cageName: cage?.name || `Gaiola ${cId.substring(0, 4)}`,
-        feeding: feedingLogs.filter(f => f.cageId === cId).sort((a, b) => b.timestamp.localeCompare(a.timestamp)),
-        mortality: mortalityLogs.filter(m => m.cageId === cId).sort((a, b) => b.date.localeCompare(a.date)),
-        biometry: batchBiometries.filter(b => b.cageId === cId).sort((a, b) => b.date.localeCompare(a.date))
-      });
+      const cFeed = feedingLogs.filter(f => f.cageId === cId).sort((a, b) => (b.timestamp || b.date || '').localeCompare(a.timestamp || a.date || ''));
+      const cMort = mortalityLogs.filter(m => m.cageId === cId).sort((a, b) => b.date.localeCompare(a.date));
+      const cBio = batchBiometries.filter(b => b.cageId === cId).sort((a, b) => b.date.localeCompare(a.date));
+
+      const histCage = existingHist?.cageDetails?.find((cd: any) => cd.cageId === cId);
+      const finalFeed = cFeed.length > 0 ? cFeed : (histCage?.feedingLogs || []).map((f: any) => ({ timestamp: f.date, amount: f.amountKg * 1000 }));
+      const finalMort = cMort.length > 0 ? cMort : (histCage?.mortalityLogs || []).map((m: any) => ({ date: m.date, count: m.count }));
+      const finalBio = cBio.length > 0 ? cBio : (histCage?.biometries || []).map((b: any) => ({ date: b.date, averageWeight: b.weight }));
+
+      if (finalFeed.length > 0 || finalMort.length > 0 || finalBio.length > 0 || (batch.cageIds || []).includes(cId)) {
+        logsByCage.set(cId, {
+          cageName: cage?.name || histCage?.cageName || `Gaiola ${cId.substring(0, 4)}`,
+          feeding: finalFeed,
+          mortality: finalMort,
+          biometry: finalBio
+        });
+      }
     });
 
     // 1. Compute Biometry Evolution Data for Charts
@@ -1388,9 +1410,13 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     if (!selectedBatchId || !currentUser.isMaster) return;
     if (!confirm('Deseja realmente EXCLUIR este lote PERMANENTEMENTE? Os lançamentos de produção da fazenda (tratos, mortalidade, biometria e despescas) associados a ele serão apagados para liberar espaço. Os registros de peso e recepção da aba Frigorífico serão mantidos para controle histórico. Esta ação não pode ser desfeita.')) return;
 
-    const targetBatch = (state.batches || []).find(b => b.id === selectedBatchId || isBatchMatch(b.id, { id: selectedBatchId, name: selectedBatchId }));
+    const cleanId = selectedBatchId.replace(/^hist-/, '').replace(/^history-/, '');
+    const targetBatch = (state.batches || []).find(b => b.id === selectedBatchId || b.id === cleanId || isBatchMatch(b.id, { id: selectedBatchId, name: selectedBatchId }));
 
     let updatedClosedHistory = [...(state.closedBatchHistory || [])];
+    const existingHist = updatedClosedHistory.find(h => h.id === selectedBatchId || h.batchId === cleanId || h.id === `hist-${cleanId}` || h.batchName === selectedBatchId);
+
+    let finalHistId = `hist-${cleanId}`;
     if (targetBatch) {
       const snapshot = buildBatchSnapshot({ ...targetBatch, isClosed: true, closedAt: targetBatch.closedAt || new Date().toISOString() }, state);
       const histId = snapshot.id?.startsWith('hist-') ? snapshot.id : (`hist-${targetBatch.id}`);
@@ -1399,14 +1425,29 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       snapshot.batchName = targetBatch.name;
       snapshot.isDeletedFromSystem = true;
       snapshot.archivedAt = new Date().toISOString();
-      updatedClosedHistory = updatedClosedHistory.filter(r => r.id !== histId && r.id !== targetBatch.id && r.batchId !== targetBatch.id);
+      updatedClosedHistory = updatedClosedHistory.filter(r => r.id !== histId && r.id !== targetBatch.id && r.batchId !== targetBatch.id && r.batchId !== cleanId);
       updatedClosedHistory.unshift(snapshot);
+      finalHistId = histId;
+    } else if (existingHist) {
+      updatedClosedHistory = updatedClosedHistory.map(h => {
+        if (h.id === existingHist.id || h.batchId === existingHist.batchId) {
+          return {
+            ...h,
+            isDeletedFromSystem: true,
+            archivedAt: new Date().toISOString(),
+            updatedAt: Date.now()
+          };
+        }
+        return h;
+      });
+      finalHistId = existingHist.id;
     }
 
     const isMatch = (itemBatchId?: string) => {
       if (!itemBatchId) return false;
-      if (itemBatchId === selectedBatchId) return true;
+      if (itemBatchId === selectedBatchId || itemBatchId === cleanId) return true;
       if (targetBatch && (itemBatchId === targetBatch.id || itemBatchId === targetBatch.name || isBatchMatch(itemBatchId, targetBatch))) return true;
+      if (existingHist && (itemBatchId === existingHist.batchId || itemBatchId === existingHist.batchName || isBatchMatch(itemBatchId, { id: existingHist.batchId, name: existingHist.batchName }))) return true;
       return false;
     };
 
@@ -1521,6 +1562,7 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     });
 
     // Immediately direct to history page for analysis as requested!
+    setSelectedBatchId(finalHistId);
     setSubTab('history');
   };
 
@@ -2855,96 +2897,110 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
               </div>
             </div>
 
-          {/* Detailed Logs Section (Only visible after closing or for audit) */}
-          {batchData.batch.isClosed && (
-            <div className="space-y-8 animate-in slide-in-from-bottom-10 duration-700 print-container">
-              <div className="flex items-center gap-3 px-4">
-                <div className="p-3 bg-blue-50 rounded-2xl">
-                  <FileText className="w-6 h-6 text-blue-600" />
-                </div>
-                <div>
-                  <h3 className="text-xl font-black text-black uppercase tracking-tighter italic">Detalhamento por Gaiola</h3>
-                  <p className="text-[10px] font-bold text-slate-600 uppercase tracking-widest">Histórico completo de manejos do lote</p>
-                </div>
+          {/* Detailed Logs Section (Histórico por Gaiola) */}
+          <div className="space-y-8 animate-in slide-in-from-bottom-10 duration-700 print-container">
+            <div className="flex items-center gap-3 px-4">
+              <div className="p-3 bg-blue-50 rounded-2xl">
+                <FileText className="w-6 h-6 text-blue-600" />
               </div>
-
-              <div className="grid grid-cols-1 gap-8">
-                {Array.from(batchData.logsByCage.entries()).map(([cageId, logs]) => (
-                  <div key={cageId} className="bg-white rounded-[2.5rem] shadow-sm border border-slate-200 overflow-hidden print-card print-no-break">
-                    <div className="bg-slate-100 px-8 py-6 border-b border-slate-100 flex items-center justify-between print:bg-slate-50">
-                      <div className="flex items-center gap-3">
-                        <Fish className="w-5 h-5 text-blue-600" />
-                        <h4 className="text-lg font-black text-black uppercase italic print-text-xl">{logs.cageName}</h4>
-                      </div>
-                      <div className="flex gap-4">
-                        <div className="text-right">
-                          <span className="text-[8px] font-black text-slate-600 uppercase block print-text-xs">Tratos</span>
-                          <span className="text-xs font-black text-slate-700 print-text-sm">{logs.feeding.length}</span>
-                        </div>
-                        <div className="text-right">
-                          <span className="text-[8px] font-black text-slate-600 uppercase block print-text-xs">Mortes</span>
-                          <span className="text-xs font-black text-red-600 print-text-sm">{logs.mortality.reduce((acc, m) => acc + m.count, 0)}</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="p-8 grid grid-cols-1 md:grid-cols-3 gap-8 print-grid-3">
-                      {/* Feeding Logs */}
-                      <div className="space-y-4">
-                        <h5 className="text-[10px] font-black text-blue-600 uppercase tracking-widest flex items-center gap-2">
-                          <Utensils className="w-3 h-3" />
-                          Histórico de Trato
-                        </h5>
-                        <div className="space-y-2 max-h-[300px] overflow-y-auto pr-2 scrollbar-hide print:max-h-none">
-                          {logs.feeding.map((f, idx) => (
-                            <div key={idx} className="flex items-center justify-between p-3 bg-slate-50 rounded-xl border border-slate-100 print:bg-slate-50">
-                              <span className="text-[10px] font-bold text-slate-600">{safeDateFormat(f.timestamp, 'dd/MM')}</span>
-                              <span className="text-xs font-black text-slate-800 italic">{formatNumber(f.amount / 1000, 1)}kg</span>
-                            </div>
-                          ))}
-                          {logs.feeding.length === 0 && <p className="text-[10px] font-bold text-slate-300 uppercase italic">Sem registros</p>}
-                        </div>
-                      </div>
-
-                      {/* Mortality Logs */}
-                      <div className="space-y-4">
-                        <h5 className="text-[10px] font-black text-red-600 uppercase tracking-widest flex items-center gap-2">
-                          <AlertCircle className="w-3 h-3" />
-                          Histórico de Mortalidade
-                        </h5>
-                        <div className="space-y-2 max-h-[300px] overflow-y-auto pr-2 scrollbar-hide print:max-h-none">
-                          {logs.mortality.map((m, idx) => (
-                            <div key={idx} className="flex items-center justify-between p-3 bg-red-50/50 rounded-xl border border-red-100 print:bg-red-50">
-                              <span className="text-[10px] font-bold text-red-500">{safeDateFormat(m.date, 'dd/MM')}</span>
-                              <span className="text-xs font-black text-red-700 italic">{m.count} un</span>
-                            </div>
-                          ))}
-                          {logs.mortality.length === 0 && <p className="text-[10px] font-bold text-slate-300 uppercase italic">Sem registros</p>}
-                        </div>
-                      </div>
-
-                      {/* Biometry Logs */}
-                      <div className="space-y-4">
-                        <h5 className="text-[10px] font-black text-emerald-600 uppercase tracking-widest flex items-center gap-2">
-                          <Scale className="w-3 h-3" />
-                          Histórico de Biometria
-                        </h5>
-                        <div className="space-y-2 max-h-[300px] overflow-y-auto pr-2 scrollbar-hide print:max-h-none">
-                          {logs.biometry.map((b, idx) => (
-                            <div key={idx} className="flex items-center justify-between p-3 bg-emerald-50/50 rounded-xl border border-emerald-100 print:bg-emerald-50">
-                              <span className="text-[10px] font-bold text-emerald-500">{safeDateFormat(b.date, 'dd/MM')}</span>
-                              <span className="text-xs font-black text-emerald-700 italic">{formatNumber(b.averageWeight, 1)}g</span>
-                            </div>
-                          ))}
-                          {logs.biometry.length === 0 && <p className="text-[10px] font-bold text-slate-300 uppercase italic">Sem registros</p>}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                ))}
+              <div>
+                <h3 className="text-xl font-black text-black uppercase tracking-tighter italic">Histórico por Gaiola</h3>
+                <p className="text-[10px] font-bold text-slate-600 uppercase tracking-widest">Histórico completo de manejos, tratos e biometrias do lote por gaiola</p>
               </div>
             </div>
-          )}
+
+            {batchData.logsByCage.size > 0 ? (
+              <div className="grid grid-cols-1 gap-8">
+                {Array.from(batchData.logsByCage.entries()).map(([cageId, logs]) => {
+                  const totalFeedKg = logs.feeding.reduce((acc, f) => acc + (f.amount || 0), 0) / 1000;
+                  const totalMortality = logs.mortality.reduce((acc, m) => acc + (m.count || 0), 0);
+                  const lastBiometry = logs.biometry.length > 0 ? logs.biometry[0] : null;
+
+                  return (
+                    <div key={cageId} className="bg-white rounded-[2.5rem] shadow-sm border border-slate-200 overflow-hidden print-card print-no-break">
+                      <div className="bg-slate-100 px-8 py-6 border-b border-slate-100 flex flex-wrap items-center justify-between gap-4 print:bg-slate-50">
+                        <div className="flex items-center gap-3">
+                          <Fish className="w-5 h-5 text-blue-600" />
+                          <h4 className="text-lg font-black text-black uppercase italic print-text-xl">{logs.cageName}</h4>
+                        </div>
+                        <div className="flex flex-wrap gap-4 sm:gap-6">
+                          <div className="text-right">
+                            <span className="text-[8px] font-black text-slate-600 uppercase block print-text-xs">Tratos (Total)</span>
+                            <span className="text-xs font-black text-slate-700 print-text-sm">{logs.feeding.length} ({formatNumber(totalFeedKg, 1)} kg)</span>
+                          </div>
+                          <div className="text-right">
+                            <span className="text-[8px] font-black text-slate-600 uppercase block print-text-xs">Mortes</span>
+                            <span className="text-xs font-black text-red-600 print-text-sm">{totalMortality} un</span>
+                          </div>
+                          <div className="text-right">
+                            <span className="text-[8px] font-black text-slate-600 uppercase block print-text-xs">Biometrias</span>
+                            <span className="text-xs font-black text-emerald-600 print-text-sm">{logs.biometry.length} {lastBiometry ? `(${formatNumber(lastBiometry.averageWeight, 1)}g)` : ''}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="p-8 grid grid-cols-1 md:grid-cols-3 gap-8 print-grid-3">
+                        {/* Feeding Logs */}
+                        <div className="space-y-4">
+                          <h5 className="text-[10px] font-black text-blue-600 uppercase tracking-widest flex items-center gap-2">
+                            <Utensils className="w-3 h-3" />
+                            Histórico de Trato
+                          </h5>
+                          <div className="space-y-2 max-h-[300px] overflow-y-auto pr-2 scrollbar-hide print:max-h-none">
+                            {logs.feeding.map((f, idx) => (
+                              <div key={idx} className="flex items-center justify-between p-3 bg-slate-50 rounded-xl border border-slate-100 print:bg-slate-50">
+                                <span className="text-[10px] font-bold text-slate-600">{safeDateFormat(f.timestamp || f.date, 'dd/MM/yyyy')}</span>
+                                <span className="text-xs font-black text-slate-800 italic">{formatNumber((f.amount || 0) / 1000, 1)} kg</span>
+                              </div>
+                            ))}
+                            {logs.feeding.length === 0 && <p className="text-[10px] font-bold text-slate-300 uppercase italic">Sem registros</p>}
+                          </div>
+                        </div>
+
+                        {/* Mortality Logs */}
+                        <div className="space-y-4">
+                          <h5 className="text-[10px] font-black text-red-600 uppercase tracking-widest flex items-center gap-2">
+                            <AlertCircle className="w-3 h-3" />
+                            Histórico de Mortalidade
+                          </h5>
+                          <div className="space-y-2 max-h-[300px] overflow-y-auto pr-2 scrollbar-hide print:max-h-none">
+                            {logs.mortality.map((m, idx) => (
+                              <div key={idx} className="flex items-center justify-between p-3 bg-red-50/50 rounded-xl border border-red-100 print:bg-red-50">
+                                <span className="text-[10px] font-bold text-red-500">{safeDateFormat(m.date, 'dd/MM/yyyy')}</span>
+                                <span className="text-xs font-black text-red-700 italic">{m.count} un</span>
+                              </div>
+                            ))}
+                            {logs.mortality.length === 0 && <p className="text-[10px] font-bold text-slate-300 uppercase italic">Sem registros</p>}
+                          </div>
+                        </div>
+
+                        {/* Biometry Logs */}
+                        <div className="space-y-4">
+                          <h5 className="text-[10px] font-black text-emerald-600 uppercase tracking-widest flex items-center gap-2">
+                            <Scale className="w-3 h-3" />
+                            Histórico de Biometria
+                          </h5>
+                          <div className="space-y-2 max-h-[300px] overflow-y-auto pr-2 scrollbar-hide print:max-h-none">
+                            {logs.biometry.map((b, idx) => (
+                              <div key={idx} className="flex items-center justify-between p-3 bg-emerald-50/50 rounded-xl border border-emerald-100 print:bg-emerald-50">
+                                <span className="text-[10px] font-bold text-emerald-500">{safeDateFormat(b.date, 'dd/MM/yyyy')}</span>
+                                <span className="text-xs font-black text-emerald-700 italic">{formatNumber(b.averageWeight, 1)}g</span>
+                              </div>
+                            ))}
+                            {logs.biometry.length === 0 && <p className="text-[10px] font-bold text-slate-300 uppercase italic">Sem registros</p>}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 text-center">
+                <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Nenhum histórico por gaiola vinculado a este lote</p>
+              </div>
+            )}
+          </div>
           {/* Print Footer */}
           <div className="hidden print:block mt-12 pt-8 border-t border-slate-200">
             <div className="flex justify-between items-end">

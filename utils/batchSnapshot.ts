@@ -512,66 +512,92 @@ export function buildBatchSnapshot(batch: Batch, state: AppState): ClosedBatchRe
     ...(batch.cageIds || []),
     ...Array.from(harvestCages),
     ...feedingLogs.map((f: FeedingLog) => f.cageId),
-    ...mortalityLogs.map((m: MortalityLog) => m.cageId).filter(Boolean) as string[]
+    ...mortalityLogs.map((m: MortalityLog) => m.cageId).filter(Boolean) as string[],
+    ...batchBiometries.map((b: BiometryLog) => b.cageId).filter(Boolean) as string[]
   ]);
+
+  if (existingHist?.cageDetails && existingHist.cageDetails.length > 0) {
+    existingHist.cageDetails.forEach((cd: any) => allBatchCageIds.add(cd.cageId));
+  }
 
   const cageDetails = Array.from(allBatchCageIds).map((cId: string) => {
     const c = cageMap.get(cId);
-    const cFeed = feedingLogs.filter((f: FeedingLog) => f.cageId === cId);
-    const cMort = mortalityLogs.filter((m: MortalityLog) => m.cageId === cId);
-    const cBio = batchBiometries.filter((b: BiometryLog) => b.cageId === cId);
+    const cFeed = feedingLogs.filter((f: FeedingLog) => f.cageId === cId).sort((a, b) => ((b.timestamp || b.date || '').localeCompare(a.timestamp || a.date || '')));
+    const cMort = mortalityLogs.filter((m: MortalityLog) => m.cageId === cId).sort((a, b) => b.date.localeCompare(a.date));
+    const cBio = batchBiometries.filter((b: BiometryLog) => b.cageId === cId).sort((a, b) => b.date.localeCompare(a.date));
+    const histCage = existingHist?.cageDetails?.find((cd: any) => cd.cageId === cId);
+
+    const feedingCount = cFeed.length > 0 ? cFeed.length : (histCage?.feedingCount || 0);
+    const feedingKg = cFeed.length > 0 
+      ? cFeed.reduce((acc: number, f: FeedingLog) => acc + f.amount, 0) / 1000 
+      : (histCage?.feedingKg || 0);
+    const mortalityCount = cMort.length > 0 
+      ? cMort.reduce((acc: number, m: MortalityLog) => acc + m.count, 0) 
+      : (histCage?.mortalityCount || 0);
+    const feedingLogsList = cFeed.length > 0
+      ? cFeed.map((f: FeedingLog) => ({ date: f.timestamp || f.date, amountKg: f.amount / 1000 }))
+      : (histCage?.feedingLogs || []);
+    const mortalityLogsList = cMort.length > 0
+      ? cMort.map((m: MortalityLog) => ({ date: m.date, count: m.count }))
+      : (histCage?.mortalityLogs || []);
+    const biometriesList = cBio.length > 0
+      ? cBio.map((b: BiometryLog) => ({ date: b.date, weight: b.averageWeight }))
+      : (histCage?.biometries || []);
+
     return {
       cageId: cId,
-      cageName: c?.name || `Gaiola ${cId.slice(0, 4)}`,
-      feedingCount: cFeed.length,
-      feedingKg: cFeed.reduce((acc: number, f: FeedingLog) => acc + f.amount, 0) / 1000,
-      mortalityCount: cMort.reduce((acc: number, m: MortalityLog) => acc + m.count, 0),
-      biometries: cBio.map((b: BiometryLog) => ({ date: b.date, weight: b.averageWeight }))
+      cageName: c?.name || histCage?.cageName || `Gaiola ${cId.slice(0, 4)}`,
+      feedingCount,
+      feedingKg,
+      mortalityCount,
+      feedingLogs: feedingLogsList,
+      mortalityLogs: mortalityLogsList,
+      biometries: biometriesList
     };
   }).filter(c => c.feedingCount > 0 || c.mortalityCount > 0 || c.biometries.length > 0);
 
   return {
     id: historyId,
     batchId: cleanBatchId,
-    batchName: batch.name,
-    settlementDate: batch.settlementDate,
-    closedAt: batch.closedAt || new Date().toISOString(),
-    initialQuantity: batch.initialQuantity,
-    initialUnitWeight: batch.initialUnitWeight,
-    protocolName: protocol?.name,
-    expectedHarvestDate: batch.expectedHarvestDate,
-    totalDays,
-    expectedFish,
-    harvestedFish,
-    mortality,
-    survivalRate,
-    survivalRateReal,
-    biomassBeforeHarvest,
-    harvestedWeight,
-    totalReceptionWeight,
-    accuracy,
-    initialAvgWeight: batch.initialUnitWeight,
-    currentAvgWeight,
-    gpd,
-    totalFeedKg: feeding / 1000,
-    fcaTheoretical,
-    fcaReal,
-    totalExpenses,
-    grossExpenses,
-    supplierInvoiceVal,
-    totalFeedCost,
-    otherExpensesVal,
-    bonusDeductionsVal: bonusDeductions,
-    cageDetails: cageDetails.length > 0 ? cageDetails : existingHist?.cageDetails,
-    totalRevenue,
-    totalProfit,
-    costPerKg,
-    profitMarginPercent: totalRevenue > 0 ? (totalProfit / totalRevenue) * 100 : undefined,
-    feedBreakdown,
-    biometryTimeline,
-    mortalityTimeline,
-    entries,
-    userId: batch.userId,
+    batchName: batch.name || existingHist?.batchName || `Lote ${cleanBatchId}`,
+    settlementDate: batch.settlementDate || existingHist?.settlementDate,
+    closedAt: batch.closedAt || existingHist?.closedAt || new Date().toISOString(),
+    initialQuantity: batch.initialQuantity || existingHist?.initialQuantity || 0,
+    initialUnitWeight: batch.initialUnitWeight || existingHist?.initialUnitWeight || 0,
+    protocolName: protocol?.name || existingHist?.protocolName,
+    expectedHarvestDate: batch.expectedHarvestDate || existingHist?.expectedHarvestDate,
+    totalDays: totalDays > 0 ? totalDays : (existingHist?.totalDays || 0),
+    expectedFish: expectedFish > 0 ? expectedFish : (existingHist?.expectedFish || 0),
+    harvestedFish: harvestedFish > 0 ? harvestedFish : (existingHist?.harvestedFish || 0),
+    mortality: mortality > 0 ? mortality : (existingHist?.mortality || 0),
+    survivalRate: survivalRate > 0 ? survivalRate : (existingHist?.survivalRate || 0),
+    survivalRateReal: survivalRateReal > 0 ? survivalRateReal : (existingHist?.survivalRateReal || 0),
+    biomassBeforeHarvest: biomassBeforeHarvest > 0 ? biomassBeforeHarvest : (existingHist?.biomassBeforeHarvest || 0),
+    harvestedWeight: harvestedWeight > 0 ? harvestedWeight : (existingHist?.harvestedWeight || 0),
+    totalReceptionWeight: totalReceptionWeight > 0 ? totalReceptionWeight : (existingHist?.totalReceptionWeight || 0),
+    accuracy: accuracy > 0 ? accuracy : (existingHist?.accuracy || 0),
+    initialAvgWeight: batch.initialUnitWeight || existingHist?.initialAvgWeight || 0,
+    currentAvgWeight: currentAvgWeight > 0 ? currentAvgWeight : (existingHist?.currentAvgWeight || batch.initialUnitWeight || 0),
+    gpd: gpd > 0 ? gpd : (existingHist?.gpd || 0),
+    totalFeedKg: feeding > 0 ? feeding / 1000 : (existingHist?.totalFeedKg || 0),
+    fcaTheoretical: fcaTheoretical > 0 ? fcaTheoretical : (existingHist?.fcaTheoretical || 0),
+    fcaReal: fcaReal > 0 ? fcaReal : (existingHist?.fcaReal || 0),
+    totalExpenses: (grossExpenses - bonusDeductions > 0) ? totalExpenses : (existingHist?.totalExpenses || 0),
+    grossExpenses: grossExpenses > 0 ? grossExpenses : (existingHist?.grossExpenses || 0),
+    supplierInvoiceVal: supplierInvoiceVal > 0 ? supplierInvoiceVal : (existingHist?.supplierInvoiceVal || 0),
+    totalFeedCost: totalFeedCost > 0 ? totalFeedCost : (existingHist?.totalFeedCost || 0),
+    otherExpensesVal: (expenses.length > 0 ? expenses.reduce((a, b) => a + b.value, 0) : (existingHist?.otherExpensesVal || 0)),
+    bonusDeductionsVal: bonusDeductions > 0 ? bonusDeductions : (existingHist?.bonusDeductionsVal || 0),
+    cageDetails: cageDetails.length > 0 ? cageDetails : (existingHist?.cageDetails || []),
+    totalRevenue: totalRevenue > 0 ? totalRevenue : (existingHist?.totalRevenue || 0),
+    totalProfit: totalProfit !== 0 ? totalProfit : (existingHist?.totalProfit ?? 0),
+    costPerKg: costPerKg > 0 ? costPerKg : (existingHist?.costPerKg || 0),
+    profitMarginPercent: totalRevenue > 0 ? (totalProfit / totalRevenue) * 100 : (existingHist?.profitMarginPercent),
+    feedBreakdown: feedBreakdown.length > 0 ? feedBreakdown : (existingHist?.feedBreakdown || []),
+    biometryTimeline: biometryTimeline.length > 1 ? biometryTimeline : (existingHist?.biometryTimeline || biometryTimeline),
+    mortalityTimeline: mortalityTimeline.length > 0 ? mortalityTimeline : (existingHist?.mortalityTimeline || []),
+    entries: entries.length > 0 ? entries : (existingHist?.entries || []),
+    userId: batch.userId || existingHist?.userId,
     updatedAt: Date.now()
   };
 }

@@ -938,14 +938,19 @@ export const ClosedBatchHistory: React.FC<Props> = ({ state, currentUser, onUpda
             </div>
           </div>
 
-          {/* 4. QUADRO 4: Quadro de Lançamentos (Visual / Somente Leitura) */}
+          {/* 4. QUADRO 4: Quadro de Lançamentos (Receitas e Despesas) */}
           <div className="space-y-4">
             <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-200 print-card print-no-break">
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
-                <h4 className="text-sm font-black text-black uppercase tracking-widest flex items-center gap-2 italic">
-                  <DollarSign className="w-4 h-4 text-emerald-600" />
-                  Quadro de Lançamentos
-                </h4>
+                <div>
+                  <h4 className="text-sm font-black text-black uppercase tracking-widest flex items-center gap-2 italic">
+                    <DollarSign className="w-4 h-4 text-emerald-600" />
+                    Quadro de Lançamentos (Receitas e Despesas)
+                  </h4>
+                  <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
+                    Lançamentos financeiros, despesas, receitas e bonificações diluídas no lote
+                  </p>
+                </div>
                 
                 <div className="flex flex-wrap items-center gap-3 print:hidden">
                   <div className="flex items-center gap-2">
@@ -971,9 +976,9 @@ export const ClosedBatchHistory: React.FC<Props> = ({ state, currentUser, onUpda
                       <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2 top-2" />
                     </div>
                   </div>
-                  <div className="px-4 py-2 bg-emerald-50 text-emerald-700 rounded-xl border border-emerald-100">
+                  <div className="px-4 py-2 bg-slate-50 text-slate-700 rounded-xl border border-slate-200">
                     <span className="text-[10px] font-black uppercase tracking-widest">
-                      Total Lançado: {formatCurrency(selectedRecord.totalExpenses)}
+                      Despesas Líquidas: {formatCurrency(costBreakdown.netExpenses)}
                     </span>
                   </div>
                 </div>
@@ -982,30 +987,49 @@ export const ClosedBatchHistory: React.FC<Props> = ({ state, currentUser, onUpda
               <div className="overflow-x-auto">
                 <table className="w-full text-left">
                   <thead>
-                    <tr className="border-b border-slate-100">
-                      <th className="text-left py-4 text-[10px] font-black text-slate-600 uppercase tracking-widest">Data</th>
-                      <th className="text-left py-4 text-[10px] font-black text-slate-600 uppercase tracking-widest">Categoria</th>
-                      <th className="text-left py-4 text-[10px] font-black text-slate-600 uppercase tracking-widest">Lançamento (Item)</th>
-                      <th className="text-right py-4 text-[10px] font-black text-slate-600 uppercase tracking-widest">Valor</th>
+                    <tr className="border-b-2 border-slate-200 bg-slate-50/80">
+                      <th className="text-left py-3.5 px-4 text-[10px] font-black text-slate-700 uppercase tracking-widest">Data</th>
+                      <th className="text-left py-3.5 px-4 text-[10px] font-black text-slate-700 uppercase tracking-widest">Tipo</th>
+                      <th className="text-left py-3.5 px-4 text-[10px] font-black text-slate-700 uppercase tracking-widest">Categoria</th>
+                      <th className="text-left py-3.5 px-4 text-[10px] font-black text-slate-700 uppercase tracking-widest">Lançamento / Descrição</th>
+                      <th className="text-right py-3.5 px-4 text-[10px] font-black text-slate-700 uppercase tracking-widest">Valor</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-50">
+                  <tbody className="divide-y divide-slate-100">
                     {filteredEntries.map((entry, idx) => {
                       const isRevenue = entry.type === 'revenue';
+                      const isBonus = entry.isCostDeduction || entry.category?.toLowerCase().includes('bonificação') || entry.description?.toLowerCase().includes('bonificação');
                       return (
                         <tr key={entry.id || idx} className="hover:bg-slate-50 transition-colors">
-                          <td className="py-4 text-xs font-bold text-slate-600">{safeDateFormat(entry.date, 'dd/MM/yyyy')}</td>
-                          <td className="py-4 text-xs font-black text-slate-600 uppercase italic">{entry.category}</td>
-                          <td className="py-4 text-xs font-black text-slate-800 uppercase italic">{entry.description}</td>
-                          <td className={`py-4 text-right text-xs font-black ${isRevenue ? 'text-blue-600' : 'text-emerald-600'}`}>
-                            {isRevenue ? '+' : ''}{formatCurrency(entry.value)}
+                          <td className="py-3.5 px-4 text-xs font-bold text-slate-600">{safeDateFormat(entry.date, 'dd/MM/yyyy')}</td>
+                          <td className="py-3.5 px-4 text-xs">
+                            <span className={`px-2 py-0.5 rounded-lg text-[9px] font-black uppercase tracking-widest inline-block ${
+                              isBonus
+                                ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                                : isRevenue
+                                  ? 'bg-blue-50 text-blue-700 border border-blue-200'
+                                  : 'bg-slate-100 text-slate-700 border border-slate-200'
+                            }`}>
+                              {isBonus ? 'Bonificação (Dedução)' : isRevenue ? 'Receita' : 'Despesa'}
+                            </span>
+                          </td>
+                          <td className="py-3.5 px-4 text-xs font-black text-slate-600 uppercase italic">{entry.category}</td>
+                          <td className="py-3.5 px-4 text-xs font-black text-slate-800 uppercase italic">{entry.description}</td>
+                          <td className={`py-3.5 px-4 text-right text-xs font-black ${
+                            isBonus 
+                              ? 'text-amber-600' 
+                              : isRevenue 
+                                ? 'text-blue-600' 
+                                : 'text-slate-800'
+                          }`}>
+                            {isBonus ? '-' : isRevenue ? '+' : ''}{formatCurrency(entry.value)}
                           </td>
                         </tr>
                       );
                     })}
                     {filteredEntries.length === 0 && (
                       <tr>
-                        <td colSpan={4} className="py-12 text-center">
+                        <td colSpan={5} className="py-12 text-center">
                           <DollarSign className="w-8 h-8 text-slate-200 mx-auto mb-2" />
                           <p className="text-[10px] font-black text-slate-600 uppercase tracking-widest">Nenhum lançamento encontrado.</p>
                         </td>
@@ -1016,6 +1040,60 @@ export const ClosedBatchHistory: React.FC<Props> = ({ state, currentUser, onUpda
               </div>
             </div>
           </div>
+
+          {/* 5. Histórico por Gaiola Arquivado */}
+          {selectedRecord.cageDetails && selectedRecord.cageDetails.length > 0 && (
+            <div className="space-y-6 print-container print-no-break">
+              <div className="flex items-center gap-3 px-2 print:px-0">
+                <div className="p-2.5 bg-blue-50 rounded-xl print:bg-slate-100">
+                  <Fish className="w-5 h-5 text-blue-600 print:text-blue-700" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-black text-slate-900 uppercase tracking-tight italic">
+                    Histórico por Gaiola (Manejos Arquivados)
+                  </h3>
+                  <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
+                    Detalhamento de tratos, mortalidade e biometria por gaiola registrado durante o cultivo
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {selectedRecord.cageDetails.map(cage => (
+                  <div key={cage.cageId} className="bg-white rounded-[2rem] p-6 shadow-sm border border-slate-200 space-y-4 print-card">
+                    <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                      <div className="flex items-center gap-2">
+                        <Fish className="w-4 h-4 text-blue-600" />
+                        <h4 className="text-sm font-black text-slate-800 uppercase italic">{cage.cageName}</h4>
+                      </div>
+                      <span className="text-[9px] font-black text-slate-500 uppercase bg-slate-50 px-2 py-0.5 rounded-lg">
+                        {cage.biometries?.length || 0} biometrias
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-2 text-center">
+                      <div className="bg-slate-50 p-2 rounded-xl">
+                        <span className="text-[8px] font-black text-slate-500 uppercase block">Tratos</span>
+                        <span className="text-xs font-black text-slate-800">{cage.feedingCount} ({formatNumber(cage.feedingKg, 1)}kg)</span>
+                      </div>
+                      <div className="bg-red-50/60 p-2 rounded-xl border border-red-100/50">
+                        <span className="text-[8px] font-black text-red-500 uppercase block">Mortes</span>
+                        <span className="text-xs font-black text-red-700">{cage.mortalityCount} un</span>
+                      </div>
+                      <div className="bg-emerald-50/60 p-2 rounded-xl border border-emerald-100/50">
+                        <span className="text-[8px] font-black text-emerald-600 uppercase block">Último Peso</span>
+                        <span className="text-xs font-black text-emerald-700">
+                          {cage.biometries && cage.biometries.length > 0 
+                            ? `${formatNumber(cage.biometries[cage.biometries.length - 1].weight, 1)}g` 
+                            : '-'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       ) : (
         <div className="bg-white rounded-[2.5rem] p-16 text-center border border-slate-200 shadow-sm space-y-4">
