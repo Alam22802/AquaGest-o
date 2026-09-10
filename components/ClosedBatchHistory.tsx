@@ -6,6 +6,7 @@ import {
   FileText, 
   TrendingUp, 
   Scale, 
+  Fish,
   FishOff, 
   DollarSign, 
   CheckCircle2, 
@@ -86,7 +87,7 @@ export const ClosedBatchHistory: React.FC<Props> = ({ state, currentUser, onUpda
     return Array.from(recordsMap.values()).sort((a, b) => {
       const dateA = a.closedAt || a.settlementDate || '';
       const dateB = b.closedAt || b.settlementDate || '';
-      return dateB.localeCompare(dateA);
+      return (dateB || '').localeCompare(dateA || '');
     });
   }, [state.batches, state.closedBatchHistory, state.harvestLogs, state.feedingLogs, state.mortalityLogs, state.biometryLogs, state.slaughterLogs, state.batchExpenses, state.batchRevenues]);
 
@@ -194,6 +195,19 @@ export const ClosedBatchHistory: React.FC<Props> = ({ state, currentUser, onUpda
     });
 
     alert(`O lote ${selectedRecord.batchName} foi reaberto com sucesso!`);
+  };
+
+  const handleDeleteHistoryRecord = (recordId: string) => {
+    if (!selectedRecord || (!currentUser.isMaster && !currentUser.canEdit) || !onUpdate) return;
+    if (!confirm(`Deseja realmente excluir permanentemente o registro histórico do lote ${selectedRecord.batchName}? Esta ação apagará este registro do histórico arquivado.`)) return;
+
+    const updated = (state.closedBatchHistory || []).filter(h => h.id !== recordId && h.batchId !== recordId && h.id !== `hist-${recordId}`);
+    onUpdate({
+      ...state,
+      closedBatchHistory: updated,
+      deletedIds: Array.from(new Set([...(state.deletedIds || []), recordId]))
+    });
+    setSelectedRecordId('');
   };
 
   const filteredEntries = useMemo(() => {
@@ -325,7 +339,7 @@ export const ClosedBatchHistory: React.FC<Props> = ({ state, currentUser, onUpda
                 Imprimir
               </button>
 
-              {currentUser.isMaster && onUpdate && selectedRecord.isDeletedFromSystem && (
+              {(currentUser.isMaster || currentUser.canEdit) && onUpdate && selectedRecord.isDeletedFromSystem && (
                 <button
                   onClick={() => handleDeleteHistoryRecord(selectedRecord.id)}
                   className="px-4 py-3 bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 rounded-2xl font-black text-xs outline-none uppercase tracking-widest shadow-sm flex items-center gap-2 transition-all"
@@ -650,7 +664,7 @@ export const ClosedBatchHistory: React.FC<Props> = ({ state, currentUser, onUpda
                       </p>
                     </div>
 
-                    {currentUser.isMaster && onUpdate && (
+                    {(currentUser.isMaster || currentUser.canEdit) && onUpdate && (
                       <button 
                         onClick={handleReopenBatch}
                         className="w-full py-3.5 bg-amber-500 text-white rounded-2xl font-black uppercase tracking-widest text-xs shadow-md shadow-amber-200 hover:bg-amber-600 transition-all active:scale-95 flex items-center justify-center gap-2 print:hidden"

@@ -1425,49 +1425,70 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
   };
 
   const handleDeleteBatch = () => {
-    if (!selectedBatchId || !currentUser.isMaster) return;
+    if (!selectedBatchId || (!currentUser.isMaster && !currentUser.canEdit)) {
+      alert('Você não possui permissão para excluir este lote.');
+      return;
+    }
     if (!confirm('Deseja realmente EXCLUIR este lote PERMANENTEMENTE? Os lançamentos de produção da fazenda (tratos, mortalidade, biometria e despescas) associados a ele serão apagados para liberar espaço. Os registros de peso e recepção da aba Frigorífico serão mantidos para controle histórico. Esta ação não pode ser desfeita.')) return;
 
-    const cleanId = selectedBatchId.replace(/^hist-/, '').replace(/^history-/, '');
-    const targetBatch = (state.batches || []).find(b => b.id === selectedBatchId || b.id === cleanId || isBatchMatch(b.id, { id: selectedBatchId, name: selectedBatchId }));
+    try {
+      const cleanId = selectedBatchId.replace(/^hist-/, '').replace(/^history-/, '');
+      const targetBatch = (state.batches || []).find(b => b.id === selectedBatchId || b.id === cleanId || isBatchMatch(b.id, { id: selectedBatchId, name: selectedBatchId }) || b.name === selectedBatchId);
 
-    let updatedClosedHistory = [...(state.closedBatchHistory || [])];
-    const existingHist = updatedClosedHistory.find(h => h.id === selectedBatchId || h.batchId === cleanId || h.id === `hist-${cleanId}` || h.batchName === selectedBatchId);
+      let updatedClosedHistory = [...(state.closedBatchHistory || [])];
+      const existingHist = updatedClosedHistory.find(h => h.id === selectedBatchId || h.batchId === cleanId || h.id === `hist-${cleanId}` || h.batchName === selectedBatchId || h.batchId === selectedBatchId);
 
-    let finalHistId = `hist-${cleanId}`;
-    if (targetBatch) {
-      const snapshot = buildBatchSnapshot({ ...targetBatch, isClosed: true, closedAt: targetBatch.closedAt || new Date().toISOString() }, state);
-      const histId = snapshot.id?.startsWith('hist-') ? snapshot.id : (`hist-${targetBatch.id}`);
-      snapshot.id = histId;
-      snapshot.batchId = targetBatch.id;
-      snapshot.batchName = targetBatch.name;
-      snapshot.isDeletedFromSystem = true;
-      snapshot.archivedAt = new Date().toISOString();
-      updatedClosedHistory = updatedClosedHistory.filter(r => r.id !== histId && r.id !== targetBatch.id && r.batchId !== targetBatch.id && r.batchId !== cleanId);
-      updatedClosedHistory.unshift(snapshot);
-      finalHistId = histId;
-    } else if (existingHist) {
-      updatedClosedHistory = updatedClosedHistory.map(h => {
-        if (h.id === existingHist.id || h.batchId === existingHist.batchId) {
-          return {
-            ...h,
-            isDeletedFromSystem: true,
-            archivedAt: new Date().toISOString(),
-            updatedAt: Date.now()
-          };
+      let finalHistId = `hist-${cleanId}`;
+      if (targetBatch) {
+        try {
+          const snapshot = buildBatchSnapshot({ ...targetBatch, isClosed: true, closedAt: targetBatch.closedAt || new Date().toISOString() }, state);
+          const histId = snapshot.id?.startsWith('hist-') ? snapshot.id : (`hist-${targetBatch.id}`);
+          snapshot.id = histId;
+          snapshot.batchId = targetBatch.id;
+          snapshot.batchName = targetBatch.name;
+          snapshot.isDeletedFromSystem = true;
+          snapshot.archivedAt = new Date().toISOString();
+          updatedClosedHistory = updatedClosedHistory.filter(r => r.id !== histId && r.id !== targetBatch.id && r.batchId !== targetBatch.id && r.batchId !== cleanId);
+          updatedClosedHistory.unshift(snapshot);
+          finalHistId = histId;
+        } catch (snapErr) {
+          console.error('Erro ao gerar snapshot do lote:', snapErr);
         }
-        return h;
-      });
-      finalHistId = existingHist.id;
-    }
+      } else if (existingHist) {
+        updatedClosedHistory = updatedClosedHistory.map(h => {
+          if (h.id === existingHist.id || h.batchId === existingHist.batchId) {
+            return {
+              ...h,
+              isDeletedFromSystem: true,
+              archivedAt: new Date().toISOString(),
+              updatedAt: Date.now()
+            };
+          }
+          return h;
+        });
+        finalHistId = existingHist.id;
+      } else if (batchData?.batch) {
+        try {
+          const snapshot = buildBatchSnapshot({ ...batchData.batch, isClosed: true, closedAt: batchData.batch.closedAt || new Date().toISOString() }, state);
+          snapshot.id = `hist-${cleanId}`;
+          snapshot.batchId = cleanId;
+          snapshot.batchName = batchData.batch.name || cleanId;
+          snapshot.isDeletedFromSystem = true;
+          snapshot.archivedAt = new Date().toISOString();
+          updatedClosedHistory.unshift(snapshot);
+          finalHistId = `hist-${cleanId}`;
+        } catch (snapErr) {
+          console.error('Erro ao criar snapshot a partir de batchData:', snapErr);
+        }
+      }
 
-    const isMatch = (itemBatchId?: string) => {
-      if (!itemBatchId) return false;
-      if (itemBatchId === selectedBatchId || itemBatchId === cleanId) return true;
-      if (targetBatch && (itemBatchId === targetBatch.id || itemBatchId === targetBatch.name || isBatchMatch(itemBatchId, targetBatch))) return true;
-      if (existingHist && (itemBatchId === existingHist.batchId || itemBatchId === existingHist.batchName || isBatchMatch(itemBatchId, { id: existingHist.batchId, name: existingHist.batchName }))) return true;
-      return false;
-    };
+      const isMatch = (itemBatchId?: string) => {
+        if (!itemBatchId) return false;
+        if (itemBatchId === selectedBatchId || itemBatchId === cleanId) return true;
+        if (targetBatch && (itemBatchId === targetBatch.id || itemBatchId === targetBatch.name || isBatchMatch(itemBatchId, targetBatch))) return true;
+        if (existingHist && (itemBatchId === existingHist.batchId || itemBatchId === existingHist.batchName || isBatchMatch(itemBatchId, { id: existingHist.batchId, name: existingHist.batchName }))) return true;
+        return false;
+      };
 
     const harvestCages = new Set((state.harvestLogs || []).filter(h => isMatch(h.batchId)).map(h => h.cageId));
     const targetCageIds = new Set([
@@ -1563,25 +1584,29 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       return s;
     });
 
-    onUpdate({
-      ...state,
-      batches: (state.batches || []).filter(b => b.id !== selectedBatchId && (!targetBatch || b.id !== targetBatch.id)),
-      feedingLogs: (state.feedingLogs || []).filter(f => !feedingRemoveSet.has(f.id)),
-      mortalityLogs: (state.mortalityLogs || []).filter(m => !mortalityRemoveSet.has(m.id)),
-      biometryLogs: (state.biometryLogs || []).filter(b => !biometryRemoveSet.has(b.id)),
-      harvestLogs: (state.harvestLogs || []).filter(h => !harvestRemoveSet.has(h.id)),
-      batchExpenses: (state.batchExpenses || []).filter(e => !expenseRemoveSet.has(e.id)),
-      batchRevenues: (state.batchRevenues || []).filter(r => !revenueRemoveSet.has(r.id)),
-      slaughterLogs: preservedSlaughterLogs,
-      harvestSchedules: (state.harvestSchedules || []).filter(hs => !scheduleRemoveSet.has(hs.id)),
-      cages: (state.cages || []).map(c => (isMatch(c.batchId) || (targetBatch && c.batchId === targetBatch.id)) ? { ...c, batchId: undefined, initialFishCount: undefined, settlementDate: undefined, harvestDate: undefined, status: 'Limpeza' as const, maintenanceStartDate: new Date().toISOString().split('T')[0], maintenanceEndDate: undefined, updatedAt: Date.now() } : c),
-      closedBatchHistory: updatedClosedHistory,
-      deletedIds: Array.from(new Set([...(state.deletedIds || []), ...allRemovedIds])),
-    });
+      onUpdate({
+        ...state,
+        batches: (state.batches || []).filter(b => b.id !== selectedBatchId && (!targetBatch || b.id !== targetBatch.id)),
+        feedingLogs: (state.feedingLogs || []).filter(f => !feedingRemoveSet.has(f.id)),
+        mortalityLogs: (state.mortalityLogs || []).filter(m => !mortalityRemoveSet.has(m.id)),
+        biometryLogs: (state.biometryLogs || []).filter(b => !biometryRemoveSet.has(b.id)),
+        harvestLogs: (state.harvestLogs || []).filter(h => !harvestRemoveSet.has(h.id)),
+        batchExpenses: (state.batchExpenses || []).filter(e => !expenseRemoveSet.has(e.id)),
+        batchRevenues: (state.batchRevenues || []).filter(r => !revenueRemoveSet.has(r.id)),
+        slaughterLogs: preservedSlaughterLogs,
+        harvestSchedules: (state.harvestSchedules || []).filter(hs => !scheduleRemoveSet.has(hs.id)),
+        cages: (state.cages || []).map(c => (isMatch(c.batchId) || (targetBatch && c.batchId === targetBatch.id)) ? { ...c, batchId: undefined, initialFishCount: undefined, settlementDate: undefined, harvestDate: undefined, status: 'Limpeza' as const, maintenanceStartDate: new Date().toISOString().split('T')[0], maintenanceEndDate: undefined, updatedAt: Date.now() } : c),
+        closedBatchHistory: updatedClosedHistory,
+        deletedIds: Array.from(new Set([...(state.deletedIds || []), ...allRemovedIds])),
+      });
 
-    // Immediately direct to history page for analysis as requested!
-    setSelectedBatchId(finalHistId);
-    setSubTab('history');
+      // Immediately direct to history page for analysis as requested!
+      setSelectedBatchId(finalHistId);
+      setSubTab('history');
+    } catch (err: any) {
+      console.error('Erro ao excluir lote:', err);
+      alert(`Ocorreu um erro ao excluir o lote: ${err?.message || 'Erro desconhecido'}`);
+    }
   };
 
   const handlePrint = () => {
@@ -2045,14 +2070,23 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                   </div>
                 </div>
 
-                {!batchData.batch.isClosed && currentUser.isMaster && (
-                  <button 
-                    onClick={handleCloseBatch}
-                    className="w-full py-4 bg-emerald-600 text-white rounded-2xl font-black uppercase tracking-widest text-xs shadow-xl shadow-emerald-100 hover:bg-emerald-700 transition-all active:scale-95 flex items-center justify-center gap-2"
-                  >
-                    <Lock className="w-4 h-4" />
-                    Fechar Lote Definitivamente
-                  </button>
+                {!batchData.batch.isClosed && hasPermission && (
+                  <div className="space-y-3">
+                    <button 
+                      onClick={handleCloseBatch}
+                      className="w-full py-4 bg-emerald-600 text-white rounded-2xl font-black uppercase tracking-widest text-xs shadow-xl shadow-emerald-100 hover:bg-emerald-700 transition-all active:scale-95 flex items-center justify-center gap-2"
+                    >
+                      <Lock className="w-4 h-4" />
+                      Fechar Lote Definitivamente
+                    </button>
+                    <button 
+                      onClick={handleDeleteBatch}
+                      className="w-full py-3.5 bg-red-50 text-red-600 border border-red-100 rounded-2xl font-black uppercase tracking-widest text-xs hover:bg-red-600 hover:text-white transition-all active:scale-95 flex items-center justify-center gap-2"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                      Excluir Lote
+                    </button>
+                  </div>
                 )}
 
                 {batchData.batch.isClosed && (
@@ -2060,11 +2094,11 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                     <div className="p-4 bg-slate-100 rounded-2xl border border-slate-200 text-center">
                       <p className="text-[10px] font-black text-slate-600 uppercase tracking-widest">Lote Encerrado</p>
                       <p className="text-[9px] font-bold text-slate-600 uppercase mt-1">
-                        {currentUser.isMaster ? 'Utilize a opção abaixo para reabrir caso precise fazer alterações' : 'Nenhuma alteração permitida'}
+                        {hasPermission ? 'Utilize as opções abaixo para reabrir caso precise fazer alterações ou excluir do sistema' : 'Nenhuma alteração permitida'}
                       </p>
                     </div>
                     
-                    {currentUser.isMaster && (
+                    {hasPermission && (
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                         <button 
                           onClick={handleReopenBatch}

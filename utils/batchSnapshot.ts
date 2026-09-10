@@ -399,7 +399,7 @@ export function buildBatchSnapshot(batch: Batch, state: AppState): ClosedBatchRe
     });
   }
 
-  biometryTimeline.sort((a, b) => a.fullDate.localeCompare(b.fullDate));
+  biometryTimeline.sort((a, b) => (a.fullDate || '').localeCompare(b.fullDate || ''));
 
   // Mortality evolution
   const mortalityByDateMap = new Map<string, number>();
@@ -499,7 +499,7 @@ export function buildBatchSnapshot(batch: Batch, state: AppState): ClosedBatchRe
     ...expenseEntries,
     ...revenueEntries,
     ...slaughterEntries
-  ].sort((a, b) => b.date.localeCompare(a.date));
+  ].sort((a, b) => (b.date || '').localeCompare(a.date || ''));
 
   const historyId = (batch.id && (batch.id.startsWith('hist-') || batch.id.startsWith('history-')))
     ? batch.id
@@ -523,8 +523,8 @@ export function buildBatchSnapshot(batch: Batch, state: AppState): ClosedBatchRe
   const cageDetails = Array.from(allBatchCageIds).map((cId: string) => {
     const c = cageMap.get(cId);
     const cFeed = feedingLogs.filter((f: FeedingLog) => f.cageId === cId).sort((a, b) => ((b.timestamp || b.date || '').localeCompare(a.timestamp || a.date || '')));
-    const cMort = mortalityLogs.filter((m: MortalityLog) => m.cageId === cId).sort((a, b) => b.date.localeCompare(a.date));
-    const cBio = batchBiometries.filter((b: BiometryLog) => b.cageId === cId).sort((a, b) => b.date.localeCompare(a.date));
+    const cMort = mortalityLogs.filter((m: MortalityLog) => m.cageId === cId).sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+    const cBio = batchBiometries.filter((b: BiometryLog) => b.cageId === cId).sort((a, b) => (b.date || '').localeCompare(a.date || ''));
     const histCage = existingHist?.cageDetails?.find((cd: any) => cd.cageId === cId);
 
     const feedingCount = cFeed.length > 0 ? cFeed.length : (histCage?.feedingCount || 0);
