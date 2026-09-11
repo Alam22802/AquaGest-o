@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { AppState, FeedType, FeedStockLog, User } from '../types';
-import { Plus, Package, TrendingDown, AlertCircle, Calendar, Settings2, Edit, Trash2, X, ArrowUpDown, Clock, User as UserIcon, Filter, CheckSquare, Square, Info, FileText, Copy, RotateCcw, FileDown, Box, ChevronDown, ChevronUp } from 'lucide-react';
+import { Plus, Package, TrendingDown, AlertCircle, Calendar, Settings2, Edit, Trash2, X, ArrowUpDown, Clock, User as UserIcon, Filter, CheckSquare, Square, Info, FileText, Copy, RotateCcw, FileDown, Box, ChevronDown, ChevronUp, Sliders, Check } from 'lucide-react';
 import { subDays, format, parseISO, differenceInDays, addDays } from 'date-fns';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -40,6 +40,7 @@ interface IndicationRow {
   manuallyOverridden?: boolean;
   useProjection?: boolean;
   dailyFeedingsCount?: number;
+  standardizeByCageModel?: boolean;
 }
 
 const getInterpolatedStandardCurvePoints = (standardCurves: any[], avgInitial: number) => {
@@ -187,7 +188,8 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
         if (Array.isArray(parsed) && parsed.length > 0) {
           return parsed.map(r => ({
             ...r,
-            dailyFeedingsCount: r.dailyFeedingsCount || 3
+            dailyFeedingsCount: r.dailyFeedingsCount || 3,
+            standardizeByCageModel: r.standardizeByCageModel !== false
           }));
         }
       } catch (e) {}
@@ -198,7 +200,8 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
         tableId: '',
         batchId: '',
         currentWeek: '1',
-        dailyFeedingsCount: 3
+        dailyFeedingsCount: 3,
+        standardizeByCageModel: true
       }
     ];
   });
@@ -951,7 +954,8 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
         tableId: tId,
         batchId: '',
         currentWeek: '1',
-        dailyFeedingsCount: 3
+        dailyFeedingsCount: 3,
+        standardizeByCageModel: true
       }
     ];
     setIndicationRows(newRows);
@@ -974,7 +978,8 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
         tableId: tId,
         batchId: '',
         currentWeek: '1',
-        dailyFeedingsCount: 3
+        dailyFeedingsCount: 3,
+        standardizeByCageModel: true
       }
     ];
     setIndicationRows(resetRows);
@@ -1375,7 +1380,8 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
         expectedWeekWeight: 0,
         effectiveAvgWeight: 0,
         isManualWeek: false,
-        useProjection: false
+        useProjection: false,
+        isStandardized: false
       };
     }
 
@@ -1408,22 +1414,65 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     }
 
     // Resolve cages belonging to this batch
-    const batchCages = (state.cages || []).filter(c => c.batchId === row.batchId && c.status === 'Ocupada');
+    const batchCages = (state.cages || []).filter(c => c.batchId === row.batchId && (c.status === 'Ocupada' || (c.initialFishCount && c.initialFishCount > 0)));
 
-    const cagesData = batchCages.map(cage => {
+    const standardize = row.standardizeByCageModel !== false;
+
+    // 1. Calculate raw daily feed for each cage
+    const rawCages = batchCages.map(cage => {
       const cageWeight = effectiveAvgWeight;
       const initialCount = cage.initialFishCount || 0;
-      const dailyFeed = (initialCount * cageWeight / 1000) * (feedPercentPV / 100);
+      const rawDailyFeed = (initialCount * cageWeight / 1000) * (feedPercentPV / 100);
+      const modelKey = (cage.model || 'Padrão').trim().toUpperCase();
 
       return {
         cage,
         initialCount,
         cageWeight,
-        dailyFeed
+        rawDailyFeed,
+        modelKey
       };
     });
 
-    const totalDailyFeed = (batch.initialQuantity * effectiveAvgWeight / 1000) * (feedPercentPV / 100);
+    // 2. Find maximum daily feed per cage model in this batch
+    const maxFeedByModel = new Map<string, number>();
+    if (standardize) {
+      rawCages.forEach(item => {
+        if (item.initialCount > 0) {
+          const currentMax = maxFeedByModel.get(item.modelKey) || 0;
+          if (item.rawDailyFeed > currentMax) {
+            maxFeedByModel.set(item.modelKey, item.rawDailyFeed);
+          }
+        }
+      });
+    }
+
+    // 3. Standardize: each cage of that model receives the highest calculated daily feed
+    const cagesData = rawCages.map(item => {
+      const maxForModel = maxFeedByModel.get(item.modelKey);
+      const dailyFeed = (standardize && maxForModel !== undefined && item.initialCount > 0)
+        ? maxForModel
+        : item.rawDailyFeed;
+
+      const isAdjusted = standardize && dailyFeed > (item.rawDailyFeed + 0.001);
+
+      return {
+        cage: item.cage,
+        initialCount: item.initialCount,
+        cageWeight: item.cageWeight,
+        rawDailyFeed: item.rawDailyFeed,
+        dailyFeed,
+        isAdjusted,
+        modelKey: item.modelKey
+      };
+    });
+
+    // 4. Batch total daily feed reflects the standardized cage feeds
+    const totalDailyFeed = cagesData.length > 0
+      ? cagesData.reduce((acc, c) => acc + c.dailyFeed, 0)
+      : ((batch.initialQuantity * effectiveAvgWeight / 1000) * (feedPercentPV / 100));
+
+    const isStandardized = standardize && cagesData.some(c => c.isAdjusted);
 
     return {
       cagesData,
@@ -1437,7 +1486,8 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       expectedWeekWeight,
       effectiveAvgWeight,
       isManualWeek,
-      useProjection
+      useProjection,
+      isStandardized
     };
   };
 
@@ -1507,7 +1557,7 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
 
       // Metadata card
       doc.setFillColor(241, 245, 249);
-      doc.rect(15, 42, 180, 26, 'F');
+      doc.rect(15, 42, 180, 28, 'F');
       
       doc.setTextColor(30, 41, 59);
       doc.setFont('helvetica', 'bold');
@@ -1517,17 +1567,17 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(8.5);
       doc.setTextColor(71, 85, 105);
-      doc.text(`Responsavel Clinico: ${currentUser?.username || 'Nao especificado'}`, 20, 54);
-      doc.text(`Base de Calculo: Peso medio da ultima biometria registrada e tabela de trato recomendada`, 20, 59);
-      doc.text(`Prazo: Trato diario baseado em um periodo de 1 dia de arracoamento`, 20, 64);
+      doc.text(`Responsavel: ${currentUser?.username || 'Nao especificado'}  |  Prazo: 1 dia de arracoamento`, 20, 54);
+      doc.text(`Base de Calculo: Peso medio da ultima biometria registrada e tabela nutricional recomendada`, 20, 59);
+      doc.text(`Criterio Operacional: Trato padronizado pelo maior volume por modelo de gaiola no lote`, 20, 64);
 
       // Section 1: Detailed Batches feeding table
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(10);
       doc.setTextColor(29, 78, 216);
-      doc.text('1. DIMENSIONAMENTO POR LOTE E ESTRATIFICACAO POR GAIOLA', 15, 76);
+      doc.text('1. DIMENSIONAMENTO POR LOTE E ESTRATIFICACAO POR GAIOLA', 15, 78);
 
-      let currentY = 82;
+      let currentY = 84;
 
       indicationRows.forEach((row, index) => {
         const batch = (state.batches || []).find(b => b.id === row.batchId);
@@ -1562,7 +1612,7 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
           cData.cage.settlementDate ? format(parseISO(cData.cage.settlementDate), 'dd/MM/yyyy') : 'N/A',
           `${formatNumber(cData.initialCount, 0)} peixes`,
           `${formatNumber(cData.cageWeight, 1)}g`,
-          `${formatNumber(cData.dailyFeed, 1)} kg/dia\n(${feedings}x de ${formatNumber(cData.dailyFeed / feedings, 2)} kg)`
+          `${formatNumber(cData.dailyFeed, 1)} kg/dia\n(${feedings}x de ${formatNumber(cData.dailyFeed / feedings, 2)} kg)${cData.isAdjusted ? ' *' : ''}`
         ]);
 
         if (rows.length === 0) {
@@ -1592,7 +1642,17 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
           margin: { left: 15, right: 15 }
         });
 
-        currentY = (doc as any).lastAutoTable.finalY + 8;
+        currentY = (doc as any).lastAutoTable.finalY + 3;
+
+        if (calcs.isStandardized) {
+          doc.setFont('helvetica', 'italic');
+          doc.setFontSize(6.5);
+          doc.setTextColor(100, 116, 139);
+          doc.text('* Trato padronizado pelo maior volume calculado para o modelo de gaiola.', 15, currentY);
+          currentY += 5;
+        } else {
+          currentY += 2;
+        }
 
         if (currentY > 250 && index < indicationRows.length - 1) {
           doc.addPage();
@@ -1693,7 +1753,8 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       
       if (calcs.cagesData.length > 0) {
         calcs.cagesData.forEach(cData => {
-          text += `     - ${cData.cage.name} [${cData.cage.model}]: ${formatNumber(cData.initialCount, 0)} peix. | PM: ${formatNumber(cData.cageWeight, 1)}g | *${formatNumber(cData.dailyFeed, 1)} kg/dia* (${feedings}x de ${formatNumber(cData.dailyFeed / feedings, 2)} kg)\n`;
+          const adjustedTag = cData.isAdjusted ? ' *(padronizado)*' : '';
+          text += `     - ${cData.cage.name} [${cData.cage.model}]: ${formatNumber(cData.initialCount, 0)} peix. | PM: ${formatNumber(cData.cageWeight, 1)}g | *${formatNumber(cData.dailyFeed, 1)} kg/dia* (${feedings}x de ${formatNumber(cData.dailyFeed / feedings, 2)} kg)${adjustedTag}\n`;
         });
       }
       text += `\n`;
@@ -3132,6 +3193,11 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                                     return fType ? ` • ${fType.name}` : '';
                                   })()}
                                 </div>
+                                {calcs.isStandardized && (
+                                  <div className="text-[8px] text-blue-300 font-bold uppercase tracking-wide mt-0.5">
+                                    • Padronizado p/ Modelo
+                                  </div>
+                                )}
                               </td>
                               <td className="py-4 px-2 text-center">
                                 {indicationRows.length > 1 && (
@@ -3160,10 +3226,24 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                                           </div>
                                           <p className="text-[9px] text-[#e4e4d4]/60 font-bold uppercase mt-0.5">
                                             Quantidade de ração dividida em {row.dailyFeedingsCount || 3} tratos diários
+                                            {calcs.isStandardized && ' • Padronizado pelo maior consumo do modelo'}
                                           </p>
                                         </div>
                                       </div>
                                       <div className="flex items-center gap-2">
+                                        <button
+                                          type="button"
+                                          onClick={() => handleIndicationRowFieldChange(row.id, 'standardizeByCageModel', row.standardizeByCageModel === false ? true : false)}
+                                          className={`text-[9px] px-2.5 py-1 rounded-lg font-black uppercase tracking-wider flex items-center gap-1.5 transition-all border ${
+                                            row.standardizeByCageModel !== false
+                                              ? 'bg-blue-600/30 text-blue-300 border-blue-400/40 shadow-sm'
+                                              : 'bg-white/5 text-slate-400 border-white/10 hover:text-slate-200'
+                                          }`}
+                                          title="Quando ativado, nivela as gaiolas do mesmo modelo pelo maior volume de trato do lote"
+                                        >
+                                          <Sliders className="w-3 h-3" />
+                                          {row.standardizeByCageModel !== false ? 'Padronizar Modelo: SIM' : 'Padronizar Modelo: NÃO'}
+                                        </button>
                                         <span className="text-[9px] bg-emerald-500/15 text-emerald-400 px-2 py-0.5 rounded font-black uppercase tracking-wider">
                                           {row.dailyFeedingsCount || 3} Tratos Diários
                                         </span>
@@ -3187,9 +3267,19 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                                           return (
                                             <div key={cData.cage.id} className="bg-black/20 p-3 rounded-xl border border-white/5 flex items-center justify-between gap-4">
                                               <div>
-                                                <span className="text-[11px] font-black text-white uppercase block">
-                                                  {cData.cage.name} <span className="text-slate-400 font-medium">[{cData.cage.model}]</span>
-                                                </span>
+                                                <div className="flex items-center gap-1.5">
+                                                  <span className="text-[11px] font-black text-white uppercase block">
+                                                    {cData.cage.name} <span className="text-slate-400 font-medium">[{cData.cage.model}]</span>
+                                                  </span>
+                                                  {cData.isAdjusted && (
+                                                    <span 
+                                                      className="text-[8px] bg-blue-500/20 text-blue-300 border border-blue-400/30 px-1.5 py-0.5 rounded font-black uppercase tracking-wider"
+                                                      title={`Nivelado pelo maior consumo do modelo ${cData.cage.model} (${formatNumber(cData.rawDailyFeed, 1)} kg -> ${formatNumber(cData.dailyFeed, 1)} kg)`}
+                                                    >
+                                                      Padronizado
+                                                    </span>
+                                                  )}
+                                                </div>
                                                 <span className="text-[9px] text-[#e4e4d4]/50 font-bold uppercase block mt-0.5">
                                                   {formatNumber(cData.initialCount, 0)} peix. • {formatNumber(cData.cageWeight, 1)}g
                                                 </span>
@@ -3302,7 +3392,8 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                             
                             if (calcs.cagesData.length > 0) {
                               calcs.cagesData.forEach(cData => {
-                                text += `     - ${cData.cage.name} [${cData.cage.model}]: ${formatNumber(cData.initialCount, 0)} peix. | PM: ${formatNumber(cData.cageWeight, 1)}g | *${formatNumber(cData.dailyFeed, 1)} kg/dia* (${feedings}x de ${formatNumber(cData.dailyFeed / feedings, 2)} kg)\n`;
+                                const adjustedTag = cData.isAdjusted ? ' *(padronizado)*' : '';
+                                text += `     - ${cData.cage.name} [${cData.cage.model}]: ${formatNumber(cData.initialCount, 0)} peix. | PM: ${formatNumber(cData.cageWeight, 1)}g | *${formatNumber(cData.dailyFeed, 1)} kg/dia* (${feedings}x de ${formatNumber(cData.dailyFeed / feedings, 2)} kg)${adjustedTag}\n`;
                               });
                             }
                             text += `\n`;
