@@ -12,7 +12,7 @@ export interface MarketPrice {
   }[];
 }
 
-const CACHE_KEY = 'tilapia_market_price_v10';
+const CACHE_KEY = 'tilapia_market_price_v11';
 const CACHE_TIME = 1000 * 60 * 60 * 1; // 1 hour
 
 export async function getTilapiaPriceMG(): Promise<MarketPrice> {
@@ -49,20 +49,20 @@ export async function getTilapiaPriceMG(): Promise<MarketPrice> {
     }
     
     const now = new Date();
-    const sourceRange = "CEPEA (07 - 11/09/2026)";
+    const sourceRange = "CEPEA (14 - 18/09/2026)";
 
     return {
-      price: 9.42,
+      price: 9.40,
       source: sourceRange,
       lastUpdate: now.toISOString(),
-      variation: -0.57,
-      weeklyVariation: -0.57,
+      variation: -0.22,
+      weeklyVariation: -0.22,
       regions: [
-        { name: "Grandes Lagos", price: 9.49, variation: 0.02, weeklyVariation: 0.02 },
-        { name: "Morada Nova de Minas", price: 9.27, variation: -0.13, weeklyVariation: -0.13 },
-        { name: "Norte do Paraná", price: 10.09, variation: -0.37, weeklyVariation: -0.37 },
-        { name: "Oeste do Paraná", price: 8.70, variation: 0.13, weeklyVariation: 0.13 },
-        { name: "Triâng.Mineiro/Alto Paranaíba", price: 9.42, variation: -0.57, weeklyVariation: -0.57 }
+        { name: "Grandes Lagos", price: 9.48, variation: -0.17, weeklyVariation: -0.17 },
+        { name: "Morada Nova de Minas", price: 9.25, variation: -0.20, weeklyVariation: -0.20 },
+        { name: "Norte do Paraná", price: 10.10, variation: 0.09, weeklyVariation: 0.09 },
+        { name: "Oeste do Paraná", price: 8.73, variation: 0.30, weeklyVariation: 0.30 },
+        { name: "Triâng.Mineiro/Alto Paranaíba", price: 9.40, variation: -0.22, weeklyVariation: -0.22 }
       ]
     };
   }
