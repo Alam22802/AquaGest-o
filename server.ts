@@ -919,7 +919,7 @@ async function scheduleSafeFarmStatePersist(stateToSave: any) {
         const vite = await createViteServer({
           server: {
             middlewareMode: true,
-            hmr: process.env.DISABLE_HMR === "true" ? false : undefined,
+            hmr: false,
           },
           appType: "spa",
         });
@@ -932,10 +932,14 @@ async function scheduleSafeFarmStatePersist(stateToSave: any) {
         });
       }
 
-      app.listen(PORT, "0.0.0.0", () => {
+      const serverInstance = app.listen(PORT, "0.0.0.0", () => {
         console.log(`Server running on port ${PORT}`);
         console.log(`Server running on http://localhost:${PORT}`);
         console.log(`Server running on http://0.0.0.0:${PORT} in ${process.env.NODE_ENV || 'development'} mode`);
+      });
+
+      serverInstance.on("error", (err: any) => {
+        console.error("Express server error:", err);
       });
     }
   }

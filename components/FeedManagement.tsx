@@ -1,11 +1,11 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { AppState, FeedType, FeedStockLog, User } from '../types';
-import { Plus, Package, TrendingDown, AlertCircle, Calendar, Settings2, Edit, Trash2, X, ArrowUpDown, Clock, User as UserIcon, Filter, CheckSquare, Square, Info, FileText, Copy, RotateCcw, FileDown, Box, ChevronDown, ChevronUp, Sliders, Check } from 'lucide-react';
+import { Plus, Package, TrendingDown, TrendingUp, AlertCircle, Calendar, Settings2, Edit, Trash2, X, ArrowUpDown, Clock, User as UserIcon, Filter, CheckSquare, Square, Info, FileText, Copy, RotateCcw, FileDown, Box, ChevronDown, ChevronUp, Sliders, Check } from 'lucide-react';
 import { subDays, format, parseISO, differenceInDays, addDays } from 'date-fns';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { formatNumber } from '../utils/formatters';
+import { formatNumber, formatCurrency } from '../utils/formatters';
 
 interface Props {
   state: AppState;
@@ -233,12 +233,15 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
   }, [state.batches, state.feedingTables, state.biometryLogs]);
 
   const [selectedConsumptionMonth, setSelectedConsumptionMonth] = useState<string>('');
+  const [monthlyFeedViewMode, setMonthlyFeedViewMode] = useState<'consumption' | 'entries'>('consumption');
 
-  const monthlyConsumptionStats = useMemo(() => {
-    const logs = state.feedingLogs || [];
+  // Unified month list combining feeding logs (consumption) and stock logs (entries)
+  const monthlyStats = useMemo(() => {
+    const feedingLogs = state.feedingLogs || [];
+    const stockLogs = state.feedStockLogs || [];
     const monthsSet = new Set<string>();
     
-    logs.forEach(log => {
+    feedingLogs.forEach(log => {
       if (log.timestamp) {
         const monthKey = log.timestamp.slice(0, 7); // 'YYYY-MM'
         if (/^\d{4}-\d{2}$/.test(monthKey)) {
@@ -247,13 +250,51 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       }
     });
 
+    stockLogs.forEach(log => {
+      if (log.timestamp) {
+        const monthKey = log.timestamp.slice(0, 7);
+        if (/^\d{4}-\d{2}$/.test(monthKey)) {
+          monthsSet.add(monthKey);
+        }
+      }
+    });
+
     const sortedMonths = Array.from(monthsSet).sort((a, b) => b.localeCompare(a));
     return { sortedMonths };
-  }, [state.feedingLogs]);
+  }, [state.feedingLogs, state.feedStockLogs]);
 
+  // Map to get weighted average purchase price and latest price for each feed model
+  const feedCostMap = useMemo(() => {
+    const map = new Map<string, { avgPrice: number; latestPrice: number }>();
+    
+    (state.feedTypes || []).forEach(f => {
+      const entries = (state.feedStockLogs || []).filter(
+        l => l.feedTypeId === f.id && l.type === 'Entrada' && typeof l.unitPrice === 'number' && l.unitPrice > 0
+      );
+      
+      let totalKg = 0;
+      let totalVal = 0;
+      entries.forEach(e => {
+        const kg = (e.amount || 0) / 1000;
+        const price = e.unitPrice || 0;
+        totalKg += kg;
+        totalVal += kg * price;
+      });
+
+      const avgPrice = totalKg > 0 ? totalVal / totalKg : 0;
+      const sorted = [...entries].sort((a, b) => (b.timestamp || '').localeCompare(a.timestamp || ''));
+      const latestPrice = sorted[0]?.unitPrice || avgPrice;
+
+      map.set(f.id, { avgPrice, latestPrice });
+    });
+
+    return map;
+  }, [state.feedTypes, state.feedStockLogs]);
+
+  // Monthly feed consumption statistics with financial values
   const selectedMonthConsumption = useMemo(() => {
     const logs = state.feedingLogs || [];
-    const activeMonth = selectedConsumptionMonth || (monthlyConsumptionStats.sortedMonths[0] || 'all');
+    const activeMonth = selectedConsumptionMonth || (monthlyStats.sortedMonths[0] || 'all');
     
     const filteredLogs = activeMonth === 'all' 
       ? logs 
@@ -267,21 +308,116 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       totalGrams += log.amount;
     });
 
+    let totalEstimatedValue = 0;
+
     const breakdown = (state.feedTypes || []).map(feed => {
       const g = consumptionByFeedType[feed.id] || 0;
+      const consumptionKg = g / 1000;
+
+      // Price per kg: use entries from this specific month first, else overall weighted average / latest
+      const monthEntries = (state.feedStockLogs || []).filter(
+        l => l.feedTypeId === feed.id && 
+             l.type === 'Entrada' && 
+             typeof l.unitPrice === 'number' && 
+             l.unitPrice > 0 &&
+             (activeMonth === 'all' || (l.timestamp && l.timestamp.startsWith(activeMonth)))
+      );
+
+      let unitPrice = 0;
+      if (monthEntries.length > 0) {
+        const mKg = monthEntries.reduce((acc, curr) => acc + (curr.amount || 0) / 1000, 0);
+        const mVal = monthEntries.reduce((acc, curr) => acc + ((curr.amount || 0) / 1000) * (curr.unitPrice || 0), 0);
+        unitPrice = mKg > 0 ? mVal / mKg : 0;
+      }
+      if (unitPrice === 0) {
+        unitPrice = feedCostMap.get(feed.id)?.avgPrice || feedCostMap.get(feed.id)?.latestPrice || 0;
+      }
+
+      const totalValue = consumptionKg * unitPrice;
+      totalEstimatedValue += totalValue;
+
       return {
         ...feed,
-        consumptionKg: g / 1000,
+        consumptionKg,
+        unitPrice,
+        totalValue,
         percentage: totalGrams > 0 ? (g / totalGrams) * 100 : 0
       };
     }).filter(item => item.consumptionKg > 0);
 
+    const totalKg = totalGrams / 1000;
+    const avgPricePerKg = totalKg > 0 ? totalEstimatedValue / totalKg : 0;
+
     return {
       activeMonth,
-      totalKg: totalGrams / 1000,
+      totalKg,
+      totalValue: totalEstimatedValue,
+      avgPricePerKg,
       breakdown,
     };
-  }, [state.feedingLogs, state.feedTypes, selectedConsumptionMonth, monthlyConsumptionStats.sortedMonths]);
+  }, [state.feedingLogs, state.feedTypes, state.feedStockLogs, selectedConsumptionMonth, monthlyStats.sortedMonths, feedCostMap]);
+
+  // Monthly feed stock entries statistics with financial values
+  const selectedMonthEntries = useMemo(() => {
+    const stockLogs = (state.feedStockLogs || []).filter(l => l.type === 'Entrada');
+    const activeMonth = selectedConsumptionMonth || (monthlyStats.sortedMonths[0] || 'all');
+
+    const filteredLogs = activeMonth === 'all'
+      ? stockLogs
+      : stockLogs.filter(log => log.timestamp && log.timestamp.startsWith(activeMonth));
+
+    const entriesByFeedType: Record<string, { totalGrams: number; totalValue: number; count: number }> = {};
+    let grandTotalGrams = 0;
+    let grandTotalValue = 0;
+
+    filteredLogs.forEach(log => {
+      const g = log.amount || 0;
+      const kg = g / 1000;
+      const price = typeof log.unitPrice === 'number' && log.unitPrice > 0 
+        ? log.unitPrice 
+        : (feedCostMap.get(log.feedTypeId)?.avgPrice || 0);
+      const val = kg * price;
+
+      if (!entriesByFeedType[log.feedTypeId]) {
+        entriesByFeedType[log.feedTypeId] = { totalGrams: 0, totalValue: 0, count: 0 };
+      }
+
+      entriesByFeedType[log.feedTypeId].totalGrams += g;
+      entriesByFeedType[log.feedTypeId].totalValue += val;
+      entriesByFeedType[log.feedTypeId].count += 1;
+
+      grandTotalGrams += g;
+      grandTotalValue += val;
+    });
+
+    const breakdown = (state.feedTypes || []).map(feed => {
+      const data = entriesByFeedType[feed.id] || { totalGrams: 0, totalValue: 0, count: 0 };
+      const entryKg = data.totalGrams / 1000;
+      const totalValue = data.totalValue;
+      const unitPrice = entryKg > 0 ? (totalValue / entryKg) : (feedCostMap.get(feed.id)?.avgPrice || 0);
+
+      return {
+        ...feed,
+        entryKg,
+        unitPrice,
+        totalValue,
+        entriesCount: data.count,
+        percentage: grandTotalGrams > 0 ? (data.totalGrams / grandTotalGrams) * 100 : 0
+      };
+    }).filter(item => item.entryKg > 0);
+
+    const totalKg = grandTotalGrams / 1000;
+    const avgPricePerKg = totalKg > 0 ? grandTotalValue / totalKg : 0;
+
+    return {
+      activeMonth,
+      totalKg,
+      totalValue: grandTotalValue,
+      avgPricePerKg,
+      entriesCount: filteredLogs.length,
+      breakdown,
+    };
+  }, [state.feedStockLogs, state.feedTypes, selectedConsumptionMonth, monthlyStats.sortedMonths, feedCostMap]);
 
   const formatMonthKeyPt = (key: string) => {
     if (key === 'all') return 'Todos os Meses (Total)';
@@ -2440,98 +2576,248 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
         </div>
       )}
 
-      {/* Indicador de Consumo Mensal com Seletor */}
+      {/* Indicador de Consumo Mensal e Entradas com Seletor e Valores */}
       <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200/90 space-y-6">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
           <div className="flex items-center gap-2.5">
-            <div className="p-2.5 bg-blue-50 text-blue-600 rounded-2xl">
-              <TrendingDown className="w-5 h-5" />
+            <div className={`p-2.5 ${monthlyFeedViewMode === 'consumption' ? 'bg-blue-50 text-blue-600' : 'bg-emerald-50 text-emerald-600'} rounded-2xl transition-colors`}>
+              {monthlyFeedViewMode === 'consumption' ? (
+                <TrendingDown className="w-5 h-5" />
+              ) : (
+                <TrendingUp className="w-5 h-5" />
+              )}
             </div>
             <div>
               <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest italic">
-                Consumo Mensal de Ração
+                {monthlyFeedViewMode === 'consumption' ? 'Consumo Mensal de Ração' : 'Rações de Entrada do Mês'}
               </h3>
               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tight">
-                Acompanhamento do volume de trato por período
+                {monthlyFeedViewMode === 'consumption'
+                  ? 'Acompanhamento do volume de trato por período'
+                  : 'Acompanhamento do volume de compras/entradas e valores financeiros'}
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
-            <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Período:</span>
-            <select
-              className="text-[11px] font-black uppercase text-slate-600 bg-slate-50 border border-slate-200 px-3 py-2 rounded-xl outline-none focus:ring-2 focus:ring-blue-500/20 cursor-pointer transition-all animate-none"
-              value={selectedMonthConsumption.activeMonth}
-              onChange={e => setSelectedConsumptionMonth(e.target.value)}
-            >
-              <option value="all">Todos os Meses (Total Geral)</option>
-              {monthlyConsumptionStats.sortedMonths.map(mKey => (
-                <option key={mKey} value={mKey}>
-                  {formatMonthKeyPt(mKey)}
-                </option>
-              ))}
-            </select>
+          <div className="flex flex-wrap items-center gap-3">
+            {/* Seletor de Modo: Consumo vs Entradas */}
+            <div className="bg-slate-100 p-1 rounded-2xl border border-slate-200 flex items-center shadow-inner">
+              <button
+                type="button"
+                onClick={() => setMonthlyFeedViewMode('consumption')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-black uppercase tracking-wider transition-all ${
+                  monthlyFeedViewMode === 'consumption'
+                    ? 'bg-blue-600 text-white shadow-sm'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <TrendingDown className="w-3.5 h-3.5" />
+                Consumo do Mês
+              </button>
+              <button
+                type="button"
+                onClick={() => setMonthlyFeedViewMode('entries')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-black uppercase tracking-wider transition-all ${
+                  monthlyFeedViewMode === 'entries'
+                    ? 'bg-emerald-600 text-white shadow-sm'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <TrendingUp className="w-3.5 h-3.5" />
+                Rações de Entrada
+              </button>
+            </div>
+
+            {/* Seletor de Período */}
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Período:</span>
+              <select
+                className="text-[11px] font-black uppercase text-slate-600 bg-slate-50 border border-slate-200 px-3 py-2 rounded-xl outline-none focus:ring-2 focus:ring-blue-500/20 cursor-pointer transition-all animate-none"
+                value={selectedConsumptionMonth || (monthlyStats.sortedMonths[0] || 'all')}
+                onChange={e => setSelectedConsumptionMonth(e.target.value)}
+              >
+                <option value="all">Todos os Meses (Total Geral)</option>
+                {monthlyStats.sortedMonths.map(mKey => (
+                  <option key={mKey} value={mKey}>
+                    {formatMonthKeyPt(mKey)}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-stretch">
-          {/* Cartão de Destaque */}
-          <div className="md:col-span-5 bg-gradient-to-br from-slate-50 to-slate-100 p-6 rounded-2xl border border-slate-150 text-center md:text-left flex flex-col justify-center">
-            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">
-              Consumo Total no Período
-            </span>
-            <h2 className="text-3xl font-black text-blue-600 tracking-tighter">
-              {formatNumber(selectedMonthConsumption.totalKg, 1)} <span className="text-lg font-black uppercase text-blue-400">kg</span>
-            </h2>
-            <p className="text-[9.5px] font-bold text-slate-400 uppercase tracking-wide mt-2 italic">
-              Soma de todos os tratos lançados no sistema para o período de {formatMonthKeyPt(selectedMonthConsumption.activeMonth).toLowerCase()}.
-            </p>
-          </div>
-
-          {/* Lista por Tipo */}
-          <div className="md:col-span-7 space-y-4 flex flex-col justify-center">
-            <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
-              Consumo Detalhado por Modelo de Ração
-            </h4>
-            
-            {selectedMonthConsumption.breakdown.length === 0 ? (
-              <div className="py-6 text-center text-[10px] font-black text-slate-400 uppercase tracking-wider italic">
-                Nenhum consumo de ração registrado neste período.
+          {/* Cartão de Destaque: Somente Kg para Consumo, e Valores para Entradas */}
+          {monthlyFeedViewMode === 'consumption' ? (
+            <div className="md:col-span-5 bg-gradient-to-br from-slate-50 to-slate-100 p-6 rounded-2xl border border-slate-150 text-center md:text-left flex flex-col justify-center">
+              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">
+                Consumo Total no Período
+              </span>
+              <h2 className="text-3xl font-black text-blue-600 tracking-tighter">
+                {formatNumber(selectedMonthConsumption.totalKg, 1)} <span className="text-lg font-black uppercase text-blue-400">kg</span>
+              </h2>
+              <p className="text-[9.5px] font-bold text-slate-400 uppercase tracking-wide mt-2 italic">
+                Soma de todos os tratos lançados no sistema para o período de {formatMonthKeyPt(selectedMonthConsumption.activeMonth).toLowerCase()}.
+              </p>
+            </div>
+          ) : (
+            <div className="md:col-span-5 bg-gradient-to-br from-slate-50 via-slate-50 to-emerald-50/50 p-6 rounded-2xl border border-emerald-200/80 text-center md:text-left flex flex-col justify-between">
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[10px] font-black text-emerald-600 uppercase tracking-widest block">
+                    Entradas de Ração no Período
+                  </span>
+                  <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase bg-emerald-100 text-emerald-800">
+                    Compras / Estoque
+                  </span>
+                </div>
+                <h2 className="text-3xl font-black text-emerald-600 tracking-tighter">
+                  {formatNumber(selectedMonthEntries.totalKg, 1)} <span className="text-lg font-black uppercase text-emerald-400">kg</span>
+                </h2>
               </div>
-            ) : (
-              <div className="space-y-3.5 max-h-[160px] overflow-y-auto pr-1">
-                {selectedMonthConsumption.breakdown.map((item, index) => {
-                  const colors = [
-                    'bg-blue-500', 'bg-emerald-500', 'bg-amber-500', 'bg-purple-500', 
-                    'bg-teal-500', 'bg-rose-500', 'bg-indigo-500', 'bg-cyan-500'
-                  ];
-                  const colorClass = colors[index % colors.length];
 
-                  return (
-                    <div key={item.id} className="space-y-1">
-                      <div className="flex justify-between items-center text-xs">
-                        <span className="font-black text-slate-700 uppercase">
-                          {item.name}
-                        </span>
-                        <div className="flex items-center gap-1 font-bold">
-                          <span className="text-slate-800">
-                            {formatNumber(item.consumptionKg, 1)} kg
+              {/* Informações de Valores Financeiros */}
+              <div className="my-3 py-3 border-y border-emerald-200/70 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10.5px] font-black uppercase tracking-wider text-slate-600">
+                    Valor Total das Entradas:
+                  </span>
+                  <span className="text-base font-black text-emerald-700">
+                    {formatCurrency(selectedMonthEntries.totalValue)}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">
+                    Preço Médio / Kg:
+                  </span>
+                  <span className="text-xs font-black text-emerald-600">
+                    {selectedMonthEntries.avgPricePerKg > 0 
+                      ? `R$ ${formatNumber(selectedMonthEntries.avgPricePerKg, 2)} / kg`
+                      : '---'}
+                  </span>
+                </div>
+              </div>
+
+              <p className="text-[9.5px] font-bold text-slate-400 uppercase tracking-wide italic">
+                Total de {selectedMonthEntries.entriesCount} entrada(s) de ração registradas para o período de {formatMonthKeyPt(selectedMonthEntries.activeMonth).toLowerCase()}.
+              </p>
+            </div>
+          )}
+
+          {/* Lista por Tipo / Modelo */}
+          <div className="md:col-span-7 space-y-3.5 flex flex-col justify-center">
+            <div className="flex items-center justify-between">
+              <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                {monthlyFeedViewMode === 'consumption'
+                  ? 'Consumo Detalhado por Modelo de Ração'
+                  : 'Entradas Detalhadas por Modelo de Ração'}
+              </h4>
+              <span className="text-[9px] font-black text-slate-400 uppercase">
+                {monthlyFeedViewMode === 'consumption'
+                  ? `${selectedMonthConsumption.breakdown.length} modelo(s) consumido(s)`
+                  : `${selectedMonthEntries.breakdown.length} modelo(s) recebido(s)`}
+              </span>
+            </div>
+            
+            {monthlyFeedViewMode === 'consumption' ? (
+              selectedMonthConsumption.breakdown.length === 0 ? (
+                <div className="py-8 text-center text-[10px] font-black text-slate-400 uppercase tracking-wider italic bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+                  Nenhum consumo de ração registrado neste período.
+                </div>
+              ) : (
+                <div className="space-y-3 max-h-[190px] overflow-y-auto pr-1">
+                  {selectedMonthConsumption.breakdown.map((item, index) => {
+                    const colors = [
+                      'bg-blue-500', 'bg-emerald-500', 'bg-amber-500', 'bg-purple-500', 
+                      'bg-teal-500', 'bg-rose-500', 'bg-indigo-500', 'bg-cyan-500'
+                    ];
+                    const colorClass = colors[index % colors.length];
+
+                    return (
+                      <div key={item.id} className="space-y-1">
+                        <div className="flex justify-between items-center text-xs">
+                          <span className="font-black text-slate-700 uppercase">
+                            {item.name}
                           </span>
-                          <span className="text-[10px] text-slate-400">
-                            ({formatNumber(item.percentage, 0)}%)
-                          </span>
+                          <div className="flex items-center gap-1 font-bold">
+                            <span className="text-slate-800">
+                              {formatNumber(item.consumptionKg, 1)} kg
+                            </span>
+                            <span className="text-[10px] text-slate-400">
+                              ({formatNumber(item.percentage, 0)}%)
+                            </span>
+                          </div>
+                        </div>
+                        <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
+                          <div 
+                            className={`h-full ${colorClass} transition-all duration-500`}
+                            style={{ width: `${item.percentage}%` }}
+                          />
                         </div>
                       </div>
-                      <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
-                        <div 
-                          className={`h-full ${colorClass} transition-all duration-500`}
-                          style={{ width: `${item.percentage}%` }}
-                        />
+                    );
+                  })}
+                </div>
+              )
+            ) : (
+              selectedMonthEntries.breakdown.length === 0 ? (
+                <div className="py-8 text-center text-[10px] font-black text-slate-400 uppercase tracking-wider italic bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+                  Nenhuma entrada de ração registrada neste período.
+                </div>
+              ) : (
+                <div className="space-y-2.5 max-h-[190px] overflow-y-auto pr-1">
+                  {selectedMonthEntries.breakdown.map((item, index) => {
+                    const colors = [
+                      'bg-emerald-500', 'bg-blue-500', 'bg-teal-500', 'bg-purple-500', 
+                      'bg-amber-500', 'bg-cyan-500', 'bg-rose-500', 'bg-indigo-500'
+                    ];
+                    const colorClass = colors[index % colors.length];
+
+                    return (
+                      <div key={item.id} className="space-y-1.5 bg-slate-50/80 p-2.5 rounded-xl border border-slate-200/70">
+                        <div className="flex justify-between items-center text-xs">
+                          <span className="font-black text-slate-700 uppercase">
+                            {item.name}
+                          </span>
+                          <div className="flex items-center gap-1.5 font-bold">
+                            <span className="text-emerald-700 font-black">
+                              {formatNumber(item.entryKg, 1)} kg
+                            </span>
+                            <span className="text-[10px] text-slate-400">
+                              ({formatNumber(item.percentage, 0)}%)
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Linha de Valores Financeiros */}
+                        <div className="flex justify-between items-center text-[10px] font-bold">
+                          <span className="text-slate-500">
+                            {item.unitPrice > 0 ? (
+                              <>Preço médio: <strong className="text-slate-700">R$ {formatNumber(item.unitPrice, 2)}</strong>/kg</>
+                            ) : (
+                              <span className="text-slate-400 italic">Sem preço cadastrado</span>
+                            )}
+                            {item.entriesCount > 0 && (
+                              <span className="text-slate-400 ml-1.5">({item.entriesCount}x entrada{item.entriesCount > 1 ? 's' : ''})</span>
+                            )}
+                          </span>
+                          <span className="text-emerald-700 font-black">
+                            {item.totalValue > 0 ? formatCurrency(item.totalValue) : '---'}
+                          </span>
+                        </div>
+
+                        <div className="w-full bg-slate-200 h-1.5 rounded-full overflow-hidden">
+                          <div 
+                            className={`h-full ${colorClass} transition-all duration-500`}
+                            style={{ width: `${item.percentage}%` }}
+                          />
+                        </div>
                       </div>
-                    </div>
-                  );
-                })}
-              </div>
+                    );
+                  })}
+                </div>
+              )
             )}
           </div>
         </div>
