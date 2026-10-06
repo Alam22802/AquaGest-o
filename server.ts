@@ -634,20 +634,20 @@ async function scheduleSafeFarmStatePersist(stateToSave: any) {
   // Helper to construct fallback data dynamically matching the current date
   const getDynamicFallback = () => {
     const now = new Date();
-    const sourceRange = "CEPEA (14 - 18/09/2026)";
+    const sourceRange = "CEPEA (28 - 02/10/2026)";
 
     return {
-      price: 9.40,
+      price: 9.31,
       source: sourceRange,
       lastUpdate: now.toISOString(),
-      variation: -0.22,
-      weeklyVariation: -0.22,
+      variation: -0.82,
+      weeklyVariation: -0.82,
       regions: [
-        { name: "Grandes Lagos", price: 9.48, variation: -0.17, weeklyVariation: -0.17 },
-        { name: "Morada Nova de Minas", price: 9.25, variation: -0.20, weeklyVariation: -0.20 },
-        { name: "Norte do Paraná", price: 10.10, variation: 0.09, weeklyVariation: 0.09 },
-        { name: "Oeste do Paraná", price: 8.73, variation: 0.30, weeklyVariation: 0.30 },
-        { name: "Triâng.Mineiro/Alto Paranaíba", price: 9.40, variation: -0.22, weeklyVariation: -0.22 }
+        { name: "Grandes Lagos", price: 9.45, variation: -0.22, weeklyVariation: -0.22 },
+        { name: "Morada Nova de Minas", price: 9.22, variation: -0.16, weeklyVariation: -0.16 },
+        { name: "Norte do Paraná", price: 10.08, variation: -0.20, weeklyVariation: -0.20 },
+        { name: "Oeste do Paraná", price: 8.73, variation: 0.04, weeklyVariation: 0.04 },
+        { name: "Triâng.Mineiro/Alto Paranaíba", price: 9.31, variation: -0.82, weeklyVariation: -0.82 }
       ]
     };
   };
