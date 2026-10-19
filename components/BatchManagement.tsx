@@ -1429,6 +1429,7 @@ const BatchManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
           state={state}
           onUpdate={onUpdate}
           currentUser={currentUser}
+          initialBatchIds={selectedBatchIds}
         />
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">

@@ -1,5 +1,5 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { AppState, Batch, BatchExpense, BatchRevenue, User } from '../types';
 import { format, differenceInDays, parseISO } from 'date-fns';
 import { formatNumber, formatCurrency } from '../utils/formatters';
@@ -28,7 +28,15 @@ import {
   Unlock,
   Activity,
   History,
-  Archive
+  Archive,
+  CheckSquare,
+  Square,
+  Search,
+  ChevronDown,
+  ChevronUp,
+  Layers,
+  Tag,
+  Filter
 } from 'lucide-react';
 import { ClosedBatchHistory } from './ClosedBatchHistory';
 import { buildBatchSnapshot, isCostDeductionRevenue } from '../utils/batchSnapshot';
@@ -50,6 +58,8 @@ interface Props {
   state: AppState;
   onUpdate: (newState: AppState) => void;
   currentUser: User;
+  initialBatchIds?: string[];
+  initialBatchId?: string;
 }
 
 const generateId = () => {
@@ -134,9 +144,23 @@ const checkIsFeedingLogForBatch = (f: any, batch: any, harvestLogs: any[] = [], 
   return false;
 };
 
-const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
+const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser, initialBatchIds, initialBatchId }) => {
   const [subTab, setSubTab] = useState<'closing' | 'history'>('closing');
-  const [selectedBatchId, setSelectedBatchId] = useState<string>('');
+  const [selectedBatchIds, setSelectedBatchIds] = useState<string[]>(() => {
+    if (initialBatchIds && initialBatchIds.length > 0) return initialBatchIds;
+    if (initialBatchId) return [initialBatchId];
+    return [];
+  });
+  const [isSelectorOpen, setIsSelectorOpen] = useState(false);
+  const [batchSearchTerm, setBatchSearchTerm] = useState('');
+  const [filterBatchId, setFilterBatchId] = useState('');
+  const [selectedEntryBatchId, setSelectedEntryBatchId] = useState('');
+  const [showBatchListCard, setShowBatchListCard] = useState(false);
+
+  const selectedBatchId = selectedBatchIds.length === 1 
+    ? selectedBatchIds[0] 
+    : (selectedEntryBatchId || selectedBatchIds[0] || '');
+  const setSelectedBatchId = (id: string) => setSelectedBatchIds(id ? [id] : []);
   const [expenseForm, setExpenseForm] = useState({
     category: '',
     item: '',
@@ -221,12 +245,33 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       .sort((a, b) => a.name.localeCompare(b.name));
   }, [state.batches, state.cages, state.harvestLogs, state.closedBatchHistory]);
 
-  const batchData = useMemo(() => {
-    if (!selectedBatchId) return null;
-    const batch = (state.batches || []).find(b => b.id === selectedBatchId) ||
-      batches.find(b => b.id === selectedBatchId);
-    if (!batch) return null;
+  const isInitialMount = useRef(true);
+  useEffect(() => {
+    if (isInitialMount.current && batches.length > 0) {
+      isInitialMount.current = false;
+      if (selectedBatchIds.length === 0 && (!initialBatchIds || initialBatchIds.length === 0) && !initialBatchId) {
+        setSelectedBatchIds([batches[0].id]);
+      }
+    }
+  }, [batches, initialBatchIds, initialBatchId, selectedBatchIds]);
 
+  useEffect(() => {
+    if (initialBatchIds && initialBatchIds.length > 0) {
+      setSelectedBatchIds(initialBatchIds);
+    }
+  }, [initialBatchIds]);
+
+  const selectedBatches = useMemo(() => batches.filter(b => selectedBatchIds.includes(b.id)), [batches, selectedBatchIds]);
+
+  const filteredBatchesBySearch = useMemo(() => {
+    if (!batchSearchTerm.trim()) return batches;
+    return batches.filter(b => b.name.toLowerCase().includes(batchSearchTerm.toLowerCase()));
+  }, [batches, batchSearchTerm]);
+
+  const computeSingleBatchClosing = (
+    batch: Batch & { isArchived?: boolean },
+    feedTypePrices: Map<string, number>
+  ) => {
     const cleanBatchId = (batch.id || '').replace(/^hist-/, '').replace(/^history-/, '');
     const histRecord = (state.closedBatchHistory || []).find(h => 
       (h.batchId && (h.batchId === cleanBatchId || h.batchId === batch.id)) ||
@@ -238,7 +283,6 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     // Create lookups for better performance
     const harvestsByBatch = (state.harvestLogs || []).filter(h => h.batchId === batch.id);
     const harvestCages = new Set(harvestsByBatch.map(h => h.cageId));
-    const batchCages = new Set((state.cages || []).filter(c => c.batchId === batch.id).map(c => c.id));
     
     // Map for quick cage lookup
     const cageMap = new Map((state.cages || []).map(c => [c.id, c]));
@@ -303,10 +347,10 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     // Fallback if raw logs were archived/deleted: recover complete metrics from histRecord
     if (!hasRawLogs && histRecord) {
       const histEntries = histRecord.entries || [];
-      const histJuvenileCost = histRecord.supplierInvoiceVal ?? histEntries.filter(e => e.type === 'expense' && (e.category?.toLowerCase().includes('alevino') || e.category?.toLowerCase().includes('povoamento') || e.description?.toLowerCase().includes('aquisição de juvenis'))).reduce((acc, curr) => acc + curr.value, 0);
-      const histFeedCost = histRecord.totalFeedCost ?? ((histRecord.feedBreakdown || []).reduce((acc, f) => acc + f.cost, 0) || histEntries.filter(e => e.type === 'expense' && e.category?.toLowerCase().includes('ração')).reduce((acc, curr) => acc + curr.value, 0));
-      const histOtherExpenses = histRecord.otherExpensesVal ?? histEntries.filter(e => e.type === 'expense' && !e.category?.toLowerCase().includes('alevino') && !e.category?.toLowerCase().includes('povoamento') && !e.category?.toLowerCase().includes('ração') && !e.description?.toLowerCase().includes('aquisição de juvenis')).reduce((acc, curr) => acc + curr.value, 0);
-      const histBonus = histRecord.bonusDeductionsVal ?? histEntries.filter(e => e.type === 'revenue' && e.category?.toLowerCase().includes('bonifica')).reduce((acc, curr) => acc + curr.value, 0);
+      const histJuvenileCost = histRecord.supplierInvoiceVal ?? histEntries.filter((e: any) => e.type === 'expense' && (e.category?.toLowerCase().includes('alevino') || e.category?.toLowerCase().includes('povoamento') || e.description?.toLowerCase().includes('aquisição de juvenis'))).reduce((acc: number, curr: any) => acc + curr.value, 0);
+      const histFeedCost = histRecord.totalFeedCost ?? ((histRecord.feedBreakdown || []).reduce((acc: number, f: any) => acc + f.cost, 0) || histEntries.filter((e: any) => e.type === 'expense' && e.category?.toLowerCase().includes('ração')).reduce((acc: number, curr: any) => acc + curr.value, 0));
+      const histOtherExpenses = histRecord.otherExpensesVal ?? histEntries.filter((e: any) => e.type === 'expense' && !e.category?.toLowerCase().includes('alevino') && !e.category?.toLowerCase().includes('povoamento') && !e.category?.toLowerCase().includes('ração') && !e.description?.toLowerCase().includes('aquisição de juvenis')).reduce((acc: number, curr: any) => acc + curr.value, 0);
+      const histBonus = histRecord.bonusDeductionsVal ?? histEntries.filter((e: any) => e.type === 'revenue' && e.category?.toLowerCase().includes('bonifica')).reduce((acc: number, curr: any) => acc + curr.value, 0);
 
       const totalExpenses = histRecord.totalExpenses || 0;
       const grossExpenses = histRecord.grossExpenses || (histJuvenileCost + histFeedCost + histOtherExpenses) || totalExpenses;
@@ -319,7 +363,7 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       const hFeeding = (histRecord.totalFeedKg || 0) * 1000;
       const costPerKg = histRecord.costPerKg || (totalReceptionWeight > 0 ? totalExpenses / totalReceptionWeight : 0);
 
-      const feedDetailsByType = (histRecord.feedBreakdown || []).map((fe, idx) => ({
+      const feedDetailsByType = (histRecord.feedBreakdown || []).map((fe: any, idx: number) => ({
         feedTypeId: `feed-${idx}`,
         typeName: fe.name,
         amountGrams: fe.amountKg * 1000,
@@ -328,7 +372,7 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
         cost: fe.cost
       }));
 
-      const biometryEvolutionTimeline = (histRecord.biometryTimeline || []).map(b => ({
+      const biometryEvolutionTimeline = (histRecord.biometryTimeline || []).map((b: any) => ({
         date: b.date,
         fullDate: b.fullDate,
         weight: b.weight,
@@ -339,9 +383,10 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
 
       const mortalityEvolutionData = (histRecord.mortalityTimeline || []);
 
-      const allEntries = histEntries.map((e, idx) => ({
+      const allEntries = histEntries.map((e: any, idx: number) => ({
         id: e.id || `hist-entry-${idx}`,
         batchId: batch.id,
+        batchName: batch.name,
         description: e.description,
         category: e.category,
         value: e.value,
@@ -354,27 +399,22 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
         isCostDeduction: (e as any).category?.toLowerCase().includes('bonifica')
       }));
 
-      const filteredEntries = allEntries.filter(e => {
-        const matchCategory = !filterCategory || e.category === filterCategory;
-        const matchItem = !filterItem || e.description.toLowerCase().includes(filterItem.toLowerCase());
-        return matchCategory && matchItem;
-      }).sort((a, b) => (b.date || '').localeCompare(a.date || ''));
-
       const logsByCage = new Map<string, any>();
       if (histRecord.cageDetails && histRecord.cageDetails.length > 0) {
-        histRecord.cageDetails.forEach(cd => {
+        histRecord.cageDetails.forEach((cd: any) => {
           if (!cd?.cageId) return;
           logsByCage.set(cd.cageId, {
             cageName: cd.cageName || `Gaiola ${cd.cageId}`,
+            batchName: batch.name,
             feeding: [{ amount: (cd.feedingKg || 0) * 1000, timestamp: batch.settlementDate || '', feedTypeName: 'Ração' }],
             mortality: [{ count: cd.mortalityCount || 0, date: batch.settlementDate || '' }],
-            biometry: (cd.biometries || []).map(b => ({ averageWeight: b.weight || 0, date: b.date || '' }))
+            biometry: (cd.biometries || []).map((b: any) => ({ averageWeight: b.weight || 0, date: b.date || '' }))
           });
         });
       }
 
-      const categories = Array.from(new Set(allEntries.map(e => e.category))).filter(Boolean).sort();
-      const items = Array.from(new Set(allEntries.map(e => e.description))).filter(Boolean).sort();
+      const categories = Array.from(new Set(allEntries.map((e: any) => e.category))).filter(Boolean).sort();
+      const items = Array.from(new Set(allEntries.map((e: any) => e.description))).filter(Boolean).sort();
 
       return {
         batch: {
@@ -386,6 +426,7 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
         feeding: hFeeding,
         feedingByType: Object.fromEntries(feedDetailsByType.map(f => [f.typeName, f.amountGrams])),
         feedingByTypeId: Object.fromEntries(feedDetailsByType.map(f => [f.feedTypeId, f.amountGrams])),
+        rawHarvestedFish: hFish,
         harvestedFish: hFish,
         harvestedWeight: hWeight,
         totalRevenue,
@@ -393,8 +434,8 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
         slaughteredWeight: totalReceptionWeight,
         slaughteredCount: hFish,
         slaughteredReceptionWeight: totalReceptionWeight,
-        expenses: histEntries.filter(e => e.type === 'expense'),
-        revenues: histEntries.filter(e => e.type === 'revenue'),
+        expenses: histEntries.filter((e: any) => e.type === 'expense'),
+        revenues: histEntries.filter((e: any) => e.type === 'revenue'),
         otherExpensesVal: histOtherExpenses,
         grossExpenses,
         bonusDeductionsVal: histBonus,
@@ -417,6 +458,11 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
         liveFish: Math.max(0, batch.initialQuantity - hMortality - hFish),
         currentBiomassKg: (Math.max(0, batch.initialQuantity - hMortality - hFish) * (histRecord.currentAvgWeight || batch.initialUnitWeight)) / 1000,
         biomassBeforeHarvest: histRecord.biomassBeforeHarvest || 0,
+        avgWeightBeforeHarvest: histRecord.currentAvgWeight || batch.initialUnitWeight,
+        currentAvgWeight: histRecord.currentAvgWeight || batch.initialUnitWeight,
+        initialBatchWeightKg: ((batch.initialQuantity || 0) * (batch.initialUnitWeight || 0)) / 1000,
+        finalWeight: totalReceptionWeight > 0 ? totalReceptionWeight : hWeight,
+        finalAvgWeight: hFish > 0 ? ((totalReceptionWeight || hWeight) / hFish) * 1000 : (histRecord.currentAvgWeight || batch.initialUnitWeight),
         logsByCage,
         categories,
         items,
@@ -425,7 +471,6 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
         revenueCategories: categories,
         revenueItems: items,
         allEntries,
-        filteredEntries,
         totalReceptionWeight,
         biometryEvolutionData: biometryEvolutionTimeline,
         mortalityEvolutionData
@@ -497,41 +542,14 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     const slaughteredWeight = slaughters.reduce((acc, curr) => acc + (curr.netWeight || curr.receptionWeight || 0), 0);
     const slaughteredCount = slaughters.reduce((acc, curr) => acc + (curr.fishCount || 0), 0);
 
-    const expenses = (state.batchExpenses || [])
-      .filter(e => e.batchId === batch.id);
-    
-    const revenues = (state.batchRevenues || [])
-      .filter(r => r.batchId === batch.id);
+    const expenses = (state.batchExpenses || []).filter(e => e.batchId === batch.id);
+    const revenues = (state.batchRevenues || []).filter(r => r.batchId === batch.id);
     
     const supplierInvoiceVal = batch.invoices && batch.invoices.length > 0
       ? batch.invoices.reduce((sum, inv) => sum + inv.invoiceValue, 0)
       : (batch.invoiceValue || 0);
 
-    // Calculate feed prices per kg based on feed stock entries or default price
-    const feedTypePrices = new Map<string, number>();
-    (state.feedTypes || []).forEach(feedType => {
-      const entries = (state.feedStockLogs || []).filter(
-        log => log.feedTypeId === feedType.id && 
-               log.type === 'Entrada' && 
-               log.unitPrice !== undefined && 
-               log.unitPrice > 0
-      );
-      if (entries.length === 0) {
-        feedTypePrices.set(feedType.id, feedType.pricePerKg || 0);
-        return;
-      }
-      let totalCost = 0;
-      let totalKg = 0;
-      entries.forEach(log => {
-        const amountKg = log.amount / 1000;
-        totalCost += (log.unitPrice || 0) * amountKg;
-        totalKg += amountKg;
-      });
-      const avgPrice = totalKg > 0 ? (totalCost / totalKg) : (entries.reduce((acc, log) => acc + (log.unitPrice || 0), 0) / entries.length);
-      feedTypePrices.set(feedType.id, avgPrice);
-    });
-
-    // Calculate total feed cost and breakdown by feed model for this batch
+    // Calculate feed details and total cost for this batch
     const feedDetailsByType: { feedTypeId: string; typeName: string; amountKg: number; cost: number; pricePerKg: number }[] = [];
     let totalFeedCost = 0;
 
@@ -623,7 +641,7 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       'Serviço Terceirizado'
     ];
     const supplierItems = batch.invoices && batch.invoices.length > 0
-      ? batch.invoices.map(inv => `Aquisição de Juvenis/Alevinos - ${inv.supplierName || 'Povoamento'}${inv.invoiceNumber ? ' (Nº: ' + inv.invoiceNumber + ')' : ''}`)
+      ? batch.invoices.map((inv: any) => `Aquisição de Juvenis/Alevinos - ${inv.supplierName || 'Povoamento'}${inv.invoiceNumber ? ' (Nº: ' + inv.invoiceNumber + ')' : ''}`)
       : (supplierInvoiceVal > 0 ? [`Aquisição de Juvenis/Alevinos - ${batch.supplierName || 'Povoamento'}`] : []);
 
     const feedItems = feedDetailsByType.map(fe => `Consumo Ração - ${fe.typeName}`);
@@ -678,9 +696,10 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     ])).sort();
 
     const settlementInvoiceEntries = batch.invoices && batch.invoices.length > 0 
-      ? batch.invoices.map((inv, idx) => ({
+      ? batch.invoices.map((inv: any, idx: number) => ({
           id: `settlement-invoice-virtual-${inv.id || idx}`,
           batchId: batch.id,
+          batchName: batch.name,
           description: `Aquisição de Juvenis/Alevinos - ${inv.supplierName || 'Povoamento'}${inv.invoiceNumber ? ' (Nº: ' + inv.invoiceNumber + ')' : ''}`,
           category: 'Alevinos/Povoamento',
           value: inv.invoiceValue,
@@ -692,6 +711,7 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       : (supplierInvoiceVal > 0 ? [{
           id: 'settlement-invoice-virtual-legacy',
           batchId: batch.id,
+          batchName: batch.name,
           description: `Aquisição de Juvenis/Alevinos - ${batch.supplierName || 'Povoamento'}`,
           category: 'Alevinos/Povoamento',
           value: supplierInvoiceVal,
@@ -704,6 +724,7 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     const feedVirtualEntries = feedDetailsByType.map((fe, idx) => ({
       id: `feed-expense-virtual-${fe.feedTypeId}-${idx}`,
       batchId: batch.id,
+      batchName: batch.name,
       description: `Consumo de Ração - ${fe.typeName} (${formatNumber(fe.amountKg, 1)}kg x R$ ${formatNumber(fe.pricePerKg, 2)}/kg)`,
       category: 'Ração / Alimentação',
       value: fe.cost,
@@ -722,6 +743,7 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       return {
         id: `slaughter-virtual-${s.id || idx}`,
         batchId: batch.id,
+        batchName: batch.name,
         description: `Recepção Frigorífico: Lote Abate ${s.slaughterBatch || batch.name} ${s.producer ? `(${s.producer})` : ''} - ${formatNumber(s.receptionWeight || 0, 1)}kg`,
         category: 'Receita Frigorífico',
         value: estimatedVal,
@@ -739,6 +761,7 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       ...expenses.map(e => ({ 
         id: e.id,
         batchId: e.batchId,
+        batchName: batch.name,
         description: e.description,
         category: e.category,
         value: e.value,
@@ -755,6 +778,7 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
         return {
           id: r.id, 
           batchId: r.batchId, 
+          batchName: batch.name,
           description: desc,
           category: r.category || (isBonus ? 'Bonificação de juvenis' : 'Receita'),
           value: revenueVal,
@@ -769,12 +793,6 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       })
     ];
 
-    const filteredEntries = allEntries.filter(e => {
-      const matchCategory = !filterCategory || e.category === filterCategory;
-      const matchItem = !filterItem || e.description.toLowerCase().includes(filterItem.toLowerCase());
-      return matchCategory && matchItem;
-    }).sort((a, b) => b.date.localeCompare(a.date));
-
     const protocol = (state.protocols || []).find(p => p.id === batch.protocolId);
     
     // Calculate total days
@@ -784,51 +802,49 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       : new Date();
     const totalDays = isNaN(differenceInDays(endDate, startDate)) ? 0 : differenceInDays(endDate, startDate);
 
-    // Survival Rate (Predicted): (Expected Fish / Initial)
+    // Survival Rate (Predicted)
     const survivalRate = batch.initialQuantity > 0 
       ? (expectedFish / batch.initialQuantity) * 100 
       : 0;
 
-    // Initial Biomass at Settlement (peso do lote de entrada no povoamento em kg)
+    // Initial Biomass at Settlement in kg
     const initialBatchWeightKg = ((batch.initialQuantity || 0) * (batch.initialUnitWeight || 0)) / 1000;
 
-    // Biomass Before Harvest: (Avg Weight * Expected Fish) / 1000
+    // Biomass Before Harvest
     const expectedWeight = expectedFish * (avgWeightBeforeHarvest / 1000);
     biomassBeforeHarvest = expectedWeight;
 
-    // FCA Previsto: Total Feed / (Biomassa Prevista - Peso Inicial do Povoamento)
+    // FCA Previsto
     const weightGainTheoretical = Math.max(0, expectedWeight - initialBatchWeightKg);
     const fcaTheoretical = weightGainTheoretical > 0 ? (feeding / 1000) / weightGainTheoretical : 0;
 
-    // FCA Real: Total Feed / (Peso Final Recebido/Despescado - Peso Inicial do Povoamento)
+    // FCA Real
     const finalWeight = totalReceptionWeight > 0 ? totalReceptionWeight : harvestedWeight;
     const weightGainReal = Math.max(0, finalWeight - initialBatchWeightKg);
     const fcaReal = weightGainReal > 0 ? (feeding / 1000) / weightGainReal : 0;
 
-    // GPD: (Final Avg Weight - Initial Weight) / Total Days
+    // GPD
     const finalAvgWeight = harvestedFish > 0 ? (finalWeight / harvestedFish) * 1000 : currentAvgWeight;
     const gpd = totalDays > 0 ? (finalAvgWeight - batch.initialUnitWeight) / totalDays : 0;
 
     // Cost per kg
-    const divisor = totalReceptionWeight;
-    const costPerKg = divisor > 0 ? totalExpenses / divisor : 0;
+    const costPerKg = totalReceptionWeight > 0 ? totalExpenses / totalReceptionWeight : 0;
 
-    // Accuracy (Assertividade): Real Delivered/Reception Weight / Expected Weight
-    const realDeliveredWeight = totalReceptionWeight > 0 ? totalReceptionWeight : harvestedWeight;
-    const accuracy = expectedWeight > 0 ? (realDeliveredWeight / expectedWeight) * 100 : 0;
+    // Accuracy
+    const accuracy = expectedWeight > 0 ? (finalWeight / expectedWeight) * 100 : 0;
 
-    // Real Survival Rate: Harvested Fish / Initial Quantity
+    // Real Survival Rate
     const survivalRateReal = batch.initialQuantity > 0 ? (harvestedFish / batch.initialQuantity) * 100 : 0;
 
-    // Group logs by cage for detailed view
+    // Group logs by cage
     const logsByCage = new Map<string, {
       cageName: string;
+      batchName?: string;
       feeding: any[];
       mortality: any[];
       biometry: any[];
     }>();
 
-    // Get all cage IDs involved in this batch
     const allCageIds = new Set<string>([
       ...(batch.cageIds || []),
       ...harvestsByBatch.map(h => h.cageId),
@@ -858,6 +874,7 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       if (finalFeed.length > 0 || finalMort.length > 0 || finalBio.length > 0 || (batch.cageIds || []).includes(cId)) {
         logsByCage.set(cId, {
           cageName: cage?.name || histCage?.cageName || `Gaiola ${cId.substring(0, 4)}`,
+          batchName: batch.name,
           feeding: finalFeed,
           mortality: finalMort,
           biometry: finalBio
@@ -865,7 +882,7 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       }
     });
 
-    // 1. Compute Biometry Evolution Data for Charts
+    // Biometry Evolution Data for Charts
     const biometryDateMap = new Map<string, { weights: number[]; count: number }>();
     batchBiometries.forEach(b => {
       if (b.date && b.averageWeight && b.averageWeight > 0) {
@@ -887,7 +904,6 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       days: number;
     }[] = [];
 
-    // Initial settlement point
     if (startDateStr) {
       biometryEvolutionTimeline.push({
         date: safeDateFormat(startDateStr, 'dd/MM'),
@@ -898,7 +914,6 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       });
     }
 
-    // Biometry points
     const sortedBiometryDates = Array.from(biometryDateMap.keys()).sort();
     sortedBiometryDates.forEach(d => {
       if (d === startDateStr) return;
@@ -925,7 +940,6 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       });
     });
 
-    // If batch has harvest, add harvest date and real harvest weight
     if (firstHarvestDate && harvestBiometricsAvgWeight > 0 && !biometryDateMap.has(firstHarvestDate)) {
       const daysPassed = startDateStr ? Math.max(0, differenceInDays(parseISO(firstHarvestDate), parseISO(startDateStr))) : 0;
       biometryEvolutionTimeline.push({
@@ -941,7 +955,7 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
 
     const finalBiometryEvolutionTimeline = (biometryEvolutionTimeline.length > 1 || !histRecord?.biometryTimeline || histRecord.biometryTimeline.length === 0)
       ? biometryEvolutionTimeline
-      : histRecord.biometryTimeline.map(b => ({
+      : histRecord.biometryTimeline.map((b: any) => ({
           date: b.date,
           fullDate: b.fullDate,
           weight: b.weight,
@@ -950,7 +964,7 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
           isHarvestDate: b.isHarvestDate
         }));
 
-    // 2. Compute Mortality Evolution Data for Charts
+    // Mortality Evolution Data for Charts
     const mortalityByDateMap = new Map<string, number>();
     mortalityLogs.forEach(m => {
       if (m.date && m.count > 0) {
@@ -983,6 +997,7 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       feeding,
       feedingByType,
       feedingByTypeId,
+      rawHarvestedFish,
       harvestedFish,
       harvestedWeight,
       totalRevenue,
@@ -1014,6 +1029,313 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       liveFish,
       currentBiomassKg,
       biomassBeforeHarvest,
+      avgWeightBeforeHarvest,
+      currentAvgWeight,
+      initialBatchWeightKg,
+      finalWeight,
+      finalAvgWeight,
+      logsByCage,
+      categories,
+      items,
+      expenseCategories,
+      expenseItems,
+      revenueCategories,
+      revenueItems,
+      allEntries,
+      totalReceptionWeight,
+      biometryEvolutionData: finalBiometryEvolutionTimeline,
+      mortalityEvolutionData: finalMortalityEvolutionData
+    };
+  };
+
+  const batchData = useMemo(() => {
+    // 1. Calculate feed prices per kg based on feed stock entries
+    const feedTypePrices = new Map<string, number>();
+    (state.feedTypes || []).forEach(feedType => {
+      const entries = (state.feedStockLogs || []).filter(
+        log => log.feedTypeId === feedType.id && 
+               log.type === 'Entrada' && 
+               log.unitPrice !== undefined && 
+               log.unitPrice > 0
+      );
+      if (entries.length === 0) {
+        feedTypePrices.set(feedType.id, feedType.pricePerKg || 0);
+        return;
+      }
+      let totalCost = 0;
+      let totalKg = 0;
+      entries.forEach(log => {
+        const amountKg = log.amount / 1000;
+        totalCost += (log.unitPrice || 0) * amountKg;
+        totalKg += amountKg;
+      });
+      const avgPrice = totalKg > 0 ? (totalCost / totalKg) : (entries.reduce((acc, log) => acc + (log.unitPrice || 0), 0) / entries.length);
+      feedTypePrices.set(feedType.id, avgPrice);
+    });
+
+    // 2. Resolve selected batches
+    const selectedBatches = batches.filter(b => selectedBatchIds.includes(b.id));
+    if (selectedBatches.length === 0) return null;
+
+    // 3. Single Batch Mode
+    if (selectedBatches.length === 1) {
+      const single = computeSingleBatchClosing(selectedBatches[0], feedTypePrices);
+      const filteredEntries = single.allEntries.filter((e: any) => {
+        const matchCategory = !filterCategory || e.category === filterCategory;
+        const matchItem = !filterItem || e.description.toLowerCase().includes(filterItem.toLowerCase());
+        return matchCategory && matchItem;
+      }).sort((a: any, b: any) => (b.date || '').localeCompare(a.date || ''));
+
+      return {
+        ...single,
+        filteredEntries,
+        isConsolidated: false,
+        selectedBatchesCount: 1,
+        batchSummaries: []
+      };
+    }
+
+    // 4. Consolidated Mode (Multiple Batches)
+    const singleList = selectedBatches.map(b => computeSingleBatchClosing(b, feedTypePrices));
+
+    const totalInitialQty = singleList.reduce((acc, d) => acc + (d.batch.initialQuantity || 0), 0);
+    const initialBatchWeightKg = singleList.reduce((acc, d) => acc + d.initialBatchWeightKg, 0);
+    const weightedInitialWeight = totalInitialQty > 0 
+      ? singleList.reduce((acc, d) => acc + (d.batch.initialQuantity || 0) * (d.batch.initialUnitWeight || 0), 0) / totalInitialQty 
+      : 0;
+
+    const settlementDates = singleList.map(d => d.batch.settlementDate).filter(Boolean).sort();
+    const earliestSettlementDate = settlementDates[0] || '';
+    const latestSettlementDate = settlementDates[settlementDates.length - 1] || '';
+    const harvestDates = singleList.map(d => d.batch.expectedHarvestDate).filter(Boolean).sort();
+    const latestExpectedHarvestDate = harvestDates[harvestDates.length - 1] || '';
+
+    const allClosed = singleList.every(d => d.batch.isClosed);
+    const closedAt = allClosed ? singleList.map(d => d.batch.closedAt).filter(Boolean).sort().slice(-1)[0] : undefined;
+
+    const invoices = singleList.flatMap(d => d.batch.invoices || []);
+    const invoiceValue = singleList.reduce((acc, d) => acc + (d.batch.invoiceValue || 0), 0);
+    const supplierInvoiceVal = singleList.reduce((acc, d) => acc + d.supplierInvoiceVal, 0);
+
+    const consolidatedBatch: Batch & { isArchived?: boolean } = {
+      id: `consolidated-${selectedBatchIds.join('-')}`,
+      name: selectedBatches.map(b => b.name).join(' + '),
+      settlementDate: earliestSettlementDate,
+      expectedHarvestDate: latestExpectedHarvestDate,
+      initialQuantity: totalInitialQty,
+      initialUnitWeight: weightedInitialWeight,
+      isClosed: allClosed,
+      closedAt,
+      invoices,
+      invoiceValue,
+      cageIds: Array.from(new Set(singleList.flatMap(d => d.batch.cageIds || [])))
+    };
+
+    const mortality = singleList.reduce((acc, d) => acc + d.mortality, 0);
+    const feeding = singleList.reduce((acc, d) => acc + d.feeding, 0);
+    const rawHarvestedFish = singleList.reduce((acc, d) => acc + d.rawHarvestedFish, 0);
+    const harvestedFish = singleList.reduce((acc, d) => acc + d.harvestedFish, 0);
+    const harvestedWeight = singleList.reduce((acc, d) => acc + d.harvestedWeight, 0);
+    const slaughteredWeight = singleList.reduce((acc, d) => acc + d.slaughteredWeight, 0);
+    const slaughteredCount = singleList.reduce((acc, d) => acc + d.slaughteredCount, 0);
+    const slaughteredReceptionWeight = singleList.reduce((acc, d) => acc + d.slaughteredReceptionWeight, 0);
+    const totalReceptionWeight = singleList.reduce((acc, d) => acc + d.totalReceptionWeight, 0);
+    const liveFish = singleList.reduce((acc, d) => acc + d.liveFish, 0);
+    const currentBiomassKg = singleList.reduce((acc, d) => acc + d.currentBiomassKg, 0);
+    const expectedFish = singleList.reduce((acc, d) => acc + d.expectedFish, 0);
+    const expectedWeight = singleList.reduce((acc, d) => acc + d.expectedWeight, 0);
+    const biomassBeforeHarvest = singleList.reduce((acc, d) => acc + d.biomassBeforeHarvest, 0);
+
+    const weightGainTheoretical = Math.max(0, expectedWeight - initialBatchWeightKg);
+    const fcaTheoretical = weightGainTheoretical > 0 ? (feeding / 1000) / weightGainTheoretical : 0;
+
+    const finalWeight = totalReceptionWeight > 0 ? totalReceptionWeight : harvestedWeight;
+    const weightGainReal = Math.max(0, finalWeight - initialBatchWeightKg);
+    const fcaReal = weightGainReal > 0 ? (feeding / 1000) / weightGainReal : 0;
+
+    const survivalRate = totalInitialQty > 0 ? (expectedFish / totalInitialQty) * 100 : 0;
+    const survivalRateReal = totalInitialQty > 0 ? (harvestedFish / totalInitialQty) * 100 : 0;
+    const accuracy = expectedWeight > 0 ? (finalWeight / expectedWeight) * 100 : 0;
+
+    const totalDays = Math.max(0, ...singleList.map(d => d.totalDays));
+    const finalAvgWeight = harvestedFish > 0 ? (finalWeight / harvestedFish) * 1000 : weightedInitialWeight;
+    const gpd = totalDays > 0 ? (finalAvgWeight - weightedInitialWeight) / totalDays : 0;
+
+    const feedingByType: Record<string, number> = {};
+    const feedingByTypeId: Record<string, number> = {};
+    singleList.forEach(d => {
+      Object.entries(d.feedingByType).forEach(([k, v]) => {
+        feedingByType[k] = (feedingByType[k] || 0) + v;
+      });
+      Object.entries(d.feedingByTypeId).forEach(([k, v]) => {
+        feedingByTypeId[k] = (feedingByTypeId[k] || 0) + v;
+      });
+    });
+
+    const feedDetailMap = new Map<string, { feedTypeId: string; typeName: string; amountKg: number; cost: number }>();
+    singleList.forEach(d => {
+      d.feedDetailsByType.forEach(f => {
+        const prev = feedDetailMap.get(f.feedTypeId) || { feedTypeId: f.feedTypeId, typeName: f.typeName, amountKg: 0, cost: 0 };
+        prev.amountKg += f.amountKg;
+        prev.cost += f.cost;
+        feedDetailMap.set(f.feedTypeId, prev);
+      });
+    });
+    const feedDetailsByType = Array.from(feedDetailMap.values()).map(f => ({
+      ...f,
+      pricePerKg: f.amountKg > 0 ? f.cost / f.amountKg : 0
+    }));
+    const totalFeedCost = feedDetailsByType.reduce((acc, f) => acc + f.cost, 0);
+
+    const otherExpensesVal = singleList.reduce((acc, d) => acc + d.otherExpensesVal, 0);
+    const grossExpenses = supplierInvoiceVal + totalFeedCost + otherExpensesVal;
+    const bonusDeductionsVal = singleList.reduce((acc, d) => acc + d.bonusDeductionsVal, 0);
+    const netExpenses = Math.max(0, grossExpenses - bonusDeductionsVal);
+    const totalExpenses = netExpenses;
+    const totalRevenue = singleList.reduce((acc, d) => acc + d.totalRevenue, 0);
+    const totalProfit = (totalRevenue + bonusDeductionsVal) - grossExpenses;
+    const costPerKg = totalReceptionWeight > 0 ? totalExpenses / totalReceptionWeight : 0;
+
+    const allEntries = singleList.flatMap(d => d.allEntries.map((e: any) => ({
+      ...e,
+      batchId: e.batchId || d.batch.id,
+      batchName: e.batchName || d.batch.name
+    })));
+    const filteredEntries = allEntries.filter((e: any) => {
+      const matchCategory = !filterCategory || e.category === filterCategory;
+      const matchItem = !filterItem || e.description.toLowerCase().includes(filterItem.toLowerCase());
+      const matchBatch = !filterBatchId || e.batchId === filterBatchId;
+      return matchCategory && matchItem && matchBatch;
+    }).sort((a: any, b: any) => (b.date || '').localeCompare(a.date || ''));
+
+    const logsByCage = new Map<string, any>();
+    singleList.forEach(d => {
+      d.logsByCage.forEach((val, k) => {
+        logsByCage.set(k, {
+          ...val,
+          batchName: d.batch.name
+        });
+      });
+    });
+
+    const expenseCategories = Array.from(new Set(singleList.flatMap(d => d.expenseCategories))).sort();
+    const expenseItems = Array.from(new Set(singleList.flatMap(d => d.expenseItems))).sort();
+    const revenueCategories = Array.from(new Set(singleList.flatMap(d => d.revenueCategories))).sort();
+    const revenueItems = Array.from(new Set(singleList.flatMap(d => d.revenueItems))).sort();
+    const categories = Array.from(new Set(singleList.flatMap(d => d.categories))).sort();
+    const items = Array.from(new Set(singleList.flatMap(d => d.items))).sort();
+
+    const batchSummaries = singleList.map(d => ({
+      id: d.batch.id,
+      name: d.batch.name,
+      settlementDate: d.batch.settlementDate,
+      isClosed: d.batch.isClosed,
+      initialQuantity: d.batch.initialQuantity || 0,
+      initialUnitWeight: d.batch.initialUnitWeight || 0,
+      initialBiomassKg: d.initialBatchWeightKg,
+      mortality: d.mortality,
+      survivalRateReal: d.survivalRateReal,
+      feedingKg: d.feeding / 1000,
+      fcaReal: d.fcaReal,
+      harvestedFish: d.harvestedFish,
+      harvestedWeight: d.harvestedWeight,
+      totalExpenses: d.totalExpenses,
+      costPerKg: d.costPerKg,
+      totalRevenue: d.totalRevenue,
+      totalProfit: d.totalProfit,
+      marginPercent: d.totalRevenue > 0 ? (d.totalProfit / d.totalRevenue) * 100 : 0
+    }));
+
+    const biometryDateMap = new Map<string, { weights: number[]; count: number }>();
+    singleList.forEach(d => {
+      d.biometryEvolutionData.forEach(b => {
+        if (b.fullDate && b.weight) {
+          const existing = biometryDateMap.get(b.fullDate) || { weights: [], count: 0 };
+          existing.weights.push(b.weight);
+          existing.count += 1;
+          biometryDateMap.set(b.fullDate, existing);
+        }
+      });
+    });
+    const sortedDates = Array.from(biometryDateMap.keys()).sort();
+    const combinedBiometryTimeline = sortedDates.map(dateStr => {
+      const info = biometryDateMap.get(dateStr)!;
+      const avgW = info.weights.reduce((a, b) => a + b, 0) / info.weights.length;
+      const days = earliestSettlementDate ? Math.max(0, differenceInDays(parseISO(dateStr), parseISO(earliestSettlementDate))) : 0;
+      return {
+        date: safeDateFormat(dateStr, 'dd/MM'),
+        fullDate: dateStr,
+        weight: Math.round(avgW * 10) / 10,
+        days
+      };
+    });
+
+    const mortDateMap = new Map<string, number>();
+    singleList.forEach(d => {
+      d.mortalityEvolutionData.forEach(m => {
+        if (m.fullDate && m.count) {
+          mortDateMap.set(m.fullDate, (mortDateMap.get(m.fullDate) || 0) + m.count);
+        }
+      });
+    });
+    const sortedMortDates = Array.from(mortDateMap.keys()).sort();
+    let cumulativeCount = 0;
+    const combinedMortalityTimeline = sortedMortDates.map(d => {
+      const count = mortDateMap.get(d) || 0;
+      cumulativeCount += count;
+      return {
+        date: safeDateFormat(d, 'dd/MM'),
+        fullDate: d,
+        count,
+        cumulative: cumulativeCount,
+        cumulativeRate: totalInitialQty > 0 ? Number(((cumulativeCount / totalInitialQty) * 100).toFixed(2)) : 0
+      };
+    });
+
+    return {
+      batch: consolidatedBatch,
+      latestSettlementDate,
+      mortality,
+      feeding,
+      feedingByType,
+      feedingByTypeId,
+      rawHarvestedFish,
+      harvestedFish,
+      harvestedWeight,
+      totalRevenue,
+      totalProfit,
+      slaughteredWeight,
+      slaughteredCount,
+      slaughteredReceptionWeight,
+      expenses: singleList.flatMap(d => d.expenses),
+      revenues: singleList.flatMap(d => d.revenues),
+      otherExpensesVal,
+      grossExpenses,
+      bonusDeductionsVal,
+      netExpenses,
+      supplierInvoiceVal,
+      totalFeedCost,
+      feedDetailsByType,
+      totalExpenses,
+      protocol: singleList[0]?.protocol,
+      totalDays,
+      survivalRate,
+      fcaTheoretical,
+      fcaReal,
+      gpd,
+      costPerKg,
+      accuracy,
+      survivalRateReal,
+      expectedFish,
+      expectedWeight,
+      liveFish,
+      currentBiomassKg,
+      biomassBeforeHarvest,
+      avgWeightBeforeHarvest: finalAvgWeight,
+      currentAvgWeight: finalAvgWeight,
+      initialBatchWeightKg,
+      finalWeight,
+      finalAvgWeight,
       logsByCage,
       categories,
       items,
@@ -1024,10 +1346,13 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       allEntries,
       filteredEntries,
       totalReceptionWeight,
-      biometryEvolutionData: finalBiometryEvolutionTimeline,
-      mortalityEvolutionData: finalMortalityEvolutionData
+      biometryEvolutionData: combinedBiometryTimeline,
+      mortalityEvolutionData: combinedMortalityTimeline,
+      isConsolidated: true,
+      selectedBatchesCount: selectedBatches.length,
+      batchSummaries
     };
-  }, [selectedBatchId, state.batches, state.mortalityLogs, state.feedingLogs, state.harvestLogs, state.slaughterLogs, state.batchExpenses, state.batchRevenues, state.protocols, state.biometryLogs, state.cages, state.feedTypes, state.feedStockLogs, filterCategory, filterItem]);
+  }, [selectedBatchIds, batches, state.batches, state.mortalityLogs, state.feedingLogs, state.harvestLogs, state.slaughterLogs, state.batchExpenses, state.batchRevenues, state.protocols, state.biometryLogs, state.cages, state.feedTypes, state.feedStockLogs, state.closedBatchHistory, filterCategory, filterItem, filterBatchId]);
 
   const handleOpenAdjustFeed = () => {
     if (!batchData) return;
@@ -1100,10 +1425,11 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
 
   const handleAddExpense = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedBatchId || !expenseForm.category || !expenseForm.item || !expenseForm.amount) return;
+    const targetBatchId = (batchData?.isConsolidated && selectedEntryBatchId) ? selectedEntryBatchId : selectedBatchId;
+    if (!targetBatchId || !expenseForm.category || !expenseForm.item || !expenseForm.amount) return;
 
     const expenseData = {
-      batchId: selectedBatchId,
+      batchId: targetBatchId,
       category: expenseForm.category.trim(),
       description: expenseForm.item.trim(),
       date: expenseForm.date,
@@ -1155,17 +1481,18 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
 
   const handleAddRevenue = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedBatchId || !revenueForm.category || !revenueForm.item || !revenueForm.amount) return;
+    const targetBatchId = (batchData?.isConsolidated && selectedEntryBatchId) ? selectedEntryBatchId : selectedBatchId;
+    if (!targetBatchId || !revenueForm.category || !revenueForm.item || !revenueForm.amount) return;
 
-    const targetBatch = (state.batches || []).find(b => b.id === selectedBatchId);
-    const batchName = targetBatch ? targetBatch.name : selectedBatchId;
+    const targetBatch = (state.batches || []).find(b => b.id === targetBatchId) || batches.find(b => b.id === targetBatchId);
+    const batchName = targetBatch ? targetBatch.name : targetBatchId;
     const recWeight = revenueForm.receptionWeight ? Number(revenueForm.receptionWeight) : undefined;
     const revValue = Number(revenueForm.amount);
     const catName = revenueForm.category.trim();
     const itemName = revenueForm.item.trim();
 
     const revenueData = {
-      batchId: selectedBatchId,
+      batchId: targetBatchId,
       category: catName,
       description: itemName,
       value: revValue,
@@ -1786,18 +2113,308 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                 </div>
               )}
               
-              <select 
-                className="px-6 py-3 bg-white border border-slate-200 rounded-2xl font-black text-sm outline-none focus:ring-2 focus:ring-blue-500/10 uppercase tracking-widest shadow-sm"
-                value={selectedBatchId}
-                onChange={(e) => setSelectedBatchId(e.target.value)}
-              >
-                <option value="">Selecionar Lote para Fechamento</option>
-                {batches.map(b => (
-                  <option key={b.id} value={b.id}>{b.name} - {safeDateFormat(b.settlementDate, 'dd/MM/yyyy')}</option>
-                ))}
-              </select>
+              {/* Multi-Batch Selector Dropdown */}
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setIsSelectorOpen(!isSelectorOpen)}
+                  className="px-5 py-3 bg-white border border-slate-200 rounded-2xl font-black text-xs outline-none hover:border-blue-400 focus:ring-2 focus:ring-blue-500/10 uppercase tracking-widest shadow-sm flex items-center gap-2.5 transition-all"
+                  title="Selecionar lotes para fechamento"
+                >
+                  <Layers className="w-4 h-4 text-blue-600" />
+                  <span className="max-w-[200px] sm:max-w-xs truncate">
+                    {selectedBatchIds.length === 0
+                      ? "Selecionar Lote(s)"
+                      : selectedBatchIds.length === 1
+                      ? `${selectedBatches[0]?.name || 'Lote'} (${safeDateFormat(selectedBatches[0]?.settlementDate, 'dd/MM/yyyy')})`
+                      : `Consolidado (${selectedBatchIds.length} Lotes)`}
+                  </span>
+                  <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${isSelectorOpen ? 'rotate-180' : ''}`} />
+                </button>
+
+                {isSelectorOpen && (
+                  <div className="absolute right-0 top-full mt-2 w-80 sm:w-96 bg-white border border-slate-200 rounded-2xl shadow-2xl p-4 z-50 space-y-3 animate-in fade-in zoom-in-95">
+                    <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                      <span className="text-[10px] font-black text-slate-700 uppercase tracking-widest flex items-center gap-1.5">
+                        <Tag className="w-3.5 h-3.5 text-blue-600" />
+                        Seleção de Lotes ({selectedBatchIds.length}/{batches.length})
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setIsSelectorOpen(false)}
+                        className="text-slate-400 hover:text-slate-600 p-1"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+
+                    <div className="relative">
+                      <Search className="w-3.5 h-3.5 absolute left-3 top-3 text-slate-400" />
+                      <input
+                        type="text"
+                        placeholder="Buscar lote por nome..."
+                        value={batchSearchTerm}
+                        onChange={e => setBatchSearchTerm(e.target.value)}
+                        className="w-full pl-8 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-blue-500/20"
+                      />
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setSelectedBatchIds(batches.map(b => b.id))}
+                        className="flex-1 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 font-black text-[9px] uppercase tracking-wider rounded-lg transition-colors"
+                      >
+                        Selecionar Todos
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedBatchIds([])}
+                        className="flex-1 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 font-black text-[9px] uppercase tracking-wider rounded-lg transition-colors"
+                      >
+                        Limpar Seleção
+                      </button>
+                    </div>
+
+                    <div className="max-h-60 overflow-y-auto divide-y divide-slate-50 pr-1">
+                      {filteredBatchesBySearch.map(b => {
+                        const isSelected = selectedBatchIds.includes(b.id);
+                        return (
+                          <div
+                            key={b.id}
+                            className={`flex items-center justify-between p-2 rounded-xl transition-colors ${
+                              isSelected ? 'bg-blue-50/50' : 'hover:bg-slate-50'
+                            }`}
+                          >
+                            <label className="flex items-center gap-3 cursor-pointer flex-1 min-w-0">
+                              <input
+                                type="checkbox"
+                                checked={isSelected}
+                                onChange={(e) => {
+                                  if (e.target.checked) {
+                                    setSelectedBatchIds([...selectedBatchIds, b.id]);
+                                  } else {
+                                    setSelectedBatchIds(selectedBatchIds.filter(id => id !== b.id));
+                                  }
+                                }}
+                                className="w-4 h-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500 cursor-pointer"
+                              />
+                              <div className="min-w-0">
+                                <div className="font-black text-xs text-slate-800 uppercase truncate">{b.name}</div>
+                                <div className="text-[9px] font-bold text-slate-400">
+                                  Povoamento: {safeDateFormat(b.settlementDate, 'dd/MM/yyyy')} • {formatNumber(b.initialQuantity)} un
+                                </div>
+                              </div>
+                            </label>
+
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setSelectedBatchIds([b.id]);
+                                setIsSelectorOpen(false);
+                              }}
+                              className="text-[9px] font-bold text-blue-600 hover:text-blue-800 underline uppercase ml-2 shrink-0"
+                              title="Visualizar apenas este lote"
+                            >
+                              Apenas
+                            </button>
+                          </div>
+                        );
+                      })}
+                      {filteredBatchesBySearch.length === 0 && (
+                        <div className="py-4 text-center text-xs text-slate-400 font-bold uppercase">
+                          Nenhum lote encontrado
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
+                      <span className="text-[9px] font-bold text-slate-500">
+                        {selectedBatchIds.length > 1 ? `${selectedBatchIds.length} lotes somados` : selectedBatchIds.length === 1 ? '1 lote individual' : 'Nenhum selecionado'}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setIsSelectorOpen(false)}
+                        className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-black text-xs uppercase tracking-wider rounded-xl transition-all shadow-sm"
+                      >
+                        Pronto
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
+
+          {/* Barra de Seleção de Lotes (Estilo Visão de Lotes) */}
+          <div className="bg-slate-50 border border-slate-200 p-4 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 print:hidden">
+            <div className="flex items-center gap-3">
+              <input
+                type="checkbox"
+                id="select-all-batches-closing"
+                checked={batches.length > 0 && batches.every(b => selectedBatchIds.includes(b.id))}
+                onChange={(e) => {
+                  if (e.target.checked) {
+                    setSelectedBatchIds(batches.map(b => b.id));
+                  } else {
+                    setSelectedBatchIds([]);
+                  }
+                }}
+                className="w-4.5 h-4.5 text-blue-600 border-slate-300 rounded focus:ring-blue-500 cursor-pointer"
+              />
+              <label
+                htmlFor="select-all-batches-closing"
+                className="text-[10px] font-black text-slate-600 uppercase tracking-widest cursor-pointer select-none"
+              >
+                Selecionar Todos ({batches.length} Lote{batches.length !== 1 ? 's' : ''})
+              </label>
+            </div>
+
+            <div className="flex items-center gap-3 flex-wrap self-end sm:self-auto">
+              {selectedBatchIds.length > 0 && (
+                <span className={`text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-lg border ${
+                  selectedBatchIds.length > 1 
+                    ? 'text-blue-700 bg-blue-50 border-blue-200/70' 
+                    : 'text-slate-700 bg-slate-100 border-slate-200'
+                }`}>
+                  {selectedBatchIds.length} selecionado{selectedBatchIds.length > 1 ? 's' : ''}
+                  {selectedBatchIds.length > 1 ? ' (Fechamento Consolidado)' : ' (Fechamento Individual)'}
+                </span>
+              )}
+
+              {selectedBatchIds.length > 1 && (
+                <button
+                  type="button"
+                  onClick={() => setSelectedBatchIds([])}
+                  className="text-[10px] font-bold text-slate-500 hover:text-red-600 uppercase tracking-wider transition-colors"
+                >
+                  Limpar Seleção
+                </button>
+              )}
+
+              <button
+                type="button"
+                onClick={() => setShowBatchListCard(!showBatchListCard)}
+                className="px-3.5 py-2 bg-white border border-slate-200 hover:border-slate-300 rounded-xl text-[10px] font-black uppercase tracking-wider text-slate-700 flex items-center gap-1.5 shadow-sm transition-all"
+              >
+                <Tag className="w-3.5 h-3.5 text-blue-500" />
+                {showBatchListCard ? 'Ocultar Seleção de Lotes' : 'Escolher Lotes para Juntar'}
+              </button>
+            </div>
+          </div>
+
+          {/* Card Expansível de Seleção com Checkboxes (Estilo Visão de Lotes) */}
+          {showBatchListCard && (
+            <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-4 print:hidden animate-in fade-in">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
+                <div>
+                  <h4 className="text-xs font-black text-slate-800 uppercase tracking-widest flex items-center gap-2">
+                    <Layers className="w-4 h-4 text-blue-600" />
+                    Selecione os Lotes para Juntar no Fechamento
+                  </h4>
+                  <p className="text-[10px] font-bold text-slate-500 uppercase mt-0.5">
+                    Marque múltiplos lotes para consolidar e somar dados de produção, insumos, despescas e receitas.
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedBatchIds(batches.map(b => b.id))}
+                    className="text-[10px] font-black text-blue-600 hover:underline uppercase"
+                  >
+                    Marcar Todos ({batches.length})
+                  </button>
+                  <span className="text-slate-300">•</span>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedBatchIds([])}
+                    className="text-[10px] font-black text-slate-500 hover:underline uppercase"
+                  >
+                    Desmarcar Todos
+                  </button>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                {batches.map(batch => {
+                  const isChecked = selectedBatchIds.includes(batch.id);
+                  return (
+                    <div
+                      key={batch.id}
+                      onClick={() => {
+                        if (isChecked) {
+                          setSelectedBatchIds(selectedBatchIds.filter(id => id !== batch.id));
+                        } else {
+                          setSelectedBatchIds([...selectedBatchIds, batch.id]);
+                        }
+                      }}
+                      className={`p-3.5 rounded-2xl border-2 transition-all cursor-pointer flex items-center justify-between gap-3 ${
+                        isChecked
+                          ? 'border-blue-500 bg-blue-50/40 shadow-sm'
+                          : 'border-slate-100 hover:border-slate-200 bg-slate-50/50'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={() => {}} // handled by container onClick
+                          className="w-4 h-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500 cursor-pointer"
+                        />
+                        <div className="min-w-0">
+                          <div className="text-xs font-black text-slate-800 uppercase truncate">
+                            {batch.name}
+                          </div>
+                          <div className="text-[9px] font-bold text-slate-400">
+                            {safeDateFormat(batch.settlementDate, 'dd/MM/yyyy')} • {formatNumber(batch.initialQuantity)} un
+                          </div>
+                        </div>
+                      </div>
+
+                      <span className={`text-[8px] font-black px-1.5 py-0.5 rounded-full uppercase shrink-0 ${
+                        batch.isClosed
+                          ? 'bg-emerald-100 text-emerald-800'
+                          : 'bg-amber-100 text-amber-800'
+                      }`}>
+                        {batch.isClosed ? 'Concluído' : 'Aberto'}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Chips dos Lotes Ativos Selecionados */}
+          {selectedBatches.length > 0 && (
+            <div className="flex flex-wrap items-center gap-2 print:hidden">
+              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mr-1 flex items-center gap-1">
+                <Tag className="w-3 h-3 text-slate-400" />
+                Lotes Selecionados ({selectedBatches.length}):
+              </span>
+              {selectedBatches.map(b => (
+                <span
+                  key={b.id}
+                  className="inline-flex items-center gap-1.5 px-3 py-1 bg-white border border-blue-200 text-blue-700 rounded-xl text-xs font-black uppercase shadow-xs"
+                >
+                  {b.name}
+                  <button
+                    type="button"
+                    onClick={() => setSelectedBatchIds(selectedBatchIds.filter(id => id !== b.id))}
+                    className="ml-1 text-slate-400 hover:text-red-500 p-0.5 transition-colors"
+                    title={`Remover ${b.name}`}
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </span>
+              ))}
+              {selectedBatches.length > 1 && (
+                <span className="text-[9px] font-bold text-emerald-600 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-lg uppercase">
+                  Consolidação Ativa
+                </span>
+              )}
+            </div>
+          )}
 
       {batchData ? (
         <div className="space-y-8">
@@ -1810,7 +2427,11 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                 </div>
                 <div>
                   <h1 className="text-4xl font-black uppercase italic tracking-tighter text-black leading-none">AquaGestão</h1>
-                  <p className="text-sm font-bold text-slate-600 uppercase tracking-widest mt-1">Relatório de Fechamento de Lote</p>
+                  <p className="text-sm font-bold text-slate-600 uppercase tracking-widest mt-1">
+                    {batchData.isConsolidated 
+                      ? `Relatório de Fechamento Consolidado (${batchData.selectedBatchesCount} Lotes: ${batchData.batch.name})`
+                      : 'Relatório de Fechamento de Lote'}
+                  </p>
                 </div>
               </div>
               <div className="text-right">
@@ -1821,8 +2442,10 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
 
             <div className="mt-10 grid grid-cols-4 gap-4 print-grid-4">
               <div className="p-5 bg-slate-50 rounded-2xl border-2 border-slate-200">
-                <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest block mb-1">Identificação do Lote</span>
-                <span className="text-2xl font-black text-slate-900 uppercase italic leading-tight">{batchData.batch.name}</span>
+                <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest block mb-1">Identificação</span>
+                <span className="text-xl font-black text-slate-900 uppercase italic leading-tight">
+                  {batchData.isConsolidated ? `Consolidado (${batchData.selectedBatchesCount} Lotes)` : batchData.batch.name}
+                </span>
               </div>
               <div className="p-5 bg-slate-50 rounded-2xl border-2 border-slate-200">
                 <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest block mb-1">Data Povoamento</span>
@@ -1831,17 +2454,132 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
               <div className="p-5 bg-slate-50 rounded-2xl border-2 border-slate-200">
                 <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest block mb-1">Período de Cultivo</span>
                 <span className="text-xl font-black text-slate-900">
-                  {differenceInDays(new Date(), parseISO(batchData.batch.settlementDate))} dias
+                  {batchData.totalDays || (batchData.batch.settlementDate ? differenceInDays(new Date(), parseISO(batchData.batch.settlementDate)) : 0)} dias
                 </span>
               </div>
               <div className="p-5 bg-slate-50 rounded-2xl border-2 border-slate-200">
                 <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest block mb-1">Status Final</span>
                 <span className={`text-xl font-black uppercase italic ${batchData.batch.isClosed ? 'text-emerald-600' : 'text-amber-600'}`}>
-                  {batchData.batch.isClosed ? 'CONCLUÍDO' : 'EM ABERTO'}
+                  {batchData.isConsolidated ? (batchData.batch.isClosed ? 'TODOS CONCLUÍDOS' : 'EM ABERTO') : (batchData.batch.isClosed ? 'CONCLUÍDO' : 'EM ABERTO')}
                 </span>
               </div>
             </div>
           </div>
+
+          {/* Tabela Comparativa dos Lotes no Fechamento Consolidado */}
+          {batchData.isConsolidated && batchData.batchSummaries && batchData.batchSummaries.length > 1 && (
+            <div className="bg-white p-6 sm:p-8 rounded-[2.5rem] shadow-sm border border-slate-200 space-y-6 print-card print-no-break">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
+                <div>
+                  <h3 className="text-sm font-black text-black uppercase tracking-widest flex items-center gap-2 italic">
+                    <Layers className="w-5 h-5 text-blue-600" />
+                    Detalhamento dos Lotes Consolidados ({batchData.batchSummaries.length} Lotes Agrupados)
+                  </h3>
+                  <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mt-0.5">
+                    Visão unificada: compare o desempenho individual e o total consolidado de todos os lotes selecionados
+                  </p>
+                </div>
+                <div className="px-3 py-1 bg-blue-50 text-blue-700 rounded-xl border border-blue-200 text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5 self-start sm:self-auto">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-blue-600" />
+                  Fechamento Consolidado Ativo
+                </div>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-left">
+                  <thead>
+                    <tr className="border-b border-slate-200 text-[10px] font-black text-slate-600 uppercase tracking-wider">
+                      <th className="py-3 px-3">Lote</th>
+                      <th className="py-3 px-2">Povoamento</th>
+                      <th className="py-3 px-2 text-center">Status</th>
+                      <th className="py-3 px-2 text-right">Qtd Inicial</th>
+                      <th className="py-3 px-2 text-right">Mortalidade</th>
+                      <th className="py-3 px-2 text-right">Sobrev. Real</th>
+                      <th className="py-3 px-2 text-right">Ração (kg)</th>
+                      <th className="py-3 px-2 text-right">FCA Real</th>
+                      <th className="py-3 px-2 text-right">Despesca (kg)</th>
+                      <th className="py-3 px-2 text-right">Custo Total</th>
+                      <th className="py-3 px-2 text-right">Custo/kg</th>
+                      <th className="py-3 px-2 text-right">Faturamento</th>
+                      <th className="py-3 px-3 text-right">Lucro Líquido</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 text-xs">
+                    {batchData.batchSummaries.map((bs: any) => (
+                      <tr key={bs.id} className="hover:bg-slate-50 transition-colors">
+                        <td className="py-3.5 px-3 font-black text-slate-800 uppercase italic">
+                          {bs.name}
+                        </td>
+                        <td className="py-3.5 px-2 text-slate-600 font-bold">
+                          {safeDateFormat(bs.settlementDate, 'dd/MM/yyyy')}
+                        </td>
+                        <td className="py-3.5 px-2 text-center">
+                          <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase ${
+                            bs.isClosed ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
+                          }`}>
+                            {bs.isClosed ? 'Concluído' : 'Aberto'}
+                          </span>
+                        </td>
+                        <td className="py-3.5 px-2 text-right font-bold text-slate-700">
+                          {formatNumber(bs.initialQuantity)} un
+                        </td>
+                        <td className="py-3.5 px-2 text-right font-bold text-red-600">
+                          {formatNumber(bs.mortality)} un
+                        </td>
+                        <td className="py-3.5 px-2 text-right font-bold text-emerald-600">
+                          {formatNumber(bs.survivalRateReal, 1)}%
+                        </td>
+                        <td className="py-3.5 px-2 text-right font-bold text-amber-700">
+                          {formatNumber(bs.feedingKg, 1)} kg
+                        </td>
+                        <td className="py-3.5 px-2 text-right font-bold text-indigo-600">
+                          {formatNumber(bs.fcaReal, 2)}
+                        </td>
+                        <td className="py-3.5 px-2 text-right font-black text-blue-700">
+                          {formatNumber(bs.harvestedWeight, 1)} kg
+                        </td>
+                        <td className="py-3.5 px-2 text-right font-bold text-slate-900">
+                          {formatCurrency(bs.totalExpenses)}
+                        </td>
+                        <td className="py-3.5 px-2 text-right font-black text-emerald-700">
+                          {formatCurrency(bs.costPerKg)}
+                        </td>
+                        <td className="py-3.5 px-2 text-right font-bold text-blue-600">
+                          {formatCurrency(bs.totalRevenue)}
+                        </td>
+                        <td className={`py-3.5 px-3 text-right font-black ${bs.totalProfit >= 0 ? 'text-emerald-700' : 'text-red-600'}`}>
+                          {formatCurrency(bs.totalProfit)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr className="bg-slate-900 text-white font-black text-xs uppercase tracking-wider">
+                      <td className="py-4 px-3 rounded-l-2xl">TOTAL CONSOLIDADO</td>
+                      <td className="py-4 px-2 text-[10px] text-slate-300">
+                        {safeDateFormat(batchData.batch.settlementDate, 'dd/MM/yyyy')}
+                      </td>
+                      <td className="py-4 px-2 text-center text-[10px]">
+                        {batchData.batch.isClosed ? 'CONCLUÍDO' : 'EM ABERTO'}
+                      </td>
+                      <td className="py-4 px-2 text-right">{formatNumber(batchData.batch.initialQuantity)} un</td>
+                      <td className="py-4 px-2 text-right text-red-400">{formatNumber(batchData.mortality)} un</td>
+                      <td className="py-4 px-2 text-right text-emerald-400">{formatNumber(batchData.survivalRateReal, 1)}%</td>
+                      <td className="py-4 px-2 text-right text-amber-300">{formatNumber(batchData.feeding / 1000, 1)} kg</td>
+                      <td className="py-4 px-2 text-right text-indigo-300">{formatNumber(batchData.fcaReal, 2)}</td>
+                      <td className="py-4 px-2 text-right text-cyan-300">{formatNumber(batchData.totalReceptionWeight, 1)} kg</td>
+                      <td className="py-4 px-2 text-right">{formatCurrency(batchData.totalExpenses)}</td>
+                      <td className="py-4 px-2 text-right text-emerald-300">{formatCurrency(batchData.costPerKg)}</td>
+                      <td className="py-4 px-2 text-right text-blue-300">{formatCurrency(batchData.totalRevenue)}</td>
+                      <td className={`py-4 px-3 text-right rounded-r-2xl text-sm ${batchData.totalProfit >= 0 ? 'text-emerald-300' : 'text-red-400'}`}>
+                        {formatCurrency(batchData.totalProfit)}
+                      </td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            </div>
+          )}
 
           {/* Main Stats */}
           <div className="grid grid-cols-1 lg:grid-cols-3 print-grid-3 gap-8 print-container">
@@ -2877,9 +3615,14 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                             </span>
                           </td>
                           <td className="py-4 px-2 text-xs font-black text-slate-800 uppercase italic print-text-sm">
+                            {batchData.isConsolidated && entry.batchName && (
+                              <span className="mr-2 px-1.5 py-0.5 rounded bg-blue-100 text-blue-800 text-[9px] font-black uppercase not-italic">
+                                {entry.batchName}
+                              </span>
+                            )}
                             {entry.description}
                             {entry.receptionWeight && entry.receptionWeight > 0 && (
-                              <span className="ml-2 text-[10px] font-bold text-blue-600 lowercase">
+                              <span className="ml-2 text-[10px] font-bold text-blue-600 lowercase not-italic">
                                 ({formatNumber(entry.receptionWeight, 1)} kg)
                               </span>
                             )}

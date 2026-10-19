@@ -178,9 +178,9 @@ const App: React.FC = () => {
         const initialConfig = data.supabaseConfig || getSupabaseConfig();
         const remote = await fetchRemoteState(initialConfig);
         if (remote) {
-          // Quando o usuário abre o sistema (especialmente após dias sem logar), 
-          // o estado remoto/servidor é a fonte da verdade canônica.
-          data = remote;
+          // O estado do servidor é canônico. O sistema atualiza o usuário com os dados mais recentes,
+          // garantindo que um usuário que ficou um tempo sem logar não sobrescreva dados do servidor.
+          data = ensureStateIntegrity(remote, data, 'remote');
           if (remote.supabaseConfig) {
             saveSupabaseConfig(remote.supabaseConfig);
           }
@@ -237,7 +237,7 @@ const App: React.FC = () => {
       const remote = await fetchRemoteState(configToUse);
       
       if (remote) {
-        const merged = ensureStateIntegrity(state, remote, 'remote');
+        const merged = ensureStateIntegrity(remote, state, 'remote');
         const nowIso = new Date().toISOString();
         
         const updatedUsers = merged.users.map(u => 
@@ -488,23 +488,12 @@ const App: React.FC = () => {
 
       const newState = { ...prev };
       let actuallyChanged = false;
-      const newlyDeletedIds: string[] = [];
 
       changedKeys.forEach(key => {
         const newVal = update[key];
         const oldVal = (prev as any)[key];
 
         if (Array.isArray(newVal) && Array.isArray(oldVal)) {
-          // Detect deleted items by ID to create tombstones
-          if (oldVal.length > 0 && typeof oldVal[0] === 'object' && oldVal[0] !== null && oldVal[0].id) {
-            const newIdSet = new Set((newVal || []).filter(item => item && typeof item === 'object' && item.id).map(item => item.id));
-            oldVal.forEach(item => {
-              if (item && typeof item === 'object' && item.id && !newIdSet.has(item.id)) {
-                newlyDeletedIds.push(item.id);
-              }
-            });
-          }
-
           const processedList = ensureTimestamps(newVal, oldVal);
           if (processedList !== oldVal) {
             (newState as any)[key] = processedList;
@@ -516,14 +505,19 @@ const App: React.FC = () => {
         }
       });
 
-      if (!actuallyChanged && newlyDeletedIds.length === 0) return prev;
+      // Apenas adiciona a deletedIds se explicitamente fornecido pela ação de exclusão
+      if (update.deletedIds && Array.isArray(update.deletedIds)) {
+        const combinedDeletedIds = Array.from(new Set([
+          ...(prev.deletedIds || []),
+          ...update.deletedIds
+        ]));
+        if (combinedDeletedIds.length !== (prev.deletedIds || []).length) {
+          newState.deletedIds = combinedDeletedIds;
+          actuallyChanged = true;
+        }
+      }
 
-      const combinedDeletedIds = Array.from(new Set([
-        ...(prev.deletedIds || []),
-        ...(newState.deletedIds || []),
-        ...newlyDeletedIds
-      ]));
-      newState.deletedIds = combinedDeletedIds;
+      if (!actuallyChanged) return prev;
 
       const merged = ensureStateIntegrity(newState, undefined, 'local');
       return merged;
@@ -540,9 +534,10 @@ const App: React.FC = () => {
       const configToUse = user.supabaseConfig || state?.supabaseConfig || getSupabaseConfig();
       const remote = await fetchRemoteState(configToUse);
       if (remote) {
-        // Ao logar, prioriza o estado canônico do servidor para não injetar dados locais antigos
-        setState(remote);
-        lastSavedStateRef.current = remote;
+        // Ao logar, o sistema atualiza o usuário com os dados mais recentes do servidor canônico
+        const merged = ensureStateIntegrity(remote, state, 'remote');
+        setState(merged);
+        lastSavedStateRef.current = merged;
       }
     } catch (err) {
       console.warn('Erro ao sincronizar após login:', err);
@@ -562,9 +557,10 @@ const App: React.FC = () => {
       const configToUse = state?.supabaseConfig || getSupabaseConfig();
       const remote = await fetchRemoteState(configToUse);
       if (remote) {
-        setState(remote);
-        lastSavedStateRef.current = remote;
-        return remote;
+        const merged = ensureStateIntegrity(remote, state, 'remote');
+        setState(merged);
+        lastSavedStateRef.current = merged;
+        return merged;
       }
     } catch (err) {
       console.warn('Erro ao sincronizar login:', err);
@@ -593,59 +589,6 @@ const App: React.FC = () => {
       }
     }
   }, [state]);
-
-  useEffect(() => {
-    if (state && currentUser?.isMaster) {
-      const ninetyDaysAgo = new Date();
-      ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
-      
-      const batchesToCleanup = (state.batches || []).filter(b => 
-        b.isClosed && b.closedAt && new Date(b.closedAt) < ninetyDaysAgo
-      );
-
-      if (batchesToCleanup.length > 0) {
-        const batchIdsToRemoveArray = batchesToCleanup.map(b => b.id);
-        const batchIdsToRemove = new Set(batchIdsToRemoveArray);
-
-        const feedingLogsToRemove = (state.feedingLogs || []).filter((f) => batchIdsToRemove.has(f.batchId || '')).map(f => f.id);
-        const mortalityLogsToRemove = (state.mortalityLogs || []).filter((m) => batchIdsToRemove.has(m.batchId || '')).map(m => m.id);
-        const biometryLogsToRemove = (state.biometryLogs || []).filter((b) => batchIdsToRemove.has(b.batchId || '')).map(b => b.id);
-        const harvestLogsToRemove = (state.harvestLogs || []).filter((h) => batchIdsToRemove.has(h.batchId)).map(h => h.id);
-        const batchExpensesToRemove = (state.batchExpenses || []).filter((e) => batchIdsToRemove.has(e.batchId)).map(e => e.id);
-        const batchRevenuesToRemove = (state.batchRevenues || []).filter((r) => batchIdsToRemove.has(r.batchId)).map(r => r.id);
-        const harvestSchedulesToRemove = (state.harvestSchedules || []).filter((hs) => batchIdsToRemove.has(hs.batchId)).map(hs => hs.id);
-
-        const allRemovedIds = [
-          ...batchIdsToRemoveArray,
-          ...feedingLogsToRemove,
-          ...mortalityLogsToRemove,
-          ...biometryLogsToRemove,
-          ...harvestLogsToRemove,
-          ...batchExpensesToRemove,
-          ...batchRevenuesToRemove,
-          ...harvestSchedulesToRemove,
-        ];
-
-        const newState: AppState = {
-          ...state,
-          batches: (state.batches || []).filter(b => !batchIdsToRemove.has(b.id)),
-          feedingLogs: (state.feedingLogs || []).filter(l => !batchIdsToRemove.has(l.batchId || '')),
-          mortalityLogs: (state.mortalityLogs || []).filter(l => !batchIdsToRemove.has(l.batchId || '')),
-          biometryLogs: (state.biometryLogs || []).filter(l => !batchIdsToRemove.has(l.batchId || '')),
-          harvestLogs: (state.harvestLogs || []).filter(l => !batchIdsToRemove.has(l.batchId)),
-          harvestSchedules: (state.harvestSchedules || []).filter(l => !batchIdsToRemove.has(l.batchId)),
-          batchExpenses: (state.batchExpenses || []).filter(l => !batchIdsToRemove.has(l.batchId)),
-          batchRevenues: (state.batchRevenues || []).filter(l => !batchIdsToRemove.has(l.batchId)),
-          slaughterLogs: state.slaughterLogs || [],
-          cages: (state.cages || []).map(c => c.batchId && batchIdsToRemove.has(c.batchId) ? { ...c, batchId: undefined, initialFishCount: undefined, settlementDate: undefined, harvestDate: undefined } : c),
-          deletedIds: Array.from(new Set([...(state.deletedIds || []), ...allRemovedIds]))
-        };
-
-        handleStateUpdate(newState);
-        console.log(`Sistema: Limpeza automática realizada para ${batchesToCleanup.length} lotes arquivados há mais de 90 dias.`);
-      }
-    }
-  }, [state, currentUser, handleStateUpdate]);
 
   const renderContent = () => {
     if (!state || !currentUser) return null;

@@ -188,8 +188,10 @@ async function scheduleSafeFarmStatePersist(stateToSave: any) {
   function isServerItemDeleted(item: any, deletedSet: Set<string>, preserveOnBatchDeletion: boolean = false): boolean {
     if (!item || !item.id) return true;
     if (deletedSet.has(item.id)) {
-      if (preserveOnBatchDeletion && (item.batchId || item.batchName || item.entries || item.isDeletedFromSystem || item.id.startsWith('hist-'))) {
-        return false;
+      if (preserveOnBatchDeletion) {
+        // Protected items (harvest, slaughter, cold storage, utilities, chambers)
+        // are NEVER removed by batch tombstones or collateral deletions unless explicitly marked isDeletedFromSystem: true
+        return item.isDeletedFromSystem === true;
       }
       return true;
     }
@@ -383,8 +385,8 @@ async function scheduleSafeFarmStatePersist(stateToSave: any) {
     ];
 
     const merged: any = {
-      ...s1,
       ...s2,
+      ...s1,
       deletedIds: trimmedDeletedIds,
       users: mergeServerUsers(s1.users, s2.users, deletedSet),
       lastSync: new Date().toISOString()
@@ -392,6 +394,7 @@ async function scheduleSafeFarmStatePersist(stateToSave: any) {
 
     const frigorificoAndMaintenanceKeys = new Set([
       'closedBatchHistory',
+      'harvestLogs',
       'slaughterLogs',
       'slaughterExpenses',
       'slaughterEmployees',
@@ -416,7 +419,16 @@ async function scheduleSafeFarmStatePersist(stateToSave: any) {
 
     arrayKeys.forEach(key => {
       const preserve = frigorificoAndMaintenanceKeys.has(key);
-      merged[key] = mergeObjectsById(s1[key], s2[key], deletedSet, preserve);
+      const serverCollection = s1[key];
+      const clientCollection = s2[key];
+
+      // Se o cliente (s2) vier com array vazio ou nulo (ex: usuário abrindo app após tempo ou novo computador),
+      // e o servidor tiver dados existentes, o servidor NUNCA perde seus dados!
+      if (Array.isArray(serverCollection) && serverCollection.length > 0 && (!Array.isArray(clientCollection) || clientCollection.length === 0)) {
+        merged[key] = serverCollection.filter((i: any) => !isServerItemDeleted(i, deletedSet, preserve));
+      } else {
+        merged[key] = mergeObjectsById(serverCollection, clientCollection, deletedSet, preserve);
+      }
     });
 
     const mergeServerStringList = (key: string, updatedKey: string, prefix: string) => {

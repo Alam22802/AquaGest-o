@@ -152,8 +152,8 @@ function mergeArraysById<T extends { id: string, name?: string, batchId?: string
   const isItemDeleted = (item: any): boolean => {
     if (!item || !item.id) return true;
     if (deletedSet.has(item.id)) {
-      if (preserveOnBatchDeletion && (item.batchId || item.batchName || item.entries || item.isDeletedFromSystem || item.id.startsWith('hist-'))) {
-        return false;
+      if (preserveOnBatchDeletion) {
+        return item.isDeletedFromSystem === true;
       }
       return true;
     }
