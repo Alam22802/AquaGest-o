@@ -187,17 +187,13 @@ async function scheduleSafeFarmStatePersist(stateToSave: any) {
 
   function isServerItemDeleted(item: any, deletedSet: Set<string>, preserveOnBatchDeletion: boolean = false): boolean {
     if (!item || !item.id) return true;
-    if (deletedSet.has(item.id)) {
-      if (preserveOnBatchDeletion) {
-        // Protected items (harvest, slaughter, cold storage, utilities, chambers)
-        // are NEVER removed by batch tombstones or collateral deletions unless explicitly marked isDeletedFromSystem: true
-        return item.isDeletedFromSystem === true;
-      }
-      return true;
+    if (preserveOnBatchDeletion) {
+      // Protected items (harvest, slaughter, cold storage, utilities, chambers, expenses, revenues, biometry, mortality)
+      // are NEVER removed by batch tombstones or collateral deletions unless explicitly marked
+      return deletedSet.has(`explicit:${item.id}`);
     }
-    if (!preserveOnBatchDeletion) {
-      if (item.name && deletedSet.has(item.name)) return true;
-      if (item.batchId && deletedSet.has(item.batchId)) return true;
+    if (deletedSet.has(item.id)) {
+      return true;
     }
     return false;
   }
@@ -218,13 +214,6 @@ async function scheduleSafeFarmStatePersist(stateToSave: any) {
       
       const existing = map.get(item.id);
       if (!existing) {
-        // If the item only exists in the incoming client state:
-        // Do not resurrect stale ghost items from inactive devices
-        const itemTime = Number(item.updatedAt || 0);
-        if (itemTime > 0 && (now - itemTime > 30 * 24 * 60 * 60 * 1000)) {
-          // Stale item from more than 30 days ago that was absent from server - ignore
-          return;
-        }
         map.set(item.id, item);
       } else {
         const t1 = Number(existing.updatedAt || 0); // Server timestamp
@@ -406,6 +395,11 @@ async function scheduleSafeFarmStatePersist(stateToSave: any) {
       'slaughterSupplyRequests',
       'slaughterPurchaseOrders',
       'slaughterSupplyInvoices',
+      'batchExpenses',
+      'batchRevenues',
+      'mortalityLogs',
+      'biometryLogs',
+      'feedStockLogs',
       'coldStorageLogs',
       'utilityLogs',
       'coldChambers',
@@ -537,7 +531,7 @@ async function scheduleSafeFarmStatePersist(stateToSave: any) {
         return res.status(400).json({ error: "Missing state" });
       }
 
-      if (!serverFarmState || force) {
+      if (!serverFarmState) {
         serverFarmState = clientState;
       } else {
         serverFarmState = mergeFarmStates(serverFarmState, clientState);

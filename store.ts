@@ -151,15 +151,11 @@ function mergeArraysById<T extends { id: string, name?: string, batchId?: string
 
   const isItemDeleted = (item: any): boolean => {
     if (!item || !item.id) return true;
-    if (deletedSet.has(item.id)) {
-      if (preserveOnBatchDeletion) {
-        return item.isDeletedFromSystem === true;
-      }
-      return true;
+    if (preserveOnBatchDeletion) {
+      return deletedSet.has(`explicit:${item.id}`);
     }
-    if (!preserveOnBatchDeletion) {
-      if (item.name && deletedSet.has(item.name)) return true;
-      if (item.batchId && deletedSet.has(item.batchId)) return true;
+    if (deletedSet.has(item.id)) {
+      return true;
     }
     return false;
   };
@@ -168,17 +164,6 @@ function mergeArraysById<T extends { id: string, name?: string, batchId?: string
   for (let i = 0; i < safeLocal.length; i++) {
     const item = safeLocal[i];
     if (isItemDeleted(item)) continue;
-
-    // If remote priority is active and remote collection is populated:
-    // Do not resurrect stale local items that are absent from remote if they are older than 14 days
-    if (priority === 'remote' && safeRemote.length > 0) {
-      const itemTime = getTime(item);
-      const isPresentInRemote = safeRemote.some(r => r && r.id === item.id);
-      if (!isPresentInRemote && (itemTime === 0 || now - itemTime > 14 * 24 * 60 * 60 * 1000)) {
-        continue;
-      }
-    }
-
     map.set(item.id, item);
   }
 
@@ -199,13 +184,8 @@ function mergeArraysById<T extends { id: string, name?: string, batchId?: string
         // Remote is strictly newer: remote wins
         map.set(item.id, item);
       } else if (localTime > remoteTime) {
-        // Local is strictly newer: local wins only if priority is local or local was edited recently
-        if (priority === 'remote' && (now - localTime > 7 * 24 * 60 * 60 * 1000)) {
-          // Inactive local device with old timestamp should NOT override remote
-          map.set(item.id, item);
-        } else {
-          map.set(item.id, existing);
-        }
+        // Local is strictly newer: local wins
+        map.set(item.id, existing);
       } else {
         // Equal timestamps:
         if (priority === 'remote') {
@@ -490,16 +470,10 @@ export const ensureStateIntegrity = (state: any, mergeWith?: AppState, priority:
     if (deletedSet.size === 0) return arr;
     return arr.filter(i => {
       if (!i || !i.id) return false;
-      if (deletedSet.has(i.id)) {
-        if (preserveOnBatchDeletion && (i.batchId || i.batchName || i.entries || i.isDeletedFromSystem || i.id.startsWith('hist-'))) {
-          return true;
-        }
-        return false;
+      if (preserveOnBatchDeletion) {
+        return !deletedSet.has(`explicit:${i.id}`);
       }
-      if (!preserveOnBatchDeletion) {
-        if (i.name && deletedSet.has(i.name)) return false;
-        if (i.batchId && deletedSet.has(i.batchId)) return false;
-      }
+      if (deletedSet.has(i.id)) return false;
       return true;
     });
   };
@@ -522,9 +496,9 @@ export const ensureStateIntegrity = (state: any, mergeWith?: AppState, priority:
     cages: filterByTombstone(base.cages || []),
     feedTypes: filterByTombstone(base.feedTypes || []),
     feedingLogs: filterByTombstone(base.feedingLogs || []),
-    feedStockLogs: filterByTombstone(base.feedStockLogs || []),
-    mortalityLogs: filterByTombstone(base.mortalityLogs || []),
-    biometryLogs: filterByTombstone(base.biometryLogs || []),
+    feedStockLogs: filterByTombstone(base.feedStockLogs || [], true),
+    mortalityLogs: filterByTombstone(base.mortalityLogs || [], true),
+    biometryLogs: filterByTombstone(base.biometryLogs || [], true),
     slaughterLogs: filterByTombstone(base.slaughterLogs || [], true),
     slaughterExpenses: filterByTombstone(base.slaughterExpenses || [], true),
     slaughterEmployees: filterByTombstone(base.slaughterEmployees || [], true),
@@ -552,10 +526,10 @@ export const ensureStateIntegrity = (state: any, mergeWith?: AppState, priority:
     capexProjects: filterByTombstone(base.capexProjects || []),
     capexInvoices: filterByTombstone(base.capexInvoices || []),
     capexPurchaseOrders: filterByTombstone(base.capexPurchaseOrders || []),
-    harvestLogs: filterByTombstone(base.harvestLogs || []),
+    harvestLogs: filterByTombstone(base.harvestLogs || [], true),
     harvestSchedules: filterByTombstone(base.harvestSchedules || []),
-    batchExpenses: filterByTombstone(base.batchExpenses || []),
-    batchRevenues: filterByTombstone(base.batchRevenues || []),
+    batchExpenses: filterByTombstone(base.batchExpenses || [], true),
+    batchRevenues: filterByTombstone(base.batchRevenues || [], true),
     closedBatchHistory: filterByTombstone(base.closedBatchHistory || [], true),
     coldStorageLogs: filterByTombstone(base.coldStorageLogs || [], true),
     utilityLogs: filterByTombstone(base.utilityLogs || [], true),
@@ -634,9 +608,9 @@ export const ensureStateIntegrity = (state: any, mergeWith?: AppState, priority:
     batches: mergeArraysById(result.batches, mergeWith.batches, combinedDeletedIdsArray, priority),
     cages: mergeArraysById(result.cages, mergeWith.cages, combinedDeletedIdsArray, priority),
     feedingLogs: mergeArraysById(result.feedingLogs, mergeWith.feedingLogs, combinedDeletedIdsArray, priority),
-    feedStockLogs: mergeArraysById(result.feedStockLogs || [], mergeWith.feedStockLogs || [], combinedDeletedIdsArray, priority),
-    mortalityLogs: mergeArraysById(result.mortalityLogs, mergeWith.mortalityLogs, combinedDeletedIdsArray, priority),
-    biometryLogs: mergeArraysById(result.biometryLogs, mergeWith.biometryLogs, combinedDeletedIdsArray, priority),
+    feedStockLogs: mergeArraysById(result.feedStockLogs || [], mergeWith.feedStockLogs || [], combinedDeletedIdsArray, priority, true),
+    mortalityLogs: mergeArraysById(result.mortalityLogs, mergeWith.mortalityLogs, combinedDeletedIdsArray, priority, true),
+    biometryLogs: mergeArraysById(result.biometryLogs, mergeWith.biometryLogs, combinedDeletedIdsArray, priority, true),
     slaughterExpenses: mergeArraysById(result.slaughterExpenses || [], mergeWith.slaughterExpenses || [], combinedDeletedIdsArray, priority, true),
     slaughterEmployees: mergeArraysById(result.slaughterEmployees || [], mergeWith.slaughterEmployees || [], combinedDeletedIdsArray, priority, true),
     slaughterHRIndicators: mergeArraysById(result.slaughterHRIndicators || [], mergeWith.slaughterHRIndicators || [], combinedDeletedIdsArray, priority, true),
@@ -663,10 +637,10 @@ export const ensureStateIntegrity = (state: any, mergeWith?: AppState, priority:
     capexProjects: mergeArraysById(result.capexProjects || [], mergeWith.capexProjects || [], combinedDeletedIdsArray, priority),
     capexInvoices: mergeArraysById(result.capexInvoices || [], mergeWith.capexInvoices || [], combinedDeletedIdsArray, priority),
     capexPurchaseOrders: mergeArraysById(result.capexPurchaseOrders || [], mergeWith.capexPurchaseOrders || [], combinedDeletedIdsArray, priority),
-    harvestLogs: mergeArraysById(result.harvestLogs || [], mergeWith.harvestLogs || [], combinedDeletedIdsArray, priority),
+    harvestLogs: mergeArraysById(result.harvestLogs || [], mergeWith.harvestLogs || [], combinedDeletedIdsArray, priority, true),
     harvestSchedules: mergeArraysById(result.harvestSchedules || [], mergeWith.harvestSchedules || [], combinedDeletedIdsArray, priority),
-    batchExpenses: mergeArraysById(result.batchExpenses || [], mergeWith.batchExpenses || [], combinedDeletedIdsArray, priority),
-    batchRevenues: mergeArraysById(result.batchRevenues || [], mergeWith.batchRevenues || [], combinedDeletedIdsArray, priority),
+    batchExpenses: mergeArraysById(result.batchExpenses || [], mergeWith.batchExpenses || [], combinedDeletedIdsArray, priority, true),
+    batchRevenues: mergeArraysById(result.batchRevenues || [], mergeWith.batchRevenues || [], combinedDeletedIdsArray, priority, true),
     closedBatchHistory: mergeArraysById(result.closedBatchHistory || [], mergeWith.closedBatchHistory || [], combinedDeletedIdsArray, priority, true),
     coldStorageLogs: mergeArraysById(result.coldStorageLogs || [], mergeWith.coldStorageLogs || [], combinedDeletedIdsArray, priority, true),
     utilityLogs: mergeArraysById(result.utilityLogs || [], mergeWith.utilityLogs || [], combinedDeletedIdsArray, priority, true),

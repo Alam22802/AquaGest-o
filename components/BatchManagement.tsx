@@ -268,9 +268,10 @@ const BatchManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       return false;
     }).map(b => b.id);
 
-    const harvestLogsToRemove = (state.harvestLogs || []).filter((h) => isMatch(h.batchId)).map(h => h.id);
-    const batchExpensesToRemove = (state.batchExpenses || []).filter((e) => isMatch(e.batchId)).map(e => e.id);
-    const batchRevenuesToRemove = (state.batchRevenues || []).filter((r) => isMatch(r.batchId)).map(r => r.id);
+    // Harvest logs, expenses and revenues are historical operational records and must NEVER be deleted when a batch is closed
+    const harvestLogsToRemove: string[] = [];
+    const batchExpensesToRemove: string[] = [];
+    const batchRevenuesToRemove: string[] = [];
     const harvestSchedulesToRemove = (state.harvestSchedules || []).filter((hs) => isMatch(hs.batchId)).map(hs => hs.id);
 
     const allRemovedIds = [
@@ -279,9 +280,6 @@ const BatchManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       ...feedingLogsToRemove,
       ...mortalityLogsToRemove,
       ...biometryLogsToRemove,
-      ...harvestLogsToRemove,
-      ...batchExpensesToRemove,
-      ...batchRevenuesToRemove,
       ...harvestSchedulesToRemove,
     ];
 
