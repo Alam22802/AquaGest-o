@@ -7,10 +7,10 @@
       "phone": "00000000000",
       "canEdit": true,
       "isMaster": true,
-      "lastSync": "2026-08-18T10:34:58.309Z",
+      "lastSync": "2026-10-22T15:04:28.604Z",
       "password": "Costafoods@2026",
       "username": "admin",
-      "updatedAt": 1787158395488,
+      "updatedAt": 1792681468604,
       "isApproved": true,
       "lastLoginAt": "2026-08-19T16:53:15.486Z",
       "needsPasswordReset": false,
@@ -25,10 +25,10 @@
       "email": "mirelly.silva@avivar.com.br",
       "phone": "37998402697",
       "canEdit": true,
-      "lastSync": "2026-08-12T17:54:45.972Z",
+      "lastSync": "2026-10-22T15:04:28.604Z",
       "password": "Gestao@2026",
       "username": "mirellycsilva",
-      "updatedAt": 1787147996565,
+      "updatedAt": 1792681468604,
       "isApproved": true,
       "allowedTabs": [
         "capex",
@@ -63,10 +63,10 @@
       "email": "jose.neto@avivar.com.br",
       "phone": "37999549098",
       "canEdit": true,
-      "lastSync": "2026-08-17T22:39:57.894Z",
+      "lastSync": "2026-10-22T15:04:28.604Z",
       "password": "Theo@2026",
       "username": "josé neto",
-      "updatedAt": 1787080633408,
+      "updatedAt": 1792681468604,
       "isApproved": true,
       "allowedTabs": [
         "capex",
@@ -101,10 +101,10 @@
       "email": "alex.miranda@avivar.com.br",
       "phone": "37998282733",
       "canEdit": true,
-      "lastSync": "2026-08-17T16:45:14.877Z",
+      "lastSync": "2026-10-22T15:04:28.604Z",
       "password": "Li@.02020202",
       "username": "amiranda",
-      "updatedAt": 1787052303513,
+      "updatedAt": 1792681468604,
       "isApproved": true,
       "allowedTabs": [
         "capex",
@@ -139,10 +139,10 @@
       "email": "alam.douglas@avivar.com.br",
       "phone": "37998345841",
       "canEdit": true,
-      "lastSync": "2026-08-13T03:04:47.171Z",
+      "lastSync": "2026-10-22T15:04:28.604Z",
       "password": "a1b2c3",
       "username": "adouglas",
-      "updatedAt": 1787052303513,
+      "updatedAt": 1792681468604,
       "isApproved": true,
       "allowedTabs": [
         "inventory",
@@ -175,10 +175,10 @@
       "email": "vinicius.araujo@avivar.com.br",
       "phone": "37999524728",
       "canEdit": false,
-      "lastSync": "2026-07-07T18:39:56.369Z",
+      "lastSync": "2026-10-22T15:04:28.604Z",
       "password": "Fpa1001/",
       "username": "varaujo",
-      "updatedAt": 1787052303513,
+      "updatedAt": 1792681468604,
       "isApproved": true,
       "allowedTabs": [
         "capex",
@@ -206,10 +206,10 @@
       "email": "Josiane.santos@avivar.com.br",
       "phone": "3499289924",
       "canEdit": true,
-      "lastSync": "2026-08-13T15:11:18.061Z",
+      "lastSync": "2026-10-22T15:04:28.604Z",
       "password": "0606201217mA!",
       "username": "josi",
-      "updatedAt": 1787052303513,
+      "updatedAt": 1792681468604,
       "isApproved": true,
       "allowedTabs": [
         "capex",
@@ -240,7 +240,7 @@
       "canEdit": true,
       "password": "#Bamazu24",
       "username": "bianca.alves",
-      "updatedAt": 1787052303513,
+      "updatedAt": 1792681468604,
       "isApproved": true,
       "allowedTabs": [
         "capex",
@@ -259,7 +259,8 @@
       "needsPasswordReset": false,
       "receiveNotifications": true,
       "accessUnlockRequested": false,
-      "passwordResetRequested": false
+      "passwordResetRequested": false,
+      "lastSync": "2026-10-22T15:04:28.604Z"
     },
     {
       "id": "66b95dcd-ff64-4f38-9780-a0c6ae8f6b42",
@@ -267,10 +268,10 @@
       "email": "framir@avivar.com.br",
       "phone": "",
       "canEdit": true,
-      "lastSync": "2026-03-19T15:32:22.506Z",
+      "lastSync": "2026-10-22T15:04:28.604Z",
       "password": "a1b2c3",
       "username": "framir",
-      "updatedAt": 1787052303513,
+      "updatedAt": 1792681468604,
       "isApproved": true,
       "allowedTabs": [
         "capex",
@@ -303,10 +304,10 @@
       "email": "taynan.lieggio@avivar.com.br",
       "phone": "37998683996",
       "canEdit": true,
-      "lastSync": "2026-08-14T13:53:47.830Z",
+      "lastSync": "2026-10-22T15:04:28.604Z",
       "password": "araguAri@2026",
       "username": "taynan.lieggio",
-      "updatedAt": 1787052303513,
+      "updatedAt": 1792681468604,
       "isApproved": true,
       "allowedTabs": [
         "biometry",
@@ -335,10 +336,10 @@
       "email": "aline.ribeiro@avivar.com.br",
       "phone": "34992294437",
       "canEdit": true,
-      "lastSync": "2026-08-17T20:37:08.840Z",
+      "lastSync": "2026-10-22T15:04:28.604Z",
       "password": "a1b2c3",
       "username": "aline",
-      "updatedAt": 1787146972480,
+      "updatedAt": 1792681468604,
       "isApproved": true,
       "allowedTabs": [
         "inventory",
@@ -365,10 +366,10 @@
       "email": "marcelo.gontijo@avivar.com.br",
       "phone": "034988412581",
       "canEdit": true,
-      "lastSync": "2026-06-29T17:37:05.999Z",
+      "lastSync": "2026-10-22T15:04:28.604Z",
       "password": "Costafoods@2026",
       "username": "marcelo",
-      "updatedAt": 1787052303513,
+      "updatedAt": 1792681468604,
       "isApproved": true,
       "allowedTabs": [
         "slaughter",
@@ -386,10 +387,10 @@
       "email": "douglas.barreto@avivar.com.br",
       "phone": "37998147693",
       "canEdit": true,
-      "lastSync": "2026-05-25T18:33:17.345Z",
+      "lastSync": "2026-10-22T15:04:28.604Z",
       "password": "@C7l2a0dl",
       "username": "dbarreto",
-      "updatedAt": 1787052303513,
+      "updatedAt": 1792681468604,
       "isApproved": true,
       "allowedTabs": [
         "cloud",
@@ -411,10 +412,10 @@
       "email": "saulo.caldas@avivar.com.br",
       "phone": "37998285458",
       "canEdit": true,
-      "lastSync": "2026-08-12T13:08:32.248Z",
+      "lastSync": "2026-10-22T15:04:28.604Z",
       "password": "@Santanense10",
       "username": "saulo.caldas",
-      "updatedAt": 1787067207860,
+      "updatedAt": 1792681468604,
       "isApproved": true,
       "allowedTabs": [
         "dashboard",
@@ -438,10 +439,10 @@
       "email": "elisangela.leonardo@avivar.com.br",
       "phone": "37999042212",
       "canEdit": false,
-      "lastSync": "2026-05-20T16:31:23.127Z",
+      "lastSync": "2026-10-22T15:04:28.604Z",
       "password": "Meioambiente*2026",
       "username": "elisangela.leonardo",
-      "updatedAt": 1787052303513,
+      "updatedAt": 1792681468604,
       "isApproved": true,
       "allowedTabs": [
         "dashboard",
@@ -461,10 +462,10 @@
       "email": "deiverson.carvalho@avivar.com.br",
       "phone": "37 999396228",
       "canEdit": false,
-      "lastSync": "2026-08-15T02:47:02.979Z",
+      "lastSync": "2026-10-22T15:04:28.604Z",
       "password": "17826",
       "username": "deiverson",
-      "updatedAt": 1787052303513,
+      "updatedAt": 1792681468604,
       "isApproved": true,
       "allowedTabs": [
         "dashboard",
@@ -481,10 +482,10 @@
       "email": "thiago.pereira@avivar.com.br",
       "phone": "37999939060",
       "canEdit": false,
-      "lastSync": "2026-08-13T10:21:55.873Z",
+      "lastSync": "2026-10-22T15:04:28.604Z",
       "password": "a1b2c3",
       "username": "cpatrimonial",
-      "updatedAt": 1787058924937,
+      "updatedAt": 1792681468604,
       "isApproved": true,
       "allowedTabs": [
         "inventory",
@@ -511,10 +512,10 @@
       "email": "gabriel.henrique@avivar.com.br",
       "phone": "34998055269",
       "canEdit": true,
-      "lastSync": "2026-08-13T16:36:29.164Z",
+      "lastSync": "2026-10-22T15:04:28.604Z",
       "password": "19762113",
       "username": "gabriel henrique",
-      "updatedAt": 1787141638639,
+      "updatedAt": 1792681468604,
       "isApproved": true,
       "allowedTabs": [
         "dashboard",
@@ -537,10 +538,10 @@
       "email": "ryan.santos@avivar.com.br",
       "phone": "379981946465",
       "canEdit": true,
-      "lastSync": "2026-08-18T10:22:11.491Z",
+      "lastSync": "2026-10-22T15:04:28.604Z",
       "password": "Aqua2026*",
       "username": "ralves",
-      "updatedAt": 1787159231149,
+      "updatedAt": 1792681468604,
       "isApproved": true,
       "allowedTabs": [
         "biometry",
@@ -571,10 +572,10 @@
       "email": "lucas.silveira@avivar.com.br",
       "phone": "37 991149471",
       "canEdit": true,
-      "lastSync": "2026-08-12T15:55:14.456Z",
+      "lastSync": "2026-10-22T15:04:28.604Z",
       "password": "CostaFoods2026@",
       "username": "lucas.silveira",
-      "updatedAt": 1787139165943,
+      "updatedAt": 1792681468604,
       "isApproved": true,
       "allowedTabs": [
         "dashboard",
@@ -596,10 +597,10 @@
       "email": "bibiana.morais@avivar.com.br",
       "phone": "37998667641",
       "canEdit": true,
-      "lastSync": "2026-07-29T19:19:01.417Z",
+      "lastSync": "2026-10-22T15:04:28.604Z",
       "password": "morais123",
       "username": "bmorais",
-      "updatedAt": 1787052303513,
+      "updatedAt": 1792681468604,
       "isApproved": true,
       "allowedTabs": [
         "biometry",
@@ -627,10 +628,10 @@
       "email": "juliana.morais@avivar.com.br",
       "phone": "37999922955",
       "canEdit": true,
-      "lastSync": "2026-07-10T18:11:05.541Z",
+      "lastSync": "2026-10-22T15:04:28.604Z",
       "password": "A1b2c3d4!",
       "username": "jmoraes",
-      "updatedAt": 1787052303513,
+      "updatedAt": 1792681468604,
       "isApproved": true,
       "allowedTabs": [
         "dashboard",
@@ -656,7 +657,7 @@
       "canEdit": true,
       "password": "Beleza10@",
       "username": "pcosta",
-      "updatedAt": 1787052303513,
+      "updatedAt": 1792681468604,
       "isApproved": true,
       "allowedTabs": [
         "biometry",
@@ -676,7 +677,8 @@
       "needsPasswordReset": false,
       "receiveNotifications": true,
       "accessUnlockRequested": false,
-      "passwordResetRequested": false
+      "passwordResetRequested": false,
+      "lastSync": "2026-10-22T15:04:28.604Z"
     },
     {
       "id": "813f18ca-5c03-471f-a5b1-5352ae68a327",
@@ -684,10 +686,10 @@
       "email": "bianca.sfaria@avivar.com.br",
       "phone": "37999241977",
       "canEdit": true,
-      "lastSync": "2026-08-03T17:59:01.664Z",
+      "lastSync": "2026-10-22T15:04:28.604Z",
       "password": "Mb@101221",
       "username": "bfarias",
-      "updatedAt": 1787052303513,
+      "updatedAt": 1792681468604,
       "isApproved": true,
       "allowedTabs": [
         "biometry",
@@ -718,7 +720,7 @@
       "canEdit": true,
       "password": "Bem@2014",
       "username": "sara",
-      "updatedAt": 1787052303513,
+      "updatedAt": 1792681468604,
       "isApproved": true,
       "allowedTabs": [
         "biometry",
@@ -739,7 +741,8 @@
       "needsPasswordReset": false,
       "receiveNotifications": true,
       "accessUnlockRequested": false,
-      "passwordResetRequested": false
+      "passwordResetRequested": false,
+      "lastSync": "2026-10-22T15:04:28.604Z"
     },
     {
       "id": "e881d47c-c227-4492-9be9-47b5cea5e839",
@@ -749,7 +752,7 @@
       "canEdit": true,
       "password": "a1b2c3",
       "username": "diogo",
-      "updatedAt": 1787052303513,
+      "updatedAt": 1792681468604,
       "isApproved": true,
       "allowedTabs": [
         "biometry",
@@ -770,7 +773,8 @@
       "needsPasswordReset": false,
       "receiveNotifications": true,
       "accessUnlockRequested": false,
-      "passwordResetRequested": false
+      "passwordResetRequested": false,
+      "lastSync": "2026-10-22T15:04:28.604Z"
     },
     {
       "id": "f80993c0-0029-4c83-ae56-046dc77f5483",
@@ -780,7 +784,7 @@
       "canEdit": true,
       "password": "@Costa0808",
       "username": "sribeiro",
-      "updatedAt": 1787052303513,
+      "updatedAt": 1792681468604,
       "isApproved": true,
       "allowedTabs": [
         "biometry",
@@ -801,7 +805,8 @@
       "needsPasswordReset": false,
       "receiveNotifications": true,
       "accessUnlockRequested": false,
-      "passwordResetRequested": false
+      "passwordResetRequested": false,
+      "lastSync": "2026-10-22T15:04:28.604Z"
     },
     {
       "id": "c9a11caa-e63b-4e7d-a978-be01e40cfbc7",
@@ -809,10 +814,10 @@
       "email": "francinne.mendonca@avivar.com.br",
       "phone": "37991139828",
       "canEdit": false,
-      "lastSync": "2026-08-11T19:27:08.739Z",
+      "lastSync": "2026-10-22T15:04:28.604Z",
       "password": "Sobrevoar@9828",
       "username": "fmendonca",
-      "updatedAt": 1787159097613,
+      "updatedAt": 1792681468604,
       "isApproved": true,
       "allowedTabs": [
         "biometry",
@@ -842,10 +847,10 @@
       "email": "eduardo.almeida@avivar.com.br",
       "phone": "37999468618",
       "canEdit": true,
-      "lastSync": "2026-03-29T12:12:52.059Z",
+      "lastSync": "2026-10-22T15:04:28.604Z",
       "password": "Rafa2018",
       "username": "ealmeida",
-      "updatedAt": 1787052303513,
+      "updatedAt": 1792681468604,
       "isApproved": true,
       "allowedTabs": [
         "capex",
@@ -874,7 +879,7 @@
       "canEdit": true,
       "password": "Alvaro123",
       "username": "alvaro",
-      "updatedAt": 1787052303513,
+      "updatedAt": 1792681468604,
       "isApproved": true,
       "allowedTabs": [
         "biometry",
@@ -894,7 +899,8 @@
       "needsPasswordReset": false,
       "receiveNotifications": true,
       "accessUnlockRequested": false,
-      "passwordResetRequested": false
+      "passwordResetRequested": false,
+      "lastSync": "2026-10-22T15:04:28.604Z"
     },
     {
       "id": "67af2209-e2ff-465c-a7d5-7ba1e5f58980",
@@ -904,7 +910,7 @@
       "canEdit": false,
       "password": "Lucio@1990",
       "username": "lucio",
-      "updatedAt": 1787052303513,
+      "updatedAt": 1792681468604,
       "isApproved": true,
       "allowedTabs": [
         "biometry",
@@ -924,7 +930,8 @@
       "needsPasswordReset": false,
       "receiveNotifications": true,
       "accessUnlockRequested": false,
-      "passwordResetRequested": false
+      "passwordResetRequested": false,
+      "lastSync": "2026-10-22T15:04:28.604Z"
     },
     {
       "id": "b2c51efc-9eb1-4363-84d5-5ac739f89966",
@@ -934,7 +941,7 @@
       "canEdit": false,
       "password": "190421",
       "username": "yulli.rocha",
-      "updatedAt": 1787064333821,
+      "updatedAt": 1792681468604,
       "isApproved": true,
       "allowedTabs": [
         "capex"
@@ -944,7 +951,8 @@
       "receiveNotifications": true,
       "accessUnlockRequested": false,
       "blockedDueToInactivity": false,
-      "passwordResetRequested": false
+      "passwordResetRequested": false,
+      "lastSync": "2026-10-22T15:04:28.604Z"
     },
     {
       "id": "9e53b708-90dc-4f43-b141-cb95b8461421",
@@ -952,10 +960,10 @@
       "email": "melissa.oliveira@avivar.com.br",
       "phone": "37998384374",
       "canEdit": false,
-      "lastSync": "2026-06-19T19:13:02.728Z",
+      "lastSync": "2026-10-22T15:04:28.604Z",
       "password": "Mel@vivar2026",
       "username": "melissa.oliveira",
-      "updatedAt": 1787052303513,
+      "updatedAt": 1792681468604,
       "isApproved": true,
       "allowedTabs": [
         "capex",
@@ -985,7 +993,7 @@
       "canEdit": false,
       "password": "Agr2025T@sT",
       "username": "ateixeira",
-      "updatedAt": 1787052303513,
+      "updatedAt": 1792681468604,
       "isApproved": true,
       "allowedTabs": [
         "biometry",
@@ -1006,7 +1014,8 @@
       "needsPasswordReset": false,
       "receiveNotifications": true,
       "accessUnlockRequested": false,
-      "passwordResetRequested": false
+      "passwordResetRequested": false,
+      "lastSync": "2026-10-22T15:04:28.604Z"
     },
     {
       "id": "6b12a240-86a8-4a01-b752-81a18f9949b5",
@@ -1016,7 +1025,7 @@
       "canEdit": false,
       "password": "9921",
       "username": "jluiz",
-      "updatedAt": 1787052303513,
+      "updatedAt": 1792681468604,
       "isApproved": true,
       "supabaseConfig": {
         "key": "sb_publishable_6pzPUoxRa0fmfH99s3aoPQ_vwM4w0Ob",
@@ -1025,7 +1034,8 @@
       "needsPasswordReset": false,
       "receiveNotifications": true,
       "accessUnlockRequested": false,
-      "passwordResetRequested": false
+      "passwordResetRequested": false,
+      "lastSync": "2026-10-22T15:04:28.604Z"
     },
     {
       "id": "5e891058-b1df-4083-a4f2-b8dcf2e894e8",
@@ -1035,7 +1045,7 @@
       "canEdit": false,
       "password": "a1b2c3",
       "username": "lralves",
-      "updatedAt": 1787052303513,
+      "updatedAt": 1792681468604,
       "isApproved": true,
       "allowedTabs": [
         "capex",
@@ -1058,7 +1068,8 @@
       "needsPasswordReset": false,
       "receiveNotifications": true,
       "accessUnlockRequested": false,
-      "passwordResetRequested": false
+      "passwordResetRequested": false,
+      "lastSync": "2026-10-22T15:04:28.604Z"
     },
     {
       "id": "7fbd4dc8-6cfd-457c-afb2-d230fd1191a6",
@@ -1068,7 +1079,7 @@
       "canEdit": true,
       "password": "@Costa0808",
       "username": "sergio.ribeiro",
-      "updatedAt": 1787052303513,
+      "updatedAt": 1792681468604,
       "isApproved": true,
       "allowedTabs": [
         "biometry",
@@ -1088,7 +1099,8 @@
       "needsPasswordReset": false,
       "receiveNotifications": true,
       "accessUnlockRequested": false,
-      "passwordResetRequested": false
+      "passwordResetRequested": false,
+      "lastSync": "2026-10-22T15:04:28.604Z"
     }
   ],
   "lines": [
@@ -53827,5 +53839,6 @@
     "01/2026 - L2",
     "972c8350-2c1c-42e4-b325-43a8d83802ee"
   ],
-  "lastSync": "2026-10-22T10:33:52.719Z"
+  "lastSync": "2026-10-22T15:04:28.604Z",
+  "massSyncAt": 1792681468604
 }

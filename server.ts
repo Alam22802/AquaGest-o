@@ -531,8 +531,9 @@ async function scheduleSafeFarmStatePersist(stateToSave: any) {
         return res.status(400).json({ error: "Missing state" });
       }
 
-      if (!serverFarmState) {
+      if (!serverFarmState || force === true) {
         serverFarmState = clientState;
+        console.log(`[Farm State] Force mass sync applied at ${new Date().toISOString()}`);
       } else {
         serverFarmState = mergeFarmStates(serverFarmState, clientState);
       }

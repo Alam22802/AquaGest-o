@@ -174,6 +174,13 @@ function mergeArraysById<T extends { id: string, name?: string, batchId?: string
     
     const existing = map.get(item.id);
     if (!existing) {
+      if (priority === 'remote') {
+        const remoteTime = getTime(item);
+        // Only accept if it is a fresh item created recently (last 15 minutes) by the user
+        if (remoteTime === 0 || now - remoteTime > 15 * 60 * 1000) {
+          continue; // Stale ghost item from inactive client device - do not resurrect!
+        }
+      }
       map.set(item.id, item);
     } else {
       const remoteTime = getTime(item);
@@ -1383,40 +1390,68 @@ export const exportData = (state: AppState) => {
   linkElement.click();
 };
 
-export const forceAdminMassSync = async (adminState: AppState, config?: { url: string; key: string }): Promise<{ success: boolean; message: string }> => {
+export const forceAdminMassSync = async (
+  adminState: AppState, 
+  config?: { url: string; key: string }
+): Promise<{ success: boolean; message: string; state?: AppState }> => {
   try {
-    const integrityState = ensureStateIntegrity({
-      ...adminState,
-      lastSync: Date.now()
-    });
+    const nowIso = new Date().toISOString();
+    const nowTime = Date.now();
 
+    // 1. Atualizar lastSync e updatedAt de TODOS os usuários cadastrados
+    const updatedUsers = (adminState.users || []).map(u => ({
+      ...u,
+      lastSync: nowIso,
+      updatedAt: nowTime
+    }));
+
+    const massSyncedState: AppState = {
+      ...adminState,
+      users: updatedUsers,
+      lastSync: nowIso,
+      massSyncAt: nowTime
+    };
+
+    const integrityState = ensureStateIntegrity(massSyncedState);
     const configToUse = config || integrityState.supabaseConfig || getSupabaseConfig();
 
-    // 1. Force save to server API (overwrites server state)
+    let serverSavedState: AppState = integrityState;
+
+    // 2. Enviar com force: true para o servidor central
     try {
-      await fetch('/api/farm-state', {
+      const res = await fetch('/api/farm-state', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ state: integrityState, force: true })
       });
+      if (res.ok) {
+        const json = await res.json();
+        if (json && json.state) {
+          serverSavedState = json.state;
+        }
+      }
     } catch (err) {
       console.warn('Erro na sincronização em massa com o servidor:', err);
     }
 
-    // 2. Force overwrite in Supabase (WITHOUT merging)
+    // 3. Forçar gravação no Supabase (se configurado)
     const supabase = getSupabase(configToUse);
     if (supabase) {
-      const { error } = await supabase
-        .from('farm_data')
-        .upsert({ id: 'singleton', state: integrityState, last_sync: new Date().toISOString() });
-      if (error) {
-        console.error('Erro no upsert forçado do Supabase:', error);
+      try {
+        const { error } = await supabase
+          .from('farm_data')
+          .upsert({ id: 'singleton', state: serverSavedState, last_sync: nowIso });
+        if (error) {
+          console.error('Erro no upsert forçado do Supabase:', error);
+        }
+      } catch (sbErr) {
+        console.warn('Erro no Supabase mass sync:', sbErr);
       }
     }
 
-    // 3. Update localStorage
+    // 4. Atualizar cache local do Admin
     try {
-      const jsonStr = JSON.stringify(integrityState);
+      const jsonStr = JSON.stringify(serverSavedState);
       localStorage.setItem(STORAGE_KEY, LZString.compressToUTF16(jsonStr));
     } catch (e) {
       console.warn('Erro de cota ao salvar no localStorage:', e);
@@ -1424,7 +1459,8 @@ export const forceAdminMassSync = async (adminState: AppState, config?: { url: s
 
     return {
       success: true,
-      message: 'Sincronização em massa concluída com sucesso! Todos os dados do Administrador foram replicados para o banco central e nuvem. Todos os usuários agora visualizarão a mesma base de dados.'
+      message: 'Sincronização em massa concluída com sucesso! Todos os dados do Administrador foram replicados para o banco central e nuvem. A data de última sincronia de todos os usuários foi atualizada para agora.',
+      state: serverSavedState
     };
   } catch (err: any) {
     return {

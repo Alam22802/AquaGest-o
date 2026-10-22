@@ -88,10 +88,19 @@ const UserManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     setIsSyncingMass(true);
     try {
       const res = await forceAdminMassSync(state, state.supabaseConfig);
-      if (res.success) {
+      if (res.success && res.state) {
+        onUpdate(res.state);
+      } else if (res.success) {
+        const nowIso = new Date().toISOString();
+        const updatedUsers = (state.users || []).map(u => ({
+          ...u,
+          lastSync: nowIso,
+          updatedAt: Date.now()
+        }));
         onUpdate({
           ...state,
-          lastSync: Date.now()
+          users: updatedUsers,
+          lastSync: nowIso
         });
       }
       alert(res.message);

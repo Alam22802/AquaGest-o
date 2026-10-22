@@ -711,5 +711,6 @@ export interface AppState {
   notificationSettings?: NotificationSettings;
   supabaseConfig?: { url: string; key: string };
   lastSync?: string;
+  massSyncAt?: number;
   deletedIds?: string[];
 }
