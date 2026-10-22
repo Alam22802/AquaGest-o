@@ -18,7 +18,10 @@ import {
   Layers,
   History,
   Trash2,
-  Unlock
+  Unlock,
+  ChevronDown,
+  Tag,
+  X
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -54,7 +57,9 @@ const safeDateFormat = (dateStr: string | undefined, formatStr: string) => {
 };
 
 export const ClosedBatchHistory: React.FC<Props> = ({ state, currentUser, onUpdate, initialBatchId }) => {
-  const [selectedRecordId, setSelectedRecordId] = useState<string>('');
+  const [selectedRecordIds, setSelectedRecordIds] = useState<string[]>([]);
+  const [isSelectorOpen, setIsSelectorOpen] = useState(false);
+  const [batchSearchTerm, setBatchSearchTerm] = useState('');
   const [filterCategory, setFilterCategory] = useState('');
   const [filterItem, setFilterItem] = useState('');
   const [printOrientation, setPrintOrientation] = useState<'portrait' | 'landscape'>('portrait');
@@ -92,24 +97,201 @@ export const ClosedBatchHistory: React.FC<Props> = ({ state, currentUser, onUpda
   }, [state.batches, state.closedBatchHistory, state.harvestLogs, state.feedingLogs, state.mortalityLogs, state.biometryLogs, state.slaughterLogs, state.batchExpenses, state.batchRevenues]);
 
   useEffect(() => {
-    if (initialBatchId) {
+    if (initialBatchId && selectedRecordIds.length === 0) {
       const cleanId = initialBatchId.replace(/^hist-/, '');
       const match = historicalRecords.find(r => r.id === initialBatchId || r.batchId === initialBatchId || r.batchId === cleanId || r.id === `hist-${cleanId}` || r.batchName === initialBatchId);
       if (match) {
-        setSelectedRecordId(match.id);
+        setSelectedRecordIds([match.id]);
         return;
       }
     }
-    if (!selectedRecordId && historicalRecords.length > 0) {
-      setSelectedRecordId(historicalRecords[0].id);
+    if (selectedRecordIds.length === 0 && historicalRecords.length > 0) {
+      setSelectedRecordIds([historicalRecords[0].id]);
     }
-  }, [historicalRecords, selectedRecordId, initialBatchId]);
+  }, [historicalRecords, initialBatchId]);
 
-  const selectedRecord = useMemo(() => {
-    if (!selectedRecordId) return null;
-    const cleanId = selectedRecordId.replace(/^hist-/, '');
-    return historicalRecords.find(r => r.id === selectedRecordId || r.batchId === selectedRecordId || r.batchId === cleanId || r.id === `hist-${cleanId}` || r.batchName === selectedRecordId) || null;
-  }, [selectedRecordId, historicalRecords]);
+  const filteredRecordsBySearch = useMemo(() => {
+    if (!batchSearchTerm.trim()) return historicalRecords;
+    const term = batchSearchTerm.toLowerCase();
+    return historicalRecords.filter(r => 
+      r.batchName.toLowerCase().includes(term) ||
+      safeDateFormat(r.settlementDate, 'dd/MM/yyyy').includes(term)
+    );
+  }, [historicalRecords, batchSearchTerm]);
+
+  const selectedRecords = useMemo(() => {
+    if (selectedRecordIds.length === 0) return [];
+    return historicalRecords.filter(r => {
+      const cleanId = (r.batchId || r.id).replace(/^hist-/, '');
+      return (
+        selectedRecordIds.includes(r.id) || 
+        selectedRecordIds.includes(r.batchId) || 
+        selectedRecordIds.includes(cleanId) ||
+        selectedRecordIds.includes(`hist-${cleanId}`) ||
+        selectedRecordIds.includes(r.batchName)
+      );
+    });
+  }, [selectedRecordIds, historicalRecords]);
+
+  const isConsolidated = selectedRecords.length > 1;
+  const singleSelectedRecord = selectedRecords.length === 1 ? selectedRecords[0] : null;
+
+  // Compute consolidated record when multiple closed batches are selected
+  const displayRecord = useMemo((): (ClosedBatchRecord & { batchNames?: string[] }) | null => {
+    if (selectedRecords.length === 0) return null;
+    if (selectedRecords.length === 1) return selectedRecords[0];
+
+    const totalInitialQuantity = selectedRecords.reduce((acc, r) => acc + (r.initialQuantity || 0), 0);
+    const totalMortality = selectedRecords.reduce((acc, r) => acc + (r.mortality || 0), 0);
+    const totalHarvestedFish = selectedRecords.reduce((acc, r) => acc + (r.harvestedFish || 0), 0);
+    const totalHarvestedWeight = selectedRecords.reduce((acc, r) => acc + (r.harvestedWeight || 0), 0);
+    const totalFeedKg = selectedRecords.reduce((acc, r) => acc + (r.totalFeedKg || 0), 0);
+    const totalExpectedFish = selectedRecords.reduce((acc, r) => acc + (r.expectedFish || 0), 0);
+    const totalBiomassBeforeHarvest = selectedRecords.reduce((acc, r) => acc + (r.biomassBeforeHarvest || 0), 0);
+    const totalReceptionWeight = selectedRecords.reduce((acc, r) => acc + (r.totalReceptionWeight || r.harvestedWeight || 0), 0);
+
+    // Ponderated initial avg weight
+    const initialAvgWeight = totalInitialQuantity > 0 
+      ? selectedRecords.reduce((acc, r) => acc + ((r.initialAvgWeight || 0) * (r.initialQuantity || 0)), 0) / totalInitialQuantity
+      : 0;
+
+    const currentAvgWeight = totalHarvestedFish > 0 
+      ? (totalHarvestedWeight * 1000) / totalHarvestedFish 
+      : 0;
+
+    const survivalRate = totalInitialQuantity > 0
+      ? selectedRecords.reduce((acc, r) => acc + ((r.survivalRate || 0) * (r.initialQuantity || 0)), 0) / totalInitialQuantity
+      : 0;
+
+    const survivalRateReal = totalInitialQuantity > 0
+      ? (totalHarvestedFish / totalInitialQuantity) * 100
+      : 0;
+
+    const fcaReal = totalHarvestedWeight > 0 ? totalFeedKg / totalHarvestedWeight : 0;
+    const fcaTheoretical = totalBiomassBeforeHarvest > 0 ? totalFeedKg / totalBiomassBeforeHarvest : 0;
+    const accuracy = survivalRate > 0 ? (survivalRateReal / survivalRate) * 100 : 0;
+
+    const totalDays = Math.round(selectedRecords.reduce((acc, r) => acc + (r.totalDays || 0), 0) / selectedRecords.length);
+    const gpd = totalDays > 0 && currentAvgWeight > initialAvgWeight ? (currentAvgWeight - initialAvgWeight) / totalDays : 0;
+
+    // Financial calculations
+    const supplierInvoiceVal = selectedRecords.reduce((acc, r) => acc + (r.supplierInvoiceVal || 0), 0);
+    const totalFeedCost = selectedRecords.reduce((acc, r) => acc + (r.totalFeedCost || 0), 0);
+    const otherExpensesVal = selectedRecords.reduce((acc, r) => acc + (r.otherExpensesVal || 0), 0);
+    const bonusDeductionsVal = selectedRecords.reduce((acc, r) => acc + (r.bonusDeductionsVal || 0), 0);
+    const grossExpenses = selectedRecords.reduce((acc, r) => acc + (r.grossExpenses || (r.supplierInvoiceVal || 0) + (r.totalFeedCost || 0) + (r.otherExpensesVal || 0)), 0);
+    const totalExpenses = selectedRecords.reduce((acc, r) => acc + (r.totalExpenses || 0), 0);
+    const totalRevenue = selectedRecords.reduce((acc, r) => acc + (r.totalRevenue || 0), 0);
+    const totalProfit = selectedRecords.reduce((acc, r) => acc + (r.totalProfit ?? ((r.totalRevenue || 0) - (r.totalExpenses || 0))), 0);
+    const costPerKg = totalReceptionWeight > 0 ? totalExpenses / totalReceptionWeight : 0;
+    const profitMarginPercent = totalRevenue > 0 ? (totalProfit / totalRevenue) * 100 : 0;
+
+    // Aggregated feed breakdown
+    const feedMap = new Map<string, { name: string; amountKg: number; cost: number }>();
+    selectedRecords.forEach(r => {
+      (r.feedBreakdown || []).forEach(f => {
+        const curr = feedMap.get(f.name) || { name: f.name, amountKg: 0, cost: 0 };
+        curr.amountKg += f.amountKg || 0;
+        curr.cost += f.cost || 0;
+        feedMap.set(f.name, curr);
+      });
+    });
+    const feedBreakdown = Array.from(feedMap.values());
+
+    // Combined entries with batchName
+    const entries = selectedRecords.flatMap(r => 
+      (r.entries || []).map(e => ({
+        ...e,
+        id: `${r.id}-${e.id || Math.random()}`,
+        batchName: r.batchName
+      }))
+    ).sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+
+    // Mortality timeline: group by date
+    const mortMap = new Map<string, number>();
+    selectedRecords.forEach(r => {
+      (r.mortalityTimeline || []).forEach(m => {
+        mortMap.set(m.date, (mortMap.get(m.date) || 0) + m.count);
+      });
+    });
+    let cumulative = 0;
+    const sortedMortDates = Array.from(mortMap.keys()).sort();
+    const mortalityTimeline = sortedMortDates.map(d => {
+      const count = mortMap.get(d) || 0;
+      cumulative += count;
+      return { date: d, count, cumulative };
+    });
+
+    // Biometry timeline: group by day / date
+    const bioMap = new Map<string, { totalWeight: number; count: number; days: number; isHarvestDate?: boolean }>();
+    selectedRecords.forEach(r => {
+      (r.biometryTimeline || []).forEach(b => {
+        const key = b.date || b.fullDate;
+        const existing = bioMap.get(key) || { totalWeight: 0, count: 0, days: b.days, isHarvestDate: b.isHarvestDate };
+        if (b.weight !== undefined) {
+          existing.totalWeight += b.weight;
+          existing.count += 1;
+        }
+        bioMap.set(key, existing);
+      });
+    });
+    const biometryTimeline = Array.from(bioMap.entries())
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([date, val]) => ({
+        date,
+        fullDate: date,
+        days: val.days,
+        weight: val.count > 0 ? Math.round((val.totalWeight / val.count) * 10) / 10 : undefined,
+        isHarvestDate: val.isHarvestDate
+      }));
+
+    const sortedDates = selectedRecords.map(r => r.settlementDate).filter(Boolean).sort();
+    const sortedCloseDates = selectedRecords.map(r => r.closedAt).filter(Boolean).sort();
+
+    return {
+      id: 'consolidated',
+      batchId: 'consolidated',
+      batchName: `Consolidado (${selectedRecords.length} Lotes)`,
+      batchNames: selectedRecords.map(r => r.batchName),
+      settlementDate: sortedDates[0] || '',
+      closedAt: sortedCloseDates[sortedCloseDates.length - 1] || '',
+      totalDays,
+      initialQuantity: totalInitialQuantity,
+      initialUnitWeight: initialAvgWeight,
+      initialAvgWeight,
+      currentAvgWeight,
+      mortality: totalMortality,
+      harvestedFish: totalHarvestedFish,
+      harvestedWeight: totalHarvestedWeight,
+      totalFeedKg,
+      totalFeedCost,
+      expectedFish: totalExpectedFish,
+      biomassBeforeHarvest: totalBiomassBeforeHarvest,
+      totalReceptionWeight,
+      survivalRate,
+      survivalRateReal,
+      fcaReal,
+      fcaTheoretical,
+      accuracy,
+      gpd,
+      supplierInvoiceVal,
+      otherExpensesVal,
+      bonusDeductionsVal,
+      grossExpenses,
+      totalExpenses,
+      totalRevenue,
+      totalProfit,
+      costPerKg,
+      profitMarginPercent,
+      feedBreakdown,
+      entries,
+      mortalityTimeline,
+      biometryTimeline,
+      isDeletedFromSystem: false
+    };
+  }, [selectedRecords]);
+
+  const selectedRecord = displayRecord;
 
   const costBreakdown = useMemo(() => {
     if (!selectedRecord) return { juvenileCost: 0, feedCost: 0, otherExpenses: 0, bonusDeductions: 0, grossExpenses: 0, netExpenses: 0, costPerKg: 0, totalRevenue: 0, totalProfit: 0, margin: 0 };
@@ -155,11 +337,11 @@ export const ClosedBatchHistory: React.FC<Props> = ({ state, currentUser, onUpda
   }, [selectedRecord]);
 
   const handleReopenBatch = () => {
-    if (!selectedRecord || !currentUser.isMaster || !onUpdate) return;
-    if (!confirm(`Deseja realmente REABRIR o lote ${selectedRecord.batchName}? Ao reabrir, o lote retornará para a lista de lotes ativos e permitirá lançamentos, edições e fechamento.`)) return;
+    if (!singleSelectedRecord || !currentUser.isMaster || !onUpdate) return;
+    if (!confirm(`Deseja realmente REABRIR o lote ${singleSelectedRecord.batchName}? Ao reabrir, o lote retornará para a lista de lotes ativos e permitirá lançamentos, edições e fechamento.`)) return;
 
-    const cleanId = (selectedRecord.batchId || selectedRecord.id).replace(/^hist-/, '');
-    const existing = (state.batches || []).find(b => b.id === cleanId || b.id === selectedRecord.id || b.name === selectedRecord.batchName);
+    const cleanId = (singleSelectedRecord.batchId || singleSelectedRecord.id).replace(/^hist-/, '');
+    const existing = (state.batches || []).find(b => b.id === cleanId || b.id === singleSelectedRecord.id || b.name === singleSelectedRecord.batchName);
     
     let updatedBatches = [...(state.batches || [])];
     if (existing) {
@@ -169,12 +351,12 @@ export const ClosedBatchHistory: React.FC<Props> = ({ state, currentUser, onUpda
     } else {
       updatedBatches.push({
         id: cleanId,
-        name: selectedRecord.batchName,
+        name: singleSelectedRecord.batchName,
         cageIds: [],
-        initialQuantity: selectedRecord.initialQuantity,
-        initialUnitWeight: selectedRecord.initialAvgWeight || selectedRecord.initialUnitWeight || 0,
-        settlementDate: selectedRecord.settlementDate,
-        expectedHarvestDate: selectedRecord.expectedHarvestDate,
+        initialQuantity: singleSelectedRecord.initialQuantity,
+        initialUnitWeight: singleSelectedRecord.initialAvgWeight || singleSelectedRecord.initialUnitWeight || 0,
+        settlementDate: singleSelectedRecord.settlementDate,
+        expectedHarvestDate: singleSelectedRecord.expectedHarvestDate,
         isClosed: false,
         closedAt: undefined,
         updatedAt: Date.now()
@@ -182,7 +364,7 @@ export const ClosedBatchHistory: React.FC<Props> = ({ state, currentUser, onUpda
     }
 
     const updatedClosedHistory = (state.closedBatchHistory || []).map(h => {
-      if (h.id === selectedRecord.id || h.batchId === cleanId || h.batchName === selectedRecord.batchName) {
+      if (h.id === singleSelectedRecord.id || h.batchId === cleanId || h.batchName === singleSelectedRecord.batchName) {
         return { ...h, isDeletedFromSystem: false, updatedAt: Date.now() };
       }
       return h;
@@ -194,12 +376,12 @@ export const ClosedBatchHistory: React.FC<Props> = ({ state, currentUser, onUpda
       closedBatchHistory: updatedClosedHistory
     });
 
-    alert(`O lote ${selectedRecord.batchName} foi reaberto com sucesso!`);
+    alert(`O lote ${singleSelectedRecord.batchName} foi reaberto com sucesso!`);
   };
 
   const handleDeleteHistoryRecord = (recordId: string) => {
-    if (!selectedRecord || (!currentUser.isMaster && !currentUser.canEdit) || !onUpdate) return;
-    if (!confirm(`Deseja realmente excluir permanentemente o registro histórico do lote ${selectedRecord.batchName}? Esta ação apagará este registro do histórico arquivado.`)) return;
+    if (!singleSelectedRecord || (!currentUser.isMaster && !currentUser.canEdit) || !onUpdate) return;
+    if (!confirm(`Deseja realmente excluir permanentemente o registro histórico do lote ${singleSelectedRecord.batchName}? Esta ação apagará este registro do histórico arquivado.`)) return;
 
     const updated = (state.closedBatchHistory || []).filter(h => h.id !== recordId && h.batchId !== recordId && h.id !== `hist-${recordId}`);
     onUpdate({
@@ -207,7 +389,7 @@ export const ClosedBatchHistory: React.FC<Props> = ({ state, currentUser, onUpda
       closedBatchHistory: updated,
       deletedIds: Array.from(new Set([...(state.deletedIds || []), recordId]))
     });
-    setSelectedRecordId('');
+    setSelectedRecordIds(prev => prev.filter(id => id !== recordId));
   };
 
   const filteredEntries = useMemo(() => {
@@ -339,9 +521,9 @@ export const ClosedBatchHistory: React.FC<Props> = ({ state, currentUser, onUpda
                 Imprimir
               </button>
 
-              {(currentUser.isMaster || currentUser.canEdit) && onUpdate && selectedRecord.isDeletedFromSystem && (
+              {!isConsolidated && singleSelectedRecord && (currentUser.isMaster || currentUser.canEdit) && onUpdate && singleSelectedRecord.isDeletedFromSystem && (
                 <button
-                  onClick={() => handleDeleteHistoryRecord(selectedRecord.id)}
+                  onClick={() => handleDeleteHistoryRecord(singleSelectedRecord.id)}
                   className="px-4 py-3 bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 rounded-2xl font-black text-xs outline-none uppercase tracking-widest shadow-sm flex items-center gap-2 transition-all"
                   title="Remover este registro do histórico visual"
                 >
@@ -352,19 +534,132 @@ export const ClosedBatchHistory: React.FC<Props> = ({ state, currentUser, onUpda
             </div>
           )}
 
+          {/* Multi-Batch Selector Dropdown */}
           <div className="relative min-w-[280px]">
-            <select 
-              className="w-full px-6 py-3.5 bg-white border-2 border-indigo-200 focus:border-indigo-600 rounded-2xl font-black text-sm outline-none uppercase tracking-wider shadow-sm transition-all"
-              value={selectedRecordId}
-              onChange={(e) => setSelectedRecordId(e.target.value)}
+            <button
+              type="button"
+              onClick={() => setIsSelectorOpen(!isSelectorOpen)}
+              className="w-full px-5 py-3.5 bg-white border-2 border-indigo-200 hover:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 rounded-2xl font-black text-xs outline-none uppercase tracking-wider shadow-sm flex items-center justify-between gap-2.5 transition-all text-slate-800"
+              title="Selecionar lotes fechados no histórico"
             >
-              <option value="">-- Selecionar Lote Histórico --</option>
-              {historicalRecords.map(rec => (
-                <option key={rec.id} value={rec.id}>
-                  {rec.batchName} ({safeDateFormat(rec.settlementDate, 'dd/MM/yyyy')}) {rec.isDeletedFromSystem ? '• [Arquivado]' : '• [Fechado]'}
-                </option>
-              ))}
-            </select>
+              <div className="flex items-center gap-2 truncate">
+                <Layers className="w-4 h-4 text-indigo-600 shrink-0" />
+                <span className="truncate">
+                  {selectedRecordIds.length === 0
+                    ? "Selecionar Lote(s)"
+                    : selectedRecordIds.length === 1
+                    ? `${selectedRecords[0]?.batchName || 'Lote'} (${safeDateFormat(selectedRecords[0]?.settlementDate, 'dd/MM/yyyy')})`
+                    : `Consolidado (${selectedRecordIds.length} Lotes)`}
+                </span>
+              </div>
+              <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform shrink-0 ${isSelectorOpen ? 'rotate-180' : ''}`} />
+            </button>
+
+            {isSelectorOpen && (
+              <>
+                <div 
+                  className="fixed inset-0 z-40" 
+                  onClick={() => setIsSelectorOpen(false)} 
+                />
+                <div className="absolute right-0 top-full mt-2 w-80 sm:w-96 bg-white border border-slate-200 rounded-2xl shadow-2xl p-4 z-50 space-y-3 animate-in fade-in zoom-in-95">
+                  <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                    <span className="text-[10px] font-black text-slate-700 uppercase tracking-widest flex items-center gap-1.5">
+                      <Tag className="w-3.5 h-3.5 text-indigo-600" />
+                      Lotes Fechados ({selectedRecordIds.length}/{historicalRecords.length})
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setIsSelectorOpen(false)}
+                      className="text-slate-400 hover:text-slate-600 p-1"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+
+                  <div className="relative">
+                    <Search className="w-3.5 h-3.5 absolute left-3 top-3 text-slate-400" />
+                    <input
+                      type="text"
+                      placeholder="Buscar lote fechado..."
+                      value={batchSearchTerm}
+                      onChange={e => setBatchSearchTerm(e.target.value)}
+                      className="w-full pl-8 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500/20"
+                    />
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedRecordIds(historicalRecords.map(r => r.id))}
+                      className="flex-1 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-black text-[9px] uppercase tracking-wider rounded-lg transition-colors"
+                    >
+                      Selecionar Todos
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedRecordIds([])}
+                      className="flex-1 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 font-black text-[9px] uppercase tracking-wider rounded-lg transition-colors"
+                    >
+                      Limpar Seleção
+                    </button>
+                  </div>
+
+                  <div className="max-h-60 overflow-y-auto divide-y divide-slate-50 pr-1">
+                    {filteredRecordsBySearch.map(rec => {
+                      const isSelected = selectedRecordIds.includes(rec.id) || selectedRecordIds.includes(rec.batchId);
+                      return (
+                        <div
+                          key={rec.id}
+                          className={`flex items-center justify-between p-2 rounded-xl transition-colors ${
+                            isSelected ? 'bg-indigo-50/50' : 'hover:bg-slate-50'
+                          }`}
+                        >
+                          <label className="flex items-center gap-3 cursor-pointer flex-1 min-w-0">
+                            <input
+                              type="checkbox"
+                              checked={isSelected}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setSelectedRecordIds([...selectedRecordIds, rec.id]);
+                                } else {
+                                  setSelectedRecordIds(selectedRecordIds.filter(id => id !== rec.id && id !== rec.batchId));
+                                }
+                              }}
+                              className="w-4 h-4 text-indigo-600 border-slate-300 rounded focus:ring-indigo-500 cursor-pointer"
+                            />
+                            <div className="min-w-0">
+                              <div className="font-black text-xs text-slate-800 uppercase truncate">
+                                {rec.batchName} {rec.isDeletedFromSystem ? '• [Arquivado]' : '• [Fechado]'}
+                              </div>
+                              <div className="text-[9px] font-bold text-slate-400">
+                                Povoamento: {safeDateFormat(rec.settlementDate, 'dd/MM/yyyy')} • {formatNumber(rec.initialQuantity)} un
+                              </div>
+                            </div>
+                          </label>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedRecordIds([rec.id]);
+                              setIsSelectorOpen(false);
+                            }}
+                            className="text-[9px] font-bold text-indigo-600 hover:text-indigo-800 underline uppercase ml-2 shrink-0"
+                            title="Visualizar apenas este lote"
+                          >
+                            Apenas
+                          </button>
+                        </div>
+                      );
+                    })}
+                    {filteredRecordsBySearch.length === 0 && (
+                      <div className="py-4 text-center text-xs text-slate-400 font-bold uppercase">
+                        Nenhum lote encontrado
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </>
+            )}
           </div>
         </div>
       </div>
@@ -380,7 +675,9 @@ export const ClosedBatchHistory: React.FC<Props> = ({ state, currentUser, onUpda
                 </div>
                 <div>
                   <h1 className="text-4xl font-black uppercase italic tracking-tighter text-black leading-none">AquaGestão</h1>
-                  <p className="text-sm font-bold text-slate-600 uppercase tracking-widest mt-1">Histórico de Fechamento de Lote</p>
+                  <p className="text-sm font-bold text-slate-600 uppercase tracking-widest mt-1">
+                    {isConsolidated ? 'Relatório Consolidado de Histórico de Lotes' : 'Histórico de Fechamento de Lote'}
+                  </p>
                 </div>
               </div>
               <div className="text-right">
@@ -391,15 +688,28 @@ export const ClosedBatchHistory: React.FC<Props> = ({ state, currentUser, onUpda
 
             <div className="mt-10 grid grid-cols-4 gap-4 print-grid-4">
               <div className="p-5 bg-slate-50 rounded-2xl border-2 border-slate-200">
-                <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest block mb-1">Identificação do Lote</span>
-                <span className="text-2xl font-black text-slate-900 uppercase italic leading-tight">{selectedRecord.batchName}</span>
+                <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest block mb-1">
+                  {isConsolidated ? 'Identificação / Lotes' : 'Identificação do Lote'}
+                </span>
+                <span className="text-xl font-black text-slate-900 uppercase italic leading-tight block truncate">
+                  {selectedRecord.batchName}
+                </span>
+                {isConsolidated && selectedRecord.batchNames && (
+                  <span className="text-[9px] font-bold text-slate-500 uppercase block mt-1 line-clamp-2">
+                    {selectedRecord.batchNames.join(', ')}
+                  </span>
+                )}
               </div>
               <div className="p-5 bg-slate-50 rounded-2xl border-2 border-slate-200">
-                <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest block mb-1">Data Povoamento</span>
+                <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest block mb-1">
+                  {isConsolidated ? 'Povoamento Mais Antigo' : 'Data Povoamento'}
+                </span>
                 <span className="text-xl font-black text-slate-900">{safeDateFormat(selectedRecord.settlementDate, 'dd/MM/yyyy')}</span>
               </div>
               <div className="p-5 bg-slate-50 rounded-2xl border-2 border-slate-200">
-                <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest block mb-1">Período de Cultivo</span>
+                <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest block mb-1">
+                  {isConsolidated ? 'Período Médio de Cultivo' : 'Período de Cultivo'}
+                </span>
                 <span className="text-xl font-black text-slate-900">
                   {selectedRecord.totalDays} dias
                 </span>
@@ -407,7 +717,7 @@ export const ClosedBatchHistory: React.FC<Props> = ({ state, currentUser, onUpda
               <div className="p-5 bg-slate-50 rounded-2xl border-2 border-slate-200">
                 <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest block mb-1">Status no Histórico</span>
                 <span className="text-xl font-black uppercase italic text-emerald-600">
-                  {selectedRecord.isDeletedFromSystem ? 'ARQUIVADO' : 'CONCLUÍDO'}
+                  {isConsolidated ? 'CONSOLIDADO' : selectedRecord.isDeletedFromSystem ? 'ARQUIVADO' : 'CONCLUÍDO'}
                 </span>
               </div>
             </div>
@@ -421,7 +731,7 @@ export const ClosedBatchHistory: React.FC<Props> = ({ state, currentUser, onUpda
               </div>
               <div>
                 <h3 className="text-lg font-black text-slate-900 uppercase tracking-tight italic">
-                  Resumo Financeiro e Produtivo do Lote Finalizado
+                  {isConsolidated ? `Resumo Financeiro e Produtivo Consolidado (${selectedRecords.length} Lotes)` : 'Resumo Financeiro e Produtivo do Lote Finalizado'}
                 </h3>
                 <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
                   Indicadores Consolidados de Produção, Despesca e Custos
@@ -438,12 +748,16 @@ export const ClosedBatchHistory: React.FC<Props> = ({ state, currentUser, onUpda
                     <div className="flex items-center justify-between">
                       <h4 className="text-sm font-black text-black uppercase tracking-widest flex items-center gap-2 italic">
                         <TrendingUp className="w-4 h-4 text-blue-600" />
-                        Visão Geral do Lote
+                        {isConsolidated ? `Visão Geral Consolidada (${selectedRecords.length} Lotes)` : 'Visão Geral do Lote'}
                       </h4>
                       <div className="px-3 py-1 bg-emerald-50 text-emerald-600 rounded-full border border-emerald-100 flex items-center gap-1.5">
                         <Lock className="w-3 h-3" />
                         <span className="text-[9px] font-black uppercase tracking-widest">
-                          {selectedRecord.closedAt ? `Fechado em ${safeDateFormat(selectedRecord.closedAt, 'dd/MM/yyyy')}` : 'Finalizado'}
+                          {isConsolidated 
+                            ? `${selectedRecords.length} Lotes Selecionados`
+                            : selectedRecord.closedAt 
+                              ? `Fechado em ${safeDateFormat(selectedRecord.closedAt, 'dd/MM/yyyy')}` 
+                              : 'Finalizado'}
                         </span>
                       </div>
                     </div>
@@ -657,14 +971,20 @@ export const ClosedBatchHistory: React.FC<Props> = ({ state, currentUser, onUpda
                   <div className="space-y-3">
                     <div className="p-4 bg-slate-100 rounded-2xl border border-slate-200 text-center">
                       <p className="text-[10px] font-black text-slate-600 uppercase tracking-widest">
-                        {selectedRecord.isDeletedFromSystem ? 'Registro Histórico Arquivado' : 'Lote Finalizado no Sistema'}
+                        {isConsolidated 
+                          ? `Consolidação de ${selectedRecords.length} Lotes Fechados`
+                          : selectedRecord.isDeletedFromSystem 
+                            ? 'Registro Histórico Arquivado' 
+                            : 'Lote Finalizado no Sistema'}
                       </p>
                       <p className="text-[9px] font-bold text-slate-500 uppercase mt-1">
-                        Visualização exclusiva para consulta e auditoria
+                        {isConsolidated 
+                          ? 'Indicadores, custos e receitas somados e ponderados'
+                          : 'Visualização exclusiva para consulta e auditoria'}
                       </p>
                     </div>
 
-                    {(currentUser.isMaster || currentUser.canEdit) && onUpdate && (
+                    {!isConsolidated && singleSelectedRecord && (currentUser.isMaster || currentUser.canEdit) && onUpdate && (
                       <button 
                         onClick={handleReopenBatch}
                         className="w-full py-3.5 bg-amber-500 text-white rounded-2xl font-black uppercase tracking-widest text-xs shadow-md shadow-amber-200 hover:bg-amber-600 transition-all active:scale-95 flex items-center justify-center gap-2 print:hidden"
@@ -1003,6 +1323,9 @@ export const ClosedBatchHistory: React.FC<Props> = ({ state, currentUser, onUpda
                   <thead>
                     <tr className="border-b-2 border-slate-200 bg-slate-50/80">
                       <th className="text-left py-3.5 px-4 text-[10px] font-black text-slate-700 uppercase tracking-widest">Data</th>
+                      {isConsolidated && (
+                        <th className="text-left py-3.5 px-4 text-[10px] font-black text-slate-700 uppercase tracking-widest">Lote</th>
+                      )}
                       <th className="text-left py-3.5 px-4 text-[10px] font-black text-slate-700 uppercase tracking-widest">Tipo</th>
                       <th className="text-left py-3.5 px-4 text-[10px] font-black text-slate-700 uppercase tracking-widest">Categoria</th>
                       <th className="text-left py-3.5 px-4 text-[10px] font-black text-slate-700 uppercase tracking-widest">Lançamento / Descrição</th>
@@ -1016,6 +1339,13 @@ export const ClosedBatchHistory: React.FC<Props> = ({ state, currentUser, onUpda
                       return (
                         <tr key={entry.id || idx} className="hover:bg-slate-50 transition-colors">
                           <td className="py-3.5 px-4 text-xs font-bold text-slate-600">{safeDateFormat(entry.date, 'dd/MM/yyyy')}</td>
+                          {isConsolidated && (
+                            <td className="py-3.5 px-4 text-xs">
+                              <span className="px-2 py-0.5 rounded-lg text-[9px] font-black uppercase tracking-wider inline-block bg-indigo-50 text-indigo-700 border border-indigo-100">
+                                {(entry as any).batchName || 'Lote'}
+                              </span>
+                            </td>
+                          )}
                           <td className="py-3.5 px-4 text-xs">
                             <span className={`px-2 py-0.5 rounded-lg text-[9px] font-black uppercase tracking-widest inline-block ${
                               isBonus
@@ -1043,7 +1373,7 @@ export const ClosedBatchHistory: React.FC<Props> = ({ state, currentUser, onUpda
                     })}
                     {filteredEntries.length === 0 && (
                       <tr>
-                        <td colSpan={5} className="py-12 text-center">
+                        <td colSpan={isConsolidated ? 6 : 5} className="py-12 text-center">
                           <DollarSign className="w-8 h-8 text-slate-200 mx-auto mb-2" />
                           <p className="text-[10px] font-black text-slate-600 uppercase tracking-widest">Nenhum lançamento encontrado.</p>
                         </td>
