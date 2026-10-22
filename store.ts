@@ -181,18 +181,11 @@ function mergeArraysById<T extends { id: string, name?: string, batchId?: string
       const isModified = isObjectModified(existing, item);
       
       if (remoteTime > localTime) {
-        // Remote is strictly newer: remote wins
+        // Incoming item is strictly newer: accept update
         map.set(item.id, item);
-      } else if (localTime > remoteTime) {
-        // Local is strictly newer: local wins
-        map.set(item.id, existing);
       } else {
-        // Equal timestamps:
-        if (priority === 'remote') {
-          map.set(item.id, item);
-        } else {
-          map.set(item.id, isModified ? existing : item);
-        }
+        // Canonical/existing item is newer or equal: canonical item wins!
+        map.set(item.id, existing);
       }
     }
   }
@@ -1339,7 +1332,7 @@ export const saveState = async (state: AppState, userConfig?: {url: string, key:
       const remoteState = data?.state as AppState | undefined;
       
       mergedStateToSave = remoteState 
-        ? ensureStateIntegrity(mergedStateToSave, remoteState, 'remote') 
+        ? ensureStateIntegrity(remoteState, mergedStateToSave, 'remote') 
         : mergedStateToSave;
 
       await supabase.from('farm_data').upsert({ id: 'singleton', state: mergedStateToSave, last_sync: new Date().toISOString() });

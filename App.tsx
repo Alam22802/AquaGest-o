@@ -318,7 +318,7 @@ const App: React.FC = () => {
         saveState(state, configToUse).then((finalState) => {
           if (finalState) {
             lastSavedStateRef.current = finalState;
-            setState(prev => prev ? ensureStateIntegrity(prev, finalState, 'local') : finalState);
+            setState(finalState);
           }
         }).finally(() => {
           isSavingRef.current = false;
