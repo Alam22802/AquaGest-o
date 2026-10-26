@@ -158,6 +158,8 @@ const App: React.FC = () => {
         coldStorageLogs: inject(migratedLogs),
         utilityLogs: inject(data.utilityLogs || []),
         coldChambers: inject(migratedChambers),
+        pcpSuppliers: inject(data.pcpSuppliers || []),
+        pcpSlaughterSchedules: inject(data.pcpSlaughterSchedules || []),
         protocols: inject(data.protocols),
         standardCurves: inject(data.standardCurves || []),
         feedingTables: inject(data.feedingTables || []),

@@ -370,7 +370,7 @@ async function scheduleSafeFarmStatePersist(stateToSave: any) {
       'coldChambers', 'protocols', 'standardCurves', 'portfolios',
       'capexProjects', 'capexInvoices', 'capexPurchaseOrders', 'feedingTables', 'costCenters',
       'pcmEquipments', 'pcmStoppageReasons', 'pcmProductionStoppages',
-      'pcmPlannedImprovements'
+      'pcmPlannedImprovements', 'pcpSuppliers', 'pcpSlaughterSchedules'
     ];
 
     const merged: any = {

@@ -343,7 +343,7 @@ const SlaughterPCP: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     onUpdate({
       ...state,
       pcpSuppliers: suppliers.filter(s => s.id !== id),
-      deletedIds: [...(state.deletedIds || []), id]
+      deletedIds: [...(state.deletedIds || []), id, `explicit:${id}`]
     });
   };
 
@@ -456,7 +456,11 @@ const SlaughterPCP: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     onUpdate({
       ...state,
       pcpSlaughterSchedules: [...otherSchedules, ...updatedSchedules],
-      deletedIds: Array.from(new Set([...(state.deletedIds || []), ...deletedSpecificIds]))
+      deletedIds: Array.from(new Set([
+        ...(state.deletedIds || []),
+        ...deletedSpecificIds,
+        ...deletedSpecificIds.map(id => `explicit:${id}`)
+      ]))
     });
 
     setEditingMonthKey(null);
@@ -496,7 +500,11 @@ const SlaughterPCP: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     onUpdate({
       ...state,
       pcpSlaughterSchedules: schedules.filter(s => !selectedScheduleIds.has(s.id)),
-      deletedIds: [...(state.deletedIds || []), ...idsArr]
+      deletedIds: [
+        ...(state.deletedIds || []),
+        ...idsArr,
+        ...idsArr.map(id => `explicit:${id}`)
+      ]
     });
     setSelectedScheduleIds(new Set());
   };
@@ -623,7 +631,7 @@ const SlaughterPCP: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     onUpdate({
       ...state,
       pcpSlaughterSchedules: schedules.filter(s => s.id !== id),
-      deletedIds: [...(state.deletedIds || []), id]
+      deletedIds: [...(state.deletedIds || []), id, `explicit:${id}`]
     });
     
     if (selectedScheduleIds.has(id)) {

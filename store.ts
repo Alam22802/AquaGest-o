@@ -394,7 +394,7 @@ export const areStatesEqual = (a: AppState, b: AppState): boolean => {
     'coldChambers', 'protocols', 'standardCurves', 'portfolios',
     'capexProjects', 'capexInvoices', 'capexPurchaseOrders', 'feedingTables', 'costCenters',
     'pcmEquipments', 'pcmStoppageReasons', 'pcmProductionStoppages',
-    'pcmPlannedImprovements', 'deletedIds',
+    'pcmPlannedImprovements', 'pcpSuppliers', 'pcpSlaughterSchedules', 'deletedIds',
     'slaughterSupplyCategories', 'slaughterExpenseCategories', 'slaughterHREntryTypes', 'slaughterHRDepartments', 'slaughterHRRoles'
   ];
 
@@ -428,6 +428,10 @@ export const areStatesEqual = (a: AppState, b: AppState): boolean => {
         if (itemA.date !== itemB.date) return false;
         if (itemA.timestamp !== itemB.timestamp) return false;
         if (itemA.averageWeight !== itemB.averageWeight) return false;
+        if (itemA.expectedDate !== itemB.expectedDate) return false;
+        if (itemA.expectedWeight !== itemB.expectedWeight) return false;
+        if (itemA.pricePerKg !== itemB.pricePerKg) return false;
+        if (itemA.supplierId !== itemB.supplierId) return false;
 
         if (JSON.stringify(itemA) !== JSON.stringify(itemB)) return false;
       } else {
