@@ -2,6 +2,7 @@
 import { AppState, User, NotificationSettings, SlaughterLog } from './types';
 import { createClient } from '@supabase/supabase-js';
 import LZString from 'lz-string';
+import { mergeFeedTypesList, reconcileFeedTypes } from './utils/feedStock';
 
 const STORAGE_KEY = 'aquagestao_v1';
 const SUPABASE_CONFIG_KEY = 'aquagestao_supabase_config';
@@ -422,6 +423,9 @@ export const areStatesEqual = (a: AppState, b: AppState): boolean => {
         
         // Fast checks on key primitive fields before full stringify
         if (itemA.amount !== itemB.amount) return false;
+        if (itemA.totalStock !== itemB.totalStock) return false;
+        if (itemA.stockBaseline !== itemB.stockBaseline) return false;
+        if (itemA.stockBaselineAt !== itemB.stockBaselineAt) return false;
         if (itemA.count !== itemB.count) return false;
         if (itemA.batchId !== itemB.batchId) return false;
         if (itemA.cageId !== itemB.cageId) return false;
@@ -607,7 +611,7 @@ export const ensureStateIntegrity = (state: any, mergeWith?: AppState, priority:
     ...result,
     users: mergeUsers(result.users, mergeWith.users, combinedDeletedIdsArray, priority),
     slaughterLogs: mergeArraysById(result.slaughterLogs, mergeWith.slaughterLogs, combinedDeletedIdsArray, priority, true),
-    feedTypes: mergeArraysById(result.feedTypes, mergeWith.feedTypes, combinedDeletedIdsArray, priority),
+    feedTypes: mergeFeedTypesList(result.feedTypes, mergeWith.feedTypes, combinedDeletedIdsArray, priority),
     lines: mergeArraysById(result.lines, mergeWith.lines, combinedDeletedIdsArray, priority),
     batches: mergeArraysById(result.batches, mergeWith.batches, combinedDeletedIdsArray, priority),
     cages: mergeArraysById(result.cages, mergeWith.cages, combinedDeletedIdsArray, priority),
@@ -1010,31 +1014,49 @@ export const ensureStateIntegrity = (state: any, mergeWith?: AppState, priority:
     { id: 'feed-2-3mm', name: 'Ração 2 a 3mm', totalStock: 100, maxCapacity: 5000, minStockPercentage: 20 },
   ];
 
-  if (!finalResult.feedTypes || finalResult.feedTypes.length === 0) {
-    finalResult.feedTypes = targetFeedDefinitions.map(f => ({ ...f, updatedAt: Date.now() }));
+  const hadNoFeedTypes = !finalResult.feedTypes || finalResult.feedTypes.length === 0;
+  if (hadNoFeedTypes) {
+    finalResult.feedTypes = targetFeedDefinitions.map(f => ({
+      ...f,
+      stockBaseline: f.totalStock,
+      stockBaselineAt: Date.now(),
+      updatedAt: Date.now()
+    }));
   } else {
-    // Keep existing feedTypes and totalStock intact. Only add missing feed types if missing.
+    // Keep existing feedTypes and totalStock intact. Only add missing feed types if missing and not deleted.
     const existingNames = finalResult.feedTypes.map(f => (f.name || '').toLowerCase());
     targetFeedDefinitions.forEach(def => {
+      if (deletedSet.has(def.id)) return;
       const exists = existingNames.some(n => 
         (def.id === 'feed-4-6mm' && n.includes('4') && n.includes('6')) ||
         (def.id === 'feed-3-4mm' && n.includes('3') && n.includes('4')) ||
         (def.id === 'feed-2-3mm' && n.includes('2') && n.includes('3'))
       );
       if (!exists && !finalResult.feedTypes.some(f => f.id === def.id)) {
-        finalResult.feedTypes.push({ ...def, updatedAt: Date.now() });
+        finalResult.feedTypes.push({
+          ...def,
+          stockBaseline: def.totalStock,
+          stockBaselineAt: Date.now(),
+          updatedAt: Date.now()
+        });
       }
     });
   }
 
-  // Ensure stock logs exist, but DO NOT overwrite existing logs or user edits
-  if (!finalResult.feedStockLogs || finalResult.feedStockLogs.length === 0) {
+  // Only seed default stock log on truly brand-new farm initialization if not explicitly deleted
+  if (
+    hadNoFeedTypes &&
+    (!finalResult.feedStockLogs || finalResult.feedStockLogs.length === 0) &&
+    !deletedSet.has('log-stock-2026-07-25-01') &&
+    !deletedSet.has('explicit:log-stock-2026-07-25-01')
+  ) {
     const feed46 = finalResult.feedTypes.find(f => {
       const n = (f.name || '').toLowerCase();
       return (n.includes('4') && n.includes('6')) || f.id === 'feed-4-6mm';
     }) || finalResult.feedTypes[0];
 
     const feed46Id = feed46 ? feed46.id : 'feed-01';
+    const seedTime = Date.now();
 
     finalResult.feedStockLogs = [
       {
@@ -1044,10 +1066,18 @@ export const ensureStateIntegrity = (state: any, mergeWith?: AppState, priority:
         type: 'Entrada',
         timestamp: '2026-07-25T10:00:00.000Z',
         userId: 'master-001',
-        updatedAt: Date.now()
+        createdAt: seedTime,
+        updatedAt: seedTime
       }
     ];
   }
+
+  // Reconcile feedTypes stock deterministically from baseline + post-baseline entries - post-baseline feedings (grams -> kg)
+  finalResult.feedTypes = reconcileFeedTypes(
+    finalResult.feedTypes || [],
+    finalResult.feedingLogs || [],
+    finalResult.feedStockLogs || []
+  );
 
   const stateWithNormalizedCages = {
     ...finalResult,

@@ -1405,6 +1405,8 @@ const BatchClosing: React.FC<Props> = ({ state, onUpdate, currentUser, initialBa
           amount: Math.round(valKg * 1000),
           timestamp,
           userId: currentUser.id,
+          skipStockDeduction: true,
+          createdAt: new Date(timestamp).getTime() || Date.now(),
           updatedAt: Date.now()
         });
       }

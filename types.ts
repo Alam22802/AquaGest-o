@@ -105,6 +105,8 @@ export interface FeedType {
   totalStock: number;
   maxCapacity: number;
   minStockPercentage: number;
+  stockBaseline?: number;
+  stockBaselineAt?: number;
   userId?: string;
   updatedAt?: number;
 }
@@ -117,6 +119,8 @@ export interface FeedingLog {
   amount: number;
   timestamp: string;
   userId: string;
+  createdAt?: number;
+  skipStockDeduction?: boolean;
   updatedAt?: number;
 }
 
@@ -308,6 +312,7 @@ export interface FeedStockLog {
   supplierCnpj?: string;
   supplierName?: string;
   unitPrice?: number;
+  createdAt?: number;
   updatedAt?: number;
 }
 

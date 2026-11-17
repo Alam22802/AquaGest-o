@@ -3,6 +3,7 @@ import path from "path";
 import fs from "fs";
 import compression from "compression";
 import { GoogleGenAI, Type } from "@google/genai";
+import { mergeFeedTypesList, reconcileFeedTypes } from "./utils/feedStock";
 
 export const app = express();
 
@@ -129,6 +130,16 @@ function loadInitialFarmState(): any {
 }
 
 let serverFarmState: any = loadInitialFarmState();
+if (serverFarmState && Array.isArray(serverFarmState.feedTypes)) {
+  serverFarmState = {
+    ...serverFarmState,
+    feedTypes: reconcileFeedTypes(
+      serverFarmState.feedTypes || [],
+      serverFarmState.feedingLogs || [],
+      serverFarmState.feedStockLogs || []
+    )
+  };
+}
 
 // Sequential persistence queue to prevent concurrent filesystem write collisions
 let isSavingFarmState = false;
@@ -416,6 +427,15 @@ async function scheduleSafeFarmStatePersist(stateToSave: any) {
       const serverCollection = s1[key];
       const clientCollection = s2[key];
 
+      if (key === 'feedTypes') {
+        if (Array.isArray(serverCollection) && serverCollection.length > 0 && (!Array.isArray(clientCollection) || clientCollection.length === 0)) {
+          merged[key] = serverCollection.filter((i: any) => !isServerItemDeleted(i, deletedSet, false));
+        } else {
+          merged[key] = mergeFeedTypesList(serverCollection, clientCollection, deletedSet, 'local');
+        }
+        return;
+      }
+
       // Se o cliente (s2) vier com array vazio ou nulo (ex: usuário abrindo app após tempo ou novo computador),
       // e o servidor tiver dados existentes, o servidor NUNCA perde seus dados!
       if (Array.isArray(serverCollection) && serverCollection.length > 0 && (!Array.isArray(clientCollection) || clientCollection.length === 0)) {
@@ -517,6 +537,14 @@ async function scheduleSafeFarmStatePersist(stateToSave: any) {
       });
     }
 
+    if (Array.isArray(merged.feedTypes)) {
+      merged.feedTypes = reconcileFeedTypes(
+        merged.feedTypes,
+        merged.feedingLogs || [],
+        merged.feedStockLogs || []
+      );
+    }
+
     return merged;
   }
 
@@ -532,7 +560,14 @@ async function scheduleSafeFarmStatePersist(stateToSave: any) {
       }
 
       if (!serverFarmState || force === true) {
-        serverFarmState = clientState;
+        serverFarmState = {
+          ...clientState,
+          feedTypes: reconcileFeedTypes(
+            clientState.feedTypes || [],
+            clientState.feedingLogs || [],
+            clientState.feedStockLogs || []
+          )
+        };
         console.log(`[Farm State] Force mass sync applied at ${new Date().toISOString()}`);
       } else {
         serverFarmState = mergeFarmStates(serverFarmState, clientState);

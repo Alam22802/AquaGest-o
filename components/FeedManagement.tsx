@@ -6,6 +6,14 @@ import { subDays, format, parseISO, differenceInDays, addDays } from 'date-fns';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { formatNumber, formatCurrency } from '../utils/formatters';
+import {
+  gramsToKg,
+  kgToGrams,
+  parseNumberInput,
+  getFeedLogCreatedAt,
+  getFeedStockBreakdown,
+  reconcileFeedTypes
+} from '../utils/feedStock';
 
 interface Props {
   state: AppState;
@@ -452,28 +460,37 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     if (!hasPermission) return;
     if (!formData.name) return;
 
-    const newStockGrams = Number(formData.currentStockKg) * 1000;
+    const newStockKg = parseNumberInput(formData.currentStockKg);
+    const newStockGrams = kgToGrams(newStockKg);
+    const now = Date.now();
 
     if (editingId) {
       const oldFeed = (state.feedTypes || []).find(f => f.id === editingId);
       const diff = newStockGrams - (oldFeed?.totalStock || 0);
+      const shouldResetBaseline = currentUser.isMaster && diff !== 0;
 
       const updatedFeeds = (state.feedTypes || []).map(f => {
         if (f.id === editingId) {
           return {
             ...f,
             name: formData.name,
-            maxCapacity: Number(formData.maxCapacity),
-            minStockPercentage: Number(formData.minStockPercentage),
-            totalStock: currentUser.isMaster ? newStockGrams : f.totalStock,
-            updatedAt: Date.now()
+            maxCapacity: parseNumberInput(formData.maxCapacity),
+            minStockPercentage: parseNumberInput(formData.minStockPercentage),
+            ...(shouldResetBaseline
+              ? {
+                  totalStock: newStockGrams,
+                  stockBaseline: newStockGrams,
+                  stockBaselineAt: now
+                }
+              : {}),
+            updatedAt: now
           };
         }
         return f;
       });
 
       const newLogs = [...(state.feedStockLogs || [])];
-      if (currentUser.isMaster && diff !== 0) {
+      if (shouldResetBaseline) {
         newLogs.unshift({
           id: generateId(),
           feedTypeId: editingId,
@@ -481,11 +498,18 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
           type: 'Ajuste',
           timestamp: new Date().toISOString(),
           userId: currentUser.id,
-          updatedAt: Date.now()
+          createdAt: now, // Igual a stockBaselineAt: fica registrado no histórico sem duplicar cálculo
+          updatedAt: now
         });
       }
 
-      onUpdate({ ...state, feedTypes: updatedFeeds, feedStockLogs: newLogs });
+      const reconciledFeeds = reconcileFeedTypes(
+        updatedFeeds,
+        state.feedingLogs || [],
+        newLogs
+      );
+
+      onUpdate({ ...state, feedTypes: reconciledFeeds, feedStockLogs: newLogs });
       setEditingId(null);
     } else {
       const newId = generateId();
@@ -494,9 +518,11 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
         id: newId,
         name: formData.name,
         totalStock: initialStock,
-        maxCapacity: Number(formData.maxCapacity),
-        minStockPercentage: Number(formData.minStockPercentage),
-        updatedAt: Date.now()
+        stockBaseline: initialStock,
+        stockBaselineAt: now,
+        maxCapacity: parseNumberInput(formData.maxCapacity),
+        minStockPercentage: parseNumberInput(formData.minStockPercentage),
+        updatedAt: now
       };
 
       const newLogs = [...(state.feedStockLogs || [])];
@@ -508,7 +534,8 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
           type: 'Entrada',
           timestamp: new Date().toISOString(),
           userId: currentUser.id,
-          updatedAt: Date.now()
+          createdAt: now, // Já incluído no stockBaseline inicial
+          updatedAt: now
         });
       }
 
@@ -528,7 +555,7 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       name: feed.name,
       maxCapacity: feed.maxCapacity.toString(),
       minStockPercentage: feed.minStockPercentage.toString(),
-      currentStockKg: (feed.totalStock / 1000).toString()
+      currentStockKg: gramsToKg(feed.totalStock).toString()
     });
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -536,11 +563,13 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
   const removeFeed = (id: string) => {
     if (!hasPermission) return;
     if (!confirm('Tem certeza que deseja excluir este modelo de ração?')) return;
+    const removedLogIds = (state.feedStockLogs || []).filter(l => l.feedTypeId === id).map(l => l.id);
+    const explicitRemovedLogIds = removedLogIds.map(logId => `explicit:${logId}`);
     onUpdate({
       ...state,
       feedTypes: (state.feedTypes || []).filter(f => f.id !== id),
       feedStockLogs: (state.feedStockLogs || []).filter(l => l.feedTypeId !== id),
-      deletedIds: [...(state.deletedIds || []), id, ...(state.feedStockLogs || []).filter(l => l.feedTypeId === id).map(l => l.id)]
+      deletedIds: [...(state.deletedIds || []), id, ...removedLogIds, ...explicitRemovedLogIds]
     });
   };
 
@@ -549,14 +578,10 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     if (!hasPermission) return;
     if (!entryData.feedId || !entryData.amount) return;
 
-    const amountGrams = Number(entryData.amount) * 1000;
-
-    const updatedFeeds = (state.feedTypes || []).map(f => {
-      if (f.id === entryData.feedId) {
-        return { ...f, totalStock: f.totalStock + amountGrams, updatedAt: Date.now() };
-      }
-      return f;
-    });
+    const amountKg = parseNumberInput(entryData.amount);
+    if (amountKg <= 0) return;
+    const amountGrams = kgToGrams(amountKg);
+    const now = Date.now();
 
     const newLog: FeedStockLog = {
       id: generateId(),
@@ -568,14 +593,22 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       invoiceNumber: entryData.invoiceNumber || undefined,
       supplierCnpj: entryData.supplierCnpj || undefined,
       supplierName: entryData.supplierName || undefined,
-      unitPrice: entryData.unitPrice ? Number(entryData.unitPrice) : undefined,
-      updatedAt: Date.now()
+      unitPrice: entryData.unitPrice ? parseNumberInput(entryData.unitPrice) : undefined,
+      createdAt: now,
+      updatedAt: now
     };
+
+    const updatedFeedStockLogs = [newLog, ...(state.feedStockLogs || [])];
+    const reconciledFeeds = reconcileFeedTypes(
+      state.feedTypes || [],
+      state.feedingLogs || [],
+      updatedFeedStockLogs
+    );
 
     onUpdate({ 
       ...state, 
-      feedTypes: updatedFeeds, 
-      feedStockLogs: [newLog, ...(state.feedStockLogs || [])] 
+      feedTypes: reconciledFeeds, 
+      feedStockLogs: updatedFeedStockLogs 
     });
     setEntryData({ 
       feedId: '', 
@@ -613,18 +646,34 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     const oldLog = (state.feedStockLogs || []).find(l => l.id === editingLogId);
     if (!oldLog) return;
 
-    const newAmountGrams = Number(logFormData.amount) * 1000;
+    const newAmountGrams = kgToGrams(parseNumberInput(logFormData.amount));
+    const now = Date.now();
+    const preservedCreatedAt = getFeedLogCreatedAt(oldLog) || now;
     
-    // Update feedTypes stock
+    // Para lançamentos anteriores ou iguais ao último ajuste de saldo (`createdAt <= stockBaselineAt`),
+    // ajustamos o stockBaseline pela diferença. Para lançamentos posteriores, reconcileFeedTypes atualiza automaticamente.
     const updatedFeeds = (state.feedTypes || []).map(f => {
-      let stock = f.totalStock;
+      const baselineAt = f.stockBaselineAt ?? f.updatedAt ?? 0;
+      if (preservedCreatedAt > baselineAt) return f;
+
+      let baseline = f.stockBaseline ?? f.totalStock;
+      let changed = false;
       if (f.id === oldLog.feedTypeId) {
-        stock -= oldLog.amount;
+        baseline -= oldLog.amount;
+        changed = true;
       }
       if (f.id === logFormData.feedTypeId) {
-        stock += newAmountGrams;
+        baseline += newAmountGrams;
+        changed = true;
       }
-      return { ...f, totalStock: Math.max(0, stock), updatedAt: Date.now() };
+      if (!changed) return f;
+      return {
+        ...f,
+        stockBaseline: baseline,
+        stockBaselineAt: baselineAt,
+        totalStock: baseline,
+        updatedAt: now
+      };
     });
 
     const cleanTime = (logFormData.time || '12:00').slice(0, 5);
@@ -640,14 +689,22 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       invoiceNumber: logFormData.type === 'Entrada' && logFormData.invoiceNumber ? logFormData.invoiceNumber : undefined,
       supplierCnpj: logFormData.type === 'Entrada' && logFormData.supplierCnpj ? logFormData.supplierCnpj : undefined,
       supplierName: logFormData.type === 'Entrada' && logFormData.supplierName ? logFormData.supplierName : undefined,
-      unitPrice: logFormData.type === 'Entrada' && logFormData.unitPrice ? Number(logFormData.unitPrice) : undefined,
-      updatedAt: Date.now()
+      unitPrice: logFormData.type === 'Entrada' && logFormData.unitPrice ? parseNumberInput(logFormData.unitPrice) : undefined,
+      createdAt: preservedCreatedAt,
+      updatedAt: now
     };
+
+    const updatedFeedStockLogs = (state.feedStockLogs || []).map(l => l.id === editingLogId ? updatedLog : l);
+    const reconciledFeeds = reconcileFeedTypes(
+      updatedFeeds,
+      state.feedingLogs || [],
+      updatedFeedStockLogs
+    );
 
     onUpdate({
       ...state,
-      feedTypes: updatedFeeds,
-      feedStockLogs: (state.feedStockLogs || []).map(l => l.id === editingLogId ? updatedLog : l)
+      feedTypes: reconciledFeeds,
+      feedStockLogs: updatedFeedStockLogs
     });
 
     setEditingLogId(null);
@@ -661,9 +718,10 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
         .reduce((acc, log) => acc + log.amount, 0);
       const avgDailyConsumption = consumptionLast7Days / 7;
       const daysLeft = avgDailyConsumption > 0 ? Math.floor(feed.totalStock / avgDailyConsumption) : Infinity;
-      return { ...feed, avgDaily: avgDailyConsumption, daysLeft };
+      const breakdown = getFeedStockBreakdown(feed, state.feedingLogs || [], state.feedStockLogs || []);
+      return { ...feed, avgDaily: avgDailyConsumption, daysLeft, breakdown };
     });
-  }, [state.feedTypes, state.feedingLogs]);
+  }, [state.feedTypes, state.feedingLogs, state.feedStockLogs]);
 
   // Log filtering and sorting
   const filteredLogs = useMemo(() => {
@@ -716,29 +774,49 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     if (!confirm(`Deseja excluir ${selectedLogIds.size} lançamentos selecionados? O estoque será ajustado.`)) return;
 
     const logsToRemove = (state.feedStockLogs || []).filter(l => selectedLogIds.has(l.id));
+    const now = Date.now();
+    const feedMapLocal = new Map((state.feedTypes || []).map(f => [f.id, f]));
     
-    // Group by feed type to update stock
-    const feedUpdates = new Map<string, number>();
+    // Group pre-baseline adjustments by feed type
+    const preBaselineRemovals = new Map<string, number>();
     logsToRemove.forEach(log => {
-      const current = feedUpdates.get(log.feedTypeId) || 0;
-      feedUpdates.set(log.feedTypeId, current + log.amount);
+      const feed = feedMapLocal.get(log.feedTypeId);
+      const baselineAt = feed?.stockBaselineAt ?? feed?.updatedAt ?? 0;
+      if (getFeedLogCreatedAt(log) <= baselineAt) {
+        const current = preBaselineRemovals.get(log.feedTypeId) || 0;
+        preBaselineRemovals.set(log.feedTypeId, current + log.amount);
+      }
     });
+
+    const remainingFeedStockLogs = (state.feedStockLogs || []).filter(l => !selectedLogIds.has(l.id));
+    const baseFeeds = (state.feedTypes || []).map(f => {
+      const adjustment = preBaselineRemovals.get(f.id);
+      if (adjustment !== undefined) {
+        const newBaseline = (f.stockBaseline ?? f.totalStock) - adjustment;
+        return { 
+          ...f, 
+          stockBaseline: newBaseline,
+          totalStock: newBaseline,
+          updatedAt: now
+        };
+      }
+      return f;
+    });
+
+    const reconciledFeeds = reconcileFeedTypes(
+      baseFeeds,
+      state.feedingLogs || [],
+      remainingFeedStockLogs
+    );
+
+    const idsToDelete = Array.from(selectedLogIds);
+    const explicitIdsToDelete = idsToDelete.map(id => `explicit:${id}`);
 
     onUpdate({
       ...state,
-      feedStockLogs: (state.feedStockLogs || []).filter(l => !selectedLogIds.has(l.id)),
-      feedTypes: (state.feedTypes || []).map(f => {
-        const adjustment = feedUpdates.get(f.id);
-        if (adjustment !== undefined) {
-          return { 
-            ...f, 
-            totalStock: Math.max(0, f.totalStock - adjustment),
-            updatedAt: Date.now()
-          };
-        }
-        return f;
-      }),
-      deletedIds: [...(state.deletedIds || []), ...Array.from(selectedLogIds)]
+      feedStockLogs: remainingFeedStockLogs,
+      feedTypes: reconciledFeeds,
+      deletedIds: [...(state.deletedIds || []), ...idsToDelete, ...explicitIdsToDelete]
     });
     setSelectedLogIds(new Set());
   };
@@ -2840,9 +2918,10 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
             </thead>
             <tbody className="divide-y divide-slate-100">
               {feedStats.map(feed => {
-                const stockKg = feed.totalStock / 1000;
+                const stockKg = gramsToKg(feed.totalStock);
                 const percentage = feed.maxCapacity > 0 ? (stockKg / feed.maxCapacity) * 100 : 0;
                 const isCritical = percentage <= feed.minStockPercentage;
+                const hasMovements = feed.breakdown.entriesCountAfter > 0 || feed.breakdown.feedingsCountAfter > 0;
                 
                 return (
                   <tr key={feed.id} className="hover:bg-slate-50 transition-colors">
@@ -2850,12 +2929,19 @@ const FeedManagement: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
                         <div className="w-20 bg-slate-100 h-2.5 rounded-full overflow-hidden">
-                          <div className={`h-full transition-all duration-500 ${isCritical ? 'bg-red-500' : 'bg-emerald-500'}`} style={{width: `${Math.min(100, percentage)}%`}} />
+                          <div className={`h-full transition-all duration-500 ${isCritical ? 'bg-red-500' : 'bg-emerald-500'}`} style={{width: `${Math.min(100, Math.max(0, percentage))}%`}} />
                         </div>
                         <span className={`text-[11px] font-black ${isCritical ? 'text-red-600' : 'text-slate-600'}`}>
-                          {formatNumber(stockKg, 1)}kg ({formatNumber(percentage, 0)}%)
+                          {formatNumber(stockKg, 1)}kg ({formatNumber(Math.max(0, percentage), 0)}%)
                         </span>
                       </div>
+                      {hasMovements && (
+                        <div className="text-[9px] font-bold text-slate-400 mt-1">
+                          Base: {formatNumber(feed.breakdown.baselineKg, 1)}kg
+                          {feed.breakdown.entriesAfterKg > 0 && ` | +${formatNumber(feed.breakdown.entriesAfterKg, 1)}kg ent.`}
+                          {feed.breakdown.feedingsAfterKg > 0 && ` | -${formatNumber(feed.breakdown.feedingsAfterKg, 2)}kg tratos`}
+                        </div>
+                      )}
                     </td>
                     <td className="px-6 py-4 text-xs font-bold text-slate-500">{formatNumber(feed.maxCapacity)}kg</td>
                     <td className="px-6 py-4 text-xs font-bold text-slate-500">{formatNumber(feed.minStockPercentage)}%</td>

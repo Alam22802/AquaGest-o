@@ -4,6 +4,13 @@ import { AppState, FeedingLog as IFeedingLog, User } from '../types';
 import { Utensils, Trash2, Edit3, X, ArrowUpDown, Clock, Calendar, AlertTriangle, Eye, CheckCircle2, ArrowRightLeft } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { formatNumber } from '../utils/formatters';
+import {
+  gramsToKg,
+  kgToGrams,
+  parseNumberInput,
+  getFeedLogCreatedAt,
+  reconcileFeedTypes
+} from '../utils/feedStock';
 
 interface Props {
   state: AppState;
@@ -279,11 +286,35 @@ const FeedingLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
 
   const removeSelectedLogs = () => {
     if (!hasPermission || selectedLogIds.size === 0) return;
-    if (!confirm(`Deseja excluir ${selectedLogIds.size} trato(s) selecionado(s) do histórico do lote? Atenção: o saldo de ração NÃO será estornado para o estoque central.`)) return;
+
+    const logsToRemove = (state.feedingLogs || []).filter(l => selectedLogIds.has(l.id));
+    let totalRefundKg = 0;
+    logsToRemove.forEach(l => {
+      if (l.skipStockDeduction) return;
+      const feed = feedMap.get(l.feedTypeId);
+      const baselineAt = feed?.stockBaselineAt ?? feed?.updatedAt ?? 0;
+      if (getFeedLogCreatedAt(l) > baselineAt) {
+        totalRefundKg += gramsToKg(l.amount);
+      }
+    });
+
+    const confirmMsg = totalRefundKg > 0
+      ? `Deseja excluir ${selectedLogIds.size} trato(s) selecionado(s)? O total de ${formatNumber(totalRefundKg, 2)} kg referente aos tratos após o último ajuste será estornado automaticamente ao estoque.`
+      : `Deseja excluir ${selectedLogIds.size} trato(s) antigo(s) selecionado(s) (anteriores ao último ajuste de saldo)? O saldo atual ajustado será mantido.`;
+
+    if (!confirm(confirmMsg)) return;
+
+    const remainingLogs = (state.feedingLogs || []).filter(l => !selectedLogIds.has(l.id));
+    const reconciledFeeds = reconcileFeedTypes(
+      state.feedTypes || [],
+      remainingLogs,
+      state.feedStockLogs || []
+    );
 
     onUpdate({
       ...state,
-      feedingLogs: (state.feedingLogs || []).filter(l => !selectedLogIds.has(l.id)),
+      feedingLogs: remainingLogs,
+      feedTypes: reconciledFeeds,
       deletedIds: [...(state.deletedIds || []), ...Array.from(selectedLogIds)]
     });
     setSelectedLogIds(new Set());
@@ -299,7 +330,7 @@ const FeedingLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
       return;
     }
 
-    const amountNum = Number(formData.amount);
+    const amountNum = parseNumberInput(formData.amount);
     
     const isBulkMode = isBulk && !editingId;
     
@@ -316,15 +347,18 @@ const FeedingLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
     }
 
     if (!formData.feedTypeId || isNaN(amountNum) || amountNum <= 0) {
-      alert('Informe uma quantidade válida.');
+      alert('Informe uma quantidade válida em gramas.');
       return;
     }
 
     const selectedFeed = feedMap.get(formData.feedTypeId);
     if (!selectedFeed) return;
 
+    const now = Date.now();
+
     if (editingId) {
       const targetOriginalLog = originalLog || (state.feedingLogs || []).find(l => l.id === editingId);
+      const preservedCreatedAt = targetOriginalLog ? getFeedLogCreatedAt(targetOriginalLog) || now : now;
 
       const updatedLogs = (state.feedingLogs || []).map(l => 
         l.id === editingId ? {
@@ -334,47 +368,70 @@ const FeedingLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
           feedTypeId: formData.feedTypeId,
           amount: amountNum,
           timestamp: `${formData.date}T${formData.time}:00`,
-          updatedAt: Date.now()
+          createdAt: preservedCreatedAt,
+          updatedAt: now
         } : l
       );
 
-      // Na edição do lançamento de trato:
-      // Se a quantidade diminuir: a diferença retorna ao estoque (+).
-      // Se a quantidade aumentar: o saldo adicional é debitado do estoque (-).
-      // Se o tipo de ração mudar: estorna o valor da ração anterior e debita o valor da nova ração.
-      let updatedFeeds = state.feedTypes || [];
-      if (targetOriginalLog) {
+      // Na edição do lançamento de trato (em gramas, convertido para kg ao abater do estoque):
+      // - Se o trato foi criado APÓS o último ajuste de saldo (`createdAt > stockBaselineAt`),
+      //   reconcileFeedTypes recalcula automaticamente o saldo em kg usando o novo valor.
+      // - Se o trato for anterior ao último ajuste (`createdAt <= stockBaselineAt`),
+      //   ajustamos o baseline com a diferença convertida para kg.
+      let baseFeeds = state.feedTypes || [];
+      if (targetOriginalLog && !targetOriginalLog.skipStockDeduction) {
         const oldFeedId = targetOriginalLog.feedTypeId;
         const newFeedId = formData.feedTypeId;
-        const oldAmount = Number(targetOriginalLog.amount) || 0;
-        const newAmount = amountNum;
+        const oldAmountGrams = Number(targetOriginalLog.amount) || 0;
+        const newAmountGrams = amountNum;
+        const oldAmountKg = gramsToKg(oldAmountGrams);
+        const newAmountKg = gramsToKg(newAmountGrams);
 
-        updatedFeeds = updatedFeeds.map(f => {
-          let stock = f.totalStock;
+        baseFeeds = baseFeeds.map(f => {
+          const baselineAt = f.stockBaselineAt ?? f.updatedAt ?? 0;
+          if (preservedCreatedAt > baselineAt) {
+            return f;
+          }
+
+          let baselineKg = gramsToKg(f.stockBaseline ?? f.totalStock);
           let changed = false;
 
           if (oldFeedId === newFeedId && f.id === newFeedId) {
-            stock = stock + oldAmount - newAmount;
+            baselineKg = baselineKg + oldAmountKg - newAmountKg;
             changed = true;
           } else {
             if (f.id === oldFeedId) {
-              stock = stock + oldAmount;
+              baselineKg = baselineKg + oldAmountKg;
               changed = true;
             }
             if (f.id === newFeedId) {
-              stock = stock - newAmount;
+              baselineKg = baselineKg - newAmountKg;
               changed = true;
             }
           }
 
-          return changed ? { ...f, totalStock: stock, updatedAt: Date.now() } : f;
+          if (!changed) return f;
+          const updatedBaselineGrams = kgToGrams(baselineKg);
+          return {
+            ...f,
+            stockBaseline: updatedBaselineGrams,
+            stockBaselineAt: baselineAt,
+            totalStock: updatedBaselineGrams,
+            updatedAt: now
+          };
         });
       }
+
+      const reconciledFeeds = reconcileFeedTypes(
+        baseFeeds,
+        updatedLogs,
+        state.feedStockLogs || []
+      );
 
       onUpdate({ 
         ...state, 
         feedingLogs: updatedLogs,
-        feedTypes: updatedFeeds 
+        feedTypes: reconciledFeeds 
       });
       setEditingId(null);
     } else {
@@ -384,23 +441,25 @@ const FeedingLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
         cageId,
         batchId: formBatchId || cageMap.get(cageId)?.batchId || '',
         feedTypeId: formData.feedTypeId,
-        amount: amountNum,
+        amount: amountNum, // armazenado em gramas
         timestamp: `${formData.date}T${formData.time}:00`,
         userId: currentUser.id,
-        updatedAt: Date.now()
+        createdAt: now,
+        updatedAt: now
       }));
 
-      const totalDeduction = amountNum * cagesToProcess.length;
-
-      const updatedFeeds = (state.feedTypes || []).map(f => {
-        if (f.id === formData.feedTypeId) return { ...f, totalStock: f.totalStock - totalDeduction, updatedAt: Date.now() };
-        return f;
-      });
+      const updatedLogs = [...newLogs, ...(state.feedingLogs || [])];
+      // Reconcilia o estoque convertendo cada trato diário (gramas -> kg: / 1000) a partir do baseline em kg
+      const reconciledFeeds = reconcileFeedTypes(
+        state.feedTypes || [],
+        updatedLogs,
+        state.feedStockLogs || []
+      );
 
       onUpdate({ 
         ...state, 
-        feedingLogs: [...newLogs, ...(state.feedingLogs || [])], 
-        feedTypes: updatedFeeds 
+        feedingLogs: updatedLogs, 
+        feedTypes: reconciledFeeds 
       });
     }
     resetForm();
@@ -448,13 +507,31 @@ const FeedingLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
 
   const removeLog = (logId: string) => {
     if (!hasPermission) return;
-    if (!confirm('Deseja excluir este trato do histórico do lote? Atenção: o saldo de ração NÃO será estornado para o estoque central.')) return;
     const log = (state.feedingLogs || []).find(l => l.id === logId);
     if (!log) return;
+
+    const feed = feedMap.get(log.feedTypeId);
+    const baselineAt = feed?.stockBaselineAt ?? feed?.updatedAt ?? 0;
+    const willRefund = !log.skipStockDeduction && getFeedLogCreatedAt(log) > baselineAt;
+    const amountKg = gramsToKg(log.amount);
+
+    const confirmMsg = willRefund
+      ? `Deseja excluir este trato? O saldo de ${formatNumber(amountKg, 2)} kg será estornado automaticamente para o estoque.`
+      : 'Deseja excluir este trato antigo (anterior ao último ajuste de saldo)? O saldo atual ajustado será mantido.';
+
+    if (!confirm(confirmMsg)) return;
     
+    const remainingLogs = (state.feedingLogs || []).filter(l => l.id !== logId);
+    const reconciledFeeds = reconcileFeedTypes(
+      state.feedTypes || [],
+      remainingLogs,
+      state.feedStockLogs || []
+    );
+
     onUpdate({ 
       ...state, 
-      feedingLogs: (state.feedingLogs || []).filter(l => l.id !== logId), 
+      feedingLogs: remainingLogs,
+      feedTypes: reconciledFeeds,
       deletedIds: [...(state.deletedIds || []), logId]
     });
   };
@@ -575,9 +652,28 @@ const FeedingLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                 <option value="">Tipo de Ração...</option>
                 {(state.feedTypes || []).map(ft => <option key={ft.id} value={ft.id}>{ft.name} (Saldo: {formatNumber(ft.totalStock/1000, 1)}kg)</option>)}
               </select>
-              <div className="relative">
-                <input type="number" required placeholder="Quantidade (gramas)" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none" value={formData.amount} onChange={e => setFormData({...formData, amount: e.target.value})} />
-                <div className="absolute right-4 top-1/2 -translate-y-1/2 text-[11px] font-black text-slate-300 uppercase">GRAMAS</div>
+              <div className="space-y-1.5">
+                <div className="relative">
+                  <input type="number" step="any" min="0.01" required placeholder="Quantidade (gramas)" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none pr-20" value={formData.amount} onChange={e => setFormData({...formData, amount: e.target.value})} />
+                  <div className="absolute right-4 top-1/2 -translate-y-1/2 text-[11px] font-black text-slate-400 uppercase">GRAMAS</div>
+                </div>
+                {(() => {
+                  const g = parseNumberInput(formData.amount);
+                  if (g <= 0) return null;
+                  const kgPerCage = gramsToKg(g);
+                  const cageCount = isBulk && !editingId ? selectedCageIds.size : 1;
+                  const totalKg = kgPerCage * cageCount;
+                  return (
+                    <div className="px-3 py-2 bg-blue-50/80 border border-blue-100 rounded-xl text-[10px] font-bold text-blue-800 flex items-center justify-between">
+                      <span>Conversão p/ estoque (g → kg):</span>
+                      <span className="font-black">
+                        {isBulk && !editingId && cageCount > 1
+                          ? `${formatNumber(kgPerCage, 3)} kg × ${cageCount} gaiolas = ${formatNumber(totalKg, 3)} kg`
+                          : `${formatNumber(g, 0)} g = ${formatNumber(kgPerCage, 3)} kg`}
+                      </span>
+                    </div>
+                  );
+                })()}
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <input type="date" required className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none" value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} />
@@ -623,9 +719,9 @@ const FeedingLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
           <div className="text-[10px] text-blue-900 leading-relaxed">
             <div className="uppercase tracking-wider font-black mb-1.5 text-blue-800">Regras de Estoque no Trato Diário:</div>
             <ul className="space-y-1 font-medium list-disc pl-3.5 text-blue-900/90">
-              <li><strong>Novo lançamento:</strong> O saldo lançado é debitado automaticamente do estoque de ração.</li>
-              <li><strong>Edição de lançamento:</strong> O estoque é recalculado com a diferença (se diminuir, o saldo retorna ao estoque; se aumentar, a diferença é debitada).</li>
-              <li><strong>Exclusão de lançamento:</strong> O saldo lançado não é estornado para o estoque central.</li>
+              <li><strong>Conversão automática (g → kg):</strong> Os tratos lançados em gramas são convertidos para quilogramas (÷ 1.000) ao abater do saldo de estoque.</li>
+              <li><strong>Edição de lançamento:</strong> O estoque é recalculado com a diferença em kg (se diminuir, retorna ao estoque; se aumentar, a diferença é debitada).</li>
+              <li><strong>Exclusão de lançamento:</strong> Tratos lançados após o último ajuste têm o saldo em kg estornado automaticamente para o estoque.</li>
             </ul>
           </div>
         </div>
@@ -837,7 +933,10 @@ const FeedingLog: React.FC<Props> = ({ state, onUpdate, currentUser }) => {
                       <div className="flex items-center gap-1"><Calendar className="w-3 h-3 opacity-30" /> {format(parseISO(log.timestamp), 'dd/MM/yyyy')}</div>
                       <div className="flex items-center gap-1"><Clock className="w-3 h-3 opacity-30" /> {format(parseISO(log.timestamp), 'HH:mm')}</div>
                     </td>
-                    <td className="px-6 py-4 font-black text-slate-700">{formatNumber(log.amount)}g</td>
+                    <td className="px-6 py-4">
+                      <div className="font-black text-slate-700">{formatNumber(log.amount)}g</div>
+                      <div className="text-[10px] font-bold text-slate-400">({formatNumber(gramsToKg(log.amount), 2)} kg)</div>
+                    </td>
                     <td className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase">{user ? `@${user.username}` : 'Usuário Excluído'}</td>
                     {hasPermission && (
                       <td className="px-6 py-4 text-center">
